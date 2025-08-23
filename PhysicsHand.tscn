@@ -120,7 +120,7 @@ mass = 4.0
 [node name="leftControllerTarget XRController3D" type="XRController3D" parent="RigidBody3D2/XROrigin3D"]
 tracker = &"left_hand"
 
-[node name="MeshInstance3D2" type="MeshInstance3D" parent="RigidBody3D2/XROrigin3D/leftControllerTarget XRController3D"]
+[node name="leftmesh" type="MeshInstance3D" parent="RigidBody3D2/XROrigin3D/leftControllerTarget XRController3D"]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
 mesh = SubResource("BoxMesh_a73qe")
 skeleton = NodePath("../../../../physicsHandRight/CollisionShape3D")
