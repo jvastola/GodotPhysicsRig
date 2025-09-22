@@ -14,6 +14,7 @@ extends RigidBody3D
 @export_group("Springs")
 @export var climb_force := 2500.0
 @export var climb_drag := 50.0
+@export var drag_max_velocity := 10.0
 
 
 var _previous_position: Vector3
@@ -84,24 +85,26 @@ func _pid_rotation(delta: float) -> void:
 func _hookes_law() -> void:
 	if not is_instance_valid(player_rigidbody): return
 
+	# Calculate the climbing force. This is a spring-like force that pulls the player up.
 	var displacement := global_position - target.global_position
 	var force := displacement * climb_force
-	var drag := _get_drag(get_physics_process_delta_time())
-	player_rigidbody.apply_central_force(force * mass)
 	
+	# Get the drag multiplier. This is high when the hand is still and low when it's moving.
+	var drag := _get_drag(get_physics_process_delta_time())
+	# Calculate the drag force. This slows the player down when they are holding on to a surface.
 	var drag_force: Vector3 = drag * -player_rigidbody.linear_velocity * climb_drag
-	player_rigidbody.apply_central_force(drag_force * mass)
+
+	# Apply the combined climbing and drag forces to the player.
+	player_rigidbody.apply_central_force(force + drag_force)
 	
 func _get_drag(delta: float) -> float:
 	var hand_velocity := (global_position - _previous_position) / delta
 	_previous_position = global_position
 
-	if hand_velocity.is_zero_approx():
+	if drag_max_velocity <= 0.0:
 		return 1.0
 
-	var drag := 1.0 / (hand_velocity.length() + 0.01)
-	if drag >1: drag= 1
-	if drag < .03: drag= .03
+	var drag := 1.0 - clamp(hand_velocity.length() / drag_max_velocity, 0.0, 1.0)
 	return drag
 
 
