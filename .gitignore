@@ -15,11 +15,19 @@ mono_crash.*.json
 *.fos
 *.pck
 *.zip
-*.vscode/
 icon.svg.import
 editor_data/
 bin/
-.godot/
 logs/
 user://
-godot-mcp-server/package-lock.json
+
+# MCP Server dependencies
+godot-mcp-server/node_modules/
+godot-mcp-server/build/
+godot-mcp-server/*.log
+
+# Keep MCP server source
+!godot-mcp-server/src/
+!godot-mcp-server/package.json
+!godot-mcp-server/tsconfig.json
+!godot-mcp-server/README.md
