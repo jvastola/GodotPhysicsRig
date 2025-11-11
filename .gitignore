@@ -22,12 +22,4 @@ logs/
 user://
 
 # MCP Server dependencies
-godot-mcp-server/node_modules/
-godot-mcp-server/build/
-godot-mcp-server/*.log
-
-# Keep MCP server source
-!godot-mcp-server/src/
-!godot-mcp-server/package.json
-!godot-mcp-server/tsconfig.json
-!godot-mcp-server/README.md
+godot-mcp-server/
