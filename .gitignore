@@ -22,3 +22,4 @@ bin/
 .godot/
 logs/
 user://
+godot-mcp-server/package-lock.json
