@@ -1,0 +1,51 @@
+[gd_scene load_steps=6 format=3 uid="uid://cyi0m4x7nswyk"]
+
+[ext_resource type="Script" uid="uid://kj2sngpay0sa" path="res://portal.gd" id="1_portal"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_portal"]
+transparency = 1
+albedo_color = Color(0.3, 0.6, 1, 0.5)
+emission_enabled = true
+emission = Color(0.3, 0.6, 1, 1)
+emission_energy_multiplier = 2.0
+
+[sub_resource type="BoxMesh" id="BoxMesh_portal"]
+material = SubResource("StandardMaterial3D_portal")
+size = Vector3(2, 3, 0.2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_portal"]
+size = Vector3(2, 3, 0.5)
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_portal"]
+particle_flag_align_y = true
+emission_shape = 3
+emission_box_extents = Vector3(1, 1.5, 0.1)
+direction = Vector3(0, 0, 1)
+spread = 10.0
+initial_velocity_min = 0.5
+initial_velocity_max = 1.5
+gravity = Vector3(0, 0, 0)
+scale_min = 0.05
+scale_max = 0.15
+
+[node name="Portal" type="Area3D"]
+collision_layer = 8
+collision_mask = 2
+script = ExtResource("1_portal")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_portal")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_portal")
+
+[node name="GPUParticles3D" type="GPUParticles3D" parent="."]
+amount = 50
+lifetime = 2.0
+process_material = SubResource("ParticleProcessMaterial_portal")
+draw_pass_1 = SubResource("BoxMesh_portal")
+
+[node name="PortalLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)
+text = "Portal"
+outline_size = 8

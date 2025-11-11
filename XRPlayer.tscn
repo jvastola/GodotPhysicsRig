@@ -1,0 +1,70 @@
+[gd_scene load_steps=7 format=3 uid="uid://cpq6v7yqk8y8j"]
+
+[ext_resource type="Script" uid="uid://02kpb1kqm303" path="res://xr_player.gd" id="1_player"]
+[ext_resource type="Script" uid="uid://3ir0c0htxlqh" path="res://xr_origin_3d.gd" id="2_xr_origin"]
+[ext_resource type="Script" uid="uid://der68q68jhigr" path="res://physics_hand.gd" id="3_physics_hand"]
+[ext_resource type="Script" uid="uid://b8jtkbbgoxbge" path="res://desktop_controller.gd" id="4_desktop"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_player"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_player"]
+
+[node name="XRPlayer" type="RigidBody3D" groups=["player"]]
+collision_layer = 2
+axis_lock_angular_x = true
+axis_lock_angular_y = true
+axis_lock_angular_z = true
+mass = 2.0
+script = ExtResource("1_player")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_player")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("SphereMesh_player")
+
+[node name="XROrigin3D" type="XROrigin3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.7, 0)
+script = ExtResource("2_xr_origin")
+
+[node name="XRCamera3D" type="XRCamera3D" parent="XROrigin3D"]
+
+[node name="LeftController" type="XRController3D" parent="XROrigin3D"]
+tracker = &"left_hand"
+
+[node name="RightController" type="XRController3D" parent="XROrigin3D"]
+tracker = &"right_hand"
+
+[node name="DesktopCamera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+
+[node name="DesktopController" type="Node" parent="."]
+script = ExtResource("4_desktop")
+
+[node name="PhysicsHandLeft" type="RigidBody3D" parent="." node_paths=PackedStringArray("player_rigidbody", "target")]
+collision_layer = 4
+gravity_scale = 0.0
+center_of_mass_mode = 1
+contact_monitor = true
+max_contacts_reported = 8
+script = ExtResource("3_physics_hand")
+player_rigidbody = NodePath("..")
+target = NodePath("../XROrigin3D/LeftController")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PhysicsHandLeft"]
+transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
+shape = SubResource("SphereShape3D_player")
+
+[node name="PhysicsHandRight" type="RigidBody3D" parent="." node_paths=PackedStringArray("player_rigidbody", "target")]
+collision_layer = 4
+gravity_scale = 0.0
+center_of_mass_mode = 1
+contact_monitor = true
+max_contacts_reported = 8
+script = ExtResource("3_physics_hand")
+player_rigidbody = NodePath("..")
+target = NodePath("../XROrigin3D/RightController")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PhysicsHandRight"]
+transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
+shape = SubResource("SphereShape3D_player")

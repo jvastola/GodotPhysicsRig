@@ -1,0 +1,121 @@
+[gd_scene load_steps=13 format=3 uid="uid://dtvg5mcsdmt1f"]
+
+[ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://Portal.tscn" id="2_portal"]
+[ext_resource type="Script" uid="uid://exskxheotyxj" path="res://grabbable.gd" id="3_grabbable"]
+
+[sub_resource type="Environment" id="Environment_second"]
+background_mode = 1
+background_color = Color(0.2, 0.3, 0.4, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_floor2"]
+size = Vector3(15, 1, 15)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor2"]
+albedo_color = Color(0.6, 0.4, 0.3, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_floor2"]
+material = SubResource("StandardMaterial3D_floor2")
+size = Vector3(15, 1, 15)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_cube"]
+size = Vector3(0.3, 0.3, 0.3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cube"]
+albedo_color = Color(0.8, 0.2, 0.2, 1)
+metallic = 0.5
+roughness = 0.3
+
+[sub_resource type="BoxMesh" id="BoxMesh_cube"]
+material = SubResource("StandardMaterial3D_cube")
+size = Vector3(0.3, 0.3, 0.3)
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_ball"]
+radius = 0.15
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ball"]
+albedo_color = Color(0.2, 0.6, 0.9, 1)
+metallic = 0.3
+roughness = 0.2
+
+[sub_resource type="SphereMesh" id="SphereMesh_ball"]
+material = SubResource("StandardMaterial3D_ball")
+radius = 0.15
+height = 0.3
+
+[node name="SecondRoom" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_second")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866023, -0.433016, 0.250001, 0, 0.499998, 0.866027, -0.500003, -0.749999, 0.43301, 0, 5, 0)
+light_color = Color(1, 0.9, 0.8, 1)
+shadow_enabled = true
+
+[node name="Floor" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+shape = SubResource("BoxShape3D_floor2")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
+mesh = SubResource("BoxMesh_floor2")
+
+[node name="SpawnPoint" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+
+[node name="PortalBack" parent="." instance=ExtResource("2_portal")]
+transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 1.5, 5)
+target_scene = "res://MainScene.tscn"
+portal_color = Color(1, 0.6, 0.3, 0.5)
+
+[node name="PortalLabel" parent="PortalBack" index="3"]
+text = "Return"
+
+[node name="WelcomeLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+text = "Second Room!"
+font_size = 64
+outline_size = 16
+
+[node name="GrabbableCube" type="RigidBody3D" parent="." groups=["grabbable"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1.5, 0)
+mass = 0.5
+contact_monitor = true
+max_contacts_reported = 4
+script = ExtResource("3_grabbable")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GrabbableCube"]
+shape = SubResource("BoxShape3D_cube")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="GrabbableCube"]
+mesh = SubResource("BoxMesh_cube")
+
+[node name="Label3D" type="Label3D" parent="GrabbableCube"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+text = "Anchor Grab"
+font_size = 24
+outline_size = 8
+
+[node name="GrabbableBall" type="RigidBody3D" parent="." groups=["grabbable"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1.5, 0)
+mass = 0.3
+contact_monitor = true
+max_contacts_reported = 4
+script = ExtResource("3_grabbable")
+grab_mode = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GrabbableBall"]
+shape = SubResource("SphereShape3D_ball")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="GrabbableBall"]
+mesh = SubResource("SphereMesh_ball")
+
+[node name="Label3D" type="Label3D" parent="GrabbableBall"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+text = "Free Grab"
+font_size = 24
+outline_size = 8
+
+[editable path="PortalBack"]

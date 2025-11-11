@@ -3,11 +3,13 @@ extends Node3D
 signal focus_lost
 signal focus_gained
 signal pose_recentered
+signal vr_mode_active(is_active: bool)
 
 @export var maximum_refresh_rate : int = 90
 
 var xr_interface : OpenXRInterface
 var xr_is_focussed = false
+var is_vr_mode := false
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
@@ -34,9 +36,14 @@ func _ready():
 		xr_interface.session_focussed.connect(_on_openxr_focused_state)
 		xr_interface.session_stopping.connect(_on_openxr_stopping)
 		xr_interface.pose_recentered.connect(_on_openxr_pose_recentered)
+		
+		is_vr_mode = true
+		emit_signal("vr_mode_active", true)
 	else:
 		# We couldn't start OpenXR - continue in desktop mode for development
 		print("OpenXR not instantiated! Running in desktop mode.")
+		is_vr_mode = false
+		emit_signal("vr_mode_active", false)
 
 # Handle OpenXR session ready
 func _on_openxr_session_begun() -> void:

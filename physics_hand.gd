@@ -19,10 +19,20 @@ extends RigidBody3D
 @export var max_spring_force := 2000.0  # ✅ new: clamp for spring impulse
 @export var max_player_velocity := 8.0   # ✅ new: velocity cap to limit bounce
 
+@export_group("Grabbing")
+@export var controller_name: String = "left_hand"  # "left_hand" or "right_hand"
+@export var grab_action_trigger: String = "trigger"  # Trigger to grab
+@export var grab_action_grip: String = "grip"  # Grip to grab
+@export var release_button: String = "by_button"  # Button to release
+
 
 var _previous_position: Vector3
 
 var _is_colliding: bool = false
+
+# Grabbing state
+var held_object: RigidBody3D = null
+var nearby_grabbables: Array[RigidBody3D] = []
 
 
 func _ready() -> void:
@@ -37,6 +47,16 @@ func _ready() -> void:
 	#set_center_of_mass_mode(RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM)
 	#set_center_of_mass(Vector3.ZERO)
 	
+	# Set up controller actions
+	if controller_name == "left_hand":
+		grab_action_trigger = "trigger_click"
+		grab_action_grip = "grip_click"
+		release_button = "by_button"
+	else:
+		grab_action_trigger = "trigger_click"
+		grab_action_grip = "grip_click"
+		release_button = "by_button"
+	
 
 
 func _physics_process(delta: float) -> void:
@@ -47,6 +67,8 @@ func _physics_process(delta: float) -> void:
 	
 	if _is_colliding:
 		_hookes_law()
+	
+	_handle_grab_input()
 
 
 func _pid_movement(delta: float) -> void:
@@ -151,8 +173,78 @@ func _get_drag(delta: float) -> float:
 
 func _on_body_entered(_body: Node) -> void:
 	_is_colliding = true
+	
+	# Track grabbable objects
+	if _body.is_in_group("grabbable") and _body is RigidBody3D:
+		if not nearby_grabbables.has(_body):
+			nearby_grabbables.append(_body)
+			print("PhysicsHand: Grabbable nearby - ", _body.name)
 
 func _on_body_exited(_body: Node) -> void:
 	# This is slightly more robust than the original. It checks if we are still
 	# colliding with other objects before setting _is_colliding to false.
 	_is_colliding = false
+	
+	# Remove from nearby grabbables
+	if _body in nearby_grabbables:
+		nearby_grabbables.erase(_body)
+
+
+func _handle_grab_input() -> void:
+	"""Handle grab and release input from VR controllers"""
+	if not is_instance_valid(target) or not target is XRController3D:
+		return
+	
+	var controller = target as XRController3D
+	
+	# Try to grab if trigger or grip pressed
+	if held_object == null:
+		var trigger_pressed = controller.get_float("trigger") > 0.5
+		var grip_pressed = controller.get_float("grip") > 0.5
+		
+		if trigger_pressed or grip_pressed:
+			_try_grab_nearest()
+	
+	# Release if release button pressed or grip/trigger released
+	else:
+		var trigger_value = controller.get_float("trigger")
+		var grip_value = controller.get_float("grip")
+		var release_pressed = controller.is_button_pressed("by_button") if controller_name == "right_hand" else controller.is_button_pressed("by_button")
+		
+		# Release if button pressed or both trigger and grip released
+		if release_pressed or (trigger_value < 0.3 and grip_value < 0.3):
+			_release_object()
+
+
+func _try_grab_nearest() -> void:
+	"""Try to grab the nearest grabbable object"""
+	if nearby_grabbables.is_empty():
+		return
+	
+	# Find closest grabbable
+	var closest: RigidBody3D = null
+	var closest_dist := INF
+	
+	for grabbable in nearby_grabbables:
+		if not is_instance_valid(grabbable):
+			continue
+		
+		var dist = global_position.distance_to(grabbable.global_position)
+		if dist < closest_dist:
+			closest_dist = dist
+			closest = grabbable
+	
+	if closest and closest.has_method("try_grab"):
+		if closest.try_grab(self):
+			held_object = closest
+			print("PhysicsHand: Grabbed ", held_object.name)
+
+
+func _release_object() -> void:
+	"""Release the currently held object"""
+	if held_object and is_instance_valid(held_object):
+		if held_object.has_method("release"):
+			held_object.release()
+			print("PhysicsHand: Released ", held_object.name)
+	
+	held_object = null
