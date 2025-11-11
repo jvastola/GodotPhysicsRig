@@ -149,10 +149,10 @@ func _get_drag(delta: float) -> float:
 	return drag
 
 
-func _on_body_entered(body: Node) -> void:
+func _on_body_entered(_body: Node) -> void:
 	_is_colliding = true
 
-func _on_body_exited(body: Node) -> void:
+func _on_body_exited(_body: Node) -> void:
 	# This is slightly more robust than the original. It checks if we are still
 	# colliding with other objects before setting _is_colliding to false.
 	_is_colliding = false

@@ -107,7 +107,7 @@ mesh = SubResource("BoxMesh_a73qe")
 skeleton = NodePath("../CollisionShape3D")
 
 [node name="RigidBody3D2" type="RigidBody3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.0384223, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.03842, 0)
 collision_layer = 2
 axis_lock_angular_x = true
 axis_lock_angular_y = true
@@ -155,5 +155,5 @@ shape = SubResource("SphereShape3D_n1xam")
 mesh = SubResource("SphereMesh_n1xam")
 
 [node name="RigidBody3D" type="RigidBody3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9250599, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.92506, 0, 0)
 visible = false

@@ -35,9 +35,8 @@ func _ready():
 		xr_interface.session_stopping.connect(_on_openxr_stopping)
 		xr_interface.pose_recentered.connect(_on_openxr_pose_recentered)
 	else:
-		# We couldn't start OpenXR.
-		print("OpenXR not instantiated!")
-		get_tree().quit()
+		# We couldn't start OpenXR - continue in desktop mode for development
+		print("OpenXR not instantiated! Running in desktop mode.")
 
 # Handle OpenXR session ready
 func _on_openxr_session_begun() -> void:
