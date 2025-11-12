@@ -1,6 +1,6 @@
 [gd_scene load_steps=7 format=3 uid="uid://b2gkx1eim00mw"]
 
-[ext_resource type="Script" uid="uid://d20mjy3mr3gyp" path="res://ui_viewport_3d.gd" id="1_ui_script"]
+[ext_resource type="Script" path="res://ui_viewport_3d.gd" id="1_ui_script"]
 [ext_resource type="PackedScene" uid="uid://buvibmbg15qul" path="res://UIPanel.tscn" id="2_ui_panel"]
 
 [sub_resource type="ViewportTexture" id="ViewportTexture_ui"]
@@ -22,7 +22,8 @@ size = Vector3(2, 2, 0.01)
 script = ExtResource("1_ui_script")
 
 [node name="SubViewport" type="SubViewport" parent="."]
-render_target_update_mode = 1
+transparent_bg = true
+render_target_update_mode = 4
 
 [node name="UIPanel" parent="SubViewport" instance=ExtResource("2_ui_panel")]
 

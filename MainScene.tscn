@@ -1,10 +1,11 @@
-[gd_scene load_steps=10 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=15 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://Portal.tscn" id="2_portal"]
 [ext_resource type="Script" uid="uid://crqnjrrq5qvuw" path="res://subdivided_cube.gd" id="3_cube"]
 [ext_resource type="Script" uid="uid://ct42jl8bcsjkj" path="res://floor_interactable.gd" id="4_floor_script"]
 [ext_resource type="PackedScene" uid="uid://b2gkx1eim00mw" path="res://UIViewport3D.tscn" id="5_ui_viewport"]
+[ext_resource type="Shader" uid="uid://chjyjc8300le1" path="res://red_sphere_layered.gdshader" id="6_red_shader"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -17,6 +18,26 @@ albedo_color = Color(0.322343, 0.283225, 0.582868, 1)
 [sub_resource type="BoxMesh" id="BoxMesh_floor"]
 material = SubResource("StandardMaterial3D_floor")
 size = Vector3(20, 1, 20)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_blue_cube"]
+albedo_color = Color(0, 0, 1, 1)
+roughness = 0.5
+
+[sub_resource type="BoxMesh" id="BoxMesh_blue_cube"]
+material = SubResource("StandardMaterial3D_blue_cube")
+size = Vector3(0.5, 0.5, 0.5)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_red_sphere"]
+render_priority = 1
+shader = ExtResource("6_red_shader")
+shader_parameter/albedo_color = Color(1, 0, 0, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_red_sphere"]
+material = SubResource("ShaderMaterial_red_sphere")
+radius = 0.25
+height = 0.5
+radial_segments = 32
+rings = 16
 
 [node name="MainScene" type="Node3D"]
 
@@ -62,3 +83,12 @@ target_scene = "res://SecondRoom.tscn"
 
 [node name="UIViewport3D" parent="." instance=ExtResource("5_ui_viewport")]
 transform = Transform3D(1.00696, 0, 0, 0, 1.00696, 0, 0, 0, 1.00696, 0, 1, -2)
+
+[node name="BlueCube" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0383402, 1, -2.50433)
+mesh = SubResource("BoxMesh_blue_cube")
+
+[node name="RedSphere" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1, -2.5)
+layers = 3
+mesh = SubResource("SphereMesh_red_sphere")
