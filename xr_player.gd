@@ -28,6 +28,8 @@ enum TurnMode { SNAP, SMOOTH }
 # Turning state
 var can_snap_turn := true
 var snap_turn_timer := 0.0
+var _pending_snap_angle := 0.0
+var _smooth_input := 0.0
 
 
 func _ready() -> void:
@@ -41,6 +43,27 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if is_vr_mode:
 		_handle_turning(delta)
+
+
+func _physics_process(delta: float) -> void:
+	# Apply any pending rotation to the physics body during the physics step
+	if player_body:
+		# Apply snap rotation if pending
+		if abs(_pending_snap_angle) > 0.001:
+			var lv = player_body.linear_velocity
+			var av = player_body.angular_velocity
+			player_body.rotate_y(deg_to_rad(_pending_snap_angle))
+			# restore linear velocity so rotation doesn't alter falling
+			player_body.linear_velocity = lv
+			# clear pending
+			_pending_snap_angle = 0.0
+
+		# Apply smooth rotation based on input
+		if abs(_smooth_input) > 0.001:
+			var turn_amount = -_smooth_input * smooth_turn_speed * delta
+			var lv2 = player_body.linear_velocity
+			player_body.rotate_y(deg_to_rad(turn_amount))
+			player_body.linear_velocity = lv2
 
 
 func _check_initial_mode() -> void:
@@ -156,6 +179,8 @@ func _handle_turning(delta: float) -> void:
 		# Reset snap turn when thumbstick returns to center
 		if turn_mode == TurnMode.SNAP and snap_turn_timer <= 0:
 			can_snap_turn = true
+		# Clear smooth input when centered
+		_smooth_input = 0.0
 
 
 func _handle_snap_turn(input: float) -> void:
@@ -166,24 +191,18 @@ func _handle_snap_turn(input: float) -> void:
 	# Determine turn direction
 	# Invert sign so pushing the thumbstick right (positive x) turns right
 	var turn_angle = -snap_turn_angle if input > 0 else snap_turn_angle
-	
-	# Rotate the player body around Y axis
-	if player_body:
-		player_body.rotate_y(deg_to_rad(turn_angle))
-	
+
+	# Queue the snap rotation to be applied in physics step
+	_pending_snap_angle = turn_angle
+
 	# Start cooldown
 	can_snap_turn = false
 	snap_turn_timer = snap_turn_cooldown
-	
-	print("XRPlayer: Snap turn ", turn_angle, " degrees")
+
+	print("XRPlayer: Queued snap turn ", turn_angle, " degrees")
 
 
 func _handle_smooth_turn(input: float, delta: float) -> void:
 	"""Handle smooth turning"""
-	# Calculate rotation amount based on input and speed
-	# Invert sign so pushing the thumbstick right (positive x) rotates right
-	var turn_amount = -input * smooth_turn_speed * delta
-	
-	# Rotate the player body around Y axis
-	if player_body:
-		player_body.rotate_y(deg_to_rad(turn_amount))
+	# Store smooth input for physics step to apply
+	_smooth_input = input

@@ -16,6 +16,7 @@
 [node name="XRPlayer" type="Node3D"]
 script = ExtResource("1_player")
 turn_mode = 1
+smooth_turn_speed = 180.0
 
 [node name="PlayerBody" type="RigidBody3D" parent="." groups=["player"]]
 collision_layer = 2
@@ -42,7 +43,6 @@ tracker = &"left_hand"
 
 [node name="LeftHandMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController"]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
-visible = false
 mesh = SubResource("BoxMesh_hand")
 
 [node name="RightController" type="XRController3D" parent="PlayerBody/XROrigin3D"]
@@ -50,7 +50,6 @@ tracker = &"right_hand"
 
 [node name="RightHandMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/RightController"]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
-visible = false
 mesh = SubResource("BoxMesh_hand")
 
 [node name="DesktopCamera" type="Camera3D" parent="PlayerBody"]
