@@ -113,6 +113,7 @@ mesh = SubResource("SphereMesh_watch_hit")
 [node name="HandPointer" type="Node3D" parent="PlayerBody/XROrigin3D/LeftController"]
 script = ExtResource("6_pointer")
 ray_length = 1.5
+pointer_color = Color(0.568627, 1, 1, 1)
 
 [node name="PointerFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.07)
