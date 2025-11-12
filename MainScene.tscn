@@ -1,7 +1,8 @@
-[gd_scene load_steps=7 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=8 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://Portal.tscn" id="2_portal"]
+[ext_resource type="Script" uid="uid://crqnjrrq5qvuw" path="res://subdivided_cube.gd" id="3_cube"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -36,6 +37,16 @@ mesh = SubResource("BoxMesh_floor")
 
 [node name="SpawnPoint" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+
+[node name="ColorCube" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -2)
+cast_shadow = 0
+script = ExtResource("3_cube")
+size = Vector3(0.25, 0.25, 0.25)
+subdivisions = 8
+seed = 12345
+material_unshaded = true
+flip_winding = true
 
 [node name="XRPlayer" parent="." instance=ExtResource("1_xrplayer")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)

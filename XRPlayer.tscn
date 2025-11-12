@@ -84,6 +84,8 @@ transform = Transform3D(0.820421, -0.571759, 0, 0.571759, 0.820421, 0, 0, 0, 1, 
 script = ExtResource("5_watch")
 rotation_axis_local = Vector3(0, 1, 0)
 ray_length = 1.0
+show_line = false
+show_hitpoint = false
 
 [node name="WatchFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch"]
 cast_shadow = 0
@@ -98,6 +100,7 @@ mesh = SubResource("BoxMesh_watch_needle")
 [node name="RayCast" type="RayCast3D" parent="PlayerBody/XROrigin3D/LeftController/Watch"]
 target_position = Vector3(0, 1, 0)
 collision_mask = 2
+hit_from_inside = true
 
 [node name="RayVisual" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch"]
 material_override = SubResource("StandardMaterial3D_ray")
@@ -119,6 +122,7 @@ mesh = SubResource("QuadMesh_pointer_face")
 
 [node name="PointerRayCast" type="RayCast3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer"]
 target_position = Vector3(0, 0, -3.5)
+hit_from_inside = true
 
 [node name="PointerRayVisual" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer"]
 cast_shadow = 0
