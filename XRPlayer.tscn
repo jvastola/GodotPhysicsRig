@@ -1,11 +1,12 @@
-[gd_scene load_steps=18 format=3 uid="uid://cpq6v7yqk8y8j"]
+[gd_scene load_steps=19 format=3 uid="uid://cpq6v7yqk8y8j"]
 
 [ext_resource type="Script" uid="uid://02kpb1kqm303" path="res://xr_player.gd" id="1_player"]
 [ext_resource type="Script" uid="uid://3ir0c0htxlqh" path="res://xr_origin_3d.gd" id="2_xr_origin"]
 [ext_resource type="Script" uid="uid://der68q68jhigr" path="res://physics_hand.gd" id="3_physics_hand"]
 [ext_resource type="Script" uid="uid://b8jtkbbgoxbge" path="res://desktop_controller.gd" id="4_desktop"]
-[ext_resource type="Script" path="res://watch_compass.gd" id="5_watch"]
-[ext_resource type="Script" path="res://hand_pointer.gd" id="6_pointer"]
+[ext_resource type="Script" uid="uid://chk4ixs7ag67p" path="res://watch_compass.gd" id="5_watch"]
+[ext_resource type="Script" uid="uid://u2otyj4gjtl2" path="res://hand_pointer.gd" id="6_pointer"]
+[ext_resource type="PackedScene" uid="uid://b2gkx1eim00mw" path="res://UIViewport3D.tscn" id="7_ui_viewport"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_s7h6x"]
 radius = 0.2
@@ -80,12 +81,15 @@ cast_shadow = 0
 mesh = SubResource("BoxMesh_hand")
 
 [node name="Watch" type="Node3D" parent="PlayerBody/XROrigin3D/LeftController"]
-transform = Transform3D(0.820421, -0.571759, 0, 0.571759, 0.820421, 0, 0, 0, 1, -0.0622383, 0.0441848, 0)
+transform = Transform3D(-2.94803e-08, -0.738337, 0.674431, -3.22737e-08, 0.674431, 0.738338, -0.999999, -2.12286e-22, -4.37114e-08, -0.0622383, 0.0441848, 0)
 script = ExtResource("5_watch")
 rotation_axis_local = Vector3(0, 1, 0)
 ray_length = 1.0
 show_line = false
 show_hitpoint = false
+
+[node name="UIViewportWatch" parent="PlayerBody/XROrigin3D/LeftController/Watch" instance=ExtResource("7_ui_viewport")]
+transform = Transform3D(0.0999999, 7.00354e-10, 9.78694e-10, -1.19201e-09, 0.0464455, 0.0885596, 1.65669e-10, -0.0885596, 0.0464455, 1.36133e-10, 0.058575, -0.118114)
 
 [node name="WatchFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch"]
 cast_shadow = 0
@@ -114,6 +118,8 @@ mesh = SubResource("SphereMesh_watch_hit")
 script = ExtResource("6_pointer")
 ray_length = 1.5
 pointer_color = Color(0.568627, 1, 1, 1)
+hit_min_scale = 0.2
+hit_max_scale = 1.0
 
 [node name="PointerFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.07)
@@ -143,6 +149,8 @@ mesh = SubResource("BoxMesh_hand")
 [node name="HandPointer" type="Node3D" parent="PlayerBody/XROrigin3D/RightController"]
 script = ExtResource("6_pointer")
 ray_length = 1.5
+hit_min_scale = 0.2
+hit_max_scale = 1.0
 
 [node name="PointerFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/RightController/HandPointer"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.07)

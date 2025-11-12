@@ -17,6 +17,7 @@ extends Node3D
 @export_range(0.0, 10.0, 0.1) var ray_length: float = 2.0
 @export var show_line: bool = true
 @export var show_hitpoint: bool = true
+@export var ui_viewport_node_path: NodePath = "UIViewportWatch"
 
 # When true, the needle is enabled only while the ray hits the player; when
 # false the needle remains visible regardless of player hits.
@@ -28,6 +29,7 @@ extends Node3D
 @onready var _raycast: RayCast3D = get_node_or_null(raycast_node_path) as RayCast3D
 @onready var _ray_visual: MeshInstance3D = get_node_or_null(ray_visual_node_path) as MeshInstance3D
 @onready var _ray_hit_indicator: MeshInstance3D = get_node_or_null(ray_hit_node_path) as MeshInstance3D
+@onready var _ui_viewport: Node = get_node_or_null(ui_viewport_node_path) as Node
 
 var _ray_mesh: ImmediateMesh
 
@@ -148,6 +150,9 @@ func _update_ray_visual(axis_world: Vector3) -> void:
 	if _needle:
 		if needle_only_on_player_hit:
 			_needle.visible = hit_player
+			# Also toggle the watch UI viewport the same way as the needle
+			if _ui_viewport:
+				_ui_viewport.visible = hit_player
 		else:
 			_needle.visible = true
 

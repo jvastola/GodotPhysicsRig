@@ -35,6 +35,10 @@ signal pointer_event(event: Dictionary)
 @onready var _ray_visual: MeshInstance3D = get_node_or_null(ray_visual_node_path) as MeshInstance3D
 @onready var _ray_hit: MeshInstance3D = get_node_or_null(ray_hit_node_path) as MeshInstance3D
 
+@export var hit_scale_per_meter: float = 0.02
+@export var hit_min_scale: float = 0.01
+@export var hit_max_scale: float = 0.2
+
 var _line_mesh: ImmediateMesh
 var _hover_target: Node = null
 var _hover_collider: Object = null
@@ -149,7 +153,14 @@ func _physics_process(_delta: float) -> void:
 				up = Vector3.FORWARD
 			var x: Vector3 = up.cross(y).normalized()
 			var z: Vector3 = y.cross(x).normalized()
-			hit_xform.basis = Basis(x, y, z)
+			# Create a basis scaled by the desired scale factor so we don't overwrite
+			# node scale by setting global_transform after changing scale.
+			# Scale linearly from hit_min_scale at 0m to hit_max_scale at 1.5m, clamped outside that range.
+			var scale_factor: float = lerp(hit_min_scale, hit_max_scale, clamp(distance / 1.5, 0.0, 1.0))
+			var scaled_x: Vector3 = x * scale_factor
+			var scaled_y: Vector3 = y * scale_factor
+			var scaled_z: Vector3 = z * scale_factor
+			hit_xform.basis = Basis(scaled_x, scaled_y, scaled_z)
 			_ray_hit.global_transform = hit_xform
 
 	if _line_mesh:

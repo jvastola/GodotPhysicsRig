@@ -1,6 +1,6 @@
 [gd_scene load_steps=16 format=3 uid="uid://dtvg5mcsdmt1f"]
 
-[ext_resource type="Script" path="res://floor_interactable.gd" id="1_ra6av"]
+[ext_resource type="Script" uid="uid://ct42jl8bcsjkj" path="res://floor_interactable.gd" id="1_ra6av"]
 [ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://Portal.tscn" id="2_portal"]
 [ext_resource type="Script" uid="uid://exskxheotyxj" path="res://grabbable.gd" id="3_grabbable"]
 
