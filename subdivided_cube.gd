@@ -21,6 +21,7 @@ const FACE_DEFS: Array[Dictionary] = [
 @export var pointer_group: StringName = &"pointer_interactable"
 @export var allow_continuous_paint: bool = true
 @export var require_pointer_color: bool = false
+@export var debug_logs: bool = false
 
 var _cell_colors: Array = [] # faces x rows x columns
 var _paint_rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -123,9 +124,14 @@ func handle_pointer_event(event: Dictionary) -> void:
 	if event.is_empty():
 		return
 	var event_type: String = String(event.get("type", ""))
-	print_debug("subdivided_cube: handle_pointer_event ->", event_type, "from", event.get("handler"))
+	# Reduce noisy per-frame logging. Only emit logs for important transitions
+	# or when debug_logs is explicitly enabled.
+	if debug_logs:
+		print_debug("subdivided_cube: handle_pointer_event ->", event_type, "from", event.get("handler"))
 	match event_type:
 		"press":
+			if debug_logs:
+				print_debug("subdivided_cube: press event, applying paint at", event.get("global_position"))
 			_apply_paint_event(event)
 		"hold":
 			if allow_continuous_paint:
@@ -141,8 +147,12 @@ func handle_pointer_event(event: Dictionary) -> void:
 				_apply_paint_event(event)
 		"enter":
 			_hover_cell = _cell_from_world_point(event.get("global_position", global_transform.origin))
+			if debug_logs:
+				print_debug("subdivided_cube: enter -> cell", _hover_cell)
 		"exit":
 			_hover_cell = {}
+			if debug_logs:
+				print_debug("subdivided_cube: exit")
 		_:
 			pass
 
