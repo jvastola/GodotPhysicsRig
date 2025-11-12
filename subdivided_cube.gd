@@ -12,7 +12,7 @@ const FACE_DEFS: Array[Dictionary] = [
 ]
 
 @export var size: Vector3 = Vector3(2.0, 2.0, 2.0)
-@export_range(1, 128, 1) var subdivisions: int = 16
+@export_range(1, 128, 1) var subdivisions: int = 1
 @export var seed: int = 0
 @export var material_unshaded: bool = false
 @export var flip_winding: bool = false
@@ -123,6 +123,7 @@ func handle_pointer_event(event: Dictionary) -> void:
 	if event.is_empty():
 		return
 	var event_type: String = String(event.get("type", ""))
+	print_debug("subdivided_cube: handle_pointer_event ->", event_type, "from", event.get("handler"))
 	match event_type:
 		"press":
 			_apply_paint_event(event)
@@ -130,7 +131,10 @@ func handle_pointer_event(event: Dictionary) -> void:
 			if allow_continuous_paint:
 				_apply_paint_event(event)
 		"hover":
-			if allow_continuous_paint and event.get("action_pressed", false):
+			# paint when the trigger is just pressed while hovering (match floor behavior)
+			if event.get("action_just_pressed", false):
+				_apply_paint_event(event)
+			elif allow_continuous_paint and event.get("action_pressed", false):
 				_apply_paint_event(event)
 		"drag":
 			if allow_continuous_paint:
@@ -166,6 +170,7 @@ func paint_cell(global_point: Vector3, color_override: Variant = null) -> bool:
 		return false
 
 	_cell_colors[fi][iy][ix] = new_color
+	print_debug("subdivided_cube: painted cell", fi, ix, iy, "color", new_color)
 	build_mesh()
 	cell_painted.emit(fi, ix, iy, new_color)
 	return true
@@ -252,12 +257,19 @@ func _locate_cell(local_point: Vector3, nx: int, ny: int) -> Dictionary:
 		var n: Vector3 = face["n"]
 		var u: Vector3 = face["u"]
 		var v: Vector3 = face["v"]
-		var offset_point: Vector3 = n * 0.5
+		# account for the mesh 'size' when locating which face/cell was hit
+		var half: Vector3 = size * 0.5
+		var offset_point: Vector3 = Vector3(n.x * half.x, n.y * half.y, n.z * half.z)
 		var d: float = (local_point - offset_point).dot(n)
-		if abs(d) > 0.001:
+		if abs(d) > 0.001 * max(max(half.x, half.y), half.z):
 			continue
-		var su: float = local_point.dot(u) + 0.5
-		var sv: float = local_point.dot(v) + 0.5
+		# project onto the face axes and normalize by the corresponding size components
+		var size_u: float = abs(u.x) * size.x + abs(u.y) * size.y + abs(u.z) * size.z
+		var size_v: float = abs(v.x) * size.x + abs(v.y) * size.y + abs(v.z) * size.z
+		if size_u == 0.0 or size_v == 0.0:
+			continue
+		var su: float = (local_point.dot(u) / size_u) + 0.5
+		var sv: float = (local_point.dot(v) / size_v) + 0.5
 		if su < 0.0 or su >= 1.0 or sv < 0.0 or sv >= 1.0:
 			continue
 		var ix: int = clamp(int(floor(su * nx)), 0, nx - 1)
