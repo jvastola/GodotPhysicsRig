@@ -25,6 +25,15 @@ extends RigidBody3D
 @export var grab_action_grip: String = "grip"  # Grip to grab
 @export var release_button: String = "by_button"  # Button to release
 
+enum ReleaseMode {
+	BUTTON_ONLY,      # Only release with A/X button press
+	TRIGGER_RELEASE,  # Release when trigger/grip is released
+	STICKY_TRIGGER,   # Toggle: hold until trigger pressed again, then release on trigger release
+	STICKY_GRIP,      # Toggle lock using the grip button
+	STICKY_GRIP_TRIGGER # Toggle lock using either grip or trigger
+}
+
+@export var release_mode: ReleaseMode = ReleaseMode.BUTTON_ONLY
 
 var _previous_position: Vector3
 
@@ -33,6 +42,12 @@ var _is_colliding: bool = false
 # Grabbing state
 var held_object: RigidBody3D = null
 var nearby_grabbables: Array[RigidBody3D] = []
+
+# Sticky trigger state tracking
+var _sticky_locked: bool = false  # Generic sticky lock for STICKY modes
+var _prev_trigger_pressed: bool = false
+var _prev_grip_pressed: bool = false
+var _prev_release_button_pressed: bool = false
 
 
 func _ready() -> void:
@@ -60,7 +75,6 @@ func _ready() -> void:
 		grab_action_grip = "grip_click"
 		release_button = "a_button"  # A button for right hand
 	
-
 
 func _physics_process(delta: float) -> void:
 	if not is_instance_valid(target): return
@@ -200,24 +214,93 @@ func _handle_grab_input() -> void:
 	
 	var controller = target as XRController3D
 	
-	# Try to grab if trigger or grip pressed
+	# Read current input states
+	var trigger_value = controller.get_float("trigger")
+	var grip_value = controller.get_float("grip")
+	var trigger_pressed = trigger_value > 0.5
+	var grip_pressed = grip_value > 0.5
+	
+	# Check release button through multiple methods for robustness
+	var release_button_pressed = _check_release_button(controller)
+	
+	# Try to grab if trigger or grip pressed and not holding anything
 	if held_object == null:
-		var trigger_pressed = controller.get_float("trigger") > 0.5
-		var grip_pressed = controller.get_float("grip") > 0.5
-		
 		if trigger_pressed or grip_pressed:
 			_try_grab_nearest()
-	
-	# Hold object until release button is pressed (ignore grip/trigger release)
+			if held_object != null:
+				_sticky_locked = true  # Lock for sticky modes
+
+	# Release logic based on mode
 	else:
-		# Check if release button is pressed
-		var release_pressed = false
-		if controller.has_method("is_button_pressed"):
-			release_pressed = controller.is_button_pressed(release_button)
-		
-		# Only release when the designated release button is pressed
-		if release_pressed:
+		var should_release = false
+		match release_mode:
+			ReleaseMode.BUTTON_ONLY:
+				# Only release when A/X button is pressed
+				should_release = release_button_pressed and not _prev_release_button_pressed  # Rising edge
+
+			ReleaseMode.TRIGGER_RELEASE:
+				# Release when trigger/grip is released OR button pressed
+				var trigger_released = not trigger_pressed and not grip_pressed
+				var button_just_pressed = release_button_pressed and not _prev_release_button_pressed
+				should_release = trigger_released or button_just_pressed
+
+			ReleaseMode.STICKY_TRIGGER:
+				# Sticky toggle using trigger: press to toggle lock, release to drop when unlocked
+				var trigger_just_pressed = trigger_pressed and not _prev_trigger_pressed
+				var trigger_just_released = not trigger_pressed and _prev_trigger_pressed
+				if trigger_just_pressed and held_object != null:
+					_sticky_locked = not _sticky_locked
+				var button_just_pressed = release_button_pressed and not _prev_release_button_pressed
+				should_release = (not _sticky_locked and trigger_just_released) or button_just_pressed
+
+			ReleaseMode.STICKY_GRIP:
+				# Sticky toggle using grip: press to toggle lock, release to drop when unlocked
+				var grip_just_pressed = grip_pressed and not _prev_grip_pressed
+				var grip_just_released = not grip_pressed and _prev_grip_pressed
+				if grip_just_pressed and held_object != null:
+					_sticky_locked = not _sticky_locked
+				var button_just_pressed = release_button_pressed and not _prev_release_button_pressed
+				should_release = (not _sticky_locked and grip_just_released) or button_just_pressed
+
+			ReleaseMode.STICKY_GRIP_TRIGGER:
+				# Sticky toggle using either grip or trigger; release when either is released and unlocked
+				var press_just_pressed = (trigger_pressed and not _prev_trigger_pressed) or (grip_pressed and not _prev_grip_pressed)
+				var press_just_released = ((not trigger_pressed and _prev_trigger_pressed) or (not grip_pressed and _prev_grip_pressed))
+				if press_just_pressed and held_object != null:
+					_sticky_locked = not _sticky_locked
+				var button_just_pressed = release_button_pressed and not _prev_release_button_pressed
+				should_release = (not _sticky_locked and press_just_released) or button_just_pressed
+
+		if should_release:
 			_release_object()
+			_sticky_locked = false
+	
+	# Store previous states
+	_prev_trigger_pressed = trigger_pressed
+	_prev_grip_pressed = grip_pressed
+	_prev_release_button_pressed = release_button_pressed
+
+
+func _check_release_button(controller: XRController3D) -> bool:
+	"""Check release button through multiple input methods for robustness"""
+	var pressed = false
+	
+	# Method 1: XRController3D button API
+	if controller.has_method("is_button_pressed"):
+		pressed = controller.is_button_pressed(release_button)
+	
+	# Method 2: InputMap action (if exists)
+	if not pressed and InputMap.has_action(release_button):
+		pressed = Input.is_action_pressed(release_button)
+	
+	# Method 3: Direct joypad button check (fallback)
+	if not pressed and controller.has_method("get_tracker_hand"):
+		var joy_id = 0  # Try first joypad
+		# A button is typically index 0, X is typically index 2
+		var button_index = JOY_BUTTON_A if release_button == "a_button" else JOY_BUTTON_X
+		pressed = Input.is_joy_button_pressed(joy_id, button_index)
+	
+	return pressed
 
 
 func _try_grab_nearest() -> void:
