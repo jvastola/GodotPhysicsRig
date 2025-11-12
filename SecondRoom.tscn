@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3 uid="uid://dtvg5mcsdmt1f"]
+[gd_scene load_steps=15 format=3 uid="uid://dtvg5mcsdmt1f"]
 
 [ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://Portal.tscn" id="2_portal"]
 [ext_resource type="Script" uid="uid://exskxheotyxj" path="res://grabbable.gd" id="3_grabbable"]
@@ -41,6 +41,12 @@ roughness = 0.2
 material = SubResource("StandardMaterial3D_ball")
 radius = 0.15
 height = 0.3
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_slkg3"]
+size = Vector3(0.1, 1, 0.1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ra6av"]
+size = Vector3(0.1, 1, 0.1)
 
 [node name="SecondRoom" type="Node3D"]
 
@@ -114,6 +120,27 @@ shape = SubResource("SphereShape3D_ball")
 mesh = SubResource("SphereMesh_ball")
 
 [node name="Label3D" type="Label3D" parent="GrabbableBall"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+text = "Free Grab"
+font_size = 24
+outline_size = 8
+
+[node name="GrabbableBall2" type="RigidBody3D" parent="." groups=["grabbable"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1.5, 0)
+mass = 0.1
+gravity_scale = 0.3
+contact_monitor = true
+max_contacts_reported = 4
+script = ExtResource("3_grabbable")
+grab_mode = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GrabbableBall2"]
+shape = SubResource("BoxShape3D_slkg3")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="GrabbableBall2"]
+mesh = SubResource("BoxMesh_ra6av")
+
+[node name="Label3D" type="Label3D" parent="GrabbableBall2"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
 text = "Free Grab"
 font_size = 24

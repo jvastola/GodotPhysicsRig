@@ -173,6 +173,7 @@ center_of_mass_mode = 1
 contact_monitor = true
 max_contacts_reported = 8
 script = ExtResource("3_physics_hand")
+rot_frequency = 3000.0
 player_rigidbody = NodePath("../PlayerBody")
 target = NodePath("../PlayerBody/XROrigin3D/LeftController")
 release_button = "ax_button"
