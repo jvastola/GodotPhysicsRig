@@ -80,11 +80,11 @@ shape = SubResource("BoxShape3D_a73qe")
 mesh = SubResource("BoxMesh_a73qe")
 skeleton = NodePath("../../../physicsHandRight/CollisionShape3D")
 
-[node name="CollisionShape3D2" type="CollisionShape3D" parent="physicsHandLeft"]
+[node name="Grabbedobject" type="CollisionShape3D" parent="physicsHandLeft"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 shape = SubResource("BoxShape3D_m25rd")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="physicsHandLeft/CollisionShape3D2"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="physicsHandLeft/Grabbedobject"]
 mesh = SubResource("BoxMesh_a8j2n")
 skeleton = NodePath("../../..")
 

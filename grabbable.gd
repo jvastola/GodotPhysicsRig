@@ -18,6 +18,10 @@ var original_parent: Node = null
 var grab_offset: Vector3 = Vector3.ZERO
 var grab_rotation_offset: Quaternion = Quaternion.IDENTITY
 
+# Store collision data during grab
+var grabbed_collision_shapes: Array = []
+var grabbed_mesh_instances: Array = []
+
 signal grabbed(hand: RigidBody3D)
 signal released()
 
@@ -40,13 +44,14 @@ func try_grab(hand: RigidBody3D) -> bool:
 	grabbing_hand = hand
 	original_parent = get_parent()
 	
-	# Store the offset based on grab mode
+	# Calculate the offset in hand's local space
+	var hand_inv = hand.global_transform.affine_inverse()
+	var obj_to_hand = hand_inv * global_transform
+	
 	if grab_mode == GrabMode.FREE_GRAB:
-		# Store relative position and rotation at moment of grab
-		grab_offset = global_position - hand.global_position
-		var hand_quat = hand.global_transform.basis.get_rotation_quaternion()
-		var obj_quat = global_transform.basis.get_rotation_quaternion()
-		grab_rotation_offset = obj_quat * hand_quat.inverse()
+		# Store relative position and rotation at moment of grab in local space
+		grab_offset = obj_to_hand.origin
+		grab_rotation_offset = obj_to_hand.basis.get_rotation_quaternion()
 	else:  # ANCHOR_GRAB
 		# Use the exported anchor offset and rotation
 		grab_offset = grab_anchor_offset
@@ -54,11 +59,37 @@ func try_grab(hand: RigidBody3D) -> bool:
 		                       Quaternion(Vector3.UP, grab_anchor_rotation.y) * \
 		                       Quaternion(Vector3.RIGHT, grab_anchor_rotation.x)
 	
-	# Disable gravity while held
-	gravity_scale = 0.0
+	# Clone collision shapes and meshes as direct children of the hand
+	grabbed_collision_shapes.clear()
+	grabbed_mesh_instances.clear()
 	
-	# Reduce collision with world while held
+	for child in get_children():
+		if child is CollisionShape3D and child.shape:
+			# Create new collision shape as direct child of hand
+			var new_collision = CollisionShape3D.new()
+			new_collision.shape = child.shape
+			# Transform is relative to this object, need to convert to hand space
+			new_collision.transform = Transform3D(Basis(grab_rotation_offset), grab_offset) * child.transform
+			new_collision.name = name + "_grabbed_collision_" + str(grabbed_collision_shapes.size())
+			hand.add_child(new_collision)
+			grabbed_collision_shapes.append(new_collision)
+			
+		elif child is MeshInstance3D and child.mesh:
+			# Create new mesh instance as visual
+			var new_mesh = MeshInstance3D.new()
+			new_mesh.mesh = child.mesh
+			new_mesh.transform = Transform3D(Basis(grab_rotation_offset), grab_offset) * child.transform
+			new_mesh.name = name + "_grabbed_mesh_" + str(grabbed_mesh_instances.size())
+			hand.add_child(new_mesh)
+			grabbed_mesh_instances.append(new_mesh)
+	
+	# Hide original object (keep it around for release)
+	visible = false
+	# Disable collision on the original
+	collision_layer = 0
 	collision_mask = 0
+	# Freeze it in place
+	freeze = true
 	
 	grabbed.emit(hand)
 	print("Grabbable: Object grabbed by ", hand.name)
@@ -72,14 +103,46 @@ func release() -> void:
 	
 	print("Grabbable: Object released")
 	
-	# Re-enable physics
+	# Calculate global transform from first grabbed collision shape if available
+	var release_global_transform = global_transform
+	if grabbed_collision_shapes.size() > 0 and is_instance_valid(grabbed_collision_shapes[0]):
+		release_global_transform = grabbed_collision_shapes[0].global_transform
+	
+	# Store hand velocity
+	var hand_velocity = Vector3.ZERO
+	var hand_angular_velocity = Vector3.ZERO
+	
+	if is_instance_valid(grabbing_hand):
+		hand_velocity = grabbing_hand.linear_velocity
+		hand_angular_velocity = grabbing_hand.angular_velocity * 0.5
+		
+		# Remove all grabbed collision shapes and meshes from hand
+		for collision_shape in grabbed_collision_shapes:
+			if is_instance_valid(collision_shape):
+				grabbing_hand.remove_child(collision_shape)
+				collision_shape.queue_free()
+		
+		for mesh_instance in grabbed_mesh_instances:
+			if is_instance_valid(mesh_instance):
+				grabbing_hand.remove_child(mesh_instance)
+				mesh_instance.queue_free()
+	
+	grabbed_collision_shapes.clear()
+	grabbed_mesh_instances.clear()
+	
+	# Restore object visibility and physics
+	visible = true
+	freeze = false
 	gravity_scale = 1.0
-	collision_mask = 1
+	collision_layer = 1  # Default layer
+	collision_mask = 1   # Collide with world
+	
+	# Set global transform to where the grabbed shape was
+	global_transform = release_global_transform
 	
 	# Inherit hand velocity for throwing
-	if grabbing_hand:
-		linear_velocity = grabbing_hand.linear_velocity
-		angular_velocity = grabbing_hand.angular_velocity * 0.5
+	linear_velocity = hand_velocity
+	angular_velocity = hand_angular_velocity
 	
 	is_grabbed = false
 	grabbing_hand = null
@@ -88,51 +151,7 @@ func release() -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	if is_grabbed and grabbing_hand:
-		_follow_hand()
-
-
-func _follow_hand() -> void:
-	"""Make the object follow the grabbing hand"""
-	if not is_instance_valid(grabbing_hand):
+	# When grabbed, object is frozen and moves with hand automatically as child
+	# No need to update position - it's part of the hand's rigid body now
+	if is_grabbed and not is_instance_valid(grabbing_hand):
 		release()
-		return
-	
-	# Calculate target position and rotation
-	var target_pos: Vector3
-	var target_rot: Quaternion
-	
-	if grab_mode == GrabMode.FREE_GRAB:
-		# Maintain the offset from when we grabbed
-		var hand_quat = grabbing_hand.global_transform.basis.get_rotation_quaternion()
-		target_rot = hand_quat * grab_rotation_offset
-		target_pos = grabbing_hand.global_position + hand_quat * grab_offset
-	else:  # ANCHOR_GRAB
-		# Follow hand with fixed anchor offset
-		var hand_basis = grabbing_hand.global_transform.basis
-		target_pos = grabbing_hand.global_position + hand_basis * grab_offset
-		target_rot = grabbing_hand.global_transform.basis.get_rotation_quaternion() * grab_rotation_offset
-	
-	# Smoothly move to target (using forces for physics)
-	var pos_error = target_pos - global_position
-	var force_strength = 1000.0  # Adjust for responsiveness
-	apply_central_force(pos_error * force_strength * mass)
-	
-	# Damp velocity to prevent oscillation
-	apply_central_force(-linear_velocity * mass * 10.0)
-	
-	# Apply rotational forces
-	var target_basis = Basis(target_rot)
-	var current_basis = global_transform.basis
-	
-	# Calculate rotation needed
-	var rotation_diff = target_basis * current_basis.inverse()
-	var axis = rotation_diff.get_rotation_quaternion().get_axis()
-	var angle = rotation_diff.get_rotation_quaternion().get_angle()
-	
-	if not axis.is_zero_approx() and abs(angle) > 0.001:
-		var torque = axis * angle * 500.0  # Adjust for responsiveness
-		apply_torque(torque)
-	
-	# Damp angular velocity
-	apply_torque(-angular_velocity * 5.0)

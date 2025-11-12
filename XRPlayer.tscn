@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3 uid="uid://cpq6v7yqk8y8j"]
+[gd_scene load_steps=9 format=3 uid="uid://cpq6v7yqk8y8j"]
 
 [ext_resource type="Script" uid="uid://02kpb1kqm303" path="res://xr_player.gd" id="1_player"]
 [ext_resource type="Script" uid="uid://3ir0c0htxlqh" path="res://xr_origin_3d.gd" id="2_xr_origin"]
@@ -9,36 +9,53 @@
 
 [sub_resource type="SphereMesh" id="SphereMesh_player"]
 
-[node name="XRPlayer" type="RigidBody3D" groups=["player"]]
+[sub_resource type="BoxMesh" id="BoxMesh_hand"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hand"]
+
+[node name="XRPlayer" type="Node3D"]
+script = ExtResource("1_player")
+
+[node name="PlayerBody" type="RigidBody3D" parent="." groups=["player"]]
 collision_layer = 2
 axis_lock_angular_x = true
 axis_lock_angular_y = true
 axis_lock_angular_z = true
 mass = 2.0
-script = ExtResource("1_player")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PlayerBody"]
 shape = SubResource("SphereShape3D_player")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="PlayerBody"]
+visible = false
 mesh = SubResource("SphereMesh_player")
 
-[node name="XROrigin3D" type="XROrigin3D" parent="."]
+[node name="XROrigin3D" type="XROrigin3D" parent="PlayerBody"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.7, 0)
 script = ExtResource("2_xr_origin")
 
-[node name="XRCamera3D" type="XRCamera3D" parent="XROrigin3D"]
+[node name="XRCamera3D" type="XRCamera3D" parent="PlayerBody/XROrigin3D"]
 
-[node name="LeftController" type="XRController3D" parent="XROrigin3D"]
+[node name="LeftController" type="XRController3D" parent="PlayerBody/XROrigin3D"]
 tracker = &"left_hand"
 
-[node name="RightController" type="XRController3D" parent="XROrigin3D"]
+[node name="LeftHandMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController"]
+transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
+visible = false
+mesh = SubResource("BoxMesh_hand")
+
+[node name="RightController" type="XRController3D" parent="PlayerBody/XROrigin3D"]
 tracker = &"right_hand"
 
-[node name="DesktopCamera" type="Camera3D" parent="."]
+[node name="RightHandMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/RightController"]
+transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
+visible = false
+mesh = SubResource("BoxMesh_hand")
+
+[node name="DesktopCamera" type="Camera3D" parent="PlayerBody"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 
-[node name="DesktopController" type="Node" parent="."]
+[node name="DesktopController" type="Node" parent="PlayerBody"]
 script = ExtResource("4_desktop")
 
 [node name="PhysicsHandLeft" type="RigidBody3D" parent="." node_paths=PackedStringArray("player_rigidbody", "target")]
@@ -48,12 +65,16 @@ center_of_mass_mode = 1
 contact_monitor = true
 max_contacts_reported = 8
 script = ExtResource("3_physics_hand")
-player_rigidbody = NodePath("..")
-target = NodePath("../XROrigin3D/LeftController")
+player_rigidbody = NodePath("../PlayerBody")
+target = NodePath("../PlayerBody/XROrigin3D/LeftController")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="PhysicsHandLeft"]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
-shape = SubResource("SphereShape3D_player")
+shape = SubResource("BoxShape3D_hand")
+
+[node name="PhysicsHandLeftMesh" type="MeshInstance3D" parent="PhysicsHandLeft"]
+transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
+mesh = SubResource("BoxMesh_hand")
 
 [node name="PhysicsHandRight" type="RigidBody3D" parent="." node_paths=PackedStringArray("player_rigidbody", "target")]
 collision_layer = 4
@@ -62,9 +83,13 @@ center_of_mass_mode = 1
 contact_monitor = true
 max_contacts_reported = 8
 script = ExtResource("3_physics_hand")
-player_rigidbody = NodePath("..")
-target = NodePath("../XROrigin3D/RightController")
+player_rigidbody = NodePath("../PlayerBody")
+target = NodePath("../PlayerBody/XROrigin3D/RightController")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="PhysicsHandRight"]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
-shape = SubResource("SphereShape3D_player")
+shape = SubResource("BoxShape3D_hand")
+
+[node name="PhysicsHandRightMesh" type="MeshInstance3D" parent="PhysicsHandRight"]
+transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
+mesh = SubResource("BoxMesh_hand")

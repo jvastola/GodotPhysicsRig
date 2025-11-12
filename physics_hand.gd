@@ -44,8 +44,8 @@ func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
 
-	#set_center_of_mass_mode(RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM)
-	#set_center_of_mass(Vector3.ZERO)
+	set_center_of_mass_mode(RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM)
+	set_center_of_mass(Vector3.ZERO)
 	
 	# Set up controller actions
 	if controller_name == "left_hand":

@@ -1,14 +1,15 @@
 # XRPlayer Scene
 # Manages the XR player including camera, controllers, and physics hands
 # Supports both VR and desktop modes
-extends RigidBody3D
+extends Node3D
 
-@onready var xr_origin: XROrigin3D = $XROrigin3D
-@onready var xr_camera: XRCamera3D = $XROrigin3D/XRCamera3D
-@onready var left_controller: XRController3D = $XROrigin3D/LeftController
-@onready var right_controller: XRController3D = $XROrigin3D/RightController
-@onready var desktop_camera: Camera3D = $DesktopCamera
-@onready var desktop_controller: Node = $DesktopController
+@onready var player_body: RigidBody3D = $PlayerBody
+@onready var xr_origin: XROrigin3D = $PlayerBody/XROrigin3D
+@onready var xr_camera: XRCamera3D = $PlayerBody/XROrigin3D/XRCamera3D
+@onready var left_controller: XRController3D = $PlayerBody/XROrigin3D/LeftController
+@onready var right_controller: XRController3D = $PlayerBody/XROrigin3D/RightController
+@onready var desktop_camera: Camera3D = $PlayerBody/DesktopCamera
+@onready var desktop_controller: Node = $PlayerBody/DesktopController
 @onready var physics_hand_left: RigidBody3D = $PhysicsHandLeft
 @onready var physics_hand_right: RigidBody3D = $PhysicsHandRight
 
@@ -17,16 +18,6 @@ var is_vr_mode := false
 
 
 func _ready() -> void:
-	# Player body setup
-	collision_layer = 2
-	axis_lock_angular_x = true
-	axis_lock_angular_y = true
-	axis_lock_angular_z = true
-	mass = 2.0
-	
-	# Position XR origin for proper height
-	xr_origin.position.y = -player_height
-	
 	# Wait for XR origin to initialize
 	if xr_origin:
 		xr_origin.vr_mode_active.connect(_on_vr_mode_changed)
@@ -98,9 +89,10 @@ func _activate_desktop_mode() -> void:
 
 func teleport_to(target_position: Vector3) -> void:
 	"""Teleport player to a new position"""
-	global_position = target_position
-	linear_velocity = Vector3.ZERO
-	angular_velocity = Vector3.ZERO
+	if player_body:
+		player_body.global_position = target_position
+		player_body.linear_velocity = Vector3.ZERO
+		player_body.angular_velocity = Vector3.ZERO
 
 
 func get_camera_position() -> Vector3:
@@ -109,6 +101,8 @@ func get_camera_position() -> Vector3:
 		return xr_camera.global_position
 	elif desktop_camera:
 		return desktop_camera.global_position
+	elif player_body:
+		return player_body.global_position
 	return global_position
 
 
