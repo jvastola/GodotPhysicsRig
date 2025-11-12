@@ -23,7 +23,7 @@ func _ready() -> void:
 	if viewport:
 		viewport.size = Vector2i(int(ui_size.x), int(ui_size.y))
 		viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-		viewport.transparent_bg = false
+		viewport.transparent_bg = true
 		viewport.gui_embed_subwindows = false
 		
 		# Connect button signals for debug output
