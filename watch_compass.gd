@@ -11,9 +11,37 @@ extends Node3D
 @export var north_world: Vector3 = Vector3(0, 0, -1)
 @export var rotation_axis_local: Vector3 = Vector3(0, 0, 1)
 @export_range(0.0, 100.0, 0.1) var smoothing: float = 8.0
+@export var raycast_node_path: NodePath = "RayCast"
+@export var ray_visual_node_path: NodePath = "RayVisual"
+@export var ray_hit_node_path: NodePath = "RayHit"
+@export_range(0.0, 10.0, 0.1) var ray_length: float = 2.0
+@export var hide_needle_on_player_hit: bool = true
+@export var player_group: StringName = &"player"
 
 @onready var _needle: MeshInstance3D = get_node_or_null(needle_node_path) as MeshInstance3D
 @onready var _watch_face: MeshInstance3D = get_node_or_null(watch_face_node_path) as MeshInstance3D
+@onready var _raycast: RayCast3D = get_node_or_null(raycast_node_path) as RayCast3D
+@onready var _ray_visual: MeshInstance3D = get_node_or_null(ray_visual_node_path) as MeshInstance3D
+@onready var _ray_hit_indicator: MeshInstance3D = get_node_or_null(ray_hit_node_path) as MeshInstance3D
+
+var _ray_mesh: ImmediateMesh
+
+func _ready() -> void:
+	if _raycast:
+		var axis_local := rotation_axis_local.normalized()
+		if axis_local.length_squared() > 0.0:
+			_raycast.target_position = axis_local * ray_length
+		_raycast.enabled = true
+	if _ray_visual:
+		var existing_mesh := _ray_visual.mesh
+		if existing_mesh is ImmediateMesh:
+			_ray_mesh = existing_mesh
+		else:
+			_ray_mesh = ImmediateMesh.new()
+			_ray_visual.mesh = _ray_mesh
+		_ray_visual.visible = true
+	if _ray_hit_indicator:
+		_ray_hit_indicator.visible = false
 
 func _process(delta: float) -> void:
 	# Always show the watch face and needle; update needle orientation every frame
@@ -62,3 +90,54 @@ func _process(delta: float) -> void:
 	_needle.global_transform = gtf
 
 	# done
+
+func _physics_process(delta: float) -> void:
+	# Perform raycast and visual updates in the physics step to access space state safely
+	# Compute watch face normal in world space
+	var axis_world: Vector3 = (global_transform.basis * rotation_axis_local).normalized()
+
+	_update_ray_visual(axis_world)
+
+func _update_ray_visual(axis_world: Vector3) -> void:
+	var axis_local := rotation_axis_local.normalized()
+	if axis_local.length_squared() < 1e-8:
+		return
+
+	var start_global: Vector3 = global_transform.origin
+	var hit_point: Vector3 = start_global + axis_world * ray_length
+	var hit_distance: float = ray_length
+	var hit_player := false
+	var has_hit := false
+
+	if _raycast:
+		_raycast.target_position = axis_local * ray_length
+		_raycast.force_raycast_update()
+		has_hit = _raycast.is_colliding()
+		if has_hit:
+			hit_point = _raycast.get_collision_point()
+			hit_distance = start_global.distance_to(hit_point)
+			var collider := _raycast.get_collider()
+			if hide_needle_on_player_hit and collider is Node:
+				hit_player = (collider as Node).is_in_group(player_group)
+
+	if _ray_hit_indicator:
+		_ray_hit_indicator.visible = has_hit
+		if has_hit:
+			var hit_xform := _ray_hit_indicator.global_transform
+			hit_xform.origin = hit_point
+			hit_xform.basis = Basis.IDENTITY
+			_ray_hit_indicator.global_transform = hit_xform
+
+	if hide_needle_on_player_hit and _needle:
+		_needle.visible = not hit_player
+
+	if _ray_visual:
+		_ray_visual.global_transform = global_transform
+
+	if _ray_mesh:
+		var local_end := axis_local * hit_distance
+		_ray_mesh.clear_surfaces()
+		_ray_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
+		_ray_mesh.surface_add_vertex(Vector3.ZERO)
+		_ray_mesh.surface_add_vertex(local_end)
+		_ray_mesh.surface_end()
