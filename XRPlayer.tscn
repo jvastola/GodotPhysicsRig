@@ -1,15 +1,22 @@
-[gd_scene load_steps=9 format=3 uid="uid://cpq6v7yqk8y8j"]
+[gd_scene load_steps=12 format=3 uid="uid://cpq6v7yqk8y8j"]
 
 [ext_resource type="Script" uid="uid://02kpb1kqm303" path="res://xr_player.gd" id="1_player"]
 [ext_resource type="Script" uid="uid://3ir0c0htxlqh" path="res://xr_origin_3d.gd" id="2_xr_origin"]
 [ext_resource type="Script" uid="uid://der68q68jhigr" path="res://physics_hand.gd" id="3_physics_hand"]
 [ext_resource type="Script" uid="uid://b8jtkbbgoxbge" path="res://desktop_controller.gd" id="4_desktop"]
+[ext_resource type="Script" uid="uid://chk4ixs7ag67p" path="res://watch_compass.gd" id="5_watch"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_player"]
 
 [sub_resource type="SphereMesh" id="SphereMesh_player"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_hand"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_watch_face"]
+size = Vector3(0.04, 0.004, 0.04)
+
+[sub_resource type="BoxMesh" id="BoxMesh_watch_needle"]
+size = Vector3(0.02, 0.002, 0.002)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hand"]
 
@@ -44,6 +51,18 @@ tracker = &"left_hand"
 [node name="LeftHandMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController"]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
 mesh = SubResource("BoxMesh_hand")
+
+[node name="Watch" type="Node3D" parent="PlayerBody/XROrigin3D/LeftController"]
+transform = Transform3D(0.486488, -0.0584948, -0.871727, 0.873662, 0.0249968, 0.485891, -0.00663171, -0.997975, 0.0632653, -0.0764968, 0.0454798, -0.000658901)
+script = ExtResource("5_watch")
+
+[node name="WatchFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch"]
+transform = Transform3D(1, -4.65661e-10, 2.77578e-08, -5.78439e-08, 4.47035e-08, -1, 9.31323e-10, 1, 4.56348e-08, -3.08345e-10, 0.0161632, -0.0112733)
+mesh = SubResource("BoxMesh_watch_face")
+
+[node name="Needle" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch"]
+transform = Transform3D(0.02, 0, 0, 0, 0.002, 0, 0, 0, 0.002, 3.23926e-10, 0.02, -0.0092471)
+mesh = SubResource("BoxMesh_watch_needle")
 
 [node name="RightController" type="XRController3D" parent="PlayerBody/XROrigin3D"]
 tracker = &"right_hand"
