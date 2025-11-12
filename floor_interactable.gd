@@ -20,4 +20,13 @@ func handle_pointer_event(event: Dictionary) -> void:
 		if not mat:
 			mat = StandardMaterial3D.new()
 			_mesh_inst.material_override = mat
-		mat.albedo_color = Color(randf(), randf(), randf(), 1.0)
+		# choose a color for the floor and the pointer
+		var chosen_color: Color = Color(randf(), randf(), randf(), 1.0)
+		mat.albedo_color = chosen_color
+		# If the pointer is present in the event, set its carried color so
+		# subsequent paint actions use this color.
+		var pointer = event.get("pointer", null)
+		if pointer:
+			# Best-effort: set pointer fields used by the pointer system
+			pointer.pointer_color = chosen_color
+			pointer.include_pointer_color = true
