@@ -1,10 +1,11 @@
-[gd_scene load_steps=14 format=3 uid="uid://cpq6v7yqk8y8j"]
+[gd_scene load_steps=18 format=3 uid="uid://cpq6v7yqk8y8j"]
 
 [ext_resource type="Script" uid="uid://02kpb1kqm303" path="res://xr_player.gd" id="1_player"]
 [ext_resource type="Script" uid="uid://3ir0c0htxlqh" path="res://xr_origin_3d.gd" id="2_xr_origin"]
 [ext_resource type="Script" uid="uid://der68q68jhigr" path="res://physics_hand.gd" id="3_physics_hand"]
 [ext_resource type="Script" uid="uid://b8jtkbbgoxbge" path="res://desktop_controller.gd" id="4_desktop"]
 [ext_resource type="Script" uid="uid://chk4ixs7ag67p" path="res://watch_compass.gd" id="5_watch"]
+[ext_resource type="Script" uid="uid://u2otyj4gjtl2" path="res://hand_pointer.gd" id="6_pointer"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_csjsi"]
 radius = 0.3
@@ -20,11 +21,23 @@ size = Vector3(0.04, 0.004, 0.04)
 size = Vector3(0.02, 0.002, 0.002)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ray"]
-albedo_color = Color(1, 0, 0, 1)
 
 [sub_resource type="SphereMesh" id="SphereMesh_watch_hit"]
 radius = 0.015
 height = 0.03
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pointer_face"]
+transparency = 1
+albedo_color = Color(0.87, 0.24, 0.24, 0.85)
+
+[sub_resource type="QuadMesh" id="QuadMesh_pointer_face"]
+size = Vector2(0.04, 0.04)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_pointer_hit"]
+top_radius = 0.01
+bottom_radius = 0.01
+height = 0.001
+radial_segments = 16
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hand"]
 
@@ -45,6 +58,7 @@ shape = SubResource("SphereShape3D_csjsi")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="PlayerBody"]
 transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+cast_shadow = 0
 mesh = SubResource("SphereMesh_csjsi")
 
 [node name="XROrigin3D" type="XROrigin3D" parent="PlayerBody"]
@@ -59,6 +73,7 @@ tracker = &"left_hand"
 
 [node name="LeftHandMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController"]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
+cast_shadow = 0
 mesh = SubResource("BoxMesh_hand")
 
 [node name="Watch" type="Node3D" parent="PlayerBody/XROrigin3D/LeftController"]
@@ -68,10 +83,12 @@ rotation_axis_local = Vector3(0, 1, 0)
 ray_length = 1
 
 [node name="WatchFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch"]
+cast_shadow = 0
 mesh = SubResource("BoxMesh_watch_face")
 
 [node name="Needle" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch"]
 transform = Transform3D(0.02, 0, 0, 0, 0.002, 0, 0, 0, 0.002, 0, 0.00955808, 0)
+cast_shadow = 0
 mesh = SubResource("BoxMesh_watch_needle")
 
 [node name="RayCast" type="RayCast3D" parent="PlayerBody/XROrigin3D/LeftController/Watch"]
@@ -83,18 +100,56 @@ material_override = SubResource("StandardMaterial3D_ray")
 cast_shadow = 0
 
 [node name="RayHit" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch"]
-transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
-visible = false
-material_override = SubResource("StandardMaterial3D_ray")
 cast_shadow = 0
 mesh = SubResource("SphereMesh_watch_hit")
+
+[node name="HandPointer" type="Node3D" parent="PlayerBody/XROrigin3D/LeftController"]
+script = ExtResource("6_pointer")
+ray_length = 3.5
+
+[node name="PointerFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.07)
+material_override = SubResource("StandardMaterial3D_pointer_face")
+cast_shadow = 0
+mesh = SubResource("QuadMesh_pointer_face")
+
+[node name="PointerRayCast" type="RayCast3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer"]
+target_position = Vector3(0, 0, -3.5)
+
+[node name="PointerRayVisual" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer"]
+cast_shadow = 0
+
+[node name="PointerRayHit" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer"]
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_pointer_hit")
 
 [node name="RightController" type="XRController3D" parent="PlayerBody/XROrigin3D"]
 tracker = &"right_hand"
 
 [node name="RightHandMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/RightController"]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
+cast_shadow = 0
 mesh = SubResource("BoxMesh_hand")
+
+[node name="HandPointer" type="Node3D" parent="PlayerBody/XROrigin3D/RightController"]
+script = ExtResource("6_pointer")
+ray_length = 3.5
+
+[node name="PointerFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/RightController/HandPointer"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.07)
+material_override = SubResource("StandardMaterial3D_pointer_face")
+cast_shadow = 0
+mesh = SubResource("QuadMesh_pointer_face")
+
+[node name="PointerRayCast" type="RayCast3D" parent="PlayerBody/XROrigin3D/RightController/HandPointer"]
+target_position = Vector3(0, 0, -3.5)
+
+[node name="PointerRayVisual" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/RightController/HandPointer"]
+cast_shadow = 0
+
+[node name="PointerRayHit" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/RightController/HandPointer"]
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_pointer_hit")
 
 [node name="DesktopCamera" type="Camera3D" parent="PlayerBody"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
@@ -120,6 +175,7 @@ shape = SubResource("BoxShape3D_hand")
 
 [node name="PhysicsHandLeftMesh" type="MeshInstance3D" parent="PhysicsHandLeft"]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
+cast_shadow = 0
 mesh = SubResource("BoxMesh_hand")
 
 [node name="PhysicsHandRight" type="RigidBody3D" parent="." node_paths=PackedStringArray("player_rigidbody", "target")]
@@ -131,6 +187,7 @@ max_contacts_reported = 8
 script = ExtResource("3_physics_hand")
 player_rigidbody = NodePath("../PlayerBody")
 target = NodePath("../PlayerBody/XROrigin3D/RightController")
+controller_name = "right_hand"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="PhysicsHandRight"]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
@@ -138,4 +195,5 @@ shape = SubResource("BoxShape3D_hand")
 
 [node name="PhysicsHandRightMesh" type="MeshInstance3D" parent="PhysicsHandRight"]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
+cast_shadow = 0
 mesh = SubResource("BoxMesh_hand")
