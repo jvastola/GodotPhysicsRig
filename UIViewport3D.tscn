@@ -1,0 +1,40 @@
+[gd_scene load_steps=7 format=3 uid="uid://b2gkx1eim00mw"]
+
+[ext_resource type="Script" uid="uid://d20mjy3mr3gyp" path="res://ui_viewport_3d.gd" id="1_ui_script"]
+[ext_resource type="PackedScene" uid="uid://buvibmbg15qul" path="res://UIPanel.tscn" id="2_ui_panel"]
+
+[sub_resource type="ViewportTexture" id="ViewportTexture_ui"]
+viewport_path = NodePath("SubViewport")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ui"]
+resource_local_to_scene = true
+transparency = 1
+shading_mode = 0
+albedo_texture = SubResource("ViewportTexture_ui")
+
+[sub_resource type="QuadMesh" id="QuadMesh_ui"]
+size = Vector2(2, 2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ui"]
+size = Vector3(2, 2, 0.01)
+
+[node name="UIViewport3D" type="Node3D"]
+script = ExtResource("1_ui_script")
+
+[node name="SubViewport" type="SubViewport" parent="."]
+render_target_update_mode = 1
+
+[node name="UIPanel" parent="SubViewport" instance=ExtResource("2_ui_panel")]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0)
+material_override = SubResource("StandardMaterial3D_ui")
+cast_shadow = 0
+mesh = SubResource("QuadMesh_ui")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="MeshInstance3D"]
+collision_layer = 32
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D/StaticBody3D"]
+shape = SubResource("BoxShape3D_ui")

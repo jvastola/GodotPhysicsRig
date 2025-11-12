@@ -1,6 +1,6 @@
 [gd_scene load_steps=4 format=3 uid="uid://bq8x7yqla0ak"]
 
-[ext_resource type="Script" path="res://grabbable.gd" id="1_grabbable"]
+[ext_resource type="Script" uid="uid://exskxheotyxj" path="res://grabbable.gd" id="1_grabbable"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_grabbable"]
 size = Vector3(0.3, 0.3, 0.3)
@@ -9,8 +9,6 @@ size = Vector3(0.3, 0.3, 0.3)
 size = Vector3(0.3, 0.3, 0.3)
 
 [node name="Grabbable" type="RigidBody3D" groups=["grabbable"]]
-collision_layer = 1
-collision_mask = 1
 mass = 0.5
 script = ExtResource("1_grabbable")
 
