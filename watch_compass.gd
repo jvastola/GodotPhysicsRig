@@ -15,7 +15,12 @@ extends Node3D
 @export var ray_visual_node_path: NodePath = "RayVisual"
 @export var ray_hit_node_path: NodePath = "RayHit"
 @export_range(0.0, 10.0, 0.1) var ray_length: float = 2.0
-@export var hide_needle_on_player_hit: bool = true
+@export var show_line: bool = true
+@export var show_hitpoint: bool = true
+
+# When true, the needle is enabled only while the ray hits the player; when
+# false the needle remains visible regardless of player hits.
+@export var needle_only_on_player_hit: bool = true
 @export var player_group: StringName = &"player"
 
 @onready var _needle: MeshInstance3D = get_node_or_null(needle_node_path) as MeshInstance3D
@@ -39,16 +44,25 @@ func _ready() -> void:
 		else:
 			_ray_mesh = ImmediateMesh.new()
 			_ray_visual.mesh = _ray_mesh
-		_ray_visual.visible = true
+		# Respect the show_line toggle
+		_ray_visual.visible = show_line
 	if _ray_hit_indicator:
 		_ray_hit_indicator.visible = false
+		# If hitpoint visuals are disabled, hide the node
+		if not show_hitpoint:
+			_ray_hit_indicator.visible = false
+
+	# Initialize needle visibility according to the toggle. If needle_only_on_player_hit
+	# is true, start hidden until the ray hits the player.
+	if _needle:
+		_needle.visible = not needle_only_on_player_hit
 
 func _process(delta: float) -> void:
 	# Always show the watch face and needle; update needle orientation every frame
 	if _watch_face:
 		_watch_face.visible = true
-	if _needle:
-		_needle.visible = true
+	# NOTE: needle visibility is controlled in _update_ray_visual() when
+	# `needle_only_on_player_hit` is enabled; do not force visibility here.
 
 	if not _needle:
 		return
@@ -117,27 +131,32 @@ func _update_ray_visual(axis_world: Vector3) -> void:
 			hit_point = _raycast.get_collision_point()
 			hit_distance = start_global.distance_to(hit_point)
 			var collider := _raycast.get_collider()
-			if hide_needle_on_player_hit and collider is Node:
+			if collider is Node:
 				hit_player = (collider as Node).is_in_group(player_group)
 
 	if _ray_hit_indicator:
-		_ray_hit_indicator.visible = has_hit
-		if has_hit:
+		_ray_hit_indicator.visible = has_hit and show_hitpoint
+		if has_hit and show_hitpoint:
 			var hit_xform := _ray_hit_indicator.global_transform
 			hit_xform.origin = hit_point
+			# Keep the hit indicator flat to the world by default
 			hit_xform.basis = Basis.IDENTITY
 			_ray_hit_indicator.global_transform = hit_xform
 
-	if hide_needle_on_player_hit and _needle:
-		_needle.visible = not hit_player
+	# Needle visibility: enable when the ray hits the player if the toggle is set,
+	# otherwise keep the needle visible normally.
+	if _needle:
+		if needle_only_on_player_hit:
+			_needle.visible = hit_player
+		else:
+			_needle.visible = true
 
 	if _ray_visual:
 		_ray_visual.global_transform = global_transform
-
-	if _ray_mesh:
-		var local_end := axis_local * hit_distance
-		_ray_mesh.clear_surfaces()
-		_ray_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
-		_ray_mesh.surface_add_vertex(Vector3.ZERO)
-		_ray_mesh.surface_add_vertex(local_end)
-		_ray_mesh.surface_end()
+		if _ray_mesh and show_line:
+			var local_end := axis_local * hit_distance
+			_ray_mesh.clear_surfaces()
+			_ray_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
+			_ray_mesh.surface_add_vertex(Vector3.ZERO)
+			_ray_mesh.surface_add_vertex(local_end)
+			_ray_mesh.surface_end()

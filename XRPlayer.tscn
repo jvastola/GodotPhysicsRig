@@ -7,10 +7,13 @@
 [ext_resource type="Script" uid="uid://chk4ixs7ag67p" path="res://watch_compass.gd" id="5_watch"]
 [ext_resource type="Script" uid="uid://u2otyj4gjtl2" path="res://hand_pointer.gd" id="6_pointer"]
 
-[sub_resource type="SphereShape3D" id="SphereShape3D_csjsi"]
-radius = 0.3
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_s7h6x"]
+radius = 0.2
+height = 0.5
 
-[sub_resource type="SphereMesh" id="SphereMesh_csjsi"]
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_l588l"]
+radius = 0.435
+height = 1.0
 
 [sub_resource type="BoxMesh" id="BoxMesh_hand"]
 
@@ -54,19 +57,19 @@ axis_lock_angular_z = true
 mass = 2.0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="PlayerBody"]
-shape = SubResource("SphereShape3D_csjsi")
+shape = SubResource("CapsuleShape3D_s7h6x")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="PlayerBody"]
 transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+visible = false
 cast_shadow = 0
-mesh = SubResource("SphereMesh_csjsi")
+mesh = SubResource("CapsuleMesh_l588l")
 
 [node name="XROrigin3D" type="XROrigin3D" parent="PlayerBody"]
 transform = Transform3D(0.997515, 0, 0, 0, 0.997515, 0, 0, 0, 0.997515, 0, -1.2, 0)
 script = ExtResource("2_xr_origin")
 
 [node name="XRCamera3D" type="XRCamera3D" parent="PlayerBody/XROrigin3D"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.659, 0)
 
 [node name="LeftController" type="XRController3D" parent="PlayerBody/XROrigin3D"]
 tracker = &"left_hand"
@@ -80,7 +83,7 @@ mesh = SubResource("BoxMesh_hand")
 transform = Transform3D(0.820421, -0.571759, 0, 0.571759, 0.820421, 0, 0, 0, 1, -0.0622383, 0.0441848, 0)
 script = ExtResource("5_watch")
 rotation_axis_local = Vector3(0, 1, 0)
-ray_length = 1
+ray_length = 1.0
 
 [node name="WatchFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch"]
 cast_shadow = 0
@@ -88,6 +91,7 @@ mesh = SubResource("BoxMesh_watch_face")
 
 [node name="Needle" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch"]
 transform = Transform3D(0.02, 0, 0, 0, 0.002, 0, 0, 0, 0.002, 0, 0.00955808, 0)
+visible = false
 cast_shadow = 0
 mesh = SubResource("BoxMesh_watch_needle")
 
@@ -105,7 +109,7 @@ mesh = SubResource("SphereMesh_watch_hit")
 
 [node name="HandPointer" type="Node3D" parent="PlayerBody/XROrigin3D/LeftController"]
 script = ExtResource("6_pointer")
-ray_length = 3.5
+ray_length = 1.5
 
 [node name="PointerFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.07)
@@ -133,7 +137,7 @@ mesh = SubResource("BoxMesh_hand")
 
 [node name="HandPointer" type="Node3D" parent="PlayerBody/XROrigin3D/RightController"]
 script = ExtResource("6_pointer")
-ray_length = 3.5
+ray_length = 1.5
 
 [node name="PointerFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/RightController/HandPointer"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.07)
