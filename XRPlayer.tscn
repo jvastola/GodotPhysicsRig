@@ -15,6 +15,7 @@
 
 [node name="XRPlayer" type="Node3D"]
 script = ExtResource("1_player")
+turn_mode = 1
 
 [node name="PlayerBody" type="RigidBody3D" parent="." groups=["player"]]
 collision_layer = 2

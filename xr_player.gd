@@ -13,8 +13,21 @@ extends Node3D
 @onready var physics_hand_left: RigidBody3D = $PhysicsHandLeft
 @onready var physics_hand_right: RigidBody3D = $PhysicsHandRight
 
+# Player settings
 var player_height := 1.7  # Standard VR player height
 var is_vr_mode := false
+
+# Turning settings
+enum TurnMode { SNAP, SMOOTH }
+@export var turn_mode: TurnMode = TurnMode.SNAP
+@export var snap_turn_angle: float = 45.0  # Degrees per snap turn
+@export var smooth_turn_speed: float = 90.0  # Degrees per second
+@export var turn_deadzone: float = 0.5  # Thumbstick deadzone for turning
+@export var snap_turn_cooldown: float = 0.3  # Seconds between snap turns
+
+# Turning state
+var can_snap_turn := true
+var snap_turn_timer := 0.0
 
 
 func _ready() -> void:
@@ -23,6 +36,11 @@ func _ready() -> void:
 		xr_origin.vr_mode_active.connect(_on_vr_mode_changed)
 		# Check initial state
 		call_deferred("_check_initial_mode")
+
+
+func _process(delta: float) -> void:
+	if is_vr_mode:
+		_handle_turning(delta)
 
 
 func _check_initial_mode() -> void:
@@ -113,3 +131,59 @@ func get_camera_forward() -> Vector3:
 	elif desktop_camera:
 		return -desktop_camera.global_transform.basis.z
 	return -global_transform.basis.z
+
+
+func _handle_turning(delta: float) -> void:
+	"""Handle VR turning input from right controller thumbstick"""
+	if not right_controller:
+		return
+	
+	# Update snap turn cooldown
+	if snap_turn_timer > 0:
+		snap_turn_timer -= delta
+		if snap_turn_timer <= 0:
+			can_snap_turn = true
+	
+	# Get thumbstick input for turning (horizontal axis)
+	var turn_input = right_controller.get_vector2("primary")
+	
+	if abs(turn_input.x) > turn_deadzone:
+		if turn_mode == TurnMode.SNAP:
+			_handle_snap_turn(turn_input.x)
+		else:  # SMOOTH
+			_handle_smooth_turn(turn_input.x, delta)
+	else:
+		# Reset snap turn when thumbstick returns to center
+		if turn_mode == TurnMode.SNAP and snap_turn_timer <= 0:
+			can_snap_turn = true
+
+
+func _handle_snap_turn(input: float) -> void:
+	"""Handle snap turning"""
+	if not can_snap_turn:
+		return
+	
+	# Determine turn direction
+	# Invert sign so pushing the thumbstick right (positive x) turns right
+	var turn_angle = -snap_turn_angle if input > 0 else snap_turn_angle
+	
+	# Rotate the player body around Y axis
+	if player_body:
+		player_body.rotate_y(deg_to_rad(turn_angle))
+	
+	# Start cooldown
+	can_snap_turn = false
+	snap_turn_timer = snap_turn_cooldown
+	
+	print("XRPlayer: Snap turn ", turn_angle, " degrees")
+
+
+func _handle_smooth_turn(input: float, delta: float) -> void:
+	"""Handle smooth turning"""
+	# Calculate rotation amount based on input and speed
+	# Invert sign so pushing the thumbstick right (positive x) rotates right
+	var turn_amount = -input * smooth_turn_speed * delta
+	
+	# Rotate the player body around Y axis
+	if player_body:
+		player_body.rotate_y(deg_to_rad(turn_amount))
