@@ -180,7 +180,8 @@ func paint_cell(global_point: Vector3, color_override: Variant = null) -> bool:
 		return false
 
 	_cell_colors[fi][iy][ix] = new_color
-	print_debug("subdivided_cube: painted cell", fi, ix, iy, "color", new_color)
+	if debug_logs:
+		print_debug("subdivided_cube: painted cell", fi, ix, iy, "color", new_color)
 	build_mesh()
 	cell_painted.emit(fi, ix, iy, new_color)
 	return true
