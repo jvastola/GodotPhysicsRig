@@ -29,10 +29,13 @@ signal released()
 func _ready() -> void:
 	# Enable contact monitoring for grab detection
 	contact_monitor = true
-	max_contacts_reported = 4
+	max_contacts_reported = 10
 	
 	# Add to grabbable group for easy detection
 	add_to_group("grabbable")
+	
+	# Connect to collision signals for physics interaction
+	body_entered.connect(_on_collision_entered)
 
 
 func try_grab(hand: RigidBody3D) -> bool:
@@ -56,8 +59,8 @@ func try_grab(hand: RigidBody3D) -> bool:
 		# Use the exported anchor offset and rotation
 		grab_offset = grab_anchor_offset
 		grab_rotation_offset = Quaternion(Vector3.FORWARD, grab_anchor_rotation.z) * \
-		                       Quaternion(Vector3.UP, grab_anchor_rotation.y) * \
-		                       Quaternion(Vector3.RIGHT, grab_anchor_rotation.x)
+							   Quaternion(Vector3.UP, grab_anchor_rotation.y) * \
+							   Quaternion(Vector3.RIGHT, grab_anchor_rotation.x)
 	
 	# Clone collision shapes and meshes as direct children of the hand
 	grabbed_collision_shapes.clear()
@@ -155,3 +158,38 @@ func _physics_process(_delta: float) -> void:
 	# No need to update position - it's part of the hand's rigid body now
 	if is_grabbed and not is_instance_valid(grabbing_hand):
 		release()
+
+
+func _on_collision_entered(body: Node) -> void:
+	"""Handle physics interaction when hand collides with object (even when not grabbed)"""
+	# Skip if this object is currently grabbed
+	if is_grabbed:
+		return
+	
+	# Check if colliding body is a physics hand
+	if not body.is_in_group("physics_hand"):
+		return
+	
+	var hand = body as RigidBody3D
+	if not is_instance_valid(hand):
+		return
+	
+	# Get player rigidbody from hand if available
+	var player_body = hand.get("player_rigidbody")
+	if not is_instance_valid(player_body):
+		return
+	
+	# Calculate collision force based on relative velocity
+	var relative_velocity = hand.linear_velocity - linear_velocity
+	var collision_normal = (global_position - hand.global_position).normalized()
+	
+	# Apply equal and opposite forces (Newton's third law)
+	# Use physics delta time
+	var delta = 1.0 / Engine.get_physics_ticks_per_second()
+	var force_magnitude = relative_velocity.length() * mass * 50
+	var force_on_object = collision_normal * force_magnitude
+	apply_central_impulse(force_on_object * delta)
+
+	# Object pushes player back (through hand)
+	var force_on_player = -force_on_object * 0.3  # Reduced for player comfort
+	player_body.apply_central_impulse(force_on_player * delta)

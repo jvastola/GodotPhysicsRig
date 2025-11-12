@@ -100,7 +100,8 @@ outline_size = 8
 
 [node name="GrabbableBall" type="RigidBody3D" parent="." groups=["grabbable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1.5, 0)
-mass = 0.3
+mass = 0.1
+gravity_scale = 0.3
 contact_monitor = true
 max_contacts_reported = 4
 script = ExtResource("3_grabbable")

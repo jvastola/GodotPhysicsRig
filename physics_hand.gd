@@ -47,15 +47,18 @@ func _ready() -> void:
 	set_center_of_mass_mode(RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM)
 	set_center_of_mass(Vector3.ZERO)
 	
+	# Add to physics_hand group for physics interaction with grabbables
+	add_to_group("physics_hand")
+	
 	# Set up controller actions
 	if controller_name == "left_hand":
 		grab_action_trigger = "trigger_click"
 		grab_action_grip = "grip_click"
-		release_button = "by_button"
+		release_button = "x_button"  # X button for left hand
 	else:
 		grab_action_trigger = "trigger_click"
 		grab_action_grip = "grip_click"
-		release_button = "by_button"
+		release_button = "a_button"  # A button for right hand
 	
 
 
@@ -205,14 +208,15 @@ func _handle_grab_input() -> void:
 		if trigger_pressed or grip_pressed:
 			_try_grab_nearest()
 	
-	# Release if release button pressed or grip/trigger released
+	# Hold object until release button is pressed (ignore grip/trigger release)
 	else:
-		var trigger_value = controller.get_float("trigger")
-		var grip_value = controller.get_float("grip")
-		var release_pressed = controller.is_button_pressed("by_button") if controller_name == "right_hand" else controller.is_button_pressed("by_button")
+		# Check if release button is pressed
+		var release_pressed = false
+		if controller.has_method("is_button_pressed"):
+			release_pressed = controller.is_button_pressed(release_button)
 		
-		# Release if button pressed or both trigger and grip released
-		if release_pressed or (trigger_value < 0.3 and grip_value < 0.3):
+		# Only release when the designated release button is pressed
+		if release_pressed:
 			_release_object()
 
 
