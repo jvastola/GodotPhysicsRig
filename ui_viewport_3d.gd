@@ -11,6 +11,9 @@ extends Node3D
 
 @onready var viewport: SubViewport = get_node_or_null("SubViewport") as SubViewport
 @onready var mesh_instance: MeshInstance3D = get_node_or_null("MeshInstance3D") as MeshInstance3D
+@onready var _static_body: StaticBody3D = get_node_or_null("MeshInstance3D/StaticBody3D") as StaticBody3D
+
+var _saved_static_body_layer: int = 0
 
 var _last_mouse_pos: Vector2 = Vector2(-1, -1)
 var _is_hovering: bool = false
@@ -28,6 +31,16 @@ func _ready() -> void:
 		
 		# Connect button signals for debug output
 		_connect_button_signals()
+
+	# Cache static body collision layer so we can toggle interaction cleanly
+	if _static_body:
+		_saved_static_body_layer = _static_body.collision_layer
+
+	# Ensure the mesh_instance visibility and collision are consistent
+	# (mesh visibility is visual only; collisions are controlled by the StaticBody)
+	if mesh_instance and _static_body:
+		mesh_instance.visible = true
+		_static_body.collision_layer = _saved_static_body_layer
 
 func _connect_button_signals() -> void:
 	var button1: Button = viewport.get_node_or_null("UIPanel/VBoxContainer/Button1") as Button
@@ -148,3 +161,14 @@ func _send_mouse_exit() -> void:
 	_last_mouse_pos = Vector2(-1, -1)
 	_is_hovering = false
 	_is_pressed = false
+
+func set_interactive(enabled: bool) -> void:
+	# Toggle visual and collision interactivity of the 3D UI. When disabled,
+	# the StaticBody's collision_layer is set to 0 so raycasts ignore it.
+	if mesh_instance:
+		mesh_instance.visible = enabled
+	if _static_body:
+		if enabled:
+			_static_body.collision_layer = _saved_static_body_layer
+		else:
+			_static_body.collision_layer = 0

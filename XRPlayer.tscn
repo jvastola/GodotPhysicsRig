@@ -83,7 +83,7 @@ transform = Transform3D(-0.69, 9.10311e-05, -0.00069234, -9.16451e-05, -0.69, 0.
 cast_shadow = 0
 mesh = SubResource("BoxMesh_l588l")
 
-[node name="HeadArea" type="Area3D" parent="PlayerBody/XROrigin3D/XRCamera3D"]
+[node name="HeadArea" type="Area3D" parent="PlayerBody/XROrigin3D/XRCamera3D" groups=["player"]]
 collision_layer = 2
 
 [node name="HeadCollisionShape" type="CollisionShape3D" parent="PlayerBody/XROrigin3D/XRCamera3D/HeadArea"]

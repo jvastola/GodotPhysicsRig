@@ -150,9 +150,13 @@ func _update_ray_visual(axis_world: Vector3) -> void:
 	if _needle:
 		if needle_only_on_player_hit:
 			_needle.visible = hit_player
-			# Also toggle the watch UI viewport the same way as the needle
+			# Also toggle the watch UI viewport the same way as the needle.
+			# Use the viewport's API when available so we can also disable collisions
 			if _ui_viewport:
-				_ui_viewport.visible = hit_player
+				if _ui_viewport.has_method("set_interactive"):
+					_ui_viewport.call_deferred("set_interactive", hit_player)
+				else:
+					_ui_viewport.visible = hit_player
 		else:
 			_needle.visible = true
 
