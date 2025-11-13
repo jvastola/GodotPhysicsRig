@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=3 uid="uid://cpq6v7yqk8y8j"]
+[gd_scene load_steps=21 format=3 uid="uid://cpq6v7yqk8y8j"]
 
 [ext_resource type="Script" uid="uid://02kpb1kqm303" path="res://xr_player.gd" id="1_player"]
 [ext_resource type="Script" uid="uid://3ir0c0htxlqh" path="res://xr_origin_3d.gd" id="2_xr_origin"]
@@ -13,6 +13,8 @@ radius = 0.2
 height = 0.5
 
 [sub_resource type="SphereMesh" id="SphereMesh_head"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_l588l"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_head"]
 radius = 0.18
@@ -77,7 +79,7 @@ script = ExtResource("2_xr_origin")
 [node name="HeadMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/XRCamera3D"]
 transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 0, 0, 0)
 cast_shadow = 0
-mesh = SubResource("SphereMesh_head")
+mesh = SubResource("BoxMesh_l588l")
 
 [node name="HeadArea" type="Area3D" parent="PlayerBody/XROrigin3D/XRCamera3D"]
 collision_layer = 2
