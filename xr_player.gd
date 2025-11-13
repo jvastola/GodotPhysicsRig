@@ -52,6 +52,27 @@ func _ready() -> void:
 	
 	# Restore saved headmesh texture
 	call_deferred("_restore_head_texture")
+	
+	# Ensure physics hands are properly connected
+	call_deferred("_setup_physics_hands")
+
+
+func _setup_physics_hands() -> void:
+	"""Ensure physics hands have valid references after scene transitions"""
+	if not physics_hand_left or not physics_hand_right:
+		# Try to find them if references are lost
+		physics_hand_left = get_node_or_null("PhysicsHandLeft")
+		physics_hand_right = get_node_or_null("PhysicsHandRight")
+	
+	if physics_hand_left:
+		physics_hand_left.player_rigidbody = player_body
+		physics_hand_left.target = left_controller
+		print("XRPlayer: Physics hand left connected")
+	
+	if physics_hand_right:
+		physics_hand_right.player_rigidbody = player_body
+		physics_hand_right.target = right_controller
+		print("XRPlayer: Physics hand right connected")
 
 
 func _process(delta: float) -> void:

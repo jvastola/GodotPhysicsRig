@@ -63,6 +63,10 @@ func try_grab(hand: RigidBody3D) -> bool:
 	grabbing_hand = hand
 	original_parent = get_parent()
 	
+	# Sync with hand's held_object
+	if hand.has_method("set") and hand.get("held_object") != self:
+		hand.set("held_object", self)
+	
 	# Calculate the offset in hand's local space
 	var hand_inv = hand.global_transform.affine_inverse()
 	var obj_to_hand = hand_inv * global_transform
@@ -166,6 +170,11 @@ func release() -> void:
 	# Inherit hand velocity for throwing
 	linear_velocity = hand_velocity
 	angular_velocity = hand_angular_velocity
+	
+	# Clear hand's held_object reference
+	if is_instance_valid(grabbing_hand) and grabbing_hand.has_method("get"):
+		if grabbing_hand.get("held_object") == self:
+			grabbing_hand.set("held_object", null)
 	
 	is_grabbed = false
 	grabbing_hand = null

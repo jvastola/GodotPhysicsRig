@@ -206,6 +206,11 @@ func _handle_grab_input() -> void:
 	
 	# Check release button through a single rising-edge on the configured action
 	var release_button_pressed = _check_release_button(controller)
+	
+	# Validate held_object - if it's invalid, clear it
+	if held_object != null and not is_instance_valid(held_object):
+		print("PhysicsHand: Held object became invalid, clearing reference")
+		held_object = null
 
 	# Try to grab if trigger or grip pressed and not holding anything
 	if held_object == null:
