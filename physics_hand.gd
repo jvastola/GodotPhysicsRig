@@ -208,9 +208,15 @@ func _handle_grab_input() -> void:
 	var release_button_pressed = _check_release_button(controller)
 	
 	# Validate held_object - if it's invalid, clear it
-	if held_object != null and not is_instance_valid(held_object):
-		print("PhysicsHand: Held object became invalid, clearing reference")
-		held_object = null
+	if held_object != null:
+		if not is_instance_valid(held_object):
+			print("PhysicsHand: Held object became invalid, clearing reference")
+			held_object = null
+		elif held_object.has_method("get"):
+			# Check if the object still thinks it's grabbed by us
+			if not held_object.get("is_grabbed") or held_object.get("grabbing_hand") != self:
+				print("PhysicsHand: Held object state desynchronized, clearing reference")
+				held_object = null
 
 	# Try to grab if trigger or grip pressed and not holding anything
 	if held_object == null:
@@ -296,8 +302,9 @@ func _try_grab_nearest() -> void:
 func _release_object() -> void:
 	"""Release the currently held object"""
 	if held_object and is_instance_valid(held_object):
+		var obj_name = held_object.name  # Store name before release
 		if held_object.has_method("release"):
 			held_object.release()
-			print("PhysicsHand: Released ", held_object.name)
+			print("PhysicsHand: Released ", obj_name)
 	
 	held_object = null

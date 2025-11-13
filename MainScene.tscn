@@ -79,7 +79,7 @@ flip_winding = true
 transform = Transform3D(0.999598, 0, 0, 0, 0.999598, 0, 0, 0, 0.999598, 0, 2, 0)
 
 [node name="Portal" parent="." instance=ExtResource("2_portal")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -5.60082)
 target_scene = "res://SecondRoom.tscn"
 
 [node name="UIViewport3D" parent="." instance=ExtResource("5_ui_viewport")]

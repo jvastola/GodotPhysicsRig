@@ -163,7 +163,6 @@ anchors_preset = 0
 script = ExtResource("4_xrtest")
 
 [node name="ViewportMirror" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 script = ExtResource("5_chm60")
 size = Vector2(2, 1.5)
 ResolutionPerUnit = 500

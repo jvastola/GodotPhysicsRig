@@ -53,6 +53,19 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 	var old_global_rot = player_instance.global_rotation
 	var player_parent = player_instance.get_parent()
 	
+	# Find and preserve all grabbed objects by moving them to GameManager temporarily
+	var grabbed_objects = []
+	for obj in get_tree().get_nodes_in_group("grabbable"):
+		if obj.has_method("get") and obj.get("is_grabbed"):
+			grabbed_objects.append(obj)
+			var obj_parent = obj.get_parent()
+			if obj_parent:
+				var obj_transform = obj.global_transform
+				obj_parent.remove_child(obj)
+				add_child(obj)
+				obj.global_transform = obj_transform
+				print("GameManager: Preserved grabbed object: ", obj.name)
+	
 	if player_parent and player_parent != self:
 		player_parent.remove_child(player_instance)
 		add_child(player_instance)
@@ -83,6 +96,15 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 		scene_player.queue_free()
 		await get_tree().process_frame
 	
+	# Move grabbed objects back to the new world
+	for obj in grabbed_objects:
+		if is_instance_valid(obj):
+			var obj_transform = obj.global_transform
+			remove_child(obj)
+			current_world.add_child(obj)
+			obj.global_transform = obj_transform
+			print("GameManager: Restored grabbed object to new world: ", obj.name)
+	
 	# Find spawn point and move player to new world
 	var spawn_name = player_state.get("spawn_point", "SpawnPoint")
 	var spawn_point = _find_spawn_point(current_world, spawn_name)
@@ -90,8 +112,14 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 	if spawn_point:
 		# Move player from GameManager to new world
 		var target_pos = spawn_point.global_position
-		remove_child(player_instance)
-		current_world.add_child(player_instance)
+		
+		# Only remove if it's actually our child
+		if player_instance.get_parent() == self:
+			remove_child(player_instance)
+		
+		# Only add if it's not already a child of the new world
+		if player_instance.get_parent() != current_world:
+			current_world.add_child(player_instance)
 		
 		# Wait for player to be in tree
 		await get_tree().process_frame
@@ -112,8 +140,15 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 		print("GameManager: Player moved to new world at ", target_pos)
 	else:
 		# No spawn point, just move player to new world at origin
-		remove_child(player_instance)
-		current_world.add_child(player_instance)
+		
+		# Only remove if it's actually our child
+		if player_instance.get_parent() == self:
+			remove_child(player_instance)
+		
+		# Only add if it's not already a child of the new world
+		if player_instance.get_parent() != current_world:
+			current_world.add_child(player_instance)
+		
 		await get_tree().process_frame
 		
 		var player_body = player_instance.get_node_or_null("PlayerBody")

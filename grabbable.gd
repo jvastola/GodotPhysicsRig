@@ -52,6 +52,16 @@ func _ready() -> void:
 		print("Grabbable: ", save_id, " scene of origin: ", _scene_of_origin)
 	
 	# No need to restore - player persists across scenes so grabbed items stay grabbed
+	
+	# Debug: Check grab state
+	if is_grabbed:
+		print("Grabbable: ", save_id, " is already grabbed on _ready!")
+		print("  - grabbing_hand valid: ", is_instance_valid(grabbing_hand))
+		print("  - collision shapes count: ", grabbed_collision_shapes.size())
+		if grabbed_collision_shapes.size() > 0:
+			print("  - first shape valid: ", is_instance_valid(grabbed_collision_shapes[0]))
+			if is_instance_valid(grabbed_collision_shapes[0]):
+				print("  - first shape parent: ", grabbed_collision_shapes[0].get_parent())
 
 
 func try_grab(hand: RigidBody3D) -> bool:
@@ -134,6 +144,9 @@ func release() -> void:
 	var release_global_transform = global_transform
 	if grabbed_collision_shapes.size() > 0 and is_instance_valid(grabbed_collision_shapes[0]):
 		release_global_transform = grabbed_collision_shapes[0].global_transform
+	elif is_instance_valid(grabbing_hand):
+		# If no valid collision shape, use hand position with grab offset
+		release_global_transform = grabbing_hand.global_transform * Transform3D(Basis(grab_rotation_offset), grab_offset)
 	
 	# Store hand velocity
 	var hand_velocity = Vector3.ZERO
@@ -145,13 +158,22 @@ func release() -> void:
 		
 		# Remove all grabbed collision shapes and meshes from hand
 		for collision_shape in grabbed_collision_shapes:
-			if is_instance_valid(collision_shape):
+			if is_instance_valid(collision_shape) and collision_shape.get_parent() == grabbing_hand:
 				grabbing_hand.remove_child(collision_shape)
 				collision_shape.queue_free()
 		
 		for mesh_instance in grabbed_mesh_instances:
-			if is_instance_valid(mesh_instance):
+			if is_instance_valid(mesh_instance) and mesh_instance.get_parent() == grabbing_hand:
 				grabbing_hand.remove_child(mesh_instance)
+				mesh_instance.queue_free()
+	else:
+		# Hand is invalid, just clean up what we can
+		print("Grabbable: Warning - hand invalid during release, cleaning up")
+		for collision_shape in grabbed_collision_shapes:
+			if is_instance_valid(collision_shape):
+				collision_shape.queue_free()
+		for mesh_instance in grabbed_mesh_instances:
+			if is_instance_valid(mesh_instance):
 				mesh_instance.queue_free()
 	
 	grabbed_collision_shapes.clear()
@@ -177,19 +199,61 @@ func release() -> void:
 			grabbing_hand.set("held_object", null)
 	
 	is_grabbed = false
+	var prev_hand = grabbing_hand
 	grabbing_hand = null
 	
 	released.emit()
 	
 	# Save release state
 	_save_grab_state(null)
+	
+	print("Grabbable: Release complete for ", name)
 
 
 func _physics_process(_delta: float) -> void:
 	# When grabbed, object is frozen and moves with hand automatically as child
 	# No need to update position - it's part of the hand's rigid body now
-	if is_grabbed and not is_instance_valid(grabbing_hand):
-		release()
+	if is_grabbed:
+		# If hand is invalid, auto-release
+		if not is_instance_valid(grabbing_hand):
+			print("Grabbable: Auto-releasing due to invalid hand")
+			release()
+			return
+		
+		# If grabbed collision shapes are missing (e.g., after scene transition), force release
+		if grabbed_collision_shapes.is_empty():
+			print("Grabbable: WARNING - No grabbed collision shapes, forcing full release")
+			# Force complete cleanup
+			is_grabbed = false
+			visible = true
+			freeze = false
+			collision_layer = 1
+			collision_mask = 1
+			if is_instance_valid(grabbing_hand) and grabbing_hand.has_method("set"):
+				grabbing_hand.set("held_object", null)
+			grabbing_hand = null
+			_save_grab_state(null)
+			return
+		
+		# Validate first collision shape still exists and is a child of hand
+		if not is_instance_valid(grabbed_collision_shapes[0]):
+			print("Grabbable: WARNING - Grabbed collision shape invalid, forcing release")
+			is_grabbed = false
+			visible = true
+			freeze = false
+			collision_layer = 1
+			collision_mask = 1
+			grabbed_collision_shapes.clear()
+			grabbed_mesh_instances.clear()
+			if is_instance_valid(grabbing_hand) and grabbing_hand.has_method("set"):
+				grabbing_hand.set("held_object", null)
+			grabbing_hand = null
+			_save_grab_state(null)
+			return
+		
+		# Update invisible body position to follow first grabbed shape
+		if is_instance_valid(grabbed_collision_shapes[0]):
+			global_transform = grabbed_collision_shapes[0].global_transform
 
 
 func _on_collision_entered(body: Node) -> void:
