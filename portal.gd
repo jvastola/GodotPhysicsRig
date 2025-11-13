@@ -5,9 +5,11 @@ extends Area3D
 @export_file("*.tscn") var target_scene: String = ""
 @export var spawn_point_name: String = "SpawnPoint"
 @export var portal_color: Color = Color(0.3, 0.6, 1.0, 0.5)
+@export var use_spawn_point: bool = false
 
 @onready var mesh_instance: MeshInstance3D = $MeshInstance3D
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
+var _triggered: bool = false
 
 
 func _ready() -> void:
@@ -25,6 +27,10 @@ func _on_body_entered(body: Node3D) -> void:
 	print("Portal: Body entered - ", body.name, " | In player group: ", body.is_in_group("player"))
 	
 	# Check if it's the player
+	if _triggered:
+		print("Portal: already triggered, ignoring")
+		return
+
 	if body.is_in_group("player") or body.name == "XRPlayer":
 		if target_scene.is_empty():
 			push_warning("Portal has no target scene set!")
@@ -36,6 +42,7 @@ func _on_body_entered(body: Node3D) -> void:
 		# Store player position for the target scene
 		var player_state = {
 			"spawn_point": spawn_point_name,
+			"use_spawn_point": use_spawn_point,
 			"velocity": body.linear_velocity if body is RigidBody3D else Vector3.ZERO
 		}
 		
@@ -44,8 +51,17 @@ func _on_body_entered(body: Node3D) -> void:
 		# Use call_deferred to avoid physics callback issues
 		# Use GameManager if available, otherwise direct scene change
 		if has_node("/root/GameManager"):
+			var gm = get_node("/root/GameManager")
+			# If GameManager is already processing a scene change, ignore this trigger
+			if gm and gm.has_method("get") and gm.get("_is_changing_scene"):
+				print("Portal: GameManager busy changing scene - ignoring portal trigger")
+				return
+			_triggered = true
+			# Optionally disable monitoring immediately to avoid further signals
+			# Use deferred set so we don't change physics state mid-callback
+			call_deferred("set", "monitoring", false)
 			print("Portal: Calling GameManager.change_scene_with_player")
-			get_node("/root/GameManager").call_deferred("change_scene_with_player", target_scene, player_state)
+			gm.call_deferred("change_scene_with_player", target_scene, player_state)
 		else:
 			print("Portal: GameManager not found, using fallback")
 			# Fallback: direct scene change (also deferred)

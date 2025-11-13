@@ -81,6 +81,8 @@ transform = Transform3D(0.999598, 0, 0, 0, 0.999598, 0, 0, 0, 0.999598, 0, 2, 0)
 [node name="Portal" parent="." instance=ExtResource("2_portal")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -5.60082)
 target_scene = "res://SecondRoom.tscn"
+portal_color = Color(0.696713, 0.153061, 0.812148, 0.5)
+use_spawn_point = true
 
 [node name="UIViewport3D" parent="." instance=ExtResource("5_ui_viewport")]
 transform = Transform3D(1.00696, 0, 0, 0, 1.00696, 0, 0, 0, 1.00696, 3.23463, 1, -2)

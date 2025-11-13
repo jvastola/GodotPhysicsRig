@@ -167,10 +167,32 @@ func _activate_desktop_mode() -> void:
 
 func teleport_to(target_position: Vector3) -> void:
 	"""Teleport player to a new position"""
-	if player_body:
-		player_body.global_position = target_position
-		player_body.linear_velocity = Vector3.ZERO
-		player_body.angular_velocity = Vector3.ZERO
+	if not player_body:
+		return
+
+	# To avoid physics impulse on placement (which can push the body back),
+	# temporarily disable collisions for the PlayerBody, move it, wait a couple
+	# physics frames for the new world to settle, then restore collisions and
+	# clear velocities. This prevents collision response from the old velocity
+	# or penetration resolving from throwing the player.
+	var prev_layer: int = player_body.collision_layer
+	var prev_mask: int = player_body.collision_mask
+
+	player_body.collision_layer = 0
+	player_body.collision_mask = 0
+	player_body.global_position = target_position
+	player_body.linear_velocity = Vector3.ZERO
+	player_body.angular_velocity = Vector3.ZERO
+
+	# Wait for physics to process the new placement so collisions settle
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+
+	# Restore previous collision layers/masks and ensure velocities are zero
+	player_body.collision_layer = prev_layer
+	player_body.collision_mask = prev_mask
+	player_body.linear_velocity = Vector3.ZERO
+	player_body.angular_velocity = Vector3.ZERO
 
 
 func get_camera_position() -> Vector3:
