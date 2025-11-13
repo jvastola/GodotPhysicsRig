@@ -25,16 +25,7 @@ extends RigidBody3D
 @export var grab_action_grip: String = "grip"  # Grip to grab
 @export var release_button: String = "ax_button"  # Button to release (OpenXR 'ax_button' for A/X)
 
-enum ReleaseMode {
-	BUTTON_ONLY,      # Only release with A/X button press
-	TRIGGER_RELEASE,  # Release when trigger/grip is released
-	STICKY_TRIGGER,   # Toggle: hold until trigger pressed again, then release on trigger release
-	STICKY_GRIP,      # Toggle lock using the grip button
-	STICKY_GRIP_TRIGGER # Toggle lock using either grip or trigger
-}
-
-@export var release_mode: ReleaseMode = ReleaseMode.BUTTON_ONLY
-@export var debug_release_checks: bool = false
+# Release is handled via a single rising-edge check on `release_button` (ax_button)
 
 var _previous_position: Vector3
 
@@ -45,9 +36,6 @@ var held_object: RigidBody3D = null
 var nearby_grabbables: Array[RigidBody3D] = []
 
 # Sticky trigger state tracking
-var _sticky_locked: bool = false  # Generic sticky lock for STICKY modes
-var _prev_trigger_pressed: bool = false
-var _prev_grip_pressed: bool = false
 var _prev_release_button_pressed: bool = false
 
 
@@ -216,134 +204,62 @@ func _handle_grab_input() -> void:
 	var trigger_pressed = trigger_value > 0.5
 	var grip_pressed = grip_value > 0.5
 	
-	# Check release button through multiple methods for robustness
+	# Check release button through a single rising-edge on the configured action
 	var release_button_pressed = _check_release_button(controller)
-	
+
 	# Try to grab if trigger or grip pressed and not holding anything
 	if held_object == null:
 		if trigger_pressed or grip_pressed:
 			_try_grab_nearest()
-			if held_object != null:
-				_sticky_locked = true  # Lock for sticky modes
 
-	# Release logic based on mode
+	# Simple release: rising edge of the configured release action
 	else:
-		var should_release = false
-		match release_mode:
-			ReleaseMode.BUTTON_ONLY:
-				# Only release when A/X button is pressed
-				should_release = release_button_pressed and not _prev_release_button_pressed  # Rising edge
-
-			ReleaseMode.TRIGGER_RELEASE:
-				# Release when trigger/grip is released OR button pressed
-				var trigger_released = not trigger_pressed and not grip_pressed
-				var button_just_pressed = release_button_pressed and not _prev_release_button_pressed
-				should_release = trigger_released or button_just_pressed
-
-			ReleaseMode.STICKY_TRIGGER:
-				# Sticky toggle using trigger: press to toggle lock, release to drop when unlocked
-				var trigger_just_pressed = trigger_pressed and not _prev_trigger_pressed
-				var trigger_just_released = not trigger_pressed and _prev_trigger_pressed
-				if trigger_just_pressed and held_object != null:
-					_sticky_locked = not _sticky_locked
-				var button_just_pressed = release_button_pressed and not _prev_release_button_pressed
-				should_release = (not _sticky_locked and trigger_just_released) or button_just_pressed
-
-			ReleaseMode.STICKY_GRIP:
-				# Sticky toggle using grip: press to toggle lock, release to drop when unlocked
-				var grip_just_pressed = grip_pressed and not _prev_grip_pressed
-				var grip_just_released = not grip_pressed and _prev_grip_pressed
-				if grip_just_pressed and held_object != null:
-					_sticky_locked = not _sticky_locked
-				var button_just_pressed = release_button_pressed and not _prev_release_button_pressed
-				should_release = (not _sticky_locked and grip_just_released) or button_just_pressed
-
-			ReleaseMode.STICKY_GRIP_TRIGGER:
-				# Sticky toggle using either grip or trigger; release when either is released and unlocked
-				var press_just_pressed = (trigger_pressed and not _prev_trigger_pressed) or (grip_pressed and not _prev_grip_pressed)
-				var press_just_released = ((not trigger_pressed and _prev_trigger_pressed) or (not grip_pressed and _prev_grip_pressed))
-				if press_just_pressed and held_object != null:
-					_sticky_locked = not _sticky_locked
-				var button_just_pressed = release_button_pressed and not _prev_release_button_pressed
-				should_release = (not _sticky_locked and press_just_released) or button_just_pressed
-
-		if should_release:
+		if release_button_pressed and not _prev_release_button_pressed:
 			_release_object()
-			_sticky_locked = false
 	
-	# Store previous states
-	_prev_trigger_pressed = trigger_pressed
-	_prev_grip_pressed = grip_pressed
+	# Store previous release state for rising-edge detection
 	_prev_release_button_pressed = release_button_pressed
 
 
 func _check_release_button(controller: XRController3D) -> bool:
 	"""Check release button through multiple input methods for robustness"""
-	var pressed = false
-
 	# Only accept the configured release action (defaults to "ax_button")
 	var action := release_button
-
-	if debug_release_checks:
-		print("PhysicsHand: checking release action=", action, " on controller=", controller)
 
 	# 1) get_vector2 (axis/trackpad/thumbstick)
 	if controller.has_method("get_vector2"):
 		var v = controller.get_vector2(action)
 		if v.length() > 0.3:
-			if debug_release_checks: print("PhysicsHand: matched via get_vector2 -> ", action, " value=", v)
 			return true
 
 	# 2) get_axis / get_float style
 	if controller.has_method("get_axis"):
 		var f = controller.get_axis(action)
 		if abs(f) > 0.3:
-			if debug_release_checks: print("PhysicsHand: matched via get_axis -> ", action, " value=", f)
 			return true
 	if controller.has_method("get_float"):
 		var ff = controller.get_float(action)
 		if abs(ff) > 0.3:
-			if debug_release_checks: print("PhysicsHand: matched via get_float -> ", action, " value=", ff)
 			return true
 
 	# 3) boolean/button getters
 	if controller.has_method("get_bool"):
 		if controller.get_bool(action):
-			if debug_release_checks: print("PhysicsHand: matched via get_bool -> ", action)
 			return true
 	if controller.has_method("get_pressed"):
 		if controller.get_pressed(action):
-			if debug_release_checks: print("PhysicsHand: matched via get_pressed -> ", action)
 			return true
 	if controller.has_method("get_button"):
 		if controller.get_button(action):
-			if debug_release_checks: print("PhysicsHand: matched via get_button -> ", action)
 			return true
 	if controller.has_method("is_button_pressed"):
 		if controller.is_button_pressed(action):
-			if debug_release_checks: print("PhysicsHand: matched via is_button_pressed -> ", action)
 			return true
 
 	# 4) InputMap action for the configured action name
 	if InputMap.has_action(action):
 		if Input.is_action_pressed(action):
-			if debug_release_checks: print("PhysicsHand: matched via InputMap action -> ", action)
 			return true
-
-	# 5) (optional) joypad fallback - only check if explicitly needed
-	# Note: keeping this simple; we don't map arbitrary indices to action names here.
-	# If you want to enable joypad fallback, uncomment below.
-	# if controller.has_method("get_tracker_hand"):
-	#     if debug_release_checks: print("PhysicsHand: attempting joypad fallback checks")
-	#     var joy_id = 0
-	#     var idxs = [JOY_BUTTON_A, JOY_BUTTON_X]
-	#     for bi in idxs:
-	#         if Input.is_joy_button_pressed(joy_id, bi):
-	#             if debug_release_checks: print("PhysicsHand: matched via joypad index -> ", bi)
-	#             return true
-
-	if debug_release_checks:
-		print("PhysicsHand: no release input matched for action=", action)
 
 	return false
 
