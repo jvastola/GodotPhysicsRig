@@ -14,6 +14,7 @@ extends Node3D
 @onready var physics_hand_right: RigidBody3D = $PhysicsHandRight
 @onready var head_area: Area3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea
 @onready var head_collision_shape: CollisionShape3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadCollisionShape
+@onready var head_mesh: MeshInstance3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadMesh
 
 # Player settings
 var player_height := 0.0  # Using headset tracking; keep 0 to avoid artificial offset
@@ -45,6 +46,9 @@ func _ready() -> void:
 
 	if head_collision_shape and head_collision_shape.shape and head_collision_shape.shape is SphereShape3D:
 		head_collision_shape.shape.radius = head_radius
+	
+	if head_mesh:
+		head_mesh.visible = show_head_mesh
 
 
 func _process(delta: float) -> void:
@@ -215,3 +219,18 @@ func _handle_smooth_turn(input: float, delta: float) -> void:
 	"""Handle smooth turning"""
 	# Store smooth input for physics step to apply
 	_smooth_input = input
+
+
+func apply_texture_to_head(texture: ImageTexture) -> void:
+	"""Apply a texture to the head mesh"""
+	if not head_mesh:
+		print("XRPlayer: head_mesh is null, cannot apply texture")
+		return
+	
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = texture
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.cull_mode = BaseMaterial3D.CULL_BACK  # Show front faces (outside)
+	head_mesh.material_override = mat
+	print("XRPlayer: Applied texture to head mesh, visible: ", head_mesh.visible, ", mesh: ", head_mesh.mesh)

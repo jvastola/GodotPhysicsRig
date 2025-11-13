@@ -184,6 +184,7 @@ func paint_cell(global_point: Vector3, color_override: Variant = null) -> bool:
 		print_debug("subdivided_cube: painted cell", fi, ix, iy, "color", new_color)
 	build_mesh()
 	cell_painted.emit(fi, ix, iy, new_color)
+	_update_player_head_texture()
 	return true
 
 func _apply_paint_event(event: Dictionary) -> void:
@@ -327,3 +328,72 @@ func _create_color_row(nx: int, rng: RandomNumberGenerator) -> Array:
 	for _x in range(nx):
 		row.append(Color(rng.randf(), rng.randf(), rng.randf(), 1.0))
 	return row
+
+
+func _update_player_head_texture() -> void:
+	"""Generate texture from current cell colors and apply to XR player head mesh"""
+	var player_body = get_tree().get_first_node_in_group("player")
+	if not player_body:
+		print("subdivided_cube: No player found in group 'player'")
+		return
+	
+	# The player script is on the parent of PlayerBody
+	var player = player_body.get_parent()
+	if not player:
+		print("subdivided_cube: PlayerBody has no parent")
+		return
+	
+	print("subdivided_cube: Found player: ", player.name, ", script: ", player.get_script())
+	
+	if not player.has_method("apply_texture_to_head"):
+		print("subdivided_cube: Player does not have apply_texture_to_head method")
+		return
+	
+	print("subdivided_cube: Found player, generating texture...")
+	var texture := _generate_texture_from_cells()
+	if texture:
+		print("subdivided_cube: Applying texture to player head, size: ", texture.get_width(), "x", texture.get_height())
+		player.apply_texture_to_head(texture)
+	else:
+		print("subdivided_cube: Failed to generate texture")
+
+
+func _generate_texture_from_cells() -> ImageTexture:
+	"""Generate a texture from the current cell colors with UV layout"""
+	var nx: int = max(1, subdivisions)
+	var ny: int = max(1, subdivisions)
+	
+	print("subdivided_cube: Generating texture with subdivisions: ", nx, "x", ny, ", faces: ", _cell_colors.size())
+	
+	# Create a texture that maps the 6 faces in a cube map layout
+	# Layout: 2x3 grid where each face is nx x ny pixels
+	var tex_width := nx * 3  # 3 faces wide
+	var tex_height := ny * 2  # 2 faces tall
+	
+	var img := Image.create(tex_width, tex_height, false, Image.FORMAT_RGBA8)
+	
+	# Godot BoxMesh UV layout:
+	# [left][top][right]
+	# [back][front][bottom]
+	# Face indices: 0=front(+z), 1=back(-z), 2=right(+x), 3=left(-x), 4=top(+y), 5=bottom(-y)
+	
+	# Only use the inside faces (inverted/backfaces) - skip outside faces
+	# Since the head mesh has flip_faces or is viewed from inside, we want the inner surface
+	var face_positions := [
+		Vector2i(nx, ny),      # 0: front (+z) - bottom center
+		Vector2i(0, ny),       # 1: back (-z) - bottom left
+		Vector2i(nx * 2, 0),   # 2: right (+x) - top right
+		Vector2i(0, 0),        # 3: left (-x) - top left
+		Vector2i(nx, 0),       # 4: top (+y) - top center
+		Vector2i(nx * 2, ny)   # 5: bottom (-y) - bottom right
+	]
+	
+	# Fill with cell colors from all faces
+	for fi in range(FACE_DEFS.size()):
+		var offset: Vector2i = face_positions[fi]
+		for iy in range(ny):
+			for ix in range(nx):
+				var color: Color = _cell_colors[fi][iy][ix]
+				img.set_pixel(offset.x + ix, offset.y + iy, color)
+	
+	return ImageTexture.create_from_image(img)
