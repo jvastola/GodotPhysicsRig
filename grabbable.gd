@@ -314,11 +314,29 @@ func _save_grab_state(hand: RigidBody3D) -> void:
 	if prototype_scene and prototype_scene.resource_path and prototype_scene.resource_path != "":
 		scene_to_save = prototype_scene.resource_path
 
+	# If we have a hand, compute the transform of the object relative to that hand
+	var rel_pos_arr: Array = []
+	var rel_rot_arr: Array = []
+	if is_instance_valid(hand):
+		var hand_inv = hand.global_transform.affine_inverse()
+		var rel_tf: Transform3D = hand_inv * global_transform
+		var rel_pos: Vector3 = rel_tf.origin
+		var rel_quat: Quaternion = rel_tf.basis.get_rotation_quaternion()
+		rel_pos_arr = [rel_pos.x, rel_pos.y, rel_pos.z]
+		rel_rot_arr = [rel_quat.x, rel_quat.y, rel_quat.z, rel_quat.w]
+		# Debug: log hand and relative transforms being saved
+		print("Grabbable: Saving state for ", save_id)
+		print("  - hand global_transform: ", hand.global_transform)
+		print("  - object global_transform: ", global_transform)
+		print("  - relative transform (pos, quat): ", rel_pos_arr, rel_rot_arr)
+
 	SaveManager.save_grabbed_object(
 		save_id,
 		is_grabbed,
 		hand_name,
 		global_position,
 		global_transform.basis.get_rotation_quaternion(),
-		scene_to_save
+		scene_to_save,
+		rel_pos_arr,
+		rel_rot_arr
 	)

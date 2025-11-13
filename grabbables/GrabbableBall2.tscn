@@ -1,0 +1,30 @@
+[gd_scene format=3 uid="uid://grabbable_ball2"]
+
+[ext_resource path="res://grabbable.gd" type="Script" id="1"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_slkg3"]
+size = Vector3(0.1, 1, 0.1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ra6av"]
+size = Vector3(0.1, 1, 0.1)
+
+[node name="GrabbableBall2" type="RigidBody3D"]
+mass = 0.1
+gravity_scale = 0.3
+contact_monitor = true
+max_contacts_reported = 4
+script = ExtResource(1)
+groups = ["grabbable"]
+grab_mode = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GrabbableBall2"]
+shape = SubResource("BoxShape3D_slkg3")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="GrabbableBall2"]
+mesh = SubResource("BoxMesh_ra6av")
+
+[node name="Label3D" type="Label3D" parent="GrabbableBall2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+text = "Free Grab"
+font_size = 24
+outline_size = 8

@@ -122,7 +122,7 @@ func load_head_paint() -> Dictionary:
 
 # --- GRABBED OBJECTS PERSISTENCE ---
 
-func save_grabbed_object(object_id: String, is_grabbed: bool, hand_name: String = "", position: Vector3 = Vector3.ZERO, rotation: Quaternion = Quaternion.IDENTITY, scene: String = "") -> void:
+func save_grabbed_object(object_id: String, is_grabbed: bool, hand_name: String = "", position: Vector3 = Vector3.ZERO, rotation: Quaternion = Quaternion.IDENTITY, scene: String = "", relative_position: Array = [], relative_rotation: Array = []) -> void:
 	"""Save individual grabbable object state"""
 	if not _save_data.has("grabbed_objects"):
 		_save_data["grabbed_objects"] = {}
@@ -132,7 +132,9 @@ func save_grabbed_object(object_id: String, is_grabbed: bool, hand_name: String 
 		"hand": hand_name,
 		"position": [position.x, position.y, position.z],
 		"rotation": [rotation.x, rotation.y, rotation.z, rotation.w],
-		"scene": scene
+		"scene": scene,
+		"relative_position": relative_position,
+		"relative_rotation": relative_rotation
 	}
 	
 	_save_data["grabbed_objects"][object_id] = obj_data

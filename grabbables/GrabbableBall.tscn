@@ -1,0 +1,37 @@
+[gd_scene format=3 uid="uid://grabbable_ball"]
+
+[ext_resource path="res://grabbable.gd" type="Script" id="1"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_ball"]
+radius = 0.15
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ball"]
+albedo_color = Color(0.2, 0.6, 0.9, 1)
+metallic = 0.3
+roughness = 0.2
+
+[sub_resource type="SphereMesh" id="SphereMesh_ball"]
+material = SubResource("StandardMaterial3D_ball")
+radius = 0.15
+height = 0.3
+
+[node name="GrabbableBall" type="RigidBody3D"]
+mass = 0.1
+gravity_scale = 0.3
+contact_monitor = true
+max_contacts_reported = 4
+script = ExtResource(1)
+groups = ["grabbable"]
+grab_mode = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GrabbableBall"]
+shape = SubResource("SphereShape3D_ball")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="GrabbableBall"]
+mesh = SubResource("SphereMesh_ball")
+
+[node name="Label3D" type="Label3D" parent="GrabbableBall"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+text = "Free Grab"
+font_size = 24
+outline_size = 8

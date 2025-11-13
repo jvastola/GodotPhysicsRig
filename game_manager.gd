@@ -36,6 +36,7 @@ func _deferred_restore_saved_grabs() -> void:
 	# Run a couple frames to ensure nodes are ready
 	await get_tree().process_frame
 	await get_tree().process_frame
+	print("GameManager: _deferred_restore_saved_grabs running")
 	# Guard: need SaveManager and current_world and player_instance
 	if not SaveManager or not current_world or not player_instance:
 		return
@@ -48,6 +49,8 @@ func _deferred_restore_saved_grabs() -> void:
 		var entry = saved[save_id]
 		if not entry.get("grabbed", false):
 			continue
+		# Diagnostic output for saved entry
+		print("GameManager: Restore entry for ", save_id, ": ", entry)
 		# Previously we skipped restores when the saved scene didn't match the
 		# currently loaded world. That caused misses when scenes are reparented
 		# or scene file paths are not available at runtime. Instead, just try
@@ -78,6 +81,7 @@ func _deferred_restore_saved_grabs() -> void:
 					candidate_names.append(str(x.name))
 			print("GameManager: Could not find saved grabbable node: ", save_id, ". Candidates: ", candidate_names)
 			if saved_scene_path != "":
+				print("GameManager: saved scene path present for ", save_id, ": ", saved_scene_path)
 				# Attempt to load the saved resource. Only instantiate if it is a PackedScene
 				var res = ResourceLoader.load(saved_scene_path)
 				if res and res is PackedScene:
@@ -86,19 +90,26 @@ func _deferred_restore_saved_grabs() -> void:
 						# Place instance in the current world and apply saved transform if available
 						current_world.add_child(inst)
 						# If the saved data includes a position/rotation array, apply it
-						var pos = null
-						var rot = null
+						var has_pos := false
+						var has_rot := false
+						var pos: Vector3 = Vector3.ZERO
+						var quat: Quaternion = Quaternion.IDENTITY
 						if entry.has("position") and entry["position"] is Array and entry["position"].size() >= 3:
 							var p = entry["position"]
 							pos = Vector3(p[0], p[1], p[2])
+							has_pos = true
 						if entry.has("rotation") and entry["rotation"] is Array and entry["rotation"].size() >= 4:
 							var r = entry["rotation"]
-							rot = Quaternion(r[0], r[1], r[2], r[3])
-						if pos:
-							inst.global_position = pos
-						if rot:
-							# Convert quaternion to basis
-							inst.global_rotation = rot.get_euler()
+							quat = Quaternion(r[0], r[1], r[2], r[3])
+							has_rot = true
+						# Prefer setting the full global_transform when both are present
+						if has_pos and has_rot:
+							inst.global_transform = Transform3D(Basis(quat), pos)
+						else:
+							if has_pos:
+								inst.global_position = pos
+							if has_rot:
+								inst.global_rotation = quat.get_euler()
 						# If inst exposes a save_id property, set it to match the saved id
 						var prop_list: Array = inst.get_property_list()
 						var has_save_prop := false
@@ -120,7 +131,55 @@ func _deferred_restore_saved_grabs() -> void:
 				else:
 					# If resource is not a PackedScene, skip instancing
 					print("GameManager: Saved scene path is not a PackedScene or missing: ", saved_scene_path)
-				# If we still have no target after this, continue to next saved id
+			# If instantiation from saved_scene_path did not yield a target, try fallback
+			if not target:
+				var proto_path := _find_prototype_scene_for_save_id(save_id)
+				if proto_path != "":
+					print("GameManager: Found prototype fallback for ", save_id, ": ", proto_path)
+					var proto_res = ResourceLoader.load(proto_path)
+					if proto_res and proto_res is PackedScene:
+						var proto_inst = proto_res.instantiate()
+						if proto_inst:
+							current_world.add_child(proto_inst)
+							# Apply saved transform using full Transform3D when both position and rotation are available
+							var has_pos2 := false
+							var has_rot2 := false
+							var pos2: Vector3 = Vector3.ZERO
+							var quat2: Quaternion = Quaternion.IDENTITY
+							if entry.has("position") and entry["position"] is Array and entry["position"].size() >= 3:
+								var pp = entry["position"]
+								pos2 = Vector3(pp[0], pp[1], pp[2])
+								has_pos2 = true
+							if entry.has("rotation") and entry["rotation"] is Array and entry["rotation"].size() >= 4:
+								var rr = entry["rotation"]
+								quat2 = Quaternion(rr[0], rr[1], rr[2], rr[3])
+								has_rot2 = true
+							if has_pos2 and has_rot2:
+								proto_inst.global_transform = Transform3D(Basis(quat2), pos2)
+							else:
+								if has_pos2:
+									proto_inst.global_position = pos2
+								if has_rot2:
+									proto_inst.global_rotation = quat2.get_euler()
+							# set save_id if present
+							var props: Array = proto_inst.get_property_list()
+							var has_save := false
+							for pr in props:
+								if pr is Dictionary and pr.has("name") and pr["name"] == "save_id":
+									has_save = true
+									break
+							if has_save:
+								proto_inst.set("save_id", save_id)
+							if proto_inst.has_method("try_grab"):
+								target = proto_inst
+								print("GameManager: Fallback instantiated and will use: ", proto_inst.name)
+							else:
+								proto_inst.queue_free()
+					else:
+						print("GameManager: Failed to load/instantiate prototype: ", proto_path)
+				else:
+					print("GameManager: No prototype fallback for ", save_id)
+			# If we still have no target after this, continue to next saved id
 			if not target:
 				continue
 		if not target.has_method("try_grab"):
@@ -142,6 +201,26 @@ func _deferred_restore_saved_grabs() -> void:
 			print("GameManager: Could not find hand '" + str(hand_name) + "' to restore ", save_id)
 			continue
 
+		# If the save contains a transform relative to the hand, apply it so
+		# the object will align correctly when the hand computes offsets.
+		if entry.has("relative_position") and entry.has("relative_rotation") and entry["relative_position"] is Array and entry["relative_rotation"] is Array and entry["relative_position"].size() == 3 and entry["relative_rotation"].size() == 4:
+			var rp = entry["relative_position"]
+			var rr = entry["relative_rotation"]
+			var rel_pos = Vector3(rp[0], rp[1], rp[2])
+			var rel_quat = Quaternion(rr[0], rr[1], rr[2], rr[3])
+			# Debug: log hand and saved relative transforms
+			if is_instance_valid(hand):
+				print("GameManager: Restoring ", save_id, " to hand ", hand_name)
+				print("  - hand global_transform: ", hand.global_transform)
+				print("  - saved relative pos/quaternion: ", rel_pos, rel_quat)
+			# Compute world transform so that: world_tf = hand.global_transform * rel_tf
+			var rel_tf = Transform3D(Basis(rel_quat), rel_pos)
+			if is_instance_valid(hand):
+				var computed_world: Transform3D = hand.global_transform * rel_tf
+				# Debug: computed world transform we're about to apply
+				print("  - computed world transform: ", computed_world)
+				target.global_transform = computed_world
+				print("GameManager: Applied relative transform for ", save_id)
 		# Attempt to grab the object with the hand (deferred so _ready finishes)
 		target.call_deferred("try_grab", hand)
 		print("GameManager: Restored grabbed object ", save_id, " to hand ", hand_name)
@@ -321,6 +400,15 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 		print("GameManager: Player maintained previous global position at ", old_global_pos)
 
 	# Finished changing scene
+	# If we just entered the main scene, schedule restoration of saved grabs
+	var joined_main := false
+	if typeof(scene_path) == TYPE_STRING and scene_path.find("MainScene.tscn") != -1:
+		joined_main = true
+	elif current_world and current_world.name == "MainScene":
+		joined_main = true
+	if joined_main:
+		print("GameManager: Entered MainScene — scheduling saved-grabbable restore")
+		call_deferred("_deferred_restore_saved_grabs")
 	_is_changing_scene = false
 
 
@@ -337,6 +425,45 @@ func _find_spawn_point(scene_root: Node, spawn_name: String = "SpawnPoint") -> N
 		return spawn
 	
 	return null
+
+
+func _find_prototype_scene_for_save_id(save_id: String) -> String:
+	"""Search `res://grabbables` for a PackedScene whose root node matches the saved id.
+	Returns the resource path or empty string if not found."""
+	var dir := DirAccess.open("res://grabbables")
+	if not dir:
+		return ""
+
+	dir.list_dir_begin()
+	var file_name := dir.get_next()
+	var attempts := 0
+	while file_name != "":
+		attempts += 1
+		if attempts > 500:
+			break
+		if not dir.current_is_dir():
+			if file_name.ends_with(".tscn"):
+				var path := "res://grabbables/" + file_name
+				var res = ResourceLoader.load(path)
+				if res and res is PackedScene:
+					var tmp = res.instantiate()
+					if tmp:
+						var matched := false
+						# Check name match
+						if str(tmp.name) == save_id:
+							matched = true
+						# Check save_id property if present
+						if not matched and tmp.has_method("get") and tmp.get("save_id") != null:
+							if str(tmp.get("save_id")) == save_id:
+								matched = true
+						if matched:
+							tmp.queue_free()
+							dir.list_dir_end()
+							return path
+						tmp.queue_free()
+		file_name = dir.get_next()
+	dir.list_dir_end()
+	return ""
 
 
 func get_player() -> Node:
