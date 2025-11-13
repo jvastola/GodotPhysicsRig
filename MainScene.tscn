@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://ct42jl8bcsjkj" path="res://floor_interactable.gd" id="4_floor_script"]
 [ext_resource type="PackedScene" uid="uid://b2gkx1eim00mw" path="res://UIViewport3D.tscn" id="5_ui_viewport"]
 [ext_resource type="Shader" path="res://red_sphere_layered.gdshader" id="6_red_shader"]
+[ext_resource type="Script" uid="uid://c533s0w2t38vj" path="res://mirror.gd" id="7_mirror"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -20,13 +21,8 @@ material = SubResource("StandardMaterial3D_floor")
 size = Vector3(20, 1, 20)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_mirror"]
-size = Vector2(2, 3)
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_mirror"]
-transparency = 1
-albedo_color = Color(0.8, 0.9, 1, 0.3)
-metallic = 1.0
-roughness = 0.0
+flip_faces = true
+orientation = 2
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_blue_cube"]
 albedo_color = Color(0, 0, 1, 1)
@@ -58,7 +54,7 @@ transform = Transform3D(-0.866023, -0.433016, 0.250001, 0, 0.499998, 0.866027, -
 shadow_enabled = true
 
 [node name="Floor" type="StaticBody3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.7, 0)
 collision_layer = 33
 collision_mask = 0
 script = ExtResource("4_floor_script")
@@ -94,9 +90,10 @@ target_scene = "res://SecondRoom.tscn"
 transform = Transform3D(1.00696, 0, 0, 0, 1.00696, 0, 0, 0, 1.00696, 3.23463, 1, -2)
 
 [node name="Mirror" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.5, 2)
+transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 0, 0)
 mesh = SubResource("PlaneMesh_mirror")
-surface_material_override/0 = SubResource("StandardMaterial3D_mirror")
+script = ExtResource("7_mirror")
+debug_line_length = 7.0
 
 [node name="BlueCube" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.50977, 1, -2.50433)
