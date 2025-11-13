@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=16 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://Portal.tscn" id="2_portal"]
@@ -6,7 +6,7 @@
 [ext_resource type="Script" uid="uid://ct42jl8bcsjkj" path="res://floor_interactable.gd" id="4_floor_script"]
 [ext_resource type="PackedScene" uid="uid://b2gkx1eim00mw" path="res://UIViewport3D.tscn" id="5_ui_viewport"]
 [ext_resource type="Shader" path="res://red_sphere_layered.gdshader" id="6_red_shader"]
-[ext_resource type="Script" uid="uid://c533s0w2t38vj" path="res://mirror.gd" id="7_mirror"]
+[ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://viewport_mirror.gd" id="8_viewport_mirror"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -19,10 +19,6 @@ albedo_color = Color(0.322343, 0.283225, 0.582868, 1)
 [sub_resource type="BoxMesh" id="BoxMesh_floor"]
 material = SubResource("StandardMaterial3D_floor")
 size = Vector3(20, 1, 20)
-
-[sub_resource type="PlaneMesh" id="PlaneMesh_mirror"]
-flip_faces = true
-orientation = 2
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_blue_cube"]
 albedo_color = Color(0, 0, 1, 1)
@@ -50,7 +46,7 @@ rings = 16
 environment = SubResource("Environment_main")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-transform = Transform3D(-0.866023, -0.433016, 0.250001, 0, 0.499998, 0.866027, -0.500003, 0.749999, -0.43301, 0, 5, 0)
+transform = Transform3D(-0.866024, -0.433016, 0.250001, 0.460194, -0.494776, 0.737169, -0.195511, 0.753454, 0.627759, 0, 5, 5.02959)
 shadow_enabled = true
 
 [node name="Floor" type="StaticBody3D" parent="."]
@@ -74,7 +70,7 @@ layers = 33
 cast_shadow = 0
 script = ExtResource("3_cube")
 size = Vector3(0.25, 0.25, 0.25)
-subdivisions = 8
+subdivisions = 12
 seed = 12345
 material_unshaded = true
 flip_winding = true
@@ -89,11 +85,11 @@ target_scene = "res://SecondRoom.tscn"
 [node name="UIViewport3D" parent="." instance=ExtResource("5_ui_viewport")]
 transform = Transform3D(1.00696, 0, 0, 0, 1.00696, 0, 0, 0, 1.00696, 3.23463, 1, -2)
 
-[node name="Mirror" type="MeshInstance3D" parent="."]
-transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 0, 0)
-mesh = SubResource("PlaneMesh_mirror")
-script = ExtResource("7_mirror")
-debug_line_length = 7.0
+[node name="ViewportMirror" type="Node3D" parent="."]
+script = ExtResource("8_viewport_mirror")
+ResolutionPerUnit = 500
+MainCamPath = NodePath("../XRPlayer/PlayerBody/XROrigin3D/XRCamera3D")
+MirrorColor = Color(1, 1, 1, 1)
 
 [node name="BlueCube" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.50977, 1, -2.50433)
