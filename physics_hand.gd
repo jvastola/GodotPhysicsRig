@@ -23,7 +23,7 @@ extends RigidBody3D
 @export var controller_name: String = "left_hand"  # "left_hand" or "right_hand"
 @export var grab_action_trigger: String = "trigger"  # Trigger to grab
 @export var grab_action_grip: String = "grip"  # Grip to grab
-@export var release_button: String = "by_button"  # Button to release
+@export var release_button: String = "ax_button"  # Button to release (OpenXR 'ax_button' for A/X)
 
 enum ReleaseMode {
 	BUTTON_ONLY,      # Only release with A/X button press
@@ -34,6 +34,7 @@ enum ReleaseMode {
 }
 
 @export var release_mode: ReleaseMode = ReleaseMode.BUTTON_ONLY
+@export var debug_release_checks: bool = false
 
 var _previous_position: Vector3
 
@@ -65,16 +66,11 @@ func _ready() -> void:
 	# Add to physics_hand group for physics interaction with grabbables
 	add_to_group("physics_hand")
 	
-	# Set up controller actions
-	if controller_name == "left_hand":
-		grab_action_trigger = "trigger_click"
-		grab_action_grip = "grip_click"
-		release_button = "x_button"  # X button for left hand
-	else:
-		grab_action_trigger = "trigger_click"
-		grab_action_grip = "grip_click"
-		release_button = "a_button"  # A button for right hand
-	
+	# Set up controller action
+	grab_action_trigger = "trigger_click"
+	grab_action_grip = "grip_click"
+	# Use OpenXR action name for left-hand X/A button (Quest/OpenXR uses ax_button)
+	release_button = "ax_button"
 
 func _physics_process(delta: float) -> void:
 	if not is_instance_valid(target): return
@@ -284,23 +280,72 @@ func _handle_grab_input() -> void:
 func _check_release_button(controller: XRController3D) -> bool:
 	"""Check release button through multiple input methods for robustness"""
 	var pressed = false
-	
-	# Method 1: XRController3D button API
+
+	# Only accept the configured release action (defaults to "ax_button")
+	var action := release_button
+
+	if debug_release_checks:
+		print("PhysicsHand: checking release action=", action, " on controller=", controller)
+
+	# 1) get_vector2 (axis/trackpad/thumbstick)
+	if controller.has_method("get_vector2"):
+		var v = controller.get_vector2(action)
+		if v.length() > 0.3:
+			if debug_release_checks: print("PhysicsHand: matched via get_vector2 -> ", action, " value=", v)
+			return true
+
+	# 2) get_axis / get_float style
+	if controller.has_method("get_axis"):
+		var f = controller.get_axis(action)
+		if abs(f) > 0.3:
+			if debug_release_checks: print("PhysicsHand: matched via get_axis -> ", action, " value=", f)
+			return true
+	if controller.has_method("get_float"):
+		var ff = controller.get_float(action)
+		if abs(ff) > 0.3:
+			if debug_release_checks: print("PhysicsHand: matched via get_float -> ", action, " value=", ff)
+			return true
+
+	# 3) boolean/button getters
+	if controller.has_method("get_bool"):
+		if controller.get_bool(action):
+			if debug_release_checks: print("PhysicsHand: matched via get_bool -> ", action)
+			return true
+	if controller.has_method("get_pressed"):
+		if controller.get_pressed(action):
+			if debug_release_checks: print("PhysicsHand: matched via get_pressed -> ", action)
+			return true
+	if controller.has_method("get_button"):
+		if controller.get_button(action):
+			if debug_release_checks: print("PhysicsHand: matched via get_button -> ", action)
+			return true
 	if controller.has_method("is_button_pressed"):
-		pressed = controller.is_button_pressed(release_button)
-	
-	# Method 2: InputMap action (if exists)
-	if not pressed and InputMap.has_action(release_button):
-		pressed = Input.is_action_pressed(release_button)
-	
-	# Method 3: Direct joypad button check (fallback)
-	if not pressed and controller.has_method("get_tracker_hand"):
-		var joy_id = 0  # Try first joypad
-		# A button is typically index 0, X is typically index 2
-		var button_index = JOY_BUTTON_A if release_button == "a_button" else JOY_BUTTON_X
-		pressed = Input.is_joy_button_pressed(joy_id, button_index)
-	
-	return pressed
+		if controller.is_button_pressed(action):
+			if debug_release_checks: print("PhysicsHand: matched via is_button_pressed -> ", action)
+			return true
+
+	# 4) InputMap action for the configured action name
+	if InputMap.has_action(action):
+		if Input.is_action_pressed(action):
+			if debug_release_checks: print("PhysicsHand: matched via InputMap action -> ", action)
+			return true
+
+	# 5) (optional) joypad fallback - only check if explicitly needed
+	# Note: keeping this simple; we don't map arbitrary indices to action names here.
+	# If you want to enable joypad fallback, uncomment below.
+	# if controller.has_method("get_tracker_hand"):
+	#     if debug_release_checks: print("PhysicsHand: attempting joypad fallback checks")
+	#     var joy_id = 0
+	#     var idxs = [JOY_BUTTON_A, JOY_BUTTON_X]
+	#     for bi in idxs:
+	#         if Input.is_joy_button_pressed(joy_id, bi):
+	#             if debug_release_checks: print("PhysicsHand: matched via joypad index -> ", bi)
+	#             return true
+
+	if debug_release_checks:
+		print("PhysicsHand: no release input matched for action=", action)
+
+	return false
 
 
 func _try_grab_nearest() -> void:

@@ -204,7 +204,6 @@ script = ExtResource("3_physics_hand")
 rot_frequency = 3000.0
 player_rigidbody = NodePath("../PlayerBody")
 target = NodePath("../PlayerBody/XROrigin3D/LeftController")
-release_button = "ax_button"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="PhysicsHandLeft"]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
@@ -226,7 +225,6 @@ script = ExtResource("3_physics_hand")
 player_rigidbody = NodePath("../PlayerBody")
 target = NodePath("../PlayerBody/XROrigin3D/RightController")
 controller_name = "right_hand"
-release_button = "ax_button"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="PhysicsHandRight"]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
