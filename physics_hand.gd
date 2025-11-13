@@ -33,7 +33,9 @@ var _is_colliding: bool = false
 
 # Grabbing state
 var held_object: RigidBody3D = null
-var nearby_grabbables: Array[RigidBody3D] = []
+# Use an untyped Array for nearby_grabbables to avoid TypedArray validation
+# errors when non-RigidBody3D nodes (e.g., StaticBody3D) trigger enter/exit.
+var nearby_grabbables: Array = []
 
 # Sticky trigger state tracking
 var _prev_release_button_pressed: bool = false

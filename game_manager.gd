@@ -28,6 +28,124 @@ func _setup_initial_world() -> void:
 	if player_instance:
 		print("GameManager: Initial player tracked: ", player_instance.name)
 
+	# Allow the world and player to finish initializing, then restore any saved grabbed objects
+	call_deferred("_deferred_restore_saved_grabs")
+
+
+func _deferred_restore_saved_grabs() -> void:
+	# Run a couple frames to ensure nodes are ready
+	await get_tree().process_frame
+	await get_tree().process_frame
+	# Guard: need SaveManager and current_world and player_instance
+	if not SaveManager or not current_world or not player_instance:
+		return
+
+	var saved: Dictionary = SaveManager.get_all_grabbed_objects()
+	if saved.is_empty():
+		return
+
+	for save_id in saved.keys():
+		var entry = saved[save_id]
+		if not entry.get("grabbed", false):
+			continue
+		# Previously we skipped restores when the saved scene didn't match the
+		# currently loaded world. That caused misses when scenes are reparented
+		# or scene file paths are not available at runtime. Instead, just try
+		# to find the node by id in the current world and skip if it's not
+		# present — that's more robust across different load flows.
+
+		# Find node by save_id. Search all nodes in the 'grabbable' group and
+		# match either the node.name or its `save_id` property. This is more
+		# robust than relying on scene search paths which may vary at runtime.
+		var target: Node = null
+		var candidates := get_tree().get_nodes_in_group("grabbable")
+		for c in candidates:
+			if not is_instance_valid(c):
+				continue
+			var c_name := str(c.name)
+			var c_save_id := ""
+			if c.has_method("get") and c.get("save_id") != null:
+				c_save_id = str(c.get("save_id"))
+			if c_name == save_id or (c_save_id != "" and c_save_id == save_id):
+				target = c
+				break
+		if not target:
+			# Try to instantiate a saved prototype scene if provided in the save entry.
+			var saved_scene_path := str(entry.get("scene", ""))
+			var candidate_names: Array = []
+			for x in candidates:
+				if is_instance_valid(x):
+					candidate_names.append(str(x.name))
+			print("GameManager: Could not find saved grabbable node: ", save_id, ". Candidates: ", candidate_names)
+			if saved_scene_path != "":
+				# Attempt to load the saved resource. Only instantiate if it is a PackedScene
+				var res = ResourceLoader.load(saved_scene_path)
+				if res and res is PackedScene:
+					var inst = res.instantiate()
+					if inst:
+						# Place instance in the current world and apply saved transform if available
+						current_world.add_child(inst)
+						# If the saved data includes a position/rotation array, apply it
+						var pos = null
+						var rot = null
+						if entry.has("position") and entry["position"] is Array and entry["position"].size() >= 3:
+							var p = entry["position"]
+							pos = Vector3(p[0], p[1], p[2])
+						if entry.has("rotation") and entry["rotation"] is Array and entry["rotation"].size() >= 4:
+							var r = entry["rotation"]
+							rot = Quaternion(r[0], r[1], r[2], r[3])
+						if pos:
+							inst.global_position = pos
+						if rot:
+							# Convert quaternion to basis
+							inst.global_rotation = rot.get_euler()
+						# If inst exposes a save_id property, set it to match the saved id
+						var prop_list: Array = inst.get_property_list()
+						var has_save_prop := false
+						for p in prop_list:
+							if p is Dictionary and p.has("name") and p["name"] == "save_id":
+								has_save_prop = true
+								break
+						if has_save_prop:
+							inst.set("save_id", save_id)
+						# If the instance is grabbable, use it as target
+						if inst.has_method("try_grab"):
+							target = inst
+							print("GameManager: Instantiated missing grabbable from ", saved_scene_path, " as ", inst.name)
+						else:
+							# Not a grabbable, remove to avoid clutter
+							inst.queue_free()
+					else:
+						print("GameManager: Failed to instantiate resource: ", saved_scene_path)
+				else:
+					# If resource is not a PackedScene, skip instancing
+					print("GameManager: Saved scene path is not a PackedScene or missing: ", saved_scene_path)
+				# If we still have no target after this, continue to next saved id
+			if not target:
+				continue
+		if not target.has_method("try_grab"):
+			print("GameManager: Found node but it's not grabbable: ", save_id)
+			continue
+
+		# Determine which hand to restore to
+		var hand_name: String = str(entry.get("hand", ""))
+		var hand: Node = null
+		if hand_name == "left":
+			hand = player_instance.get_node_or_null("PhysicsHandLeft")
+		elif hand_name == "right":
+			hand = player_instance.get_node_or_null("PhysicsHandRight")
+		else:
+			# Fallback: prefer left hand
+			hand = player_instance.get_node_or_null("PhysicsHandLeft")
+
+		if not hand or not is_instance_valid(hand):
+			print("GameManager: Could not find hand '" + str(hand_name) + "' to restore ", save_id)
+			continue
+
+		# Attempt to grab the object with the hand (deferred so _ready finishes)
+		target.call_deferred("try_grab", hand)
+		print("GameManager: Restored grabbed object ", save_id, " to hand ", hand_name)
+
 
 func change_scene_with_player(scene_path: String, player_state: Dictionary = {}) -> void:
 	"""Change the world scene while keeping the player intact"""

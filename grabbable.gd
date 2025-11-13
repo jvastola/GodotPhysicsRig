@@ -12,6 +12,9 @@ enum GrabMode {
 @export var grab_anchor_rotation: Vector3 = Vector3.ZERO
 @export var save_id: String = ""  # Unique ID for persistence (defaults to node name)
 
+# Optional prototype PackedScene for reinstancing this grabbable when missing
+@export var prototype_scene: PackedScene
+
 # Scene persistence tracking
 var _scene_of_origin: String = ""  # Track which scene this object belongs to
 
@@ -306,12 +309,16 @@ func _save_grab_state(hand: RigidBody3D) -> void:
 		else:
 			hand_name = hand.name
 	
-	# Save with scene information
+	# Save with scene information. Prefer an explicit prototype_scene resource
+	var scene_to_save := _scene_of_origin
+	if prototype_scene and prototype_scene.resource_path and prototype_scene.resource_path != "":
+		scene_to_save = prototype_scene.resource_path
+
 	SaveManager.save_grabbed_object(
-		save_id, 
-		is_grabbed, 
-		hand_name, 
-		global_position, 
+		save_id,
+		is_grabbed,
+		hand_name,
+		global_position,
 		global_transform.basis.get_rotation_quaternion(),
-		_scene_of_origin
+		scene_to_save
 	)
