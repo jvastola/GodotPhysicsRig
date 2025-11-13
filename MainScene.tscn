@@ -70,7 +70,7 @@ layers = 33
 cast_shadow = 0
 script = ExtResource("3_cube")
 size = Vector3(0.25, 0.25, 0.25)
-subdivisions = 12
+subdivisions = 9
 seed = 12345
 material_unshaded = true
 flip_winding = true
@@ -86,7 +86,9 @@ target_scene = "res://SecondRoom.tscn"
 transform = Transform3D(1.00696, 0, 0, 0, 1.00696, 0, 0, 0, 1.00696, 3.23463, 1, -2)
 
 [node name="ViewportMirror" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.18547, 0.5, -2.96549)
 script = ExtResource("8_viewport_mirror")
+size = Vector2(2, 1.5)
 ResolutionPerUnit = 500
 MainCamPath = NodePath("../XRPlayer/PlayerBody/XROrigin3D/XRCamera3D")
 MirrorColor = Color(1, 1, 1, 1)
