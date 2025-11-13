@@ -34,6 +34,10 @@ func _ready() -> void:
 		_paint_rng.seed = seed + 1
 	else:
 		_paint_rng.randomize()
+	
+	# Try to load saved paint state
+	_load_paint_state()
+	
 	build_mesh()
 
 func build_mesh() -> void:
@@ -185,6 +189,10 @@ func paint_cell(global_point: Vector3, color_override: Variant = null) -> bool:
 	build_mesh()
 	cell_painted.emit(fi, ix, iy, new_color)
 	_update_player_head_texture()
+	
+	# Save paint state to disk
+	_save_paint_state()
+	
 	return true
 
 func _apply_paint_event(event: Dictionary) -> void:
@@ -397,3 +405,35 @@ func _generate_texture_from_cells() -> ImageTexture:
 				img.set_pixel(offset.x + ix, offset.y + iy, color)
 	
 	return ImageTexture.create_from_image(img)
+
+
+func _save_paint_state() -> void:
+	"""Save current paint state to SaveManager"""
+	if not SaveManager:
+		return
+	SaveManager.save_head_paint(_cell_colors, subdivisions)
+
+
+func _load_paint_state() -> void:
+	"""Load saved paint state from SaveManager"""
+	if not SaveManager:
+		return
+	
+	var paint_data := SaveManager.load_head_paint()
+	if paint_data.is_empty():
+		print("subdivided_cube: No saved paint state found")
+		return
+	
+	# Validate loaded data matches current subdivisions
+	var saved_subdivisions: int = paint_data.get("subdivisions", 1)
+	if saved_subdivisions != subdivisions:
+		print("subdivided_cube: Saved subdivisions (", saved_subdivisions, ") != current (", subdivisions, "), ignoring saved paint")
+		return
+	
+	var saved_colors: Array = paint_data.get("cell_colors", [])
+	if saved_colors.size() == FACE_DEFS.size():
+		_cell_colors = saved_colors
+		print("subdivided_cube: Loaded saved paint state with ", subdivisions, " subdivisions")
+		# Will rebuild mesh and update head texture after this returns
+	else:
+		print("subdivided_cube: Saved cell colors size mismatch, ignoring")

@@ -49,6 +49,9 @@ func _ready() -> void:
 	
 	if head_mesh:
 		head_mesh.visible = show_head_mesh
+	
+	# Restore saved headmesh texture
+	call_deferred("_restore_head_texture")
 
 
 func _process(delta: float) -> void:
@@ -234,3 +237,69 @@ func apply_texture_to_head(texture: ImageTexture) -> void:
 	mat.cull_mode = BaseMaterial3D.CULL_BACK  # Show front faces (outside)
 	head_mesh.material_override = mat
 	print("XRPlayer: Applied texture to head mesh, visible: ", head_mesh.visible, ", mesh: ", head_mesh.mesh)
+
+
+func _restore_head_texture() -> void:
+	"""Restore saved head texture from paint data on scene load"""
+	if not SaveManager:
+		return
+	
+	var paint_data := SaveManager.load_head_paint()
+	if paint_data.is_empty():
+		print("XRPlayer: No saved paint data to restore")
+		return
+	
+	# Try to find the subdivided cube in the scene to trigger update
+	var cube = get_tree().get_first_node_in_group("pointer_interactable")
+	if cube and cube.has_method("_update_player_head_texture"):
+		# Cube exists, let it handle the texture update
+		cube._update_player_head_texture()
+		print("XRPlayer: Head texture restored via painted cube")
+	else:
+		# No cube in scene, generate texture directly from saved data
+		print("XRPlayer: No painted cube in scene, generating texture from saved data")
+		_apply_saved_texture_directly(paint_data)
+
+
+func _apply_saved_texture_directly(paint_data: Dictionary) -> void:
+	"""Apply saved paint texture directly when no painted cube exists in scene"""
+	if not head_mesh:
+		return
+	
+	var subdivisions: int = paint_data.get("subdivisions", 1)
+	var cell_colors: Array = paint_data.get("cell_colors", [])
+	
+	if cell_colors.is_empty() or cell_colors.size() != 6:
+		print("XRPlayer: Invalid cell colors data")
+		return
+	
+	# Generate texture from cell colors (same logic as subdivided_cube)
+	var nx: int = max(1, subdivisions)
+	var ny: int = max(1, subdivisions)
+	var tex_width := nx * 3
+	var tex_height := ny * 2
+	
+	var img := Image.create(tex_width, tex_height, false, Image.FORMAT_RGBA8)
+	
+	# Face positions in texture layout
+	var face_positions := [
+		Vector2i(nx, ny),      # 0: front (+z)
+		Vector2i(0, ny),       # 1: back (-z)
+		Vector2i(nx * 2, 0),   # 2: right (+x)
+		Vector2i(0, 0),        # 3: left (-x)
+		Vector2i(nx, 0),       # 4: top (+y)
+		Vector2i(nx * 2, ny)   # 5: bottom (-y)
+	]
+	
+	# Fill with cell colors
+	for fi in range(6):
+		var offset: Vector2i = face_positions[fi]
+		for iy in range(ny):
+			for ix in range(nx):
+				if fi < cell_colors.size() and iy < cell_colors[fi].size() and ix < cell_colors[fi][iy].size():
+					var color: Color = cell_colors[fi][iy][ix]
+					img.set_pixel(offset.x + ix, offset.y + iy, color)
+	
+	var texture := ImageTexture.create_from_image(img)
+	apply_texture_to_head(texture)
+	print("XRPlayer: Applied saved texture directly (", subdivisions, " subdivisions)")

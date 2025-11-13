@@ -1,9 +1,10 @@
-[gd_scene load_steps=19 format=3 uid="uid://dtvg5mcsdmt1f"]
+[gd_scene load_steps=20 format=3 uid="uid://dtvg5mcsdmt1f"]
 
 [ext_resource type="Script" uid="uid://ct42jl8bcsjkj" path="res://floor_interactable.gd" id="1_ra6av"]
 [ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://Portal.tscn" id="2_portal"]
 [ext_resource type="Script" uid="uid://exskxheotyxj" path="res://grabbable.gd" id="3_grabbable"]
 [ext_resource type="Script" uid="uid://d4c6j0s4qypas" path="res://xr_action_tester.gd" id="4_xrtest"]
+[ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://viewport_mirror.gd" id="5_chm60"]
 [ext_resource type="Script" uid="uid://b5lycbvj1gy00" path="res://xr_test_screen.gd" id="5_xrscreen"]
 
 [sub_resource type="Environment" id="Environment_second"]
@@ -160,6 +161,14 @@ size = Vector2i(800, 450)
 layout_mode = 3
 anchors_preset = 0
 script = ExtResource("4_xrtest")
+
+[node name="ViewportMirror" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+script = ExtResource("5_chm60")
+size = Vector2(2, 1.5)
+ResolutionPerUnit = 500
+MainCamPath = NodePath("../XRPlayer/PlayerBody/XROrigin3D/XRCamera3D")
+MirrorColor = Color(1, 1, 1, 1)
 
 [node name="XRTestScreen" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, -0.10911, -0.99403, 0, 0.99403, -0.10911, 0, 1.6, -1)

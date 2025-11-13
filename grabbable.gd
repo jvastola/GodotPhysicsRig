@@ -10,6 +10,10 @@ enum GrabMode {
 @export var grab_mode: GrabMode = GrabMode.ANCHOR_GRAB
 @export var grab_anchor_offset: Vector3 = Vector3.ZERO
 @export var grab_anchor_rotation: Vector3 = Vector3.ZERO
+@export var save_id: String = ""  # Unique ID for persistence (defaults to node name)
+
+# Scene persistence tracking
+var _scene_of_origin: String = ""  # Track which scene this object belongs to
 
 # Internal state
 var is_grabbed := false
@@ -36,6 +40,18 @@ func _ready() -> void:
 	
 	# Connect to collision signals for physics interaction
 	body_entered.connect(_on_collision_entered)
+	
+	# Set save_id if not manually set
+	if save_id.is_empty():
+		save_id = name
+	
+	# Store scene of origin
+	var current_scene = get_tree().current_scene
+	if current_scene:
+		_scene_of_origin = current_scene.scene_file_path
+		print("Grabbable: ", save_id, " scene of origin: ", _scene_of_origin)
+	
+	# No need to restore - player persists across scenes so grabbed items stay grabbed
 
 
 func try_grab(hand: RigidBody3D) -> bool:
@@ -96,6 +112,10 @@ func try_grab(hand: RigidBody3D) -> bool:
 	
 	grabbed.emit(hand)
 	print("Grabbable: Object grabbed by ", hand.name)
+	
+	# Save grab state
+	_save_grab_state(hand)
+	
 	return true
 
 
@@ -151,6 +171,9 @@ func release() -> void:
 	grabbing_hand = null
 	
 	released.emit()
+	
+	# Save release state
+	_save_grab_state(null)
 
 
 func _physics_process(_delta: float) -> void:
@@ -193,3 +216,29 @@ func _on_collision_entered(body: Node) -> void:
 	# Object pushes player back (through hand)
 	var force_on_player = -force_on_object * 0.3  # Reduced for player comfort
 	player_body.apply_central_impulse(force_on_player * delta)
+
+
+func _save_grab_state(hand: RigidBody3D) -> void:
+	"""Save current grab state to SaveManager"""
+	if not SaveManager:
+		return
+	
+	var hand_name := ""
+	if is_instance_valid(hand):
+		# Determine which hand (left or right)
+		if "left" in hand.name.to_lower():
+			hand_name = "left"
+		elif "right" in hand.name.to_lower():
+			hand_name = "right"
+		else:
+			hand_name = hand.name
+	
+	# Save with scene information
+	SaveManager.save_grabbed_object(
+		save_id, 
+		is_grabbed, 
+		hand_name, 
+		global_position, 
+		global_transform.basis.get_rotation_quaternion(),
+		_scene_of_origin
+	)
