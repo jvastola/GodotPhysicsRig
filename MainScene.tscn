@@ -5,7 +5,7 @@
 [ext_resource type="Script" uid="uid://crqnjrrq5qvuw" path="res://subdivided_cube.gd" id="3_cube"]
 [ext_resource type="Script" uid="uid://ct42jl8bcsjkj" path="res://floor_interactable.gd" id="4_floor_script"]
 [ext_resource type="PackedScene" uid="uid://b2gkx1eim00mw" path="res://UIViewport3D.tscn" id="5_ui_viewport"]
-[ext_resource type="Shader" uid="uid://chjyjc8300le1" path="res://red_sphere_layered.gdshader" id="6_red_shader"]
+[ext_resource type="Shader" path="res://red_sphere_layered.gdshader" id="6_red_shader"]
 
 [sub_resource type="Environment" id="Environment_main"]
 

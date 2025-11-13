@@ -12,10 +12,14 @@ extends Node3D
 @onready var desktop_controller: Node = $PlayerBody/DesktopController
 @onready var physics_hand_left: RigidBody3D = $PhysicsHandLeft
 @onready var physics_hand_right: RigidBody3D = $PhysicsHandRight
+@onready var head_area: Area3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea
+@onready var head_collision_shape: CollisionShape3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadCollisionShape
 
 # Player settings
-var player_height := 1.7  # Standard VR player height
+var player_height := 0.0  # Using headset tracking; keep 0 to avoid artificial offset
 var is_vr_mode := false
+@export var head_radius: float = 0.18
+@export var show_head_mesh: bool = true
 
 # Turning settings
 enum TurnMode { SNAP, SMOOTH }
@@ -38,6 +42,9 @@ func _ready() -> void:
 		xr_origin.vr_mode_active.connect(_on_vr_mode_changed)
 		# Check initial state
 		call_deferred("_check_initial_mode")
+
+	if head_collision_shape and head_collision_shape.shape and head_collision_shape.shape is SphereShape3D:
+		head_collision_shape.shape.radius = head_radius
 
 
 func _process(delta: float) -> void:
@@ -64,6 +71,8 @@ func _physics_process(delta: float) -> void:
 			var lv2 = player_body.linear_velocity
 			player_body.rotate_y(deg_to_rad(turn_amount))
 			player_body.linear_velocity = lv2
+
+		# Head collision is now an Area3D parented to the XRCamera3D; it follows the headset automatically
 
 
 func _check_initial_mode() -> void:

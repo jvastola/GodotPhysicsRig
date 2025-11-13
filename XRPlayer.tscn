@@ -1,4 +1,4 @@
-[gd_scene load_steps=19 format=3 uid="uid://cpq6v7yqk8y8j"]
+[gd_scene load_steps=20 format=3 uid="uid://cpq6v7yqk8y8j"]
 
 [ext_resource type="Script" uid="uid://02kpb1kqm303" path="res://xr_player.gd" id="1_player"]
 [ext_resource type="Script" uid="uid://3ir0c0htxlqh" path="res://xr_origin_3d.gd" id="2_xr_origin"]
@@ -8,13 +8,14 @@
 [ext_resource type="Script" uid="uid://u2otyj4gjtl2" path="res://hand_pointer.gd" id="6_pointer"]
 [ext_resource type="PackedScene" uid="uid://b2gkx1eim00mw" path="res://UIViewport3D.tscn" id="7_ui_viewport"]
 
-[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_s7h6x"]
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.2
 height = 0.5
 
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_l588l"]
-radius = 0.435
-height = 1.0
+[sub_resource type="SphereMesh" id="SphereMesh_head"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_head"]
+radius = 0.18
 
 [sub_resource type="BoxMesh" id="BoxMesh_hand"]
 
@@ -58,21 +59,34 @@ axis_lock_angular_z = true
 mass = 2.0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="PlayerBody"]
-shape = SubResource("CapsuleShape3D_s7h6x")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
+shape = SubResource("CapsuleShape3D_body")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="PlayerBody"]
-transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+[node name="HeadMesh2" type="MeshInstance3D" parent="PlayerBody/CollisionShape3D"]
 visible = false
 cast_shadow = 0
-mesh = SubResource("CapsuleMesh_l588l")
+mesh = SubResource("SphereMesh_head")
+skeleton = NodePath("../../XROrigin3D/XRCamera3D")
 
 [node name="XROrigin3D" type="XROrigin3D" parent="PlayerBody"]
-transform = Transform3D(0.997515, 0, 0, 0, 0.997515, 0, 0, 0, 0.997515, 0, -1.2, 0)
+transform = Transform3D(0.997515, 0, 0, 0, 0.997515, 0, 0, 0, 0.997515, 0, 0, 0)
 script = ExtResource("2_xr_origin")
 
 [node name="XRCamera3D" type="XRCamera3D" parent="PlayerBody/XROrigin3D"]
 
+[node name="HeadMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/XRCamera3D"]
+transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 0, 0, 0)
+cast_shadow = 0
+mesh = SubResource("SphereMesh_head")
+
+[node name="HeadArea" type="Area3D" parent="PlayerBody/XROrigin3D/XRCamera3D"]
+collision_layer = 2
+
+[node name="HeadCollisionShape" type="CollisionShape3D" parent="PlayerBody/XROrigin3D/XRCamera3D/HeadArea"]
+shape = SubResource("SphereShape3D_head")
+
 [node name="LeftController" type="XRController3D" parent="PlayerBody/XROrigin3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.846876, 0, 0)
 tracker = &"left_hand"
 
 [node name="LeftHandMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController"]
@@ -105,6 +119,7 @@ mesh = SubResource("BoxMesh_watch_needle")
 target_position = Vector3(0, 1, 0)
 collision_mask = 2
 hit_from_inside = true
+collide_with_areas = true
 
 [node name="RayVisual" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch"]
 material_override = SubResource("StandardMaterial3D_ray")
@@ -139,6 +154,7 @@ cast_shadow = 0
 mesh = SubResource("CylinderMesh_pointer_hit")
 
 [node name="RightController" type="XRController3D" parent="PlayerBody/XROrigin3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.549018, 0, 0)
 tracker = &"right_hand"
 
 [node name="RightHandMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/RightController"]
@@ -175,6 +191,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 script = ExtResource("4_desktop")
 
 [node name="PhysicsHandLeft" type="RigidBody3D" parent="." node_paths=PackedStringArray("player_rigidbody", "target")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.801002, 0, 0)
 collision_layer = 4
 gravity_scale = 0.0
 center_of_mass_mode = 1
@@ -197,6 +214,7 @@ cast_shadow = 0
 mesh = SubResource("BoxMesh_hand")
 
 [node name="PhysicsHandRight" type="RigidBody3D" parent="." node_paths=PackedStringArray("player_rigidbody", "target")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.541033, 0, 0)
 collision_layer = 4
 gravity_scale = 0.0
 center_of_mass_mode = 1
