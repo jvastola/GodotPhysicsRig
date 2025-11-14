@@ -25,6 +25,10 @@ var _rope_visual: MeshInstance3D = null
 @export var rope_sag_max: float = 2.0
 var _rope_container: Node3D = null
 var _rope_segments_arr: Array = []
+@export var rope_start_stiffness: float = 0.05
+@export var rope_end_stiffness: float = 0.05
+@export var rope_mid_sag_bias: float = 1.0
+@export var rope_start_min_length: float = 0.2
 @export var rope_color: Color = Color8(255, 200, 80)
 
 func _ready() -> void:
@@ -186,8 +190,8 @@ func _physics_process(delta: float) -> void:
 	if trigger_pressed and not _is_hooked:
 		var from = controller_transform.origin
 		var forward_vec: Vector3 = controller_transform.basis.z
-		var dir: Vector3 = forward_vec.normalized() * -1.0
-		var to = from + dir * max_distance
+		var aim_dir: Vector3 = forward_vec.normalized() * -1.0
+		var to = from + aim_dir * max_distance
 		var space = get_world_3d().direct_space_state
 		var exclude = [self]
 		if is_instance_valid(_hand):
@@ -247,15 +251,41 @@ func _physics_process(delta: float) -> void:
 			var v: Vector3 = rope_end - rope_start
 			var length: float = v.length()
 			if length > 0.001:
-				# compute mid control point with sag
-				var mid: Vector3 = (rope_start + rope_end) * 0.5
+				# Compute cubic Bezier control points to get a tensioned rope with straighter ends
 				var sag_amount: float = clamp(length * rope_sag_factor, 0.0, rope_sag_max)
-				var ctrl: Vector3 = mid + Vector3.DOWN * sag_amount
-				# sample points along bezier
-				var points = []
+				# direction from start to end
+				var curve_dir: Vector3 = v.normalized()
+				# p0 = start, p3 = end
+				var p0: Vector3 = rope_start
+				var p3: Vector3 = rope_end
+				# control points near both ends to enforce stiffness
+				# For the start control, allow a minimum forward offset in the controller's forward direction
+				var controller_forward: Vector3 = Vector3.ZERO
+				if is_instance_valid(_controller) and _controller is Node3D:
+					controller_forward = ((_controller as Node3D).global_transform.basis.z).normalized() * -1.0
+				else:
+					controller_forward = curve_dir
+				# pick distance for p1 using stiffness or a minimum forward length
+				var desired_p1_dist: float = max(length * rope_start_stiffness, rope_start_min_length)
+				# clamp to a safe fraction of the rope length so p1 doesn't cross p2
+				desired_p1_dist = clamp(desired_p1_dist, 0.001, length * 0.45)
+				var p1: Vector3 = p0 + controller_forward * desired_p1_dist
+				var p2: Vector3 = p3 - curve_dir * (length * rope_end_stiffness)
+				# ensure p2 also doesn't cross p1
+				var p2_dist = (p3 - p2).length()
+				if p2_dist < desired_p1_dist:
+					# push back p2 so it remains after p1
+					p2 = p3 - curve_dir * (length * rope_end_stiffness + (desired_p1_dist - p2_dist))
+				# apply sag bias - move both controls downward to create center sag; bias can push p1 a little less than p2
+				p1 += Vector3.DOWN * (sag_amount * (rope_mid_sag_bias * 0.5))
+				p2 += Vector3.DOWN * (sag_amount * (rope_mid_sag_bias * 1.0))
+				# sample points along cubic bezier (S-like curvature)
+				var points: Array = []
 				for i in range(rope_segments + 1):
 					var t: float = float(i) / rope_segments
-					var p: Vector3 = (1.0 - t) * (1.0 - t) * rope_start + 2.0 * (1.0 - t) * t * ctrl + t * t * rope_end
+					# cubic bezier formula
+					var mt: float = 1.0 - t
+					var p: Vector3 = mt * mt * mt * p0 + 3.0 * mt * mt * t * p1 + 3.0 * mt * t * t * p2 + t * t * t * p3
 					points.append(p)
 				# update segments
 				for i in range(rope_segments):
@@ -270,13 +300,13 @@ func _physics_process(delta: float) -> void:
 						seg.visible = false
 						continue
 					# compute orientation basis (Y aligns with seg_v)
-					var dir = seg_v / seg_length
+					var seg_dir = seg_v / seg_length
 					var up = Vector3.UP
-					if abs(dir.dot(up)) > 0.999:
+					if abs(seg_dir.dot(up)) > 0.999:
 						up = Vector3.FORWARD
-					var right = up.cross(dir).normalized()
-					var forward = dir.cross(right).normalized()
-					var seg_basis = Basis(right, dir, forward)
+					var right = up.cross(seg_dir).normalized()
+					var forward = seg_dir.cross(right).normalized()
+					var seg_basis = Basis(right, seg_dir, forward)
 					var seg_mid = a + seg_v * 0.5
 					seg.global_transform = Transform3D(seg_basis, seg_mid)
 					seg.scale = Vector3(rope_thickness, seg_length, rope_thickness)
@@ -311,7 +341,5 @@ func _exit_tree() -> void:
 	for seg in _rope_segments_arr:
 		if is_instance_valid(seg):
 			seg.queue_free()
-	if _rope_cylinder:
-		_rope_cylinder = null
 	if _rope_cylinder:
 		_rope_cylinder = null
