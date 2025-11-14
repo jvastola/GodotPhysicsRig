@@ -20,6 +20,11 @@ var _hook_local_offset: Vector3 = Vector3.ZERO
 var _rope_cylinder: CylinderMesh = null
 var _rope_visual: MeshInstance3D = null
 @export var rope_thickness: float = 0.02
+@export var rope_segments: int = 10
+@export var rope_sag_factor: float = 0.5
+@export var rope_sag_max: float = 2.0
+var _rope_container: Node3D = null
+var _rope_segments_arr: Array = []
 @export var rope_color: Color = Color8(255, 200, 80)
 
 func _ready() -> void:
@@ -55,8 +60,9 @@ func _ready() -> void:
 
 	# Create a rope visual as a thin CylinderMesh and a MeshInstance3D
 	_rope_cylinder = CylinderMesh.new()
-	_rope_cylinder.top_radius = rope_thickness
-	_rope_cylinder.bottom_radius = rope_thickness
+	# Keep the mesh base radius as 1.0 and control final thickness with scale.x/z
+	_rope_cylinder.top_radius = 1.0
+	_rope_cylinder.bottom_radius = 1.0
 	_rope_cylinder.height = 1.0
 	_rope_cylinder.radial_segments = 12
 	_rope_visual = MeshInstance3D.new()
@@ -70,10 +76,22 @@ func _ready() -> void:
 	_rope_visual.material_override = rope_mat
 	_rope_visual.visible = false
 	_rope_visual.name = "GrappleRope"
+	# Create a container for rope segments
+	_rope_container = Node3D.new()
+	_rope_container.name = "GrappleRopeContainer"
 	if root:
-		root.call_deferred("add_child", _rope_visual)
+		root.call_deferred("add_child", _rope_container)
 	else:
-		call_deferred("add_child", _rope_visual)
+		call_deferred("add_child", _rope_container)
+
+	# Initialize segment MeshInstances
+	for i in rope_segments:
+		var seg = MeshInstance3D.new()
+		seg.mesh = _rope_cylinder
+		seg.material_override = rope_mat
+		seg.visible = false
+		_rope_container.add_child(seg)
+		_rope_segments_arr.append(seg)
 
 	if enable_debug_logs:
 		print("GrappleHook: ready at", global_transform.origin, "collision_layer=", collision_layer)
@@ -119,6 +137,11 @@ func _end_grapple() -> void:
 		if _rope_cylinder:
 			# Reset scale and mesh if we later toggle rope on
 			_rope_visual.mesh = _rope_cylinder
+
+	# Hide segments on release
+	for seg in _rope_segments_arr:
+		if is_instance_valid(seg):
+			seg.visible = false
 
 func _physics_process(delta: float) -> void:
 	if not is_grabbed:
@@ -218,27 +241,51 @@ func _physics_process(delta: float) -> void:
 				_hitmarker.global_transform = Transform3D(Basis(), live_hook_point)
 
 			# Position and orient a thin cylinder between controller and hook point
-			if is_instance_valid(_rope_visual):
-				var rope_start: Vector3 = controller_transform.origin
-				var rope_end: Vector3 = live_hook_point
-				var v: Vector3 = rope_end - rope_start
-				var length: float = v.length()
-				if length > 0.001:
-					# Compute a basis that places Y along the direction vector
-					var dir: Vector3 = v / length
-					var up: Vector3 = Vector3.UP
+			# Draw curved rope using quadratic bezier segmentation
+			var rope_start: Vector3 = controller_transform.origin
+			var rope_end: Vector3 = live_hook_point
+			var v: Vector3 = rope_end - rope_start
+			var length: float = v.length()
+			if length > 0.001:
+				# compute mid control point with sag
+				var mid: Vector3 = (rope_start + rope_end) * 0.5
+				var sag_amount: float = clamp(length * rope_sag_factor, 0.0, rope_sag_max)
+				var ctrl: Vector3 = mid + Vector3.DOWN * sag_amount
+				# sample points along bezier
+				var points = []
+				for i in range(rope_segments + 1):
+					var t: float = float(i) / rope_segments
+					var p: Vector3 = (1.0 - t) * (1.0 - t) * rope_start + 2.0 * (1.0 - t) * t * ctrl + t * t * rope_end
+					points.append(p)
+				# update segments
+				for i in range(rope_segments):
+					var a: Vector3 = points[i]
+					var b: Vector3 = points[i + 1]
+					var seg = _rope_segments_arr[i]
+					if not is_instance_valid(seg):
+						continue
+					var seg_v: Vector3 = b - a
+					var seg_length: float = seg_v.length()
+					if seg_length <= 0.0001:
+						seg.visible = false
+						continue
+					# compute orientation basis (Y aligns with seg_v)
+					var dir = seg_v / seg_length
+					var up = Vector3.UP
 					if abs(dir.dot(up)) > 0.999:
 						up = Vector3.FORWARD
-					var right: Vector3 = up.cross(dir).normalized()
-					var forward: Vector3 = dir.cross(right).normalized()
-					var basis: Basis = Basis(right, dir, forward)
-					var mid: Vector3 = rope_start + v * 0.5
-					# Apply basis and scale the cylinder so its local Y length matches the rope
-					_rope_visual.global_transform = Transform3D(basis, mid)
-					_rope_visual.scale = Vector3(rope_thickness, length, rope_thickness)
-					_rope_visual.visible = true
-				else:
-					_rope_visual.visible = false
+					var right = up.cross(dir).normalized()
+					var forward = dir.cross(right).normalized()
+					var seg_basis = Basis(right, dir, forward)
+					var seg_mid = a + seg_v * 0.5
+					seg.global_transform = Transform3D(seg_basis, seg_mid)
+					seg.scale = Vector3(rope_thickness, seg_length, rope_thickness)
+					seg.visible = true
+			else:
+				# hide segments
+				for seg in _rope_segments_arr:
+					if is_instance_valid(seg):
+						seg.visible = false
 
 			# Apply winch force toward the live hook point
 			if is_instance_valid(_player_body):
@@ -259,6 +306,11 @@ func _exit_tree() -> void:
 		_hitmarker.queue_free()
 	if is_instance_valid(_rope_visual):
 		_rope_visual.queue_free()
+	if is_instance_valid(_rope_container):
+		_rope_container.queue_free()
+	for seg in _rope_segments_arr:
+		if is_instance_valid(seg):
+			seg.queue_free()
 	if _rope_cylinder:
 		_rope_cylinder = null
 	if _rope_cylinder:
