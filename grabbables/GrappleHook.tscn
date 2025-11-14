@@ -1,0 +1,31 @@
+[gd_scene load_steps=7 format=3 uid="uid://bb6a2kdloyahj"]
+
+[ext_resource type="Script" uid="uid://dkmje2b0lbcu3" path="res://grabbables/GrappleHook.gd" id="1"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_grapple"]
+size = Vector3(0.075, 0.025, 0.2)
+
+[sub_resource type="BoxMesh" id="1"]
+resource_local_to_scene = true
+size = Vector3(0.15, 0.05, 0.4)
+
+[sub_resource type="BoxMesh" id="2"]
+resource_local_to_scene = true
+
+[sub_resource type="SphereMesh" id="3"]
+resource_local_to_scene = true
+radius = 0.02
+
+[sub_resource type="SphereMesh" id="4"]
+resource_local_to_scene = true
+radius = 0.04
+
+[node name="GrappleHook" type="RigidBody3D"]
+script = ExtResource("1")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_grapple")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("1")
+
