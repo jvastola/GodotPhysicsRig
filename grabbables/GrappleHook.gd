@@ -17,6 +17,9 @@ var _controller: Node = null
 var _player_body: RigidBody3D = null
 var _hitmarker: MeshInstance3D = null
 var _hook_local_offset: Vector3 = Vector3.ZERO
+var _rope_mesh: ImmediateMesh = null
+var _rope_visual: MeshInstance3D = null
+@export var rope_color: Color = Color8(255, 200, 80)
 
 func _ready() -> void:
 	contact_monitor = true
@@ -49,6 +52,24 @@ func _ready() -> void:
 	else:
 		call_deferred("add_child", _hitmarker)
 
+	# Create a rope visual with ImmediateMesh to show line from controller to hook
+	_rope_mesh = ImmediateMesh.new()
+	_rope_visual = MeshInstance3D.new()
+	_rope_visual.mesh = _rope_mesh
+	var rope_mat = StandardMaterial3D.new()
+	rope_mat.flags_unshaded = true
+	rope_mat.emission_enabled = true
+	rope_mat.emission = rope_color
+	rope_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	rope_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_rope_visual.material_override = rope_mat
+	_rope_visual.visible = false
+	_rope_visual.name = "GrappleRope"
+	if root:
+		root.call_deferred("add_child", _rope_visual)
+	else:
+		call_deferred("add_child", _rope_visual)
+
 	if enable_debug_logs:
 		print("GrappleHook: ready at", global_transform.origin, "collision_layer=", collision_layer)
 
@@ -75,6 +96,8 @@ func _on_released() -> void:
 	set_physics_process(false)
 	if is_instance_valid(_hitmarker):
 		_hitmarker.visible = false
+	if is_instance_valid(_rope_visual):
+		_rope_visual.visible = false
 
 func _end_grapple() -> void:
 	_is_hooked = false
@@ -82,6 +105,10 @@ func _end_grapple() -> void:
 	# Hide the hitmarker when grappling ends (cleanup)
 	if is_instance_valid(_hitmarker):
 		_hitmarker.visible = false
+	if is_instance_valid(_rope_visual):
+		_rope_visual.visible = false
+		if _rope_mesh:
+			_rope_mesh.clear_surfaces()
 
 func _physics_process(delta: float) -> void:
 	if not is_grabbed:
@@ -180,6 +207,18 @@ func _physics_process(delta: float) -> void:
 				_hitmarker.visible = true
 				_hitmarker.global_transform = Transform3D(Basis(), live_hook_point)
 
+			# Draw rope from controller origin to live_hook_point using ImmediateMesh
+			if is_instance_valid(_rope_mesh) and is_instance_valid(_rope_visual):
+				var rope_start: Vector3 = controller_transform.origin
+				var rope_end: Vector3 = live_hook_point
+				_rope_visual.global_transform = Transform3D(Basis(), rope_start)
+				_rope_mesh.clear_surfaces()
+				_rope_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
+				_rope_mesh.surface_add_vertex(Vector3.ZERO)
+				_rope_mesh.surface_add_vertex(rope_end - rope_start)
+				_rope_mesh.surface_end()
+				_rope_visual.visible = true
+
 			# Apply winch force toward the live hook point
 			if is_instance_valid(_player_body):
 				var to_hook = live_hook_point - _player_body.global_transform.origin
@@ -197,3 +236,7 @@ func _exit_tree() -> void:
 	_end_grapple()
 	if is_instance_valid(_hitmarker):
 		_hitmarker.queue_free()
+	if is_instance_valid(_rope_visual):
+		_rope_visual.queue_free()
+	if _rope_mesh:
+		_rope_mesh.clear_surfaces()
