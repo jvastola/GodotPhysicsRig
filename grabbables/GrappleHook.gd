@@ -16,20 +16,28 @@ var _hand: RigidBody3D = null
 var _controller: Node = null
 var _player_body: RigidBody3D = null
 var _hitmarker: MeshInstance3D = null
+var _use_global_visuals: bool = false
+var _global_visuals = null
 var _hook_local_offset: Vector3 = Vector3.ZERO
 var _rope_cylinder: CylinderMesh = null
 var _rope_visual: MeshInstance3D = null
+var _rope_line_mesh: ImmediateMesh = null
+var _rope_line_instance: MeshInstance3D = null
 @export var rope_thickness: float = 0.02
 @export var rope_segments: int = 10
 @export var rope_sag_factor: float = 0.5
 @export var rope_sag_max: float = 2.0
 var _rope_container: Node3D = null
 var _rope_segments_arr: Array = []
+var _last_rope_points: Array = []
 @export var rope_start_stiffness: float = 0.05
 @export var rope_end_stiffness: float = 0.05
 @export var rope_mid_sag_bias: float = 1.0
 @export var rope_start_min_length: float = 0.2
 @export var rope_color: Color = Color8(255, 200, 80)
+@export var use_line_visual: bool = true
+var _visuals_pending_parent: bool = false
+@export var persist_visuals_across_scenes: bool = true
 
 func _ready() -> void:
 	contact_monitor = true
@@ -40,62 +48,112 @@ func _ready() -> void:
 	grabbed.connect(_on_grabbed)
 	released.connect(_on_released)
 
-	# Create a simple world-space hitmarker (a small emissive sphere)
-	var sphere = SphereMesh.new()
-	sphere.radius = hitmarker_radius
-	var mi = MeshInstance3D.new()
-	mi.mesh = sphere
-	var mat = StandardMaterial3D.new()
-	mat.albedo_color = hitmarker_color
-	mat.emission_enabled = true
-	mat.emission = hitmarker_color
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mi.material_override = mat
-	mi.visible = false
-	mi.name = "GrappleHitmarker"
-	_hitmarker = mi
-	# Add hitmarker to the current scene root so it's truly world-space
-	var root = get_tree().get_current_scene()
-	# Use call_deferred because the scene tree may be busy setting up children when _ready runs.
-	if root:
-		root.call_deferred("add_child", _hitmarker)
+	# Detect global visuals manager (autoload) and use it if available
+	_global_visuals = get_node_or_null("/root/GrappleVisuals")
+	if _global_visuals:
+		_use_global_visuals = true
+		_global_visuals.init_segments(rope_segments)
+	elif persist_visuals_across_scenes:
+		# If the user didn't set GrappleVisuals as an autoload, create it now
+		# so visuals persist across scenes for this grapple instance.
+		var gv_script = preload("res://grabbables/GrappleVisuals.gd")
+		if gv_script and not get_node_or_null("/root/GrappleVisuals"):
+			var gv = gv_script.new()
+			gv.name = "GrappleVisuals"
+			# Attach to root deferred so we don't collide with setup
+			get_tree().root.call_deferred("add_child", gv)
+			_global_visuals = gv
+			_use_global_visuals = true
+			# init segments after the new node is added to the scene tree so _ready() has run
+			_global_visuals.call_deferred("init_segments", rope_segments)
 	else:
-		call_deferred("add_child", _hitmarker)
+		# Create a simple world-space hitmarker (a small emissive sphere)
+		var sphere = SphereMesh.new()
+		# Set radius inside the else scope
+		sphere.radius = hitmarker_radius
+		var mi = MeshInstance3D.new()
+		mi.mesh = sphere
+		var mat = StandardMaterial3D.new()
+		mat.albedo_color = hitmarker_color
+		mat.emission_enabled = true
+		mat.emission = hitmarker_color
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mi.material_override = mat
+		mi.visible = false
+		mi.name = "GrappleHitmarker"
+		_hitmarker = mi
+		# Add hitmarker to the scene tree root so it persists across scene changes
+		var root = get_tree().root
+	# Use call_deferred because the scene tree may be busy setting up children when _ready runs.
+	# ensure root is available before attempting to attach visuals
+	var root = get_tree().root
+	if not root:
+		# Try again next idle frame; using call_deferred on the node ensures
+		# _attach_visuals_to_root will run when the SceneTree is ready.
+		call_deferred("_attach_visuals_to_root")
+		return
+	_attach_visuals_to_root()
 
 	# Create a rope visual as a thin CylinderMesh and a MeshInstance3D
-	_rope_cylinder = CylinderMesh.new()
-	# Keep the mesh base radius as 1.0 and control final thickness with scale.x/z
-	_rope_cylinder.top_radius = 1.0
-	_rope_cylinder.bottom_radius = 1.0
-	_rope_cylinder.height = 1.0
-	_rope_cylinder.radial_segments = 12
-	_rope_visual = MeshInstance3D.new()
-	_rope_visual.mesh = _rope_cylinder
-	var rope_mat = StandardMaterial3D.new()
-	rope_mat.flags_unshaded = true
-	rope_mat.emission_enabled = true
-	rope_mat.emission = rope_color
-	rope_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	rope_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_rope_visual.material_override = rope_mat
-	_rope_visual.visible = false
-	_rope_visual.name = "GrappleRope"
-	# Create a container for rope segments
-	_rope_container = Node3D.new()
-	_rope_container.name = "GrappleRopeContainer"
-	if root:
-		root.call_deferred("add_child", _rope_container)
+	# Predeclare rope material so it can be used later in segment initialization
+	var rope_mat: StandardMaterial3D = null
+	if _use_global_visuals:
+		# global visuals are managing segments and rope
+		pass
 	else:
-		call_deferred("add_child", _rope_container)
+		_rope_cylinder = CylinderMesh.new()
+		# Keep the mesh base radius as 1.0 and control final thickness with scale.x/z
+		_rope_cylinder.top_radius = 1.0
+		_rope_cylinder.bottom_radius = 1.0
+		_rope_cylinder.height = 1.0
+		_rope_cylinder.radial_segments = 12
+		_rope_visual = MeshInstance3D.new()
+		_rope_visual.mesh = _rope_cylinder
+		rope_mat = StandardMaterial3D.new()
+		rope_mat.flags_unshaded = true
+		rope_mat.emission_enabled = true
+		rope_mat.emission = rope_color
+		rope_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		rope_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		_rope_visual.material_override = rope_mat
+		_rope_visual.visible = false
+		_rope_visual.name = "GrappleRope"
+	# Add rope visual and container (deferred) — single helper prevents duplicate calls
+	_attach_visuals_to_root()
+
+	# Create a container for rope segments
+	if not _use_global_visuals:
+		_rope_container = Node3D.new()
+		_rope_container.name = "GrappleRopeContainer"
+		var root2 = get_tree().root
+		if not root2:
+			call_deferred("_attach_visuals_to_root")
+		else:
+			_attach_visuals_to_root()
 
 	# Initialize segment MeshInstances
-	for i in rope_segments:
-		var seg = MeshInstance3D.new()
-		seg.mesh = _rope_cylinder
-		seg.material_override = rope_mat
-		seg.visible = false
-		_rope_container.add_child(seg)
-		_rope_segments_arr.append(seg)
+	if not _use_global_visuals:
+		for i in range(rope_segments):
+			var seg = MeshInstance3D.new()
+			seg.mesh = _rope_cylinder
+			seg.material_override = rope_mat
+			seg.visible = false
+			_rope_container.add_child(seg)
+			_rope_segments_arr.append(seg)
+		# Create line visual (ImmediateMesh) for a simple single-line rope
+		if use_line_visual:
+			_rope_line_mesh = ImmediateMesh.new()
+			_rope_line_instance = MeshInstance3D.new()
+			_rope_line_instance.mesh = _rope_line_mesh
+			var line_mat = StandardMaterial3D.new()
+			line_mat.flags_unshaded = true
+			line_mat.emission_enabled = true
+			line_mat.emission = rope_color
+			line_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			_rope_line_instance.material_override = line_mat
+			_rope_line_instance.visible = false
+			_rope_line_instance.name = "GrappleRopeLine"
+			_attach_visuals_to_root()
 
 	if enable_debug_logs:
 		print("GrappleHook: ready at", global_transform.origin, "collision_layer=", collision_layer)
@@ -114,40 +172,67 @@ func _on_grabbed(hand: RigidBody3D) -> void:
 			_player_body = maybe_player
 
 	set_physics_process(true)
-	# show prediction marker while grabbed
+	# show prediction marker while grabbed (global visuals will be updated in _physics_process)
 	if is_instance_valid(_hitmarker):
-		_hitmarker.visible = true
+		if _use_global_visuals and _global_visuals:
+			# let physics process update the hitmarker position
+			pass
+		else:
+			_hitmarker.visible = true
 
 func _on_released() -> void:
 	_end_grapple()
 	set_physics_process(false)
 	if is_instance_valid(_hitmarker):
-		_hitmarker.visible = false
+		if _use_global_visuals and _global_visuals:
+			_global_visuals.hide_hitmarker()
+		else:
+			_hitmarker.visible = false
+			if use_line_visual and is_instance_valid(_rope_line_instance):
+				_rope_line_instance.visible = false
 	if is_instance_valid(_rope_visual):
-		_rope_visual.visible = false
+		if _use_global_visuals and _global_visuals:
+			_global_visuals.hide_segments()
+		else:
+			_rope_visual.visible = false
 		if _rope_cylinder:
 			# Reset scale and height
 			_rope_visual.scale = Vector3.ONE
 			_rope_visual.mesh = _rope_cylinder
+		if use_line_visual and is_instance_valid(_rope_line_instance):
+			_rope_line_instance.visible = false
 
 func _end_grapple() -> void:
 	_is_hooked = false
 	_hook_object = null
 	# Hide the hitmarker when grappling ends (cleanup)
 	if is_instance_valid(_hitmarker):
-		_hitmarker.visible = false
+		if _use_global_visuals and _global_visuals:
+			_global_visuals.hide_hitmarker()
+		else:
+			_hitmarker.visible = false
 	if is_instance_valid(_rope_visual):
-		_rope_visual.visible = false
+		if _use_global_visuals and _global_visuals:
+			_global_visuals.hide_segments()
+		else:
+			_rope_visual.visible = false
 		if _rope_cylinder:
 			# Reset scale and mesh if we later toggle rope on
 			_rope_visual.mesh = _rope_cylinder
+		if use_line_visual and is_instance_valid(_rope_line_instance):
+			_rope_line_instance.visible = false
 
 	# Hide segments on release
-	for seg in _rope_segments_arr:
-		if is_instance_valid(seg):
-			seg.visible = false
+	if _use_global_visuals and _global_visuals:
+		_global_visuals.hide_segments()
+	else:
+		for seg in _rope_segments_arr:
+			if is_instance_valid(seg):
+				seg.visible = false
 
 func _physics_process(delta: float) -> void:
+	# Ensure visuals are parented to the SceneTree root so they persist across scene changes
+	_ensure_visuals_parent()
 	if not is_grabbed:
 		return
 	if not is_instance_valid(_hand):
@@ -182,8 +267,19 @@ func _physics_process(delta: float) -> void:
 		_q.collision_mask = grapple_collision_mask
 		var _pres = _space.intersect_ray(_q)
 		if _pres:
-			_hitmarker.global_transform = Transform3D(Basis(), _pres.position)
-			_hitmarker.visible = true
+			if _use_global_visuals and _global_visuals:
+				_global_visuals.show_hitmarker(_pres.position)
+			else:
+				_hitmarker.global_transform = Transform3D(Basis(), _pres.position)
+				_hitmarker.visible = true
+				# Draw prediction line while aiming
+				if use_line_visual and is_instance_valid(_rope_line_mesh) and is_instance_valid(_rope_line_instance):
+					_rope_line_mesh.clear_surfaces()
+					_rope_line_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
+					_rope_line_mesh.surface_add_vertex(_from)
+					_rope_line_mesh.surface_add_vertex(_pres.position)
+					_rope_line_mesh.surface_end()
+					_rope_line_instance.visible = true
 		else:
 			_hitmarker.visible = false
 	# Launch grapple
@@ -220,13 +316,15 @@ func _physics_process(delta: float) -> void:
 			if is_instance_valid(_player_body):
 				var impulse = (world_hook_point - _player_body.global_transform.origin).normalized() * impulse_speed
 				_player_body.apply_central_impulse(impulse)
-			# Ensure hitmarker stays at the actual hook location once hooked
-			if is_instance_valid(_hitmarker):
-				_hitmarker.visible = true
-				if is_instance_valid(_hook_object) and _hook_object is Node3D:
-					_hitmarker.global_transform = Transform3D(Basis(), (_hook_object as Node3D).to_global(_hook_local_offset))
-				else:
-					_hitmarker.global_transform = Transform3D(Basis(), _hook_point)
+		# Ensure hitmarker stays at the actual hook location once hooked
+		if _use_global_visuals and _global_visuals:
+			_global_visuals.show_hitmarker(((_hook_object as Node3D).to_global(_hook_local_offset)) if is_instance_valid(_hook_object) and _hook_object is Node3D else _hook_point)
+		elif is_instance_valid(_hitmarker):
+			_hitmarker.visible = true
+			if is_instance_valid(_hook_object) and _hook_object is Node3D:
+				_hitmarker.global_transform = Transform3D(Basis(), (_hook_object as Node3D).to_global(_hook_local_offset))
+			else:
+				_hitmarker.global_transform = Transform3D(Basis(), _hook_point)
 
 
 	# While hooked, apply winch force
@@ -240,7 +338,9 @@ func _physics_process(delta: float) -> void:
 				live_hook_point = (_hook_object as Node3D).to_global(_hook_local_offset)
 
 			# Update hitmarker while hooked
-			if is_instance_valid(_hitmarker):
+			if _use_global_visuals and _global_visuals:
+				_global_visuals.show_hitmarker(live_hook_point)
+			elif is_instance_valid(_hitmarker):
 				_hitmarker.visible = true
 				_hitmarker.global_transform = Transform3D(Basis(), live_hook_point)
 
@@ -287,35 +387,76 @@ func _physics_process(delta: float) -> void:
 					var mt: float = 1.0 - t
 					var p: Vector3 = mt * mt * mt * p0 + 3.0 * mt * mt * t * p1 + 3.0 * mt * t * t * p2 + t * t * t * p3
 					points.append(p)
-				# update segments
-				for i in range(rope_segments):
-					var a: Vector3 = points[i]
-					var b: Vector3 = points[i + 1]
-					var seg = _rope_segments_arr[i]
-					if not is_instance_valid(seg):
-						continue
-					var seg_v: Vector3 = b - a
-					var seg_length: float = seg_v.length()
-					if seg_length <= 0.0001:
-						seg.visible = false
-						continue
-					# compute orientation basis (Y aligns with seg_v)
-					var seg_dir = seg_v / seg_length
-					var up = Vector3.UP
-					if abs(seg_dir.dot(up)) > 0.999:
-						up = Vector3.FORWARD
-					var right = up.cross(seg_dir).normalized()
-					var forward = seg_dir.cross(right).normalized()
-					var seg_basis = Basis(right, seg_dir, forward)
-					var seg_mid = a + seg_v * 0.5
-					seg.global_transform = Transform3D(seg_basis, seg_mid)
-					seg.scale = Vector3(rope_thickness, seg_length, rope_thickness)
-					seg.visible = true
+					_last_rope_points = points
+				# update segments with bounds checking
+				if points.size() < 2:
+					# nothing to draw
+					for seg in _rope_segments_arr:
+						if is_instance_valid(seg):
+							seg.visible = false
+				else:
+					if _use_global_visuals and _global_visuals:
+						# Hide any previously visible global segments before updating
+						_global_visuals.hide_segments()
+						var seg_count: int = min(max(rope_segments, 0), max(0, points.size() - 1))
+						for i in range(seg_count):
+							var a: Vector3 = points[i]
+							var b: Vector3 = points[i + 1]
+							_global_visuals.update_segment(i, a, b, rope_thickness)
+					else:
+						# choose the number of segments we can actually update
+						var seg_count: int = min(max(rope_segments, 0), max(0, points.size() - 1))
+						seg_count = min(seg_count, _rope_segments_arr.size())
+						for i in range(seg_count):
+							var a: Vector3 = points[i]
+							var b: Vector3 = points[i + 1]
+							var seg = _rope_segments_arr[i]
+							if not is_instance_valid(seg):
+								continue
+							var seg_v: Vector3 = b - a
+							var seg_length: float = seg_v.length()
+							if seg_length <= 0.0001:
+								seg.visible = false
+								continue
+							# compute orientation basis (Y aligns with seg_v)
+							var seg_dir = seg_v / seg_length
+							var up = Vector3.UP
+							if abs(seg_dir.dot(up)) > 0.999:
+								up = Vector3.FORWARD
+							var right = up.cross(seg_dir).normalized()
+							var forward = seg_dir.cross(right).normalized()
+							var seg_basis = Basis(right, seg_dir, forward)
+							var seg_mid = a + seg_v * 0.5
+							seg.global_transform = Transform3D(seg_basis, seg_mid)
+							seg.scale = Vector3(rope_thickness, seg_length, rope_thickness)
+							seg.visible = true
+						# hide any remaining segment instances if we have fewer points than instances
+						for j in range(seg_count, _rope_segments_arr.size()):
+							var extra = _rope_segments_arr[j]
+							if is_instance_valid(extra):
+								extra.visible = false
+				# If a simple line visual is enabled, draw a single line from start to end
+				if use_line_visual and is_instance_valid(_rope_line_mesh) and is_instance_valid(_rope_line_instance):
+					_rope_line_mesh.clear_surfaces()
+					_rope_line_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
+					_rope_line_mesh.surface_add_vertex(rope_start)
+					_rope_line_mesh.surface_add_vertex(rope_end)
+					_rope_line_mesh.surface_end()
+					_rope_line_instance.visible = true
 			else:
 				# hide segments
 				for seg in _rope_segments_arr:
 					if is_instance_valid(seg):
 						seg.visible = false
+			# Hide line visual when segments are hidden
+			if use_line_visual and is_instance_valid(_rope_line_instance):
+				_rope_line_instance.visible = false
+				if _use_global_visuals and _global_visuals:
+					# hide global
+					_global_visuals.hide_segments()
+				else:
+					# local segments already hidden
+					pass
 
 			# Apply winch force toward the live hook point
 			if is_instance_valid(_player_body):
@@ -330,16 +471,124 @@ func _physics_process(delta: float) -> void:
 			if enable_debug_logs:
 				print("GrappleHook(frame): player=", _player_body.global_transform.origin, ", hook=", live_hook_point)
 
+			# If using global visuals, ensure visuals remain attached
+			if _use_global_visuals and _global_visuals and persist_visuals_across_scenes:
+				# no-op: autoload visuals are persistent
+				pass
+			else:
+				_ensure_visuals_parent()
+
 func _exit_tree() -> void:
 	_end_grapple()
 	if is_instance_valid(_hitmarker):
-		_hitmarker.queue_free()
+		if persist_visuals_across_scenes:
+			# If visuals are persistent across scenes we keep them in the tree.
+			# Do not auto-hide here; let the global visuals manager or game flow control visibility.
+			pass
+		else:
+			_hitmarker.queue_free()
 	if is_instance_valid(_rope_visual):
-		_rope_visual.queue_free()
+		if persist_visuals_across_scenes:
+			# Keep the visuals when persisting across scenes.
+			# If a global visuals manager is present, hide segments there. Otherwise keep visible.
+			if _use_global_visuals and _global_visuals:
+				_global_visuals.hide_segments()
+			else:
+				_rope_visual.visible = false
+		else:
+			_rope_visual.queue_free()
+	if use_line_visual and is_instance_valid(_rope_line_instance):
+		if persist_visuals_across_scenes:
+			# just hide the visual but keep it around
+			_rope_line_instance.visible = false
+		else:
+			_rope_line_instance.queue_free()
 	if is_instance_valid(_rope_container):
-		_rope_container.queue_free()
+		if persist_visuals_across_scenes:
+			# When persisting, keep visuals attached to tree so they survive scene loads.
+			# If a global visual manager exists, delegate hiding to it; otherwise keep segments visible
+			if _use_global_visuals and _global_visuals:
+				_global_visuals.hide_segments()
+			else:
+				for seg in _rope_segments_arr:
+					if is_instance_valid(seg):
+						seg.visible = false
+			_rope_container.visible = false
+		else:
+			_rope_container.queue_free()
 	for seg in _rope_segments_arr:
 		if is_instance_valid(seg):
 			seg.queue_free()
 	if _rope_cylinder:
 		_rope_cylinder = null
+	# If we were hooked and using global visuals, request the visuals manager to persist
+	if _is_hooked and persist_visuals_across_scenes and _use_global_visuals and _global_visuals and _last_rope_points.size() > 0:
+		_global_visuals.persist_rope(_last_rope_points, rope_thickness, 10.0)
+
+func _ensure_visuals_parent() -> void:
+	# Reparent to get_tree().root so visuals persist across scene changes or editor reloads
+	var root = get_tree().root
+	var scheduled: bool = false
+	if is_instance_valid(_hitmarker) and _hitmarker.get_parent() != root:
+		if _visuals_pending_parent:
+			# already waiting for add_child to execute
+			pass
+		else:
+			if _hitmarker.get_parent():
+				_hitmarker.get_parent().remove_child(_hitmarker)
+			root.call_deferred("add_child", _hitmarker)
+	if is_instance_valid(_rope_visual) and _rope_visual.get_parent() != root:
+		if _visuals_pending_parent:
+			pass
+		else:
+			if _rope_visual.get_parent():
+				_rope_visual.get_parent().remove_child(_rope_visual)
+			root.call_deferred("add_child", _rope_visual)
+			_visuals_pending_parent = true
+	if is_instance_valid(_rope_container) and _rope_container.get_parent() != root:
+		# If the container is unparented, attach deferred; otherwise move it
+		if _visuals_pending_parent:
+			pass
+		else:
+			if _rope_container.get_parent():
+				_rope_container.get_parent().remove_child(_rope_container)
+			root.call_deferred("add_child", _rope_container)
+			_visuals_pending_parent = true
+	# Clear pending if visuals are already attached
+	if is_instance_valid(_hitmarker) and _hitmarker.get_parent() == root and is_instance_valid(_rope_visual) and _rope_visual.get_parent() == root and is_instance_valid(_rope_container) and _rope_container.get_parent() == root:
+		_visuals_pending_parent = false
+	# If using the line visual then include it in the check
+	if use_line_visual and is_instance_valid(_rope_line_instance) and _rope_line_instance.get_parent() == root:
+		_visuals_pending_parent = false
+	# Consider the line instance as part of visuals too
+	if use_line_visual and is_instance_valid(_rope_line_instance) and _rope_line_instance.get_parent() != root:
+		root.call_deferred("add_child", _rope_line_instance)
+		_visuals_pending_parent = true
+
+func _attach_visuals_to_root() -> void:
+	# Helper to attach the visuals once using call_deferred; prevents duplicated add_child calls
+	if _visuals_pending_parent:
+		return
+	_visuals_pending_parent = true
+	var root = get_tree().root
+	if not root:
+		# Schedule another attempt to attach visuals once the SceneTree becomes available
+		call_deferred("_attach_visuals_to_root")
+		return
+	var scheduled: bool = false
+	if not root:
+		return
+	if is_instance_valid(_hitmarker) and _hitmarker.get_parent() == null:
+		root.call_deferred("add_child", _hitmarker)
+		scheduled = true
+	if is_instance_valid(_rope_visual) and _rope_visual.get_parent() == null:
+		root.call_deferred("add_child", _rope_visual)
+		scheduled = true
+	if is_instance_valid(_rope_container) and _rope_container.get_parent() == null:
+		root.call_deferred("add_child", _rope_container)
+		scheduled = true
+	if use_line_visual and is_instance_valid(_rope_line_instance) and _rope_line_instance.get_parent() == null:
+		root.call_deferred("add_child", _rope_line_instance)
+		scheduled = true
+	if scheduled:
+		_visuals_pending_parent = true

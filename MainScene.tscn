@@ -6,7 +6,7 @@
 [ext_resource type="Script" uid="uid://ct42jl8bcsjkj" path="res://floor_interactable.gd" id="4_floor_script"]
 [ext_resource type="PackedScene" uid="uid://b2gkx1eim00mw" path="res://UIViewport3D.tscn" id="5_ui_viewport"]
 [ext_resource type="Shader" uid="uid://chjyjc8300le1" path="res://red_sphere_layered.gdshader" id="6_red_shader"]
-[ext_resource type="PackedScene" path="res://grabbables/GrappleHook.tscn" id="7_grapple"]
+[ext_resource type="PackedScene" uid="uid://cm8nv7v0apls3" path="res://grabbables/GrappleHook.tscn" id="7_grapple"]
 [ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://viewport_mirror.gd" id="8_viewport_mirror"]
 [ext_resource type="PackedScene" uid="uid://bhun80s4vlhet" path="res://RotatingObject.tscn" id="9_rotating"]
 
