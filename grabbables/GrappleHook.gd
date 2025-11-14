@@ -6,6 +6,8 @@ extends "res://grabbable.gd"
 @export var winch_speed: float = 4.0
 @export var grapple_collision_mask: int = 1
 @export var enable_debug_logs: bool = false
+@export var hitmarker_radius: float = 0.06
+@export var hitmarker_color: Color = Color8(255, 100, 50)
 
 var _is_hooked: bool = false
 var _hook_point: Vector3 = Vector3.ZERO
@@ -13,6 +15,8 @@ var _hook_object: Node = null
 var _hand: RigidBody3D = null
 var _controller: Node = null
 var _player_body: RigidBody3D = null
+var _hitmarker: MeshInstance3D = null
+var _hook_local_offset: Vector3 = Vector3.ZERO
 
 func _ready() -> void:
 	contact_monitor = true
@@ -22,6 +26,28 @@ func _ready() -> void:
 
 	grabbed.connect(_on_grabbed)
 	released.connect(_on_released)
+
+	# Create a simple world-space hitmarker (a small emissive sphere)
+	var sphere = SphereMesh.new()
+	sphere.radius = hitmarker_radius
+	var mi = MeshInstance3D.new()
+	mi.mesh = sphere
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = hitmarker_color
+	mat.emission_enabled = true
+	mat.emission = hitmarker_color
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mi.material_override = mat
+	mi.visible = false
+	mi.name = "GrappleHitmarker"
+	_hitmarker = mi
+	# Add hitmarker to the current scene root so it's truly world-space
+	var root = get_tree().get_current_scene()
+	# Use call_deferred because the scene tree may be busy setting up children when _ready runs.
+	if root:
+		root.call_deferred("add_child", _hitmarker)
+	else:
+		call_deferred("add_child", _hitmarker)
 
 	if enable_debug_logs:
 		print("GrappleHook: ready at", global_transform.origin, "collision_layer=", collision_layer)
@@ -40,14 +66,22 @@ func _on_grabbed(hand: RigidBody3D) -> void:
 			_player_body = maybe_player
 
 	set_physics_process(true)
+	# show prediction marker while grabbed
+	if is_instance_valid(_hitmarker):
+		_hitmarker.visible = true
 
 func _on_released() -> void:
 	_end_grapple()
 	set_physics_process(false)
+	if is_instance_valid(_hitmarker):
+		_hitmarker.visible = false
 
 func _end_grapple() -> void:
 	_is_hooked = false
 	_hook_object = null
+	# Hide the hitmarker when grappling ends (cleanup)
+	if is_instance_valid(_hitmarker):
+		_hitmarker.visible = false
 
 func _physics_process(delta: float) -> void:
 	if not is_grabbed:
@@ -69,6 +103,25 @@ func _physics_process(delta: float) -> void:
 	elif InputMap.has_action("trigger_click"):
 		trigger_pressed = Input.is_action_pressed("trigger_click")
 
+	# Prediction: while grabbed and not hooked, update hitmarker to where the grapple would land
+	if is_instance_valid(_hitmarker) and not _is_hooked:
+		var _from = controller_transform.origin
+		var _forward_vec: Vector3 = controller_transform.basis.z
+		var _dir: Vector3 = _forward_vec.normalized() * -1.0
+		var _to = _from + _dir * max_distance
+		var _space = get_world_3d().direct_space_state
+		var _exclude = [self]
+		if is_instance_valid(_hand):
+			_exclude.append(_hand)
+		var _q = PhysicsRayQueryParameters3D.create(_from, _to)
+		_q.exclude = _exclude
+		_q.collision_mask = grapple_collision_mask
+		var _pres = _space.intersect_ray(_q)
+		if _pres:
+			_hitmarker.global_transform = Transform3D(Basis(), _pres.position)
+			_hitmarker.visible = true
+		else:
+			_hitmarker.visible = false
 	# Launch grapple
 	if trigger_pressed and not _is_hooked:
 		var from = controller_transform.origin
@@ -87,18 +140,36 @@ func _physics_process(delta: float) -> void:
 			_is_hooked = true
 			_hook_point = res.position
 			_hook_object = res.collider
+			if is_instance_valid(_hook_object) and _hook_object is Node3D:
+				# store offset in object-local coordinates so it moves with rotation and scale
+				_hook_local_offset = (_hook_object as Node3D).to_local(_hook_point)
+			else:
+				_hook_local_offset = Vector3.ZERO
 			if enable_debug_logs:
 				print("GrappleHook: hooked at", _hook_point, "collider=", _hook_object)
 			# Apply initial impulse to the player body if available
 			if is_instance_valid(_player_body):
 				var impulse = (_hook_point - _player_body.global_transform.origin).normalized() * impulse_speed
 				_player_body.apply_central_impulse(impulse)
+			# Ensure hitmarker stays at the actual hook location once hooked
+			if is_instance_valid(_hitmarker):
+				_hitmarker.visible = true
+				if is_instance_valid(_hook_object) and _hook_object is Node3D:
+					_hitmarker.global_transform = Transform3D(Basis(), (_hook_object as Node3D).to_global(_hook_local_offset))
+				else:
+					_hitmarker.global_transform = Transform3D(Basis(), _hook_point)
 
 	# While hooked, apply winch force
 	if _is_hooked:
 		if not trigger_pressed:
 			_end_grapple()
 		else:
+			# Update hitmarker while hooked: prefer tracking the collider's transform if possible
+			if is_instance_valid(_hitmarker):
+				if is_instance_valid(_hook_object) and _hook_object is Node3D:
+					_hitmarker.global_transform = Transform3D(Basis(), (_hook_object as Node3D).to_global(_hook_local_offset))
+				else:
+					_hitmarker.global_transform = Transform3D(Basis(), _hook_point)
 			if is_instance_valid(_player_body):
 				var to_hook = _hook_point - _player_body.global_transform.origin
 				var dist = to_hook.length()
@@ -113,3 +184,5 @@ func _physics_process(delta: float) -> void:
 
 func _exit_tree() -> void:
 	_end_grapple()
+	if is_instance_valid(_hitmarker):
+		_hitmarker.queue_free()
