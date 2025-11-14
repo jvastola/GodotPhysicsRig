@@ -147,9 +147,14 @@ func _physics_process(delta: float) -> void:
 				_hook_local_offset = Vector3.ZERO
 			if enable_debug_logs:
 				print("GrappleHook: hooked at", _hook_point, "collider=", _hook_object)
-			# Apply initial impulse to the player body if available
+			# Use the object's local offset to calculate the actual world hook point to apply the initial
+			# impulse toward the dynamic surface point if the object moves/rotates.
+			var world_hook_point: Vector3 = _hook_point
+			if is_instance_valid(_hook_object) and _hook_object is Node3D:
+				world_hook_point = (_hook_object as Node3D).to_global(_hook_local_offset)
+			# Apply initial impulse to the player body if available, towards live world hook point
 			if is_instance_valid(_player_body):
-				var impulse = (_hook_point - _player_body.global_transform.origin).normalized() * impulse_speed
+				var impulse = (world_hook_point - _player_body.global_transform.origin).normalized() * impulse_speed
 				_player_body.apply_central_impulse(impulse)
 			# Ensure hitmarker stays at the actual hook location once hooked
 			if is_instance_valid(_hitmarker):
@@ -159,19 +164,25 @@ func _physics_process(delta: float) -> void:
 				else:
 					_hitmarker.global_transform = Transform3D(Basis(), _hook_point)
 
+
 	# While hooked, apply winch force
 	if _is_hooked:
 		if not trigger_pressed:
 			_end_grapple()
 		else:
-			# Update hitmarker while hooked: prefer tracking the collider's transform if possible
+			# Compute a live world hook point that updates as the hooked object moves/rotates
+			var live_hook_point: Vector3 = _hook_point
+			if is_instance_valid(_hook_object) and _hook_object is Node3D:
+				live_hook_point = (_hook_object as Node3D).to_global(_hook_local_offset)
+
+			# Update hitmarker while hooked
 			if is_instance_valid(_hitmarker):
-				if is_instance_valid(_hook_object) and _hook_object is Node3D:
-					_hitmarker.global_transform = Transform3D(Basis(), (_hook_object as Node3D).to_global(_hook_local_offset))
-				else:
-					_hitmarker.global_transform = Transform3D(Basis(), _hook_point)
+				_hitmarker.visible = true
+				_hitmarker.global_transform = Transform3D(Basis(), live_hook_point)
+
+			# Apply winch force toward the live hook point
 			if is_instance_valid(_player_body):
-				var to_hook = _hook_point - _player_body.global_transform.origin
+				var to_hook = live_hook_point - _player_body.global_transform.origin
 				var dist = to_hook.length()
 				if dist > 0.1:
 					var dir2 = to_hook.normalized()
@@ -180,7 +191,7 @@ func _physics_process(delta: float) -> void:
 						var force = dir2 * (_player_body.mass * (winch_speed - vdot)) * delta * 8.0
 						_player_body.apply_central_impulse(force)
 			if enable_debug_logs:
-				print("GrappleHook(frame): player=", _player_body.global_transform.origin, ", hook=", _hook_point)
+				print("GrappleHook(frame): player=", _player_body.global_transform.origin, ", hook=", live_hook_point)
 
 func _exit_tree() -> void:
 	_end_grapple()
