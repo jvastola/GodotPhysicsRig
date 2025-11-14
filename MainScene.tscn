@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=18 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://Portal.tscn" id="2_portal"]
@@ -8,6 +8,7 @@
 [ext_resource type="Shader" uid="uid://chjyjc8300le1" path="res://red_sphere_layered.gdshader" id="6_red_shader"]
 [ext_resource type="PackedScene" path="res://grabbables/GrappleHook.tscn" id="7_grapple"]
 [ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://viewport_mirror.gd" id="8_viewport_mirror"]
+[ext_resource type="PackedScene" uid="uid://bhun80s4vlhet" path="res://RotatingObject.tscn" id="9_rotating"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -107,3 +108,6 @@ mesh = SubResource("SphereMesh_red_sphere")
 
 [node name="GrappleHook" parent="." instance=ExtResource("7_grapple")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.406114, -0.259245)
+
+[node name="RotatingObject" parent="." instance=ExtResource("9_rotating")]
+transform = Transform3D(5.28053, 0, 0, 0, 1, 0, 0, 0, 1, 3, 3.34535, -2)
