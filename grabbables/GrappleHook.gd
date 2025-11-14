@@ -17,8 +17,9 @@ var _controller: Node = null
 var _player_body: RigidBody3D = null
 var _hitmarker: MeshInstance3D = null
 var _hook_local_offset: Vector3 = Vector3.ZERO
-var _rope_mesh: ImmediateMesh = null
+var _rope_cylinder: CylinderMesh = null
 var _rope_visual: MeshInstance3D = null
+@export var rope_thickness: float = 0.02
 @export var rope_color: Color = Color8(255, 200, 80)
 
 func _ready() -> void:
@@ -52,10 +53,14 @@ func _ready() -> void:
 	else:
 		call_deferred("add_child", _hitmarker)
 
-	# Create a rope visual with ImmediateMesh to show line from controller to hook
-	_rope_mesh = ImmediateMesh.new()
+	# Create a rope visual as a thin CylinderMesh and a MeshInstance3D
+	_rope_cylinder = CylinderMesh.new()
+	_rope_cylinder.top_radius = rope_thickness
+	_rope_cylinder.bottom_radius = rope_thickness
+	_rope_cylinder.height = 1.0
+	_rope_cylinder.radial_segments = 12
 	_rope_visual = MeshInstance3D.new()
-	_rope_visual.mesh = _rope_mesh
+	_rope_visual.mesh = _rope_cylinder
 	var rope_mat = StandardMaterial3D.new()
 	rope_mat.flags_unshaded = true
 	rope_mat.emission_enabled = true
@@ -98,6 +103,10 @@ func _on_released() -> void:
 		_hitmarker.visible = false
 	if is_instance_valid(_rope_visual):
 		_rope_visual.visible = false
+		if _rope_cylinder:
+			# Reset scale and height
+			_rope_visual.scale = Vector3.ONE
+			_rope_visual.mesh = _rope_cylinder
 
 func _end_grapple() -> void:
 	_is_hooked = false
@@ -107,8 +116,9 @@ func _end_grapple() -> void:
 		_hitmarker.visible = false
 	if is_instance_valid(_rope_visual):
 		_rope_visual.visible = false
-		if _rope_mesh:
-			_rope_mesh.clear_surfaces()
+		if _rope_cylinder:
+			# Reset scale and mesh if we later toggle rope on
+			_rope_visual.mesh = _rope_cylinder
 
 func _physics_process(delta: float) -> void:
 	if not is_grabbed:
@@ -207,17 +217,28 @@ func _physics_process(delta: float) -> void:
 				_hitmarker.visible = true
 				_hitmarker.global_transform = Transform3D(Basis(), live_hook_point)
 
-			# Draw rope from controller origin to live_hook_point using ImmediateMesh
-			if is_instance_valid(_rope_mesh) and is_instance_valid(_rope_visual):
+			# Position and orient a thin cylinder between controller and hook point
+			if is_instance_valid(_rope_visual):
 				var rope_start: Vector3 = controller_transform.origin
 				var rope_end: Vector3 = live_hook_point
-				_rope_visual.global_transform = Transform3D(Basis(), rope_start)
-				_rope_mesh.clear_surfaces()
-				_rope_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
-				_rope_mesh.surface_add_vertex(Vector3.ZERO)
-				_rope_mesh.surface_add_vertex(rope_end - rope_start)
-				_rope_mesh.surface_end()
-				_rope_visual.visible = true
+				var v: Vector3 = rope_end - rope_start
+				var length: float = v.length()
+				if length > 0.001:
+					# Compute a basis that places Y along the direction vector
+					var dir: Vector3 = v / length
+					var up: Vector3 = Vector3.UP
+					if abs(dir.dot(up)) > 0.999:
+						up = Vector3.FORWARD
+					var right: Vector3 = up.cross(dir).normalized()
+					var forward: Vector3 = dir.cross(right).normalized()
+					var basis: Basis = Basis(right, dir, forward)
+					var mid: Vector3 = rope_start + v * 0.5
+					# Apply basis and scale the cylinder so its local Y length matches the rope
+					_rope_visual.global_transform = Transform3D(basis, mid)
+					_rope_visual.scale = Vector3(rope_thickness, length, rope_thickness)
+					_rope_visual.visible = true
+				else:
+					_rope_visual.visible = false
 
 			# Apply winch force toward the live hook point
 			if is_instance_valid(_player_body):
@@ -238,5 +259,7 @@ func _exit_tree() -> void:
 		_hitmarker.queue_free()
 	if is_instance_valid(_rope_visual):
 		_rope_visual.queue_free()
-	if _rope_mesh:
-		_rope_mesh.clear_surfaces()
+	if _rope_cylinder:
+		_rope_cylinder = null
+	if _rope_cylinder:
+		_rope_cylinder = null

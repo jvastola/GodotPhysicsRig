@@ -108,6 +108,7 @@ mesh = SubResource("SphereMesh_red_sphere")
 
 [node name="GrappleHook" parent="." instance=ExtResource("7_grapple")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.406114, -0.259245)
+rope_thickness = 0.1
 
 [node name="RotatingObject" parent="." instance=ExtResource("9_rotating")]
 transform = Transform3D(5.28053, 0, 0, 0, 1, 0, 0, 0, 1, 3, 3.34535, -2)
