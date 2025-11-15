@@ -399,12 +399,9 @@ func _apply_saved_texture_directly(paint_data: Dictionary) -> void:
 		var alloc_w: int = col_widths[face_to_col[fi]]
 		var alloc_h: int = row_heights[face_to_row[fi]]
 		var face_rows: Array = cell_colors[fi] as Array
+		var nx: int = max(1, dims.x)
+		var ny: int = max(1, dims.y)
 		for iy in range(alloc_h):
-			var sample_y: int = clamp(iy, 0, dims.y - 1)
-			var row: Array = (face_rows[sample_y] as Array) if sample_y < face_rows.size() else []
-			var nx: int = max(1, dims.x)
-			var ny: int = max(1, dims.y)
-			for iy in range(alloc_h):
 				var sample_y: int = clamp(int(floor(float(iy) * float(ny) / float(alloc_h))), 0, ny - 1)
 				var row: Array = (face_rows[sample_y] as Array) if sample_y < face_rows.size() else []
 				for ix in range(alloc_w):
