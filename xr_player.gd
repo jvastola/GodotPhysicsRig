@@ -322,11 +322,11 @@ func _apply_saved_texture_directly(paint_data: Dictionary) -> void:
 			print("XRPlayer: Malformed face data in saved colors")
 			return
 		var rows: Array = face
-		var height := rows.size()
+		var height: int = rows.size()
 		if height == 0:
 			print("XRPlayer: Saved face data missing rows")
 			return
-		var width := 0
+		var width: int = 0
 		for row in rows:
 			if not (row is Array):
 				print("XRPlayer: Malformed row data in saved colors")
@@ -353,22 +353,22 @@ func _apply_saved_texture_directly(paint_data: Dictionary) -> void:
 
 	var col_widths: Array[int] = []
 	for faces in column_faces:
-		var width := 1
+		var width: int = 1
 		for fi in faces:
 			width = max(width, face_dims[fi].x)
 		col_widths.append(width)
 
 	var row_heights: Array[int] = []
 	for faces in row_faces:
-		var height := 1
+		var height: int = 1
 		for fi in faces:
 			height = max(height, face_dims[fi].y)
 		row_heights.append(height)
 
-	var tex_width := 0
+	var tex_width: int = 0
 	for width in col_widths:
 		tex_width += width
-	var tex_height := 0
+	var tex_height: int = 0
 	for height in row_heights:
 		tex_height += height
 
@@ -376,11 +376,11 @@ func _apply_saved_texture_directly(paint_data: Dictionary) -> void:
 		print("XRPlayer: Invalid texture dimensions computed from saved paint")
 		return
 
-	var img := Image.create(tex_width, tex_height, false, Image.FORMAT_RGBA8)
+	var img: Image = Image.create(tex_width, tex_height, false, Image.FORMAT_RGBA8)
 	img.fill(Color.TRANSPARENT)
 
 	var col_offsets: Array[int] = []
-	var acc := 0
+	var acc: int = 0
 	for width in col_widths:
 		col_offsets.append(acc)
 		acc += width
@@ -400,14 +400,14 @@ func _apply_saved_texture_directly(paint_data: Dictionary) -> void:
 		var alloc_h: int = row_heights[face_to_row[fi]]
 		var face_rows: Array = cell_colors[fi] as Array
 		for iy in range(alloc_h):
-			var sample_y := clamp(iy, 0, dims.y - 1)
+			var sample_y: int = clamp(iy, 0, dims.y - 1)
 			var row: Array = (face_rows[sample_y] as Array) if sample_y < face_rows.size() else []
 			for ix in range(alloc_w):
-				var sample_x := clamp(ix, 0, dims.x - 1)
+				var sample_x: int = clamp(ix, 0, dims.x - 1)
 				if sample_x < row.size():
 					var color: Color = row[sample_x] as Color
 					img.set_pixel(offset.x + ix, offset.y + iy, color)
 
-	var texture := ImageTexture.create_from_image(img)
+	var texture: ImageTexture = ImageTexture.create_from_image(img)
 	apply_texture_to_head(texture)
 	print("XRPlayer: Applied saved texture directly (subdivisions=", subdivisions_meta, ", texture=", tex_width, "x", tex_height, ")")
