@@ -12,7 +12,7 @@ const FACE_DEFS: Array[Dictionary] = [
 ]
 
 @export var size: Vector3 = Vector3(2.0, 2.0, 2.0)
-@export_range(1, 128, 1) var subdivisions: int = 1
+@export var subdivisions_axis: Vector3i = Vector3i(4, 4, 4)
 @export var seed: int = 0
 @export var material_unshaded: bool = false
 @export var flip_winding: bool = false
@@ -26,6 +26,44 @@ const FACE_DEFS: Array[Dictionary] = [
 var _cell_colors: Array = [] # faces x rows x columns
 var _paint_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _hover_cell: Dictionary = {}
+var _face_cell_dims: Array = []
+
+func _axis_counts() -> Vector3i:
+	return Vector3i(
+		max(1, subdivisions_axis.x),
+		max(1, subdivisions_axis.y),
+		max(1, subdivisions_axis.z)
+	)
+
+func _count_for_axis(axis: Vector3, axis_counts: Vector3i) -> int:
+	var abs_axis := axis.abs()
+	if abs_axis.x > 0.5:
+		return axis_counts.x
+	elif abs_axis.y > 0.5:
+		return axis_counts.y
+	else:
+		return axis_counts.z
+
+func _compute_face_dims(axis_counts: Vector3i) -> Array:
+	var dims: Array = []
+	for face in FACE_DEFS:
+		var u_div := _count_for_axis(face["u"], axis_counts)
+		var v_div := _count_for_axis(face["v"], axis_counts)
+		dims.append(Vector2i(u_div, v_div))
+	return dims
+
+func _subdivision_meta_matches(meta: Variant, axis_counts: Vector3i) -> bool:
+	if meta is Vector3i:
+		return meta == axis_counts
+	elif meta is Vector3:
+		return Vector3i(int(meta.x), int(meta.y), int(meta.z)) == axis_counts
+	elif meta is Dictionary and meta.has("x") and meta.has("y") and meta.has("z"):
+		return Vector3i(int(meta["x"]), int(meta["y"]), int(meta["z"])) == axis_counts
+	elif meta is Array and meta.size() >= 3:
+		return Vector3i(int(meta[0]), int(meta[1]), int(meta[2])) == axis_counts
+	else:
+		var uniform := int(meta)
+		return axis_counts.x == uniform and axis_counts.y == uniform and axis_counts.z == uniform
 
 func _ready() -> void:
 	if pointer_group != StringName(""):
@@ -50,12 +88,15 @@ func build_mesh() -> void:
 	else:
 		rng.randomize()
 
-	var nx: int = max(1, subdivisions)
-	var ny: int = max(1, subdivisions)
-	_ensure_cell_storage(nx, ny, rng)
+	var axis_counts: Vector3i = _axis_counts()
+	_face_cell_dims = _compute_face_dims(axis_counts)
+	_ensure_cell_storage(_face_cell_dims, rng)
 
 	for fi in range(FACE_DEFS.size()):
-		var face: Dictionary = FACE_DEFS[fi]
+		var face: Dictionary = FACE_DEFS[fi] as Dictionary
+		var dims: Vector2i = _face_cell_dims[fi]
+		var nx: int = max(1, dims.x)
+		var ny: int = max(1, dims.y)
 		var n: Vector3 = face["n"]
 		var u: Vector3 = face["u"]
 		var v: Vector3 = face["v"]
@@ -161,17 +202,13 @@ func handle_pointer_event(event: Dictionary) -> void:
 			pass
 
 func paint_cell(global_point: Vector3, color_override: Variant = null) -> bool:
-	var nx: int = max(1, subdivisions)
-	var ny: int = max(1, subdivisions)
-	if _cell_colors.size() != FACE_DEFS.size():
+	if _cell_colors.size() != FACE_DEFS.size() or _face_cell_dims.size() != FACE_DEFS.size():
 		build_mesh()
 		if _cell_colors.size() != FACE_DEFS.size():
 			return false
-		nx = max(1, subdivisions)
-		ny = max(1, subdivisions)
 
 	var local_point: Vector3 = global_transform.affine_inverse() * global_point
-	var cell: Dictionary = _locate_cell(local_point, nx, ny)
+	var cell: Dictionary = _locate_cell(local_point)
 	if cell.is_empty():
 		return false
 
@@ -271,9 +308,14 @@ func _ensure_collision(meshres: Mesh) -> void:
 
 	col_shape.disabled = false
 
-func _locate_cell(local_point: Vector3, nx: int, ny: int) -> Dictionary:
+func _locate_cell(local_point: Vector3) -> Dictionary:
+	if _face_cell_dims.size() != FACE_DEFS.size():
+		_face_cell_dims = _compute_face_dims(_axis_counts())
 	for fi in range(FACE_DEFS.size()):
 		var face: Dictionary = FACE_DEFS[fi]
+		var dims: Vector2i = _face_cell_dims[fi]
+		var nx: int = max(1, dims.x)
+		var ny: int = max(1, dims.y)
 		var n: Vector3 = face["n"]
 		var u: Vector3 = face["u"]
 		var v: Vector3 = face["v"]
@@ -298,24 +340,26 @@ func _locate_cell(local_point: Vector3, nx: int, ny: int) -> Dictionary:
 	return {}
 
 func _cell_from_world_point(global_point: Vector3) -> Dictionary:
-	var nx: int = max(1, subdivisions)
-	var ny: int = max(1, subdivisions)
 	var local_point: Vector3 = global_transform.affine_inverse() * global_point
-	return _locate_cell(local_point, nx, ny)
+	return _locate_cell(local_point)
 
 func _determine_paint_color(color_override: Variant) -> Color:
 	if color_override is Color:
 		return color_override
 	return Color(_paint_rng.randf(), _paint_rng.randf(), _paint_rng.randf(), 1.0)
 
-func _ensure_cell_storage(nx: int, ny: int, rng: RandomNumberGenerator) -> void:
+func _ensure_cell_storage(face_dims: Array, rng: RandomNumberGenerator) -> void:
 	if _cell_colors.size() != FACE_DEFS.size():
 		_cell_colors.clear()
-		for _i in range(FACE_DEFS.size()):
-			_cell_colors.append(_create_face_color_grid(nx, ny, rng))
+		for fi in range(FACE_DEFS.size()):
+			var dims: Vector2i = face_dims[fi]
+			_cell_colors.append(_create_face_color_grid(max(1, dims.x), max(1, dims.y), rng))
 		return
 
 	for fi in range(FACE_DEFS.size()):
+		var dims: Vector2i = face_dims[fi]
+		var nx: int = max(1, dims.x)
+		var ny: int = max(1, dims.y)
 		var face_arr: Array = _cell_colors[fi]
 		if face_arr.size() != ny:
 			_cell_colors[fi] = _create_face_color_grid(nx, ny, rng)
@@ -358,7 +402,7 @@ func _update_player_head_texture() -> void:
 		return
 	
 	print("subdivided_cube: Found player, generating texture...")
-	var texture := _generate_texture_from_cells()
+	var texture: ImageTexture = _generate_texture_from_cells()
 	if texture:
 		print("subdivided_cube: Applying texture to player head, size: ", texture.get_width(), "x", texture.get_height())
 		player.apply_texture_to_head(texture)
@@ -368,42 +412,67 @@ func _update_player_head_texture() -> void:
 
 func _generate_texture_from_cells() -> ImageTexture:
 	"""Generate a texture from the current cell colors with UV layout"""
-	var nx: int = max(1, subdivisions)
-	var ny: int = max(1, subdivisions)
-	
-	print("subdivided_cube: Generating texture with subdivisions: ", nx, "x", ny, ", faces: ", _cell_colors.size())
-	
-	# Create a texture that maps the 6 faces in a cube map layout
-	# Layout: 2x3 grid where each face is nx x ny pixels
-	var tex_width := nx * 3  # 3 faces wide
-	var tex_height := ny * 2  # 2 faces tall
-	
-	var img := Image.create(tex_width, tex_height, false, Image.FORMAT_RGBA8)
-	
-	# Godot BoxMesh UV layout:
-	# [left][top][right]
-	# [back][front][bottom]
-	# Face indices: 0=front(+z), 1=back(-z), 2=right(+x), 3=left(-x), 4=top(+y), 5=bottom(-y)
-	
-	# Only use the inside faces (inverted/backfaces) - skip outside faces
-	# Since the head mesh has flip_faces or is viewed from inside, we want the inner surface
-	var face_positions := [
-		Vector2i(nx, ny),      # 0: front (+z) - bottom center
-		Vector2i(0, ny),       # 1: back (-z) - bottom left
-		Vector2i(nx * 2, 0),   # 2: right (+x) - top right
-		Vector2i(0, 0),        # 3: left (-x) - top left
-		Vector2i(nx, 0),       # 4: top (+y) - top center
-		Vector2i(nx * 2, ny)   # 5: bottom (-y) - bottom right
+	if _face_cell_dims.size() != FACE_DEFS.size():
+		_face_cell_dims = _compute_face_dims(_axis_counts())
+
+	print("subdivided_cube: Generating texture with per-face dims: ", _face_cell_dims)
+
+	var column_faces := [
+		[3, 1],  # left/back column
+		[4, 0],  # top/front column
+		[2, 5]   # right/bottom column
 	]
-	
-	# Fill with cell colors from all faces
+	var row_faces := [
+		[3, 4, 2],  # top row
+		[1, 0, 5]   # bottom row
+	]
+
+	var col_widths: Array[int] = []
+	for faces in column_faces:
+		var width := 1
+		for fi in faces:
+			width = max(width, _face_cell_dims[fi].x)
+		col_widths.append(width)
+
+	var row_heights: Array[int] = []
+	for faces in row_faces:
+		var height := 1
+		for fi in faces:
+			height = max(height, _face_cell_dims[fi].y)
+		row_heights.append(height)
+
+	var tex_width := 0
+	for width in col_widths:
+		tex_width += width
+	var tex_height := 0
+	for height in row_heights:
+		tex_height += height
+
+	var img := Image.create(tex_width, tex_height, false, Image.FORMAT_RGBA8)
+	img.fill(Color.TRANSPARENT)
+
+	var col_offsets: Array[int] = []
+	var acc := 0
+	for width in col_widths:
+		col_offsets.append(acc)
+		acc += width
+	var row_offsets: Array[int] = []
+	acc = 0
+	for height in row_heights:
+		row_offsets.append(acc)
+		acc += height
+
+	var face_to_row := [1, 1, 0, 0, 0, 1]
+	var face_to_col := [1, 0, 2, 0, 1, 2]
+
 	for fi in range(FACE_DEFS.size()):
-		var offset: Vector2i = face_positions[fi]
-		for iy in range(ny):
-			for ix in range(nx):
+		var dims: Vector2i = _face_cell_dims[fi]
+		var offset := Vector2i(col_offsets[face_to_col[fi]], row_offsets[face_to_row[fi]])
+		for iy in range(dims.y):
+			for ix in range(dims.x):
 				var color: Color = _cell_colors[fi][iy][ix]
 				img.set_pixel(offset.x + ix, offset.y + iy, color)
-	
+
 	return ImageTexture.create_from_image(img)
 
 
@@ -411,7 +480,7 @@ func _save_paint_state() -> void:
 	"""Save current paint state to SaveManager"""
 	if not SaveManager:
 		return
-	SaveManager.save_head_paint(_cell_colors, subdivisions)
+	SaveManager.save_head_paint(_cell_colors, _axis_counts())
 
 
 func _load_paint_state() -> void:
@@ -424,16 +493,17 @@ func _load_paint_state() -> void:
 		print("subdivided_cube: No saved paint state found")
 		return
 	
-	# Validate loaded data matches current subdivisions
-	var saved_subdivisions: int = paint_data.get("subdivisions", 1)
-	if saved_subdivisions != subdivisions:
-		print("subdivided_cube: Saved subdivisions (", saved_subdivisions, ") != current (", subdivisions, "), ignoring saved paint")
+	# Validate loaded data matches current subdivision signature
+	var axis_counts: Vector3i = _axis_counts()
+	var saved_subdivisions: Variant = paint_data.get("subdivisions", axis_counts)
+	if not _subdivision_meta_matches(saved_subdivisions, axis_counts):
+		print("subdivided_cube: Saved subdivisions (", saved_subdivisions, ") != current (", axis_counts, "), ignoring saved paint")
 		return
 	
 	var saved_colors: Array = paint_data.get("cell_colors", [])
 	if saved_colors.size() == FACE_DEFS.size():
 		_cell_colors = saved_colors
-		print("subdivided_cube: Loaded saved paint state with ", subdivisions, " subdivisions")
+		print("subdivided_cube: Loaded saved paint state with axis counts ", axis_counts)
 		# Will rebuild mesh and update head texture after this returns
 	else:
 		print("subdivided_cube: Saved cell colors size mismatch, ignoring")

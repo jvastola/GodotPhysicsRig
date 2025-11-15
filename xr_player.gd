@@ -309,40 +309,101 @@ func _apply_saved_texture_directly(paint_data: Dictionary) -> void:
 	if not head_mesh:
 		return
 	
-	var subdivisions: int = paint_data.get("subdivisions", 1)
+	var subdivisions_meta: Variant = paint_data.get("subdivisions", 1)
 	var cell_colors: Array = paint_data.get("cell_colors", [])
-	
+
 	if cell_colors.is_empty() or cell_colors.size() != 6:
 		print("XRPlayer: Invalid cell colors data")
 		return
-	
-	# Generate texture from cell colors (same logic as subdivided_cube)
-	var nx: int = max(1, subdivisions)
-	var ny: int = max(1, subdivisions)
-	var tex_width := nx * 3
-	var tex_height := ny * 2
-	
-	var img := Image.create(tex_width, tex_height, false, Image.FORMAT_RGBA8)
-	
-	# Face positions in texture layout
-	var face_positions := [
-		Vector2i(nx, ny),      # 0: front (+z)
-		Vector2i(0, ny),       # 1: back (-z)
-		Vector2i(nx * 2, 0),   # 2: right (+x)
-		Vector2i(0, 0),        # 3: left (-x)
-		Vector2i(nx, 0),       # 4: top (+y)
-		Vector2i(nx * 2, ny)   # 5: bottom (-y)
+
+	var face_dims: Array = []
+	for face in cell_colors:
+		if not (face is Array):
+			print("XRPlayer: Malformed face data in saved colors")
+			return
+		var rows: Array = face
+		var height := rows.size()
+		if height == 0:
+			print("XRPlayer: Saved face data missing rows")
+			return
+		var width := 0
+		for row in rows:
+			if not (row is Array):
+				print("XRPlayer: Malformed row data in saved colors")
+				return
+			width = max(width, row.size())
+		if width == 0:
+			print("XRPlayer: Saved face data missing columns")
+			return
+		face_dims.append(Vector2i(width, height))
+
+	if face_dims.size() != 6:
+		print("XRPlayer: Unexpected face dimension count")
+		return
+
+	var column_faces := [
+		[3, 1],
+		[4, 0],
+		[2, 5]
 	]
-	
-	# Fill with cell colors
+	var row_faces := [
+		[3, 4, 2],
+		[1, 0, 5]
+	]
+
+	var col_widths: Array[int] = []
+	for faces in column_faces:
+		var width := 1
+		for fi in faces:
+			width = max(width, face_dims[fi].x)
+		col_widths.append(width)
+
+	var row_heights: Array[int] = []
+	for faces in row_faces:
+		var height := 1
+		for fi in faces:
+			height = max(height, face_dims[fi].y)
+		row_heights.append(height)
+
+	var tex_width := 0
+	for width in col_widths:
+		tex_width += width
+	var tex_height := 0
+	for height in row_heights:
+		tex_height += height
+
+	if tex_width <= 0 or tex_height <= 0:
+		print("XRPlayer: Invalid texture dimensions computed from saved paint")
+		return
+
+	var img := Image.create(tex_width, tex_height, false, Image.FORMAT_RGBA8)
+	img.fill(Color.TRANSPARENT)
+
+	var col_offsets: Array[int] = []
+	var acc := 0
+	for width in col_widths:
+		col_offsets.append(acc)
+		acc += width
+	var row_offsets: Array[int] = []
+	acc = 0
+	for height in row_heights:
+		row_offsets.append(acc)
+		acc += height
+
+	var face_to_row := [1, 1, 0, 0, 0, 1]
+	var face_to_col := [1, 0, 2, 0, 1, 2]
+
 	for fi in range(6):
-		var offset: Vector2i = face_positions[fi]
-		for iy in range(ny):
-			for ix in range(nx):
-				if fi < cell_colors.size() and iy < cell_colors[fi].size() and ix < cell_colors[fi][iy].size():
-					var color: Color = cell_colors[fi][iy][ix]
+		var dims: Vector2i = face_dims[fi]
+		var offset := Vector2i(col_offsets[face_to_col[fi]], row_offsets[face_to_row[fi]])
+		var face_rows: Array = cell_colors[fi] as Array
+		for iy in range(dims.y):
+			var row: Array = (face_rows[iy] as Array) if iy < face_rows.size() else []
+			for ix in range(dims.x):
+				if ix < row.size():
+					var color: Color = row[ix] as Color
 					img.set_pixel(offset.x + ix, offset.y + iy, color)
-	
+
 	var texture := ImageTexture.create_from_image(img)
 	apply_texture_to_head(texture)
-	print("XRPlayer: Applied saved texture directly (", subdivisions, " subdivisions)")
+	print("XRPlayer: Applied saved texture directly (subdivisions=", subdivisions_meta, ", texture=", tex_width, "x", tex_height, ")")

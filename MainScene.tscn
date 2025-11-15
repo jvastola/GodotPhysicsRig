@@ -67,12 +67,12 @@ mesh = SubResource("BoxMesh_floor")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
 
 [node name="ColorCube" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.6439, 0.5, -2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0.5, -2)
 layers = 33
 cast_shadow = 0
 script = ExtResource("3_cube")
 size = Vector3(0.25, 0.25, 0.25)
-subdivisions = 9
+subdivisions_axis = Vector3i(9, 3, 10)
 seed = 12345
 material_unshaded = true
 flip_winding = true
@@ -99,6 +99,10 @@ MirrorColor = Color(1, 1, 1, 1)
 
 [node name="BlueCube" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.50977, 1, -2.50433)
+mesh = SubResource("BoxMesh_blue_cube")
+
+[node name="BlueCube2" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.304437, 0, 0, 0, 0.81016, 0, 0, 0, 0.549941, -4, 0.140702, -2)
 mesh = SubResource("BoxMesh_blue_cube")
 
 [node name="RedSphere" type="MeshInstance3D" parent="."]

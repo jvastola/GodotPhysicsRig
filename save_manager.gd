@@ -11,6 +11,32 @@ var _autosave_timer := 0.0
 const AUTOSAVE_INTERVAL := 2.0  # Auto-save every 2 seconds if dirty
 
 
+func _serialize_subdivision_meta(meta: Variant) -> Variant:
+	"""Convert subdivision metadata to JSON-friendly data (array of ints when possible)."""
+	if meta is Vector3i:
+		return [meta.x, meta.y, meta.z]
+	elif meta is Vector3:
+		return [int(meta.x), int(meta.y), int(meta.z)]
+	elif meta is Array and meta.size() >= 3:
+		return [int(meta[0]), int(meta[1]), int(meta[2])]
+	elif meta is Dictionary and meta.has("x") and meta.has("y") and meta.has("z"):
+		return [int(meta["x"]), int(meta["y"]), int(meta["z"])]
+	return int(meta)
+
+
+func _deserialize_subdivision_meta(meta: Variant) -> Variant:
+	"""Convert saved subdivision metadata back into Vector3i when possible."""
+	if meta is Vector3i:
+		return meta
+	elif meta is Vector3:
+		return Vector3i(int(meta.x), int(meta.y), int(meta.z))
+	elif meta is Dictionary and meta.has("x") and meta.has("y") and meta.has("z"):
+		return Vector3i(int(meta["x"]), int(meta["y"]), int(meta["z"]))
+	elif meta is Array and meta.size() >= 3:
+		return Vector3i(int(meta[0]), int(meta[1]), int(meta[2]))
+	return int(meta)
+
+
 func _ready() -> void:
 	# Load save data on startup
 	load_game_state()
@@ -68,7 +94,7 @@ func load_game_state() -> void:
 
 # --- HEAD PAINT PERSISTENCE ---
 
-func save_head_paint(cell_colors: Array, subdivisions: int) -> void:
+func save_head_paint(cell_colors: Array, subdivisions_meta: Variant) -> void:
 	"""Save head mesh paint state"""
 	# Convert Color objects to arrays for JSON serialization
 	var serialized_colors := []
@@ -84,16 +110,17 @@ func save_head_paint(cell_colors: Array, subdivisions: int) -> void:
 			face_data.append(row_data)
 		serialized_colors.append(face_data)
 	
+	var serialized_subdivisions: Variant = _serialize_subdivision_meta(subdivisions_meta)
 	_save_data["head_paint"] = {
-		"subdivisions": subdivisions,
+		"subdivisions": serialized_subdivisions,
 		"cell_colors": serialized_colors
 	}
 	_save_dirty = true
-	print("SaveManager: Head paint state marked for save (", subdivisions, " subdivisions)")
+	print("SaveManager: Head paint state marked for save (subdivisions=", serialized_subdivisions, ")")
 
 
 func load_head_paint() -> Dictionary:
-	"""Load head mesh paint state. Returns {subdivisions: int, cell_colors: Array}"""
+	"""Load head mesh paint state. Returns {subdivisions: Variant, cell_colors: Array}"""
 	if not _save_data.has("head_paint"):
 		return {}
 	
@@ -115,7 +142,7 @@ func load_head_paint() -> Dictionary:
 			cell_colors.append(face_data)
 	
 	return {
-		"subdivisions": paint_data.get("subdivisions", 1),
+		"subdivisions": _deserialize_subdivision_meta(paint_data.get("subdivisions", 1)),
 		"cell_colors": cell_colors
 	}
 
