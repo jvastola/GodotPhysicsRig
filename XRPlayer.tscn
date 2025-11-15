@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3 uid="uid://cpq6v7yqk8y8j"]
+[gd_scene load_steps=22 format=3 uid="uid://cpq6v7yqk8y8j"]
 
 [ext_resource type="Script" uid="uid://02kpb1kqm303" path="res://xr_player.gd" id="1_player"]
 [ext_resource type="Script" uid="uid://3ir0c0htxlqh" path="res://xr_origin_3d.gd" id="2_xr_origin"]
@@ -48,10 +48,15 @@ bottom_radius = 0.01
 height = 0.001
 radial_segments = 16
 
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_extra"]
+radius = 0.2
+height = 1.2
+
 [sub_resource type="BoxShape3D" id="BoxShape3D_hand"]
 
 [node name="XRPlayer" type="Node3D"]
 script = ExtResource("1_player")
+desktop_extra_collider_offset = Vector3(0, 0, 0)
 turn_mode = 1
 smooth_turn_speed = 180.0
 
@@ -142,6 +147,7 @@ hit_max_scale = 1.0
 
 [node name="PointerFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.07)
+visible = false
 material_override = SubResource("StandardMaterial3D_pointer_face")
 cast_shadow = 0
 mesh = SubResource("QuadMesh_pointer_face")
@@ -191,8 +197,33 @@ mesh = SubResource("CylinderMesh_pointer_hit")
 [node name="DesktopCamera" type="Camera3D" parent="PlayerBody"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 
+[node name="CenterPointer" type="Node3D" parent="PlayerBody/DesktopCamera"]
+script = ExtResource("6_pointer")
+ray_length = 3.5
+
+[node name="PointerFace" type="MeshInstance3D" parent="PlayerBody/DesktopCamera/CenterPointer"]
+transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, -0.07)
+material_override = SubResource("StandardMaterial3D_pointer_face")
+cast_shadow = 0
+mesh = SubResource("QuadMesh_pointer_face")
+
+[node name="PointerRayCast" type="RayCast3D" parent="PlayerBody/DesktopCamera/CenterPointer"]
+target_position = Vector3(0, 0, -3.5)
+hit_from_inside = true
+
+[node name="PointerRayVisual" type="MeshInstance3D" parent="PlayerBody/DesktopCamera/CenterPointer"]
+cast_shadow = 0
+
+[node name="PointerRayHit" type="MeshInstance3D" parent="PlayerBody/DesktopCamera/CenterPointer"]
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_pointer_hit")
+
 [node name="DesktopController" type="Node" parent="PlayerBody"]
 script = ExtResource("4_desktop")
+
+[node name="DesktopExtraCollision" type="CollisionShape3D" parent="PlayerBody"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.426539, 0)
+shape = SubResource("CapsuleShape3D_extra")
 
 [node name="PhysicsHandLeft" type="RigidBody3D" parent="." node_paths=PackedStringArray("player_rigidbody", "target")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.801002, 0, 0)

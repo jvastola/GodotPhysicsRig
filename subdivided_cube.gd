@@ -475,15 +475,11 @@ func _generate_texture_from_cells() -> ImageTexture:
 		# cell edge color so we don't leave transparent gaps.
 		var alloc_w: int = col_widths[face_to_col[fi]]
 		var alloc_h: int = row_heights[face_to_row[fi]]
-		# Map the face's cell grid evenly to the allocated slot. We pick the
-		# nearest source cell for each output pixel by scaling the indices so
-		# each cell fills alloc_w/nx pixels in X (and alloc_h/ny in Y).
-		var nx: int = max(1, dims.x)
-		var ny: int = max(1, dims.y)
 		for iy in range(alloc_h):
-			var sample_y: int = clamp(int(floor(float(iy) * float(ny) / float(alloc_h))), 0, ny - 1)
+			# clamp sample index to nearest available row inside the face
+			var sample_y: int = clamp(iy, 0, dims.y - 1)
 			for ix in range(alloc_w):
-				var sample_x: int = clamp(int(floor(float(ix) * float(nx) / float(alloc_w))), 0, nx - 1)
+				var sample_x: int = clamp(ix, 0, dims.x - 1)
 				var color: Color = _cell_colors[fi][sample_y][sample_x]
 				img.set_pixel(offset.x + ix, offset.y + iy, color)
 

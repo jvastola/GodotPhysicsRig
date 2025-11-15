@@ -20,7 +20,12 @@ extends Node3D
 var player_height := 0.0  # Using headset tracking; keep 0 to avoid artificial offset
 var is_vr_mode := false
 @export var head_radius: float = 0.18
+var _desktop_trigger_event: InputEventMouseButton = null
 @export var show_head_mesh: bool = true
+@export var desktop_extra_collider_enabled: bool = true
+@export var desktop_extra_collider_height: float = 1.2
+@export var desktop_extra_collider_radius: float = 0.2
+@export var desktop_extra_collider_offset: Vector3 = Vector3(0, 1.15, 0)
 
 # Turning settings
 enum TurnMode { SNAP, SMOOTH }
@@ -145,6 +150,21 @@ func _activate_vr_mode() -> void:
 	if desktop_controller and desktop_controller.has_method("deactivate"):
 		desktop_controller.deactivate()
 
+	# Remove desktop-only extra collider when in VR
+	_remove_desktop_extra_collider()
+	
+	# Disable center pointer on VR
+	var center_ptr = get_node_or_null("PlayerBody/DesktopCamera/CenterPointer")
+	if center_ptr:
+		center_ptr.set_physics_process(false)
+		center_ptr.hide()
+
+	# Remove desktop left-mouse mapping for trigger_click
+	if _desktop_trigger_event:
+		if InputMap.has_action("trigger_click"):
+			InputMap.action_erase_event("trigger_click", _desktop_trigger_event)
+			_desktop_trigger_event = null
+
 
 func _activate_desktop_mode() -> void:
 	"""Enable desktop camera and controls, disable VR hands"""
@@ -163,6 +183,25 @@ func _activate_desktop_mode() -> void:
 	if physics_hand_right:
 		physics_hand_right.hide()
 		physics_hand_right.set_physics_process(false)
+
+	# Ensure extra collider is present on desktop
+	_ensure_desktop_extra_collider()
+
+	# Show center pointer on desktop
+	var center_ptr = get_node_or_null("PlayerBody/DesktopCamera/CenterPointer")
+	if center_ptr:
+		center_ptr.show()
+		center_ptr.set_physics_process(true)
+
+	# Bind left mouse button to `trigger_click` when in desktop mode so left-click acts like trigger
+	if not InputMap.has_action("trigger_click"):
+		InputMap.add_action("trigger_click")
+	# Add mouse button mapping if not already present
+	if _desktop_trigger_event == null:
+		var me := InputEventMouseButton.new()
+		me.button_index = MOUSE_BUTTON_LEFT
+		InputMap.action_add_event("trigger_click", me)
+		_desktop_trigger_event = me
 
 
 func teleport_to(target_position: Vector3) -> void:
@@ -213,6 +252,40 @@ func get_camera_forward() -> Vector3:
 	elif desktop_camera:
 		return -desktop_camera.global_transform.basis.z
 	return -global_transform.basis.z
+
+
+func _ensure_desktop_extra_collider() -> void:
+	"""Create or update the desktop-only extra collider for a taller player."""
+	if not desktop_extra_collider_enabled or not player_body:
+		return
+	var name := "DesktopExtraCollision"
+	var existing := player_body.get_node_or_null(name) as CollisionShape3D
+	# Build a capsule shape for the extra collider
+	if existing:
+		if existing.shape and existing.shape is CapsuleShape3D:
+			var s := existing.shape as CapsuleShape3D
+			s.height = desktop_extra_collider_height
+			s.radius = desktop_extra_collider_radius
+		existing.transform = Transform3D(Basis(), desktop_extra_collider_offset)
+		return
+	# Create a new shape
+	var cs: CollisionShape3D = CollisionShape3D.new()
+	cs.name = name
+	var cap: CapsuleShape3D = CapsuleShape3D.new()
+	cap.height = desktop_extra_collider_height
+	cap.radius = desktop_extra_collider_radius
+	cs.shape = cap
+	cs.transform = Transform3D(Basis(), desktop_extra_collider_offset)
+	player_body.add_child(cs)
+	# Set owner so it persists in the scene if editing
+	cs.owner = owner
+
+
+func _remove_desktop_extra_collider() -> void:
+	var name := "DesktopExtraCollision"
+	var existing := player_body.get_node_or_null(name)
+	if existing:
+		existing.queue_free()
 
 
 func _handle_turning(delta: float) -> void:
@@ -399,14 +472,15 @@ func _apply_saved_texture_directly(paint_data: Dictionary) -> void:
 		var alloc_w: int = col_widths[face_to_col[fi]]
 		var alloc_h: int = row_heights[face_to_row[fi]]
 		var face_rows: Array = cell_colors[fi] as Array
-		var nx: int = max(1, dims.x)
-		var ny: int = max(1, dims.y)
 		for iy in range(alloc_h):
-				var sample_y: int = clamp(int(floor(float(iy) * float(ny) / float(alloc_h))), 0, ny - 1)
-				var row: Array = (face_rows[sample_y] as Array) if sample_y < face_rows.size() else []
-				for ix in range(alloc_w):
-					var sample_x: int = clamp(int(floor(float(ix) * float(nx) / float(alloc_w))), 0, nx - 1)
-					if sample_x < row.size():
-						var color: Color = row[sample_x] as Color
-						img.set_pixel(offset.x + ix, offset.y + iy, color)
+			var sample_y: int = clamp(iy, 0, dims.y - 1)
+			var row: Array = (face_rows[sample_y] as Array) if sample_y < face_rows.size() else []
+			for ix in range(alloc_w):
+				var sample_x: int = clamp(ix, 0, dims.x - 1)
+				if sample_x < row.size():
+					var color: Color = row[sample_x] as Color
+					img.set_pixel(offset.x + ix, offset.y + iy, color)
+
+	var texture: ImageTexture = ImageTexture.create_from_image(img)
+	apply_texture_to_head(texture)
 	print("XRPlayer: Applied saved texture directly (subdivisions=", subdivisions_meta, ", texture=", tex_width, "x", tex_height, ")")
