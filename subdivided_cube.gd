@@ -467,10 +467,20 @@ func _generate_texture_from_cells() -> ImageTexture:
 
 	for fi in range(FACE_DEFS.size()):
 		var dims: Vector2i = _face_cell_dims[fi]
-		var offset := Vector2i(col_offsets[face_to_col[fi]], row_offsets[face_to_row[fi]])
-		for iy in range(dims.y):
-			for ix in range(dims.x):
-				var color: Color = _cell_colors[fi][iy][ix]
+		var offset: Vector2i = Vector2i(col_offsets[face_to_col[fi]], row_offsets[face_to_row[fi]])
+
+		# The allocated slot for this face may be larger than the face's
+		# subdivided dims (because col/row sizes are the max within the
+		# column/row group). Fill any extra pixels by repeating the nearest
+		# cell edge color so we don't leave transparent gaps.
+		var alloc_w: int = col_widths[face_to_col[fi]]
+		var alloc_h: int = row_heights[face_to_row[fi]]
+		for iy in range(alloc_h):
+			# clamp sample index to nearest available row inside the face
+			var sample_y: int = clamp(iy, 0, dims.y - 1)
+			for ix in range(alloc_w):
+				var sample_x: int = clamp(ix, 0, dims.x - 1)
+				var color: Color = _cell_colors[fi][sample_y][sample_x]
 				img.set_pixel(offset.x + ix, offset.y + iy, color)
 
 	return ImageTexture.create_from_image(img)

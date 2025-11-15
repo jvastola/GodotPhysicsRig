@@ -395,13 +395,17 @@ func _apply_saved_texture_directly(paint_data: Dictionary) -> void:
 
 	for fi in range(6):
 		var dims: Vector2i = face_dims[fi]
-		var offset := Vector2i(col_offsets[face_to_col[fi]], row_offsets[face_to_row[fi]])
+		var offset: Vector2i = Vector2i(col_offsets[face_to_col[fi]], row_offsets[face_to_row[fi]])
+		var alloc_w: int = col_widths[face_to_col[fi]]
+		var alloc_h: int = row_heights[face_to_row[fi]]
 		var face_rows: Array = cell_colors[fi] as Array
-		for iy in range(dims.y):
-			var row: Array = (face_rows[iy] as Array) if iy < face_rows.size() else []
-			for ix in range(dims.x):
-				if ix < row.size():
-					var color: Color = row[ix] as Color
+		for iy in range(alloc_h):
+			var sample_y := clamp(iy, 0, dims.y - 1)
+			var row: Array = (face_rows[sample_y] as Array) if sample_y < face_rows.size() else []
+			for ix in range(alloc_w):
+				var sample_x := clamp(ix, 0, dims.x - 1)
+				if sample_x < row.size():
+					var color: Color = row[sample_x] as Color
 					img.set_pixel(offset.x + ix, offset.y + iy, color)
 
 	var texture := ImageTexture.create_from_image(img)
