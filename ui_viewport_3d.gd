@@ -48,11 +48,21 @@ func _connect_button_signals() -> void:
 	var button3: Button = viewport.get_node_or_null("UIPanel/VBoxContainer/Button3") as Button
 	
 	if button1:
-		button1.pressed.connect(func(): print("Button 1 pressed!"))
+		button1.pressed.connect(self._on_button1_pressed)
 	if button2:
-		button2.pressed.connect(func(): print("Button 2 pressed!"))
+		button2.pressed.connect(self._on_button2_pressed)
 	if button3:
-		button3.pressed.connect(func(): print("Button 3 pressed!"))
+		button3.pressed.connect(self._on_button3_pressed)
+
+func _on_button1_pressed() -> void:
+	# Simple debug handler
+	print("Button 1 pressed!")
+
+func _on_button2_pressed() -> void:
+	print("Button 2 pressed!")
+
+func _on_button3_pressed() -> void:
+	print("Button 3 pressed!")
 
 func handle_pointer_event(event: Dictionary) -> void:
 	if not viewport or not mesh_instance:

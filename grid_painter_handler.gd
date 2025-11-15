@@ -217,4 +217,4 @@ func handle_pointer_event(event: Dictionary) -> void:
 		color_to_paint = event["pointer_color"]
 
 	if pnode.has_method("paint_at_uv"):
-		pnode.call_deferred("paint_at_uv", uv, color_to_paint)
+		pnode.call_deferred("paint_at_uv", uv, color_to_paint, self.get_path())
