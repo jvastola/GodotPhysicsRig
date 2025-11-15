@@ -402,12 +402,14 @@ func _apply_saved_texture_directly(paint_data: Dictionary) -> void:
 		for iy in range(alloc_h):
 			var sample_y: int = clamp(iy, 0, dims.y - 1)
 			var row: Array = (face_rows[sample_y] as Array) if sample_y < face_rows.size() else []
-			for ix in range(alloc_w):
-				var sample_x: int = clamp(ix, 0, dims.x - 1)
-				if sample_x < row.size():
-					var color: Color = row[sample_x] as Color
-					img.set_pixel(offset.x + ix, offset.y + iy, color)
-
-	var texture: ImageTexture = ImageTexture.create_from_image(img)
-	apply_texture_to_head(texture)
+			var nx: int = max(1, dims.x)
+			var ny: int = max(1, dims.y)
+			for iy in range(alloc_h):
+				var sample_y: int = clamp(int(floor(float(iy) * float(ny) / float(alloc_h))), 0, ny - 1)
+				var row: Array = (face_rows[sample_y] as Array) if sample_y < face_rows.size() else []
+				for ix in range(alloc_w):
+					var sample_x: int = clamp(int(floor(float(ix) * float(nx) / float(alloc_w))), 0, nx - 1)
+					if sample_x < row.size():
+						var color: Color = row[sample_x] as Color
+						img.set_pixel(offset.x + ix, offset.y + iy, color)
 	print("XRPlayer: Applied saved texture directly (subdivisions=", subdivisions_meta, ", texture=", tex_width, "x", tex_height, ")")
