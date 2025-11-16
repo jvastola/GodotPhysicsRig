@@ -49,7 +49,7 @@ func _ready():
 	viewport = $MirrorContainer/Viewport
 
 
-func _process(delta):
+func _process(_delta):
 	_ready() # need to reload for proper operation when used as a tool script
 	if MainCam == null:
 		# No camera specified for the mirror to operate on

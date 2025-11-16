@@ -202,7 +202,7 @@ func release() -> void:
 			grabbing_hand.set("held_object", null)
 	
 	is_grabbed = false
-	var prev_hand = grabbing_hand
+	var _prev_hand = grabbing_hand
 	grabbing_hand = null
 	
 	released.emit()

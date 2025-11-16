@@ -13,7 +13,7 @@ const FACE_DEFS: Array[Dictionary] = [
 
 @export var size: Vector3 = Vector3(2.0, 2.0, 2.0)
 @export var subdivisions_axis: Vector3i = Vector3i(4, 4, 4)
-@export var seed: int = 0
+@export var rng_seed: int = 0
 @export var material_unshaded: bool = false
 @export var flip_winding: bool = false
 @export_flags_3d_physics var collision_layers: int = (1 << 0) | (1 << 5)
@@ -68,8 +68,8 @@ func _subdivision_meta_matches(meta: Variant, axis_counts: Vector3i) -> bool:
 func _ready() -> void:
 	if pointer_group != StringName(""):
 		add_to_group(pointer_group)
-	if seed != 0:
-		_paint_rng.seed = seed + 1
+	if rng_seed != 0:
+		_paint_rng.seed = rng_seed + 1
 	else:
 		_paint_rng.randomize()
 	
@@ -83,8 +83,8 @@ func build_mesh() -> void:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
-	if seed != 0:
-		rng.seed = seed
+	if rng_seed != 0:
+		rng.seed = rng_seed
 	else:
 		rng.randomize()
 
@@ -159,7 +159,7 @@ func build_mesh() -> void:
 	var meshres: ArrayMesh = st.commit()
 	if meshres:
 		mesh = meshres
-		_assign_material(meshres)
+		_assign_material()
 		_ensure_collision(meshres)
 
 func interact_at_point(global_point: Vector3, paint_color: Color) -> bool:
@@ -239,7 +239,7 @@ func _apply_paint_event(event: Dictionary) -> void:
 	var world_point: Vector3 = event.get("global_position", global_transform.origin)
 	paint_cell(world_point, color_variant)
 
-func _assign_material(meshres: Mesh) -> void:
+func _assign_material() -> void:
 	if material_unshaded:
 		var shader := Shader.new()
 		shader.code = """

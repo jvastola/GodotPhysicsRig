@@ -95,6 +95,8 @@ func _physics_process(delta: float) -> void:
 			player_body.rotate_y(deg_to_rad(_pending_snap_angle))
 			# restore linear velocity so rotation doesn't alter falling
 			player_body.linear_velocity = lv
+			# restore angular velocity as well (avoid changing spin during rotation)
+			player_body.angular_velocity = av
 			# clear pending
 			_pending_snap_angle = 0.0
 
@@ -258,8 +260,8 @@ func _ensure_desktop_extra_collider() -> void:
 	"""Create or update the desktop-only extra collider for a taller player."""
 	if not desktop_extra_collider_enabled or not player_body:
 		return
-	var name := "DesktopExtraCollision"
-	var existing := player_body.get_node_or_null(name) as CollisionShape3D
+	var cs_name := "DesktopExtraCollision"
+	var existing := player_body.get_node_or_null(cs_name) as CollisionShape3D
 	# Build a capsule shape for the extra collider
 	if existing:
 		if existing.shape and existing.shape is CapsuleShape3D:
@@ -270,7 +272,7 @@ func _ensure_desktop_extra_collider() -> void:
 		return
 	# Create a new shape
 	var cs: CollisionShape3D = CollisionShape3D.new()
-	cs.name = name
+	cs.name = cs_name
 	var cap: CapsuleShape3D = CapsuleShape3D.new()
 	cap.height = desktop_extra_collider_height
 	cap.radius = desktop_extra_collider_radius
@@ -282,8 +284,8 @@ func _ensure_desktop_extra_collider() -> void:
 
 
 func _remove_desktop_extra_collider() -> void:
-	var name := "DesktopExtraCollision"
-	var existing := player_body.get_node_or_null(name)
+	var cs_name := "DesktopExtraCollision"
+	var existing := player_body.get_node_or_null(cs_name)
 	if existing:
 		existing.queue_free()
 
@@ -334,7 +336,7 @@ func _handle_snap_turn(input: float) -> void:
 	print("XRPlayer: Queued snap turn ", turn_angle, " degrees")
 
 
-func _handle_smooth_turn(input: float, delta: float) -> void:
+func _handle_smooth_turn(input: float, _delta: float) -> void:
 	"""Handle smooth turning"""
 	# Store smooth input for physics step to apply
 	_smooth_input = input

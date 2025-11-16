@@ -82,8 +82,7 @@ func _ready() -> void:
 		mi.visible = false
 		mi.name = "GrappleHitmarker"
 		_hitmarker = mi
-		# Add hitmarker to the scene tree root so it persists across scene changes
-		var root = get_tree().root
+	# Add hitmarker to the scene tree root so it persists across scene changes
 	# Use call_deferred because the scene tree may be busy setting up children when _ready runs.
 	# ensure root is available before attempting to attach visuals
 	var root = get_tree().root
@@ -528,7 +527,7 @@ func _exit_tree() -> void:
 func _ensure_visuals_parent() -> void:
 	# Reparent to get_tree().root so visuals persist across scene changes or editor reloads
 	var root = get_tree().root
-	var scheduled: bool = false
+	var _scheduled: bool = false
 	if is_instance_valid(_hitmarker) and _hitmarker.get_parent() != root:
 		if _visuals_pending_parent:
 			# already waiting for add_child to execute

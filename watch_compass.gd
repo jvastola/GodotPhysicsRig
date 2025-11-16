@@ -107,7 +107,7 @@ func _process(delta: float) -> void:
 
 	# done
 
-func _physics_process(delta: float) -> void:
+func _physics_process(_delta: float) -> void:
 	# Perform raycast and visual updates in the physics step to access space state safely
 	# Compute watch face normal in world space
 	var axis_world: Vector3 = (global_transform.basis * rotation_axis_local).normalized()

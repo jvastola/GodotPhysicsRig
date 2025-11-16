@@ -82,7 +82,7 @@ cast_shadow = 0
 script = ExtResource("3_cube")
 size = Vector3(0.25, 0.25, 0.25)
 subdivisions_axis = Vector3i(9, 3, 10)
-seed = 12345
+rng_seed = 12345
 material_unshaded = true
 flip_winding = true
 
