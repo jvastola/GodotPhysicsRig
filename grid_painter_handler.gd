@@ -80,14 +80,16 @@ func _closest_point_on_triangle(p: Vector3, a: Vector3, b: Vector3, c: Vector3) 
 		return b + bc * w2
 
 	# P inside face region. Compute projection onto plane
-	var denom: float = 1.0 / (ab.cross(ac).length_squared())
+	# denom is not used: the projected distance is calculated by using the
+	# normal directly. Remove the unused local to avoid the linter warning.
 	var n: Vector3 = ab.cross(ac)
 	var distance: float = (p - a).dot(n) / n.length()
 	return p - n.normalized() * distance
 
 func _find_triangle_uv(mi: MeshInstance3D, lp: Vector3) -> Vector2:
-	var mesh := mi.mesh
-	if not mesh:
+	# Don't shadow MeshInstance3D.mesh property by using a local variable
+	var mesh_res := mi.mesh
+	if not mesh_res:
 		return Vector2(-1, -1)
 
 	var best_uv: Vector2 = Vector2(-1, -1)
@@ -98,9 +100,9 @@ func _find_triangle_uv(mi: MeshInstance3D, lp: Vector3) -> Vector2:
 	var uvA2: Vector2 = Vector2()
 	var uvB2: Vector2 = Vector2()
 	var uvC2: Vector2 = Vector2()
-	var surf_count: int = mesh.get_surface_count()
+	var surf_count: int = mesh_res.get_surface_count()
 	for s in surf_count:
-		var arrays := mesh.surface_get_arrays(s)
+		var arrays := mesh_res.surface_get_arrays(s)
 		if arrays.size() == 0:
 			continue
 		var verts: PackedVector3Array = PackedVector3Array()
@@ -114,7 +116,8 @@ func _find_triangle_uv(mi: MeshInstance3D, lp: Vector3) -> Vector2:
 			inds = arrays[Mesh.ARRAY_INDEX] as PackedInt32Array
 
 		if inds and inds.size() > 0:
-			var tri_count: int = inds.size() / 3
+			# Explicit integer division to compute triangle counts
+			var tri_count: int = int(inds.size() / 3.0)
 			for ti in tri_count:
 				var i0: int = inds[ti * 3 + 0]
 				var i1: int = inds[ti * 3 + 1]
@@ -149,7 +152,7 @@ func _find_triangle_uv(mi: MeshInstance3D, lp: Vector3) -> Vector2:
 						best_dist2 = d2
 		else:
 			# no indices: triangle list in vertex order
-			var tri_count2: int = verts.size() / 3
+			var tri_count2: int = int(verts.size() / 3.0)
 			for ti in tri_count2:
 				var a2: Vector3 = verts[ti * 3 + 0]
 				var b2: Vector3 = verts[ti * 3 + 1]

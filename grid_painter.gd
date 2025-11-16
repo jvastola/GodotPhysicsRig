@@ -224,7 +224,7 @@ func _convert_saved_face_colors_to_grid(saved_colors: Array) -> void:
 		var face_colors: Array = saved_colors[fi]
 		if not (face_colors is Array):
 			continue
-		var dims: Vector2i = _face_cell_dims[fi]
+	# dims is not needed in this conversion; only offset is used to map face cells
 		var offset: Vector2i = _face_offsets[fi]
 		for y in range(face_colors.size()):
 			for x in range(face_colors[y].size()):
@@ -256,14 +256,14 @@ func _convert_grid_to_face_colors() -> Array:
 			face_arr.append(row)
 		out.append(face_arr)
 	return out
-func _find_node_recursive(start: Node, name: String) -> Node:
+func _find_node_recursive(start: Node, target_name: String) -> Node:
 	if start == null:
 		return null
 	for child in start.get_children():
 		if child is Node:
-			if child.name == name:
+			if child.name == target_name:
 				return child
-			var res: Node = _find_node_recursive(child, name)
+			var res: Node = _find_node_recursive(child, target_name)
 			if res:
 				return res
 	return null
