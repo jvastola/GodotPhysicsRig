@@ -1,0 +1,29 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Open in Godot",
+            "type": "shell",
+            "command": "open -a \"${config:godotTools.editorPath.godot4}\" \"${workspaceFolder}\"",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Build Android (gradle)",
+            "type": "shell",
+            "command": "cd android && ./gradlew assembleDebug",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        }
+    ]
+}

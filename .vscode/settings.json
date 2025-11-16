@@ -1,3 +1,9 @@
 {
-    "godotTools.editorPath.godot4": "/Applications/Godot_mono.app"
+    "godotTools.editorPath.godot4": "/Applications/Godot_mono.app",
+    "files.associations": {
+        "*.gd": "gdscript",
+        "*.tres": "gdscript"
+    },
+    "editor.formatOnSave": false,
+    
 }

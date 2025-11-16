@@ -1,0 +1,30 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "GDScript: Launch Project",
+            "type": "godot",
+            "request": "launch",
+            "project": "${workspaceFolder}",
+            "debug_collisions": false,
+            "debug_paths": false,
+            "debug_navigation": false,
+            "additional_options": ""
+        }
+        ,
+        {
+            "name": "GDScript: Attach to Running Godot",
+            "type": "godot",
+            "request": "attach",
+            "project": "${workspaceFolder}",
+            "host": "127.0.0.1",
+            "port": 6007,
+            "additional_options": "",
+            "timeout": 10
+        }
+    ]
+}
