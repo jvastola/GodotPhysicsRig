@@ -178,9 +178,11 @@ mesh = SubResource("CylinderMesh_pointer_hit")
 [node name="GridSnapIndicator" type="Node3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer"]
 script = ExtResource("8_grid_snap")
 follow_mode = "always"
-align_with_surface_normal = true
 maintain_visibility_without_hit = true
+pointer_node_path = NodePath("..")
+sync_grid_size_from_pointer = true
 raycast_path = NodePath("../PointerRayCast")
+hide_without_hit = false
 
 [node name="IndicatorMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer/GridSnapIndicator"]
 material_override = SubResource("StandardMaterial3D_grid_indicator")

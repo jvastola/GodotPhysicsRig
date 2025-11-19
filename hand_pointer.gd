@@ -1,6 +1,7 @@
 extends Node3D
 
 signal pointer_event(event: Dictionary)
+signal hit_scale_changed(scale: float)
 
 # hand_pointer.gd
 # Provides a versatile pointer that can interact with UI controls, specialised
@@ -61,6 +62,7 @@ var _last_event: Dictionary = {}
 var _controller_cache: XRController3D = null
 var _prev_action_pressed: bool = false
 var _hit_scale_user_multiplier: float = 1.0
+var _last_emitted_hit_scale: float = -1.0
 
 func _ready() -> void:
 	_clamp_ray_length()
@@ -159,6 +161,9 @@ func _physics_process(_delta: float) -> void:
 	else:
 		_clear_hover_state()
 
+	var hit_scale: float = _compute_hit_scale(distance)
+	_maybe_emit_hit_scale(hit_scale)
+
 	if _ray_hit:
 		var show_hit: bool = _should_show_hit_visual(action_state, has_hit)
 		_ray_hit.visible = show_hit
@@ -176,7 +181,7 @@ func _physics_process(_delta: float) -> void:
 			var z: Vector3 = y.cross(x).normalized()
 			# Create a basis scaled by the desired scale factor so we don't overwrite
 			# node scale by setting global_transform after changing scale.
-			var scale_factor: float = _compute_hit_scale(distance)
+			var scale_factor: float = hit_scale
 			var scaled_x: Vector3 = x * scale_factor
 			var scaled_y: Vector3 = y * scale_factor
 			var scaled_z: Vector3 = z * scale_factor
@@ -319,6 +324,13 @@ func _compute_hit_scale(distance: float) -> float:
 	var far_t: float = clamp((distance - near_reference) / far_range, 0.0, 1.0)
 	var far_scale: float = lerp(scale_factor, hit_far_scale, far_t)
 	return far_scale * _hit_scale_user_multiplier
+
+func _maybe_emit_hit_scale(scale: float) -> void:
+	if not is_finite(scale):
+		return
+	if _last_emitted_hit_scale < 0.0 or abs(scale - _last_emitted_hit_scale) > 0.0005:
+		_last_emitted_hit_scale = scale
+		hit_scale_changed.emit(scale)
 
 func _build_event(handler: Node, collider: Object, hit_point: Vector3, normal: Vector3, axis_world: Vector3, start: Vector3, distance: float, action_state: Dictionary, controller: XRController3D) -> Dictionary:
 	var event: Dictionary = {

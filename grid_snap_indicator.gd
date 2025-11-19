@@ -4,17 +4,14 @@ class_name GridSnapIndicator
 
 var _grid_size: float = 0.1
 var _snap_interval: float = 0.1
-var _orientation_space: String = "world"
 
 @export_enum("on_hit", "always", "manual") var follow_mode: String = "on_hit"
-@export_enum("world", "local") var orientation_space := "world":
-	set(value):
-		_orientation_space = value
-		_apply_orientation_space()
-	get:
-		return _orientation_space
 @export var align_with_surface_normal: bool = false
 @export var maintain_visibility_without_hit: bool = false
+@export var pointer_node_path: NodePath
+@export var sync_grid_size_from_pointer: bool = false
+@export_range(0.01, 10.0, 0.01) var pointer_scale_grid_multiplier: float = 1.0
+@export_range(0.005, 2.0, 0.005) var pointer_scale_min_grid_size: float = 0.01
 
 @export_range(0.01, 5.0, 0.01) var grid_size: float = 0.1:
 	set(value):
@@ -38,15 +35,15 @@ var _indicator_mesh: MeshInstance3D
 var _accumulated_time: float = 0.0
 var _last_snapped_position: Vector3 = Vector3.ZERO
 var _has_valid_position: bool = false
-var _initial_basis: Basis = Basis.IDENTITY
+var _pointer_node: Node = null
 
 func _ready() -> void:
 	_raycast = get_node_or_null(raycast_path) as RayCast3D
 	_indicator_mesh = get_node_or_null(indicator_mesh_path) as MeshInstance3D
-	_initial_basis = global_transform.basis
+	top_level = true
 	_apply_indicator_scale()
 	_apply_indicator_material()
-	_apply_orientation_space()
+	_connect_pointer_signal()
 	_set_indicator_visible(false)
 
 func _physics_process(delta: float) -> void:
@@ -125,6 +122,7 @@ func _apply_snapped_position(snapped: Vector3, surface_normal: Vector3) -> void:
 	global_transform = new_transform
 	_set_indicator_visible(true)
 
+
 func _apply_indicator_material() -> void:
 	if not _indicator_mesh:
 		return
@@ -142,9 +140,6 @@ func _set_indicator_visible(visible: bool) -> void:
 		_indicator_mesh.visible = visible
 	self.visible = visible
 
-func _apply_orientation_space() -> void:
-	top_level = (_orientation_space == "world")
-
 func _snap_from_sample(sample_point: Vector3, has_hit: bool, surface_normal: Vector3) -> void:
 	var should_show: bool = has_hit or not hide_without_hit
 	_apply_snapped_position(_snap_to_grid(sample_point), surface_normal)
@@ -154,11 +149,7 @@ func _snap_from_sample(sample_point: Vector3, has_hit: bool, surface_normal: Vec
 func _derive_basis(surface_normal: Vector3) -> Basis:
 	if align_with_surface_normal and surface_normal.length_squared() > 0.0:
 		return _basis_from_normal(surface_normal)
-	if _orientation_space == "world":
-		return Basis.IDENTITY
-	if _raycast:
-		return _raycast.global_transform.basis
-	return _initial_basis
+	return Basis.IDENTITY
 
 func _basis_from_normal(normal: Vector3) -> Basis:
 	var y: Vector3 = normal.normalized()
@@ -170,3 +161,19 @@ func _basis_from_normal(normal: Vector3) -> Basis:
 	var x: Vector3 = reference.cross(y).normalized()
 	var z: Vector3 = y.cross(x).normalized()
 	return Basis(x, y, z)
+
+func _connect_pointer_signal() -> void:
+	if pointer_node_path == NodePath():
+		return
+	var node := get_node_or_null(pointer_node_path)
+	if not node:
+		return
+	_pointer_node = node
+	if node.has_signal("hit_scale_changed"):
+		node.connect("hit_scale_changed", Callable(self, "_on_pointer_hit_scale_changed"))
+
+func _on_pointer_hit_scale_changed(scale: float) -> void:
+	if not sync_grid_size_from_pointer:
+		return
+	var new_size: float = max(scale * pointer_scale_grid_multiplier, pointer_scale_min_grid_size)
+	grid_size = new_size
