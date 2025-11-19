@@ -14,7 +14,13 @@ signal pointer_event(event: Dictionary)
 @export var ray_visual_node_path: NodePath = "PointerRayVisual"
 @export var ray_hit_node_path: NodePath = "PointerRayHit"
 @export var pointer_axis_local: Vector3 = Vector3(0, 0, -1)
-@export_range(0.1, 10.0, 0.1) var ray_length: float = 3.0
+@export_range(0.1, 20.0, 0.1) var ray_length: float = 3.0
+@export_range(0.1, 20.0, 0.1) var ray_length_min: float = 0.25
+@export_range(0.1, 20.0, 0.1) var ray_length_max: float = 10.0
+@export_range(0.1, 10.0, 0.1) var ray_length_adjust_speed: float = 3.0
+@export var ray_length_axis_action: String = "primary"
+@export var require_trigger_for_length_adjust: bool = true
+@export_range(0.0, 1.0, 0.01) var ray_length_adjust_deadzone: float = 0.2
 
 @export var hide_face_on_player_hit: bool = true
 @export var player_group: StringName = &"player"
@@ -29,6 +35,10 @@ signal pointer_event(event: Dictionary)
 @export var pointer_color: Color = Color(1.0, 1.0, 1.0, 1.0)
 @export var collide_with_areas: bool = true
 @export var collide_with_bodies: bool = true
+@export_enum("always", "on_hit", "on_trigger", "on_hit_or_trigger", "on_hit_and_trigger") var ray_visibility_mode: String = "always"
+@export var require_trigger_for_hit_scaling: bool = true
+@export var enable_hit_scaling: bool = true
+@export_enum("on_hit", "always", "on_trigger", "on_hit_or_trigger", "on_hit_and_trigger") var hit_visibility_mode: String = "on_hit"
 
 @onready var _pointer_face: MeshInstance3D = get_node_or_null(pointer_face_path) as MeshInstance3D
 @onready var _raycast: RayCast3D = get_node_or_null(raycast_node_path) as RayCast3D
@@ -38,6 +48,11 @@ signal pointer_event(event: Dictionary)
 @export var hit_scale_per_meter: float = 0.02
 @export var hit_min_scale: float = 0.01
 @export var hit_max_scale: float = 0.2
+@export_range(1.0, 20.0, 0.1) var hit_far_distance: float = 8.0
+@export_range(0.05, 1.0, 0.01) var hit_far_scale: float = 0.35
+@export_range(0.05, 1.5, 0.01) var hit_scale_user_multiplier_min: float = 0.25
+@export_range(0.05, 2.0, 0.01) var hit_scale_user_multiplier_max: float = 1.5
+@export_range(0.05, 2.0, 0.01) var hit_scale_adjust_speed: float = 0.75
 
 var _line_mesh: ImmediateMesh
 var _hover_target: Node = null
@@ -45,8 +60,10 @@ var _hover_collider: Object = null
 var _last_event: Dictionary = {}
 var _controller_cache: XRController3D = null
 var _prev_action_pressed: bool = false
+var _hit_scale_user_multiplier: float = 1.0
 
 func _ready() -> void:
+	_clamp_ray_length()
 	if _pointer_face:
 		_pointer_face.visible = true
 
@@ -85,6 +102,12 @@ func _physics_process(_delta: float) -> void:
 	if axis_local.length_squared() <= 0.0:
 		return
 
+	var controller: XRController3D = _get_pointer_controller()
+	var action_state: Dictionary = _gather_action_state(controller)
+	_apply_ray_length_adjustment(_delta, controller, action_state)
+	_apply_hit_scale_adjustment(_delta, controller, action_state)
+	_clamp_ray_length()
+
 	_raycast.target_position = axis_local * ray_length
 	_raycast.force_raycast_update()
 
@@ -114,9 +137,6 @@ func _physics_process(_delta: float) -> void:
 			if handler and not is_instance_valid(handler):
 				handler = null
 
-	var controller: XRController3D = _get_pointer_controller()
-	var action_state: Dictionary = _gather_action_state(controller)
-
 	if handler:
 		var base_event: Dictionary = _build_event(handler, collider_obj, end, normal, axis_world, start, distance, action_state, controller)
 		if handler != _hover_target:
@@ -140,8 +160,9 @@ func _physics_process(_delta: float) -> void:
 		_clear_hover_state()
 
 	if _ray_hit:
-		_ray_hit.visible = has_hit
-		if has_hit:
+		var show_hit: bool = _should_show_hit_visual(action_state, has_hit)
+		_ray_hit.visible = show_hit
+		if show_hit:
 			var hit_xform: Transform3D = _ray_hit.global_transform
 			hit_xform.origin = end
 			var orient_normal: Vector3 = normal
@@ -155,21 +176,23 @@ func _physics_process(_delta: float) -> void:
 			var z: Vector3 = y.cross(x).normalized()
 			# Create a basis scaled by the desired scale factor so we don't overwrite
 			# node scale by setting global_transform after changing scale.
-			# Scale linearly from hit_min_scale at 0m to hit_max_scale at 1.5m, clamped outside that range.
-			var scale_factor: float = lerp(hit_min_scale, hit_max_scale, clamp(distance / 1.5, 0.0, 1.0))
+			var scale_factor: float = _compute_hit_scale(distance)
 			var scaled_x: Vector3 = x * scale_factor
 			var scaled_y: Vector3 = y * scale_factor
 			var scaled_z: Vector3 = z * scale_factor
 			hit_xform.basis = Basis(scaled_x, scaled_y, scaled_z)
 			_ray_hit.global_transform = hit_xform
 
-	if _line_mesh:
-		var local_end: Vector3 = axis_local * distance
-		_line_mesh.clear_surfaces()
-		_line_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
-		_line_mesh.surface_add_vertex(Vector3.ZERO)
-		_line_mesh.surface_add_vertex(local_end)
-		_line_mesh.surface_end()
+	if _ray_visual and _line_mesh:
+		var show_ray: bool = _should_show_ray_visual(action_state, has_hit)
+		_ray_visual.visible = show_ray
+		if show_ray:
+			var local_end: Vector3 = axis_local * distance
+			_line_mesh.clear_surfaces()
+			_line_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
+			_line_mesh.surface_add_vertex(Vector3.ZERO)
+			_line_mesh.surface_add_vertex(local_end)
+			_line_mesh.surface_end()
 
 	if _pointer_face and hide_face_on_player_hit:
 		_pointer_face.visible = not hit_player
@@ -209,6 +232,93 @@ func _gather_action_state(controller: XRController3D) -> Dictionary:
 
 	_prev_action_pressed = state["pressed"]
 	return state
+
+func _apply_ray_length_adjustment(delta: float, controller: XRController3D, action_state: Dictionary) -> void:
+	if ray_length_axis_action == "":
+		return
+	if require_trigger_for_length_adjust and not action_state.get("pressed", false):
+		return
+	var input_value: float = _get_ray_length_input_value(controller)
+	if abs(input_value) <= ray_length_adjust_deadzone:
+		return
+	ray_length = clamp(ray_length + input_value * ray_length_adjust_speed * delta, ray_length_min, ray_length_max)
+
+func _apply_hit_scale_adjustment(delta: float, controller: XRController3D, action_state: Dictionary) -> void:
+	if not enable_hit_scaling:
+		return
+	if ray_length_axis_action == "" or not controller:
+		return
+	if require_trigger_for_hit_scaling and not action_state.get("pressed", false):
+		return
+	var vec: Vector2 = _get_pointer_axis_vector(controller)
+	var lateral_input: float = vec.x
+	if abs(lateral_input) <= ray_length_adjust_deadzone:
+		return
+	_hit_scale_user_multiplier = clamp(_hit_scale_user_multiplier + lateral_input * hit_scale_adjust_speed * delta, hit_scale_user_multiplier_min, hit_scale_user_multiplier_max)
+
+func _get_ray_length_input_value(controller: XRController3D) -> float:
+	return _get_pointer_axis_vector(controller).y
+
+func _get_pointer_axis_vector(controller: XRController3D) -> Vector2:
+	if not controller:
+		return Vector2.ZERO
+	if controller.has_method("get_vector2"):
+		return controller.get_vector2(ray_length_axis_action)
+	elif controller.has_method("get_axis"):
+		var v: float = controller.get_axis(ray_length_axis_action)
+		return Vector2(v, v)
+	elif controller.has_method("get_float"):
+		var f := controller.get_float(ray_length_axis_action)
+		return Vector2(f, f)
+	return Vector2.ZERO
+
+func _clamp_ray_length() -> void:
+	if ray_length_min > ray_length_max:
+		var temp := ray_length_min
+		ray_length_min = ray_length_max
+		ray_length_max = temp
+	ray_length = clamp(ray_length, ray_length_min, ray_length_max)
+
+func _should_show_ray_visual(action_state: Dictionary, has_hit: bool) -> bool:
+	match ray_visibility_mode:
+		"always":
+			return true
+		"on_hit":
+			return has_hit
+		"on_trigger":
+			return action_state.get("pressed", false)
+		"on_hit_or_trigger":
+			return has_hit or action_state.get("pressed", false)
+		"on_hit_and_trigger":
+			return has_hit and action_state.get("pressed", false)
+		_:
+			return true
+
+func _should_show_hit_visual(action_state: Dictionary, has_hit: bool) -> bool:
+	match hit_visibility_mode:
+		"always":
+			return true
+		"on_hit":
+			return has_hit
+		"on_trigger":
+			return action_state.get("pressed", false)
+		"on_hit_or_trigger":
+			return has_hit or action_state.get("pressed", false)
+		"on_hit_and_trigger":
+			return has_hit and action_state.get("pressed", false)
+		_:
+			return true
+
+func _compute_hit_scale(distance: float) -> float:
+	var near_reference: float = 1.5
+	var near_t: float = clamp(distance / near_reference, 0.0, 1.0)
+	var scale_factor: float = lerp(hit_min_scale, hit_max_scale, near_t)
+	if distance <= near_reference:
+		return scale_factor * _hit_scale_user_multiplier
+	var far_range: float = max(hit_far_distance - near_reference, 0.001)
+	var far_t: float = clamp((distance - near_reference) / far_range, 0.0, 1.0)
+	var far_scale: float = lerp(scale_factor, hit_far_scale, far_t)
+	return far_scale * _hit_scale_user_multiplier
 
 func _build_event(handler: Node, collider: Object, hit_point: Vector3, normal: Vector3, axis_world: Vector3, start: Vector3, distance: float, action_state: Dictionary, controller: XRController3D) -> Dictionary:
 	var event: Dictionary = {
