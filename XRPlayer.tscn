@@ -12,8 +12,7 @@
 radius = 0.2
 height = 0.5
 
-[sub_resource type="SphereMesh" id="SphereMesh_head"]
-flip_faces = true
+[sub_resource type="BoxMesh" id="BoxMesh_xxbg3"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_l588l"]
 size = Vector3(0.36, 0.36, 0.36)
@@ -68,13 +67,13 @@ axis_lock_angular_z = true
 mass = 2.0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="PlayerBody"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.92117, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.198589, 0)
 shape = SubResource("CapsuleShape3D_body")
 
 [node name="BodyMesh" type="MeshInstance3D" parent="PlayerBody/CollisionShape3D"]
-visible = false
+transform = Transform3D(0.7, 0, 0, 0, 0.8, 0, 0, 0, 0.5, 0, 0, 0)
 cast_shadow = 0
-mesh = SubResource("SphereMesh_head")
+mesh = SubResource("BoxMesh_xxbg3")
 skeleton = NodePath("../../XROrigin3D/XRCamera3D")
 
 [node name="XROrigin3D" type="XROrigin3D" parent="PlayerBody"]
@@ -83,13 +82,15 @@ script = ExtResource("2_xr_origin")
 
 [node name="XRCamera3D" type="XRCamera3D" parent="PlayerBody/XROrigin3D"]
 
-[node name="HeadMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/XRCamera3D"]
+[node name="HeadArea" type="Area3D" parent="PlayerBody/XROrigin3D/XRCamera3D" groups=["player"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.747557, 0)
+collision_layer = 2
+
+[node name="HeadMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/XRCamera3D/HeadArea"]
 transform = Transform3D(-0.69, 9.10311e-05, -0.00069234, -9.16451e-05, -0.69, 0.00060858, -0.000692265, 0.000608665, 0.689999, 0, 0, 0)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_l588l")
-
-[node name="HeadArea" type="Area3D" parent="PlayerBody/XROrigin3D/XRCamera3D" groups=["player"]]
-collision_layer = 2
+skeleton = NodePath("../..")
 
 [node name="HeadCollisionShape" type="CollisionShape3D" parent="PlayerBody/XROrigin3D/XRCamera3D/HeadArea"]
 shape = SubResource("SphereShape3D_head")

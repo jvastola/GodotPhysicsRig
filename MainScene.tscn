@@ -145,7 +145,7 @@ body_preview_mesh = NodePath("GridTargetBody")
 body_subdivisions = Vector3i(8, 4, 3)
 
 [node name="GridTargetLeft" type="MeshInstance3D" parent="GridPainterTest"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1, -2)
+transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, -0.86553, 1, -2)
 mesh = SubResource("BoxMesh_left_hand_grid")
 
 [node name="GridTargetLeftArea" type="Area3D" parent="GridPainterTest/GridTargetLeft"]
@@ -156,7 +156,7 @@ collision_mask = 32
 shape = SubResource("BoxShape3D_left_hand_grid")
 
 [node name="GridTargetRight" type="MeshInstance3D" parent="GridPainterTest"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, -2)
+transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 0.463789, 1, -2)
 mesh = SubResource("BoxMesh_right_hand_grid")
 
 [node name="GridTargetRightArea" type="Area3D" parent="GridPainterTest/GridTargetRight"]
@@ -167,7 +167,7 @@ collision_mask = 32
 shape = SubResource("BoxShape3D_right_hand_grid")
 
 [node name="GridTargetHead" type="MeshInstance3D" parent="GridPainterTest"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 1, -4)
+transform = Transform3D(0.7, 0, 0, 0, 0.7, 0, 0, 0, 0.7, -0.174123, 1.89462, -1.91268)
 mesh = SubResource("BoxMesh_head_grid")
 
 [node name="GridTargetHeadArea" type="Area3D" parent="GridPainterTest/GridTargetHead"]
@@ -178,7 +178,7 @@ collision_mask = 32
 shape = SubResource("BoxShape3D_head_grid")
 
 [node name="GridTargetBody" type="MeshInstance3D" parent="GridPainterTest"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 1, -4)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.167079, 1, -2.018)
 mesh = SubResource("BoxMesh_body_grid")
 
 [node name="GridTargetBodyArea" type="Area3D" parent="GridPainterTest/GridTargetBody"]

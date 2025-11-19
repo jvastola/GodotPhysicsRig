@@ -37,6 +37,16 @@ const SURFACE_BODY := "body"
 @export var body_subdivisions: Vector3i = Vector3i(8, 4, 2)
 
 @export var developer_mode: bool = false
+@export_group("Debug")
+var _reset_saved_grid_data_button := false
+@export var reset_saved_grid_data_button: bool:
+	get:
+		return _reset_saved_grid_data_button
+	set(value):
+		if value:
+			reset_grid_data()
+		_reset_saved_grid_data_button = false
+@export_group("")
 
 const FACE_DEFS: Array = [
 	{"n": Vector3(0, 0, 1), "u": Vector3(1, 0, 0), "v": Vector3(0, 1, 0)},
