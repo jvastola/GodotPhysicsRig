@@ -1,4 +1,4 @@
-[gd_scene load_steps=22 format=3 uid="uid://cpq6v7yqk8y8j"]
+[gd_scene load_steps=25 format=3 uid="uid://cpq6v7yqk8y8j"]
 
 [ext_resource type="Script" uid="uid://02kpb1kqm303" path="res://xr_player.gd" id="1_player"]
 [ext_resource type="Script" uid="uid://3ir0c0htxlqh" path="res://xr_origin_3d.gd" id="2_xr_origin"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" uid="uid://chk4ixs7ag67p" path="res://watch_compass.gd" id="5_watch"]
 [ext_resource type="Script" uid="uid://u2otyj4gjtl2" path="res://hand_pointer.gd" id="6_pointer"]
 [ext_resource type="PackedScene" uid="uid://b2gkx1eim00mw" path="res://UIViewport3D.tscn" id="7_ui_viewport"]
+[ext_resource type="Script" uid="uid://cblrw6wmmg7gp" path="res://grid_snap_indicator.gd" id="8_grid_snap"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_l588l"]
 size = Vector3(0.3, 0.3, 0.2)
@@ -43,6 +44,14 @@ top_radius = 0.01
 bottom_radius = 0.01
 height = 0.001
 radial_segments = 16
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_grid_indicator"]
+transparency = 1
+shading_mode = 0
+disable_fog = true
+albedo_color = Color(0.3, 0.8, 1, 0.25)
+
+[sub_resource type="BoxMesh" id="BoxMesh_grid_indicator"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_extra"]
 radius = 0.2
@@ -165,6 +174,18 @@ cast_shadow = 0
 [node name="PointerRayHit" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer"]
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_pointer_hit")
+
+[node name="GridSnapIndicator" type="Node3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer"]
+script = ExtResource("8_grid_snap")
+follow_mode = "always"
+align_with_surface_normal = true
+maintain_visibility_without_hit = true
+raycast_path = NodePath("../PointerRayCast")
+
+[node name="IndicatorMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer/GridSnapIndicator"]
+material_override = SubResource("StandardMaterial3D_grid_indicator")
+cast_shadow = 0
+mesh = SubResource("BoxMesh_grid_indicator")
 
 [node name="RightController" type="XRController3D" parent="PlayerBody/XROrigin3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.549018, 0, 0)
