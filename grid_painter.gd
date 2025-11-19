@@ -3,27 +3,21 @@ extends Node3D
 class_name GridPainter
 
 const TILE_PIXELS: int = 16
-const SURFACE_DEFAULT := "default"
 const SURFACE_LEFT_HAND := "left_hand"
 const SURFACE_RIGHT_HAND := "right_hand"
 const SURFACE_HEAD := "head"
 const SURFACE_BODY := "body"
 
-@export_group("Default Surface")
-@export_node_path("MeshInstance3D") var target_mesh: NodePath = NodePath(".")
-@export_node_path("MeshInstance3D") var linked_mesh: NodePath = NodePath("")
-@export var subdivisions_axis: Vector3i = Vector3i(8, 8, 1)
-
 @export_group("Player Surfaces")
 @export_node_path("Node3D") var player_root_path: NodePath = NodePath("../XRPlayer")
 @export var load_for_player: bool = true
+@export var link_hands: bool = true
 @export var player_target_name: String = "LeftHandMesh"
 
 @export_subgroup("Hands")
 @export_node_path("MeshInstance3D") var left_hand_target: NodePath = NodePath("PlayerBody/XROrigin3D/LeftController/LeftHandMesh")
 @export_node_path("MeshInstance3D") var left_hand_path: NodePath = NodePath("PlayerBody/XROrigin3D/LeftController/LeftHandMesh")
 @export_node_path("MeshInstance3D") var left_hand_preview_mesh: NodePath = NodePath("")
-@export_node_path("MeshInstance3D") var left_hand_preview_mesh_secondary: NodePath = NodePath("")
 @export var left_hand_subdivisions: Vector3i = Vector3i(4, 4, 1)
 @export_node_path("MeshInstance3D") var right_hand_target: NodePath = NodePath("PlayerBody/XROrigin3D/RightController/RightHandMesh")
 @export_node_path("MeshInstance3D") var right_hand_path: NodePath = NodePath("PlayerBody/XROrigin3D/RightController/RightHandMesh")
@@ -90,6 +84,7 @@ class SurfaceSlot extends RefCounted:
 		return String(origin) != "" and String(resolved_paint_path) == String(origin)
 
 var _surfaces: Dictionary = {}
+var _surface_aliases: Dictionary = {}
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _handler_script: Script = null
 var _save_path: String = "user://grid_painter_surfaces.json"
@@ -98,9 +93,10 @@ func _ready() -> void:
 	_rng.randomize()
 	_load_handler_script()
 	_register_all_surfaces()
-	load_grid_data(_save_path)
-	if player_root_path != NodePath("") and SaveManager:
-		_maybe_load_head_from_save_manager()
+	if load_for_player:
+		load_grid_data(_save_path)
+		if player_root_path != NodePath("") and SaveManager:
+			_maybe_load_head_from_save_manager()
 	_resolve_all_surface_nodes()
 	_attach_handler_scripts()
 	_apply_all_surface_textures()
@@ -113,42 +109,91 @@ func _load_handler_script() -> void:
 
 func _register_all_surfaces() -> void:
 	_surfaces.clear()
-	_register_default_surface()
+	_surface_aliases.clear()
 	if load_for_player:
-		var left_previews: Array[NodePath] = []
-		if left_hand_preview_mesh != NodePath(""):
-			left_previews.append(left_hand_preview_mesh)
-		if left_hand_preview_mesh_secondary != NodePath(""):
-			left_previews.append(left_hand_preview_mesh_secondary)
+		_register_player_surfaces()
+	else:
+		_register_preview_only_surfaces()
+
+func _register_player_surfaces() -> void:
+	var left_previews: Array[NodePath] = _collect_node_paths([left_hand_preview_mesh])
+	var right_previews: Array[NodePath] = _collect_node_paths([right_hand_preview_mesh])
+	if link_hands:
+		var shared_previews: Array[NodePath] = left_previews.duplicate()
+		for preview in right_previews:
+			if not shared_previews.has(preview):
+				shared_previews.append(preview)
+		var linked_extras: Array[NodePath] = _collect_node_paths([right_hand_target, right_hand_path])
+		var shared_surface := _register_player_surface(SURFACE_LEFT_HAND, left_hand_target, left_hand_path, left_hand_subdivisions, shared_previews, linked_extras)
+		if shared_surface:
+			_surface_aliases[SURFACE_RIGHT_HAND] = SURFACE_LEFT_HAND
+	else:
 		_register_player_surface(SURFACE_LEFT_HAND, left_hand_target, left_hand_path, left_hand_subdivisions, left_previews)
-		var right_previews: Array[NodePath] = []
-		if right_hand_preview_mesh != NodePath(""):
-			right_previews.append(right_hand_preview_mesh)
 		_register_player_surface(SURFACE_RIGHT_HAND, right_hand_target, right_hand_path, right_hand_subdivisions, right_previews)
-		var head_previews: Array[NodePath] = []
-		if head_preview_mesh != NodePath(""):
-			head_previews.append(head_preview_mesh)
-		_register_player_surface(SURFACE_HEAD, head_target, head_path, head_subdivisions, head_previews)
-		var body_previews: Array[NodePath] = []
-		if body_preview_mesh != NodePath(""):
-			body_previews.append(body_preview_mesh)
-		_register_player_surface(SURFACE_BODY, body_target, body_path, body_subdivisions, body_previews)
+	var head_previews: Array[NodePath] = _collect_node_paths([head_preview_mesh])
+	_register_player_surface(SURFACE_HEAD, head_target, head_path, head_subdivisions, head_previews)
+	var body_previews: Array[NodePath] = _collect_node_paths([body_preview_mesh])
+	_register_player_surface(SURFACE_BODY, body_target, body_path, body_subdivisions, body_previews)
 
-func _register_default_surface() -> void:
-	if target_mesh == NodePath("") and linked_mesh == NodePath(""):
-		return
-	var extras: Array[NodePath] = []
-	if linked_mesh != NodePath(""):
-		extras.append(linked_mesh)
-	var surface := _create_surface(SURFACE_DEFAULT, target_mesh, target_mesh, subdivisions_axis, false, extras)
-	_surfaces[SURFACE_DEFAULT] = surface
+func _register_preview_only_surfaces() -> void:
+	var left_previews: Array[NodePath] = _collect_node_paths([left_hand_preview_mesh])
+	var right_previews: Array[NodePath] = _collect_node_paths([right_hand_preview_mesh])
+	if link_hands:
+		var shared_previews: Array[NodePath] = left_previews.duplicate()
+		for preview in right_previews:
+			if not shared_previews.has(preview):
+				shared_previews.append(preview)
+		if not shared_previews.is_empty():
+			var canonical_id := SURFACE_LEFT_HAND if left_previews.size() > 0 else SURFACE_RIGHT_HAND
+			var alias_id := SURFACE_RIGHT_HAND if canonical_id == SURFACE_LEFT_HAND else SURFACE_LEFT_HAND
+			var shared_subdivs := left_hand_subdivisions if canonical_id == SURFACE_LEFT_HAND else right_hand_subdivisions
+			var shared_surface := _register_preview_surface(canonical_id, shared_previews[0], shared_subdivs, shared_previews)
+			if shared_surface and canonical_id != alias_id:
+				_surface_aliases[alias_id] = canonical_id
+	else:
+		if left_previews.size() > 0:
+			_register_preview_surface(SURFACE_LEFT_HAND, left_previews[0], left_hand_subdivisions, left_previews)
+		if right_previews.size() > 0:
+			_register_preview_surface(SURFACE_RIGHT_HAND, right_previews[0], right_hand_subdivisions, right_previews)
+	var head_previews: Array[NodePath] = _collect_node_paths([head_preview_mesh])
+	if head_previews.size() > 0:
+		_register_preview_surface(SURFACE_HEAD, head_previews[0], head_subdivisions, head_previews)
+	var body_previews: Array[NodePath] = _collect_node_paths([body_preview_mesh])
+	if body_previews.size() > 0:
+		_register_preview_surface(SURFACE_BODY, body_previews[0], body_subdivisions, body_previews)
 
-func _register_player_surface(id: String, target: NodePath, painter_path: NodePath, subdivs: Vector3i, preview_paths: Array[NodePath] = []) -> void:
-	if target == NodePath("") and painter_path == NodePath(""):
-		return
-	var surface := _create_surface(id, target, painter_path, subdivs, true)
+func _register_player_surface(id: String, target: NodePath, painter_path: NodePath, subdivs: Vector3i, preview_paths: Array[NodePath] = [], extra_meshes: Array[NodePath] = []) -> SurfaceSlot:
+	if target == NodePath("") and painter_path == NodePath("") and extra_meshes.size() == 0:
+		return null
+	var surface := _create_surface(id, target, painter_path, subdivs, true, extra_meshes)
 	surface.preview_meshes = preview_paths.duplicate()
 	_surfaces[id] = surface
+	return surface
+
+func _register_preview_surface(id: String, target: NodePath, subdivs: Vector3i, preview_paths: Array[NodePath] = []) -> SurfaceSlot:
+	if target == NodePath(""):
+		return null
+	var extras: Array[NodePath] = []
+	for path in preview_paths:
+		if path != target:
+			extras.append(path)
+	var surface := _create_surface(id, target, target, subdivs, false, extras)
+	surface.preview_meshes = preview_paths.duplicate()
+	_surfaces[id] = surface
+	return surface
+
+func _collect_node_paths(paths: Array) -> Array[NodePath]:
+	var result: Array[NodePath] = []
+	for entry in paths:
+		if not (entry is NodePath):
+			continue
+		var node_path: NodePath = entry
+		if node_path == NodePath(""):
+			continue
+		if result.has(node_path):
+			continue
+		result.append(node_path)
+	return result
 
 func _create_surface(id: String, target: NodePath, painter_path: NodePath, subdivs: Vector3i, use_player: bool, extras: Array[NodePath] = []) -> SurfaceSlot:
 	var surface := SurfaceSlot.new()
@@ -398,8 +443,8 @@ func _generate_cube_mesh_with_uvs_for_surface(surface: SurfaceSlot, cube_size: V
 		st.add_vertex(p10)
 	return st.commit()
 
-func randomize_grid(surface_id: String = SURFACE_DEFAULT) -> void:
-	var surface := _get_surface(surface_id)
+func randomize_grid(surface_id: String = "") -> void:
+	var surface := _get_surface_or_fallback(surface_id)
 	if not surface:
 		return
 	_rng.randomize()
@@ -409,22 +454,25 @@ func randomize_grid(surface_id: String = SURFACE_DEFAULT) -> void:
 	surface.texture = _build_texture_from_surface(surface)
 	_apply_surface_texture(surface)
 
-func apply_texture(to_target: bool = true, to_linked: bool = true, surface_id: String = SURFACE_DEFAULT) -> void:
-	var surface := _get_surface(surface_id)
+func apply_texture(to_target: bool = true, to_linked: bool = true, surface_id: String = "") -> void:
+	var surface := _get_surface_or_fallback(surface_id)
 	if not surface:
 		return
 	_apply_surface_texture(surface, to_target, to_linked)
 
-func get_cell_color(x: int, y: int, surface_id: String = SURFACE_DEFAULT) -> Color:
-	var surface := _get_surface(surface_id)
+func get_cell_color(x: int, y: int, surface_id: String = "") -> Color:
+	var surface := _get_surface_or_fallback(surface_id)
 	if not surface or x < 0 or y < 0 or x >= surface.grid_w() or y >= surface.grid_h():
 		return Color(0, 0, 0, 0)
 	return surface.grid_colors[y][x]
 
-func set_cell_color(x: int, y: int, color: Color, origin: NodePath = NodePath(""), surface_id: String = SURFACE_DEFAULT) -> void:
-	var surface := _get_surface(surface_id)
-	if not surface:
+
+func set_cell_color(x: int, y: int, color: Color, origin: NodePath = NodePath(""), surface_id: String = "") -> void:
+	var surface := _get_surface(surface_id) if surface_id != "" else null
+	if not surface and origin != NodePath(""):
 		surface = _surface_for_origin(origin)
+	if not surface:
+		surface = _fallback_surface()
 	if not surface or x < 0 or y < 0 or x >= surface.grid_w() or y >= surface.grid_h():
 		return
 	surface.grid_colors[y][x] = color
@@ -436,8 +484,8 @@ func set_cell_color(x: int, y: int, color: Color, origin: NodePath = NodePath(""
 			_assign_texture_to_mesh(origin_node, surface.texture, null)
 
 
-func fill_color(color: Color, surface_id: String = SURFACE_DEFAULT) -> void:
-	var surface := _get_surface(surface_id)
+func fill_color(color: Color, surface_id: String = "") -> void:
+	var surface := _get_surface_or_fallback(surface_id)
 	if not surface:
 		return
 	for y in range(surface.grid_h()):
@@ -453,10 +501,10 @@ func paint_at_uv(uv: Vector2, color: Color, origin: NodePath = NodePath(""), sur
 	var surface: SurfaceSlot = null
 	if surface_id != "":
 		surface = _get_surface(surface_id)
-	else:
+	if not surface and origin != NodePath(""):
 		surface = _surface_for_origin(origin)
 	if not surface:
-		surface = _get_surface(SURFACE_DEFAULT)
+		surface = _fallback_surface()
 	if not surface:
 		return
 	var gx := int(clamp(floor(uv.x * surface.grid_w()), 0, surface.grid_w() - 1))
@@ -464,6 +512,8 @@ func paint_at_uv(uv: Vector2, color: Color, origin: NodePath = NodePath(""), sur
 	set_cell_color(gx, gy, color, origin, surface.id)
 
 func save_grid_data(path: String = _save_path) -> void:
+	if not load_for_player:
+		return
 	var payload := {}
 	for id in _surfaces.keys():
 		var surface := _get_surface(id)
@@ -577,8 +627,8 @@ func _convert_grid_to_face_colors(surface: SurfaceSlot) -> Array:
 		out.append(face_rows)
 	return out
 
-func set_subdivisions_from_axis(axis_counts: Vector3i, surface_id: String = SURFACE_DEFAULT) -> void:
-	var surface := _get_surface(surface_id)
+func set_subdivisions_from_axis(axis_counts: Vector3i, surface_id: String = "") -> void:
+	var surface := _get_surface_or_fallback(surface_id)
 	if not surface:
 		return
 	surface.subdivisions_axis = axis_counts
@@ -602,35 +652,61 @@ func _surface_for_origin(origin: NodePath) -> SurfaceSlot:
 			return surface
 	return null
 
+func _get_surface_or_fallback(id: String) -> SurfaceSlot:
+	if id != "":
+		var explicit := _get_surface(id)
+		if explicit:
+			return explicit
+	return _fallback_surface()
+
+func _fallback_surface() -> SurfaceSlot:
+	var preferred_ids: Array = [SURFACE_LEFT_HAND, SURFACE_RIGHT_HAND, SURFACE_HEAD, SURFACE_BODY]
+	for pid in preferred_ids:
+		var surface := _get_surface(pid)
+		if surface:
+			return surface
+	for surface in _surfaces.values():
+		if surface:
+			return surface
+	return null
+
 func _get_surface(id: String) -> SurfaceSlot:
-	return _surfaces.get(id, null)
+	if id == "":
+		return null
+	if _surfaces.has(id):
+		return _surfaces[id]
+	if _surface_aliases.has(id):
+		var canonical_id: String = _surface_aliases[id]
+		if _surfaces.has(canonical_id):
+			return _surfaces[canonical_id]
+	return null
 
 func _exit_tree() -> void:
 	save_grid_data(_save_path)
 
-func _editor_randomize_grid(surface_id: String = SURFACE_DEFAULT) -> void:
+func _editor_randomize_grid(surface_id: String = "") -> void:
 	randomize_grid(surface_id)
 
-func _editor_apply_texture(surface_id: String = SURFACE_DEFAULT) -> void:
+func _editor_apply_texture(surface_id: String = "") -> void:
 	apply_texture(true, true, surface_id)
 
-func _editor_save_grid_png(path: String = "res://grid_painter_output.png", surface_id: String = SURFACE_DEFAULT) -> void:
-	var surface := _get_surface(surface_id)
+func _editor_save_grid_png(path: String = "res://grid_painter_output.png", surface_id: String = "") -> void:
+	var surface := _get_surface_or_fallback(surface_id)
 	if not surface:
 		return
 	if not surface.texture:
 		surface.texture = _build_texture_from_surface(surface)
 	surface.texture.get_image().save_png(path)
 
-func _editor_apply_subdivisions(surface_id: String = SURFACE_DEFAULT) -> void:
-	set_subdivisions_from_axis(subdivisions_axis, surface_id)
+func _editor_apply_subdivisions(surface_id: String = "", axis_counts: Vector3i = Vector3i(4, 4, 1)) -> void:
+	set_subdivisions_from_axis(axis_counts, surface_id)
 	randomize_grid(surface_id)
 	apply_texture(true, true, surface_id)
 
-func debug_print_grid(surface_id: String = SURFACE_DEFAULT) -> void:
+func debug_print_grid(surface_id: String = "") -> void:
 	if not developer_mode:
 		return
-	var surface := _get_surface(surface_id)
+	var surface := _get_surface_or_fallback(surface_id)
 	if not surface:
 		return
 	for y in range(surface.grid_h()):
