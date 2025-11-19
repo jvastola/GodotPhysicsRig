@@ -540,6 +540,22 @@ func load_grid_data(path: String = _save_path) -> void:
 			_deserialize_surface(surface, data["surfaces"][id])
 			surface.texture = _build_texture_from_surface(surface)
 
+func reset_grid_data(path: String = _save_path, remove_save_file: bool = true) -> void:
+	for surface in _surfaces.values():
+		if not (surface is SurfaceSlot):
+			continue
+		_reset_surface(surface)
+		surface.texture = _build_texture_from_surface(surface)
+		_apply_surface_texture(surface)
+	if remove_save_file:
+		if FileAccess.file_exists(path):
+			var err := DirAccess.remove_absolute(path)
+			if err != OK:
+				push_warning("GridPainter: Failed to delete saved grid data at %s (err=%s)" % [path, err])
+	else:
+		if load_for_player:
+			save_grid_data(path)
+
 func _serialize_surface(surface: SurfaceSlot) -> Dictionary:
 	var grid_rows := []
 	for row in surface.grid_colors:
@@ -646,6 +662,9 @@ func _editor_randomize_grid(surface_id: String = "") -> void:
 
 func _editor_apply_texture(surface_id: String = "") -> void:
 	apply_texture(true, true, surface_id)
+
+func _editor_reset_grid_data(path: String = _save_path) -> void:
+	reset_grid_data(path)
 
 func _editor_save_grid_png(path: String = "res://grid_painter_output.png", surface_id: String = "") -> void:
 	var surface := _get_surface_or_fallback(surface_id)
