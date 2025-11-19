@@ -1,8 +1,7 @@
-[gd_scene load_steps=23 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=26 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://Portal.tscn" id="2_portal"]
-[ext_resource type="Script" uid="uid://crqnjrrq5qvuw" path="res://subdivided_cube.gd" id="3_cube"]
 [ext_resource type="Script" uid="uid://ct42jl8bcsjkj" path="res://floor_interactable.gd" id="4_floor_script"]
 [ext_resource type="PackedScene" uid="uid://b2gkx1eim00mw" path="res://UIViewport3D.tscn" id="5_ui_viewport"]
 [ext_resource type="Shader" uid="uid://chjyjc8300le1" path="res://red_sphere_layered.gdshader" id="6_red_shader"]
@@ -43,13 +42,29 @@ height = 0.5
 radial_segments = 32
 rings = 16
 
-[sub_resource type="BoxMesh" id="BoxMesh_8xkvn"]
+[sub_resource type="BoxMesh" id="BoxMesh_left_hand_grid"]
+size = Vector3(0.45, 0.45, 0.45)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_grid"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_left_hand_grid"]
+size = Vector3(0.45, 0.45, 0.45)
 
-[sub_resource type="BoxMesh" id="BoxMesh_p5x2j"]
+[sub_resource type="BoxMesh" id="BoxMesh_right_hand_grid"]
+size = Vector3(0.45, 0.45, 0.45)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_p5x2j"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_right_hand_grid"]
+size = Vector3(0.45, 0.45, 0.45)
+
+[sub_resource type="BoxMesh" id="BoxMesh_head_grid"]
+size = Vector3(0.6, 0.6, 0.6)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_head_grid"]
+size = Vector3(0.6, 0.6, 0.6)
+
+[sub_resource type="BoxMesh" id="BoxMesh_body_grid"]
+size = Vector3(0.7, 0.9, 0.3)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body_grid"]
+size = Vector3(0.7, 0.9, 0.3)
 
 [node name="MainScene" type="Node3D"]
 
@@ -74,17 +89,6 @@ mesh = SubResource("BoxMesh_floor")
 
 [node name="SpawnPoint" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
-
-[node name="ColorCube" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0.5, -2)
-layers = 33
-cast_shadow = 0
-script = ExtResource("3_cube")
-size = Vector3(0.25, 0.25, 0.25)
-subdivisions_axis = Vector3i(9, 3, 10)
-rng_seed = 12345
-material_unshaded = true
-flip_winding = true
 
 [node name="XRPlayer" parent="." instance=ExtResource("1_xrplayer")]
 transform = Transform3D(0.999598, 0, 0, 0, 0.999598, 0, 0, 0, 0.999598, 0, 2, 0)
@@ -131,30 +135,66 @@ transform = Transform3D(5.28053, 0, 0, 0, 1, 0, 0, 0, 1, 3, 3.34535, -2)
 
 [node name="GridPainterTest" type="Node3D" parent="."]
 script = ExtResource("10_grid_painter")
-target_mesh = NodePath("GridTarget")
-linked_mesh = NodePath("GridLinked")
-load_for_player = true
-player_target_name = "LeftHandMesh"
+target_mesh = NodePath("GridTargetLeft")
+linked_mesh = NodePath("GridLinkedLeft")
 subdivisions_axis = Vector3i(8, 3, 2)
+left_hand_preview_mesh = NodePath("GridTargetLeft")
+left_hand_preview_mesh_secondary = NodePath("GridLinkedLeft")
+right_hand_preview_mesh = NodePath("GridTargetRight")
+head_preview_mesh = NodePath("GridTargetHead")
+body_preview_mesh = NodePath("GridTargetBody")
 
-[node name="GridTarget" type="MeshInstance3D" parent="GridPainterTest"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 1, -2)
-mesh = SubResource("BoxMesh_8xkvn")
+[node name="GridTargetLeft" type="MeshInstance3D" parent="GridPainterTest"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1, -2)
+mesh = SubResource("BoxMesh_left_hand_grid")
 
-[node name="GridTargetArea" type="Area3D" parent="GridPainterTest/GridTarget"]
+[node name="GridTargetLeftArea" type="Area3D" parent="GridPainterTest/GridTargetLeft"]
 collision_layer = 32
 collision_mask = 32
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest/GridTarget/GridTargetArea"]
-shape = SubResource("BoxShape3D_grid")
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest/GridTargetLeft/GridTargetLeftArea"]
+shape = SubResource("BoxShape3D_left_hand_grid")
 
-[node name="GridLinked" type="MeshInstance3D" parent="GridPainterTest"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 1, -2)
-mesh = SubResource("BoxMesh_p5x2j")
+[node name="GridLinkedLeft" type="MeshInstance3D" parent="GridPainterTest"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1, -2)
+mesh = SubResource("BoxMesh_left_hand_grid")
 
-[node name="GridLinkedArea" type="Area3D" parent="GridPainterTest/GridLinked"]
+[node name="GridLinkedLeftArea" type="Area3D" parent="GridPainterTest/GridLinkedLeft"]
 collision_layer = 32
 collision_mask = 32
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest/GridLinked/GridLinkedArea"]
-shape = SubResource("BoxShape3D_p5x2j")
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest/GridLinkedLeft/GridLinkedLeftArea"]
+shape = SubResource("BoxShape3D_left_hand_grid")
+
+[node name="GridTargetRight" type="MeshInstance3D" parent="GridPainterTest"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, -2)
+mesh = SubResource("BoxMesh_right_hand_grid")
+
+[node name="GridTargetRightArea" type="Area3D" parent="GridPainterTest/GridTargetRight"]
+collision_layer = 32
+collision_mask = 32
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest/GridTargetRight/GridTargetRightArea"]
+shape = SubResource("BoxShape3D_right_hand_grid")
+
+[node name="GridTargetHead" type="MeshInstance3D" parent="GridPainterTest"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 1, -4)
+mesh = SubResource("BoxMesh_head_grid")
+
+[node name="GridTargetHeadArea" type="Area3D" parent="GridPainterTest/GridTargetHead"]
+collision_layer = 32
+collision_mask = 32
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest/GridTargetHead/GridTargetHeadArea"]
+shape = SubResource("BoxShape3D_head_grid")
+
+[node name="GridTargetBody" type="MeshInstance3D" parent="GridPainterTest"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 1, -4)
+mesh = SubResource("BoxMesh_body_grid")
+
+[node name="GridTargetBodyArea" type="Area3D" parent="GridPainterTest/GridTargetBody"]
+collision_layer = 32
+collision_mask = 32
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest/GridTargetBody/GridTargetBodyArea"]
+shape = SubResource("BoxShape3D_body_grid")

@@ -2,48 +2,48 @@
 extends Node3D
 class_name GridPainter
 
-# GridPainter.gd
-# Creates an NxN paintable color grid, builds an atlas texture, applies to the
-# host mesh, and can also apply the same texture to a linked mesh whose UVs
-# are expected to be mapped to the same NxN grid.
-#
-# Usage:
-# - Attach to any Node in the scene (for example the MeshInstance you want to
-#   paint), then set `target_mesh` to the MeshInstance3D to which the generated
-#   texture will be applied. Optionally set `linked_mesh` if you want another
-#   mesh to share the same texture.
-# - Click `randomize_grid()` (or call from script) to create random colors.
-# - Use `set_cell_color(x,y,color)` to paint single cells and `apply_texture()`
-#   to update the mesh material.
-
-# Grid sizing is computed from `subdivisions_axis` to match cube atlas layout.
-#
-# New features:
-# - load_for_player: if true, GridPainter will load the SaveManager per-face saved paint (head paint) and apply it to the player mesh
-# - save_to_save_manager: optionally save the current grid into SaveManager (using per-face layout)
-# The painter exposes `subdivisions_axis` and `generate_on_ready` for random coloring.
-
-# Internal grid size (in cells) computed from subdivisions_axis into an atlas layout
-var _grid_size_x: int = 8
-var _grid_size_y: int = 8
-
-# Tile pixel resolution per cell (internal constant)
 const TILE_PIXELS: int = 16
-@export var target_mesh: NodePath = NodePath(".")
-@export var linked_mesh: NodePath = NodePath("")
-@export var generate_on_ready: bool = false
-@export var load_for_player: bool = false
-@export var player_root_path: NodePath = NodePath("../XRPlayer")
-@export var player_target_name: String = "HeadMesh"
-@export var save_to_save_manager: bool = false
+const SURFACE_DEFAULT := "default"
+const SURFACE_LEFT_HAND := "left_hand"
+const SURFACE_RIGHT_HAND := "right_hand"
+const SURFACE_HEAD := "head"
+const SURFACE_BODY := "body"
 
-# Internal grid: rows = grid_size, columns = grid_size; index [y][x]
-var _grid_colors: Array = []
-var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
-var _face_cell_dims: Array = []
-var _face_offsets: Array = []
+@export_group("Default Surface")
+@export_node_path("MeshInstance3D") var target_mesh: NodePath = NodePath(".")
+@export_node_path("MeshInstance3D") var linked_mesh: NodePath = NodePath("")
+@export var subdivisions_axis: Vector3i = Vector3i(8, 8, 1)
 
-# Face definitions used to compute per-face subdivision dims (matches `subdivided_cube.gd`)
+@export_group("Player Surfaces")
+@export_node_path("Node3D") var player_root_path: NodePath = NodePath("../XRPlayer")
+@export var load_for_player: bool = true
+@export var player_target_name: String = "LeftHandMesh"
+
+@export_subgroup("Hands")
+@export_node_path("MeshInstance3D") var left_hand_target: NodePath = NodePath("PlayerBody/XROrigin3D/LeftController/LeftHandMesh")
+@export_node_path("MeshInstance3D") var left_hand_path: NodePath = NodePath("PlayerBody/XROrigin3D/LeftController/LeftHandMesh")
+@export_node_path("MeshInstance3D") var left_hand_preview_mesh: NodePath = NodePath("")
+@export_node_path("MeshInstance3D") var left_hand_preview_mesh_secondary: NodePath = NodePath("")
+@export var left_hand_subdivisions: Vector3i = Vector3i(4, 4, 1)
+@export_node_path("MeshInstance3D") var right_hand_target: NodePath = NodePath("PlayerBody/XROrigin3D/RightController/RightHandMesh")
+@export_node_path("MeshInstance3D") var right_hand_path: NodePath = NodePath("PlayerBody/XROrigin3D/RightController/RightHandMesh")
+@export_node_path("MeshInstance3D") var right_hand_preview_mesh: NodePath = NodePath("")
+@export var right_hand_subdivisions: Vector3i = Vector3i(4, 4, 1)
+
+@export_subgroup("Head")
+@export_node_path("MeshInstance3D") var head_target: NodePath = NodePath("PlayerBody/XROrigin3D/XRCamera3D/HeadMesh")
+@export_node_path("MeshInstance3D") var head_path: NodePath = NodePath("PlayerBody/XROrigin3D/XRCamera3D/HeadMesh")
+@export_node_path("MeshInstance3D") var head_preview_mesh: NodePath = NodePath("")
+@export var head_subdivisions: Vector3i = Vector3i(8, 8, 2)
+
+@export_subgroup("Body")
+@export_node_path("MeshInstance3D") var body_target: NodePath = NodePath("PlayerBody/CollisionShape3D/BodyMesh")
+@export_node_path("MeshInstance3D") var body_path: NodePath = NodePath("PlayerBody/CollisionShape3D/BodyMesh")
+@export_node_path("MeshInstance3D") var body_preview_mesh: NodePath = NodePath("")
+@export var body_subdivisions: Vector3i = Vector3i(8, 4, 2)
+
+@export var developer_mode: bool = false
+
 const FACE_DEFS: Array = [
 	{"n": Vector3(0, 0, 1), "u": Vector3(1, 0, 0), "v": Vector3(0, 1, 0)},
 	{"n": Vector3(0, 0, -1), "u": Vector3(-1, 0, 0), "v": Vector3(0, 1, 0)},
@@ -53,543 +53,331 @@ const FACE_DEFS: Array = [
 	{"n": Vector3(0, -1, 0), "u": Vector3(1, 0, 0), "v": Vector3(0, 0, 1)}
 ]
 
-func _count_for_axis(axis: Vector3, axis_counts: Vector3i) -> int:
-	var abs_axis := axis.abs()
-	if abs_axis.x > 0.5:
-		return axis_counts.x
-	elif abs_axis.y > 0.5:
-		return axis_counts.y
-	else:
-		return axis_counts.z
+class SurfaceSlot extends RefCounted:
+	var id: String = ""
+	var target_relative: NodePath = NodePath("")
+	var paint_relative: NodePath = NodePath("")
+	var extra_targets: Array[NodePath] = []
+	var subdivisions_axis: Vector3i = Vector3i(8, 8, 1)
+	var use_player_root: bool = false
+	var grid_size_x: int = 1
+	var grid_size_y: int = 1
+	var grid_colors: Array = []
+	var face_cell_dims: Array = []
+	var face_offsets: Array = []
+	var texture: ImageTexture = null
+	var resolved_target_path: NodePath = NodePath("")
+	var resolved_paint_path: NodePath = NodePath("")
+	var resolved_extra_paths: Array[NodePath] = []
+	var preview_meshes: Array[NodePath] = []
 
-# Cached generated texture
-var _texture: ImageTexture = null
+	func grid_w() -> int:
+		return max(1, grid_size_x)
 
-func _ready():
-	# Apply exported subdivisions (maps Vector3i -> grid_size_x/grid_size_y) and build initial grid
-	set_subdivisions_from_axis(subdivisions_axis)
-	# No backwards compatibility: use `load_for_player` to load/apply to a player
+	func grid_h() -> int:
+		return max(1, grid_size_y)
 
-	# Load saved grid data if exists. If `load_for_player` is true we will load SaveManager data
-	if load_for_player and SaveManager:
-		_load_from_save_manager()
-	else:
-		load_grid_data()
-	# Apply the loaded texture to meshes
-	apply_texture()
-	# Ensure material applied early if added in editor with linked meshes
-	_texture = _build_texture_from_grid()
-	if generate_on_ready:
-		randomize_grid()
-		apply_texture()
+	func matches_origin(origin: NodePath) -> bool:
+		if origin == NodePath(""):
+			return false
+		if resolved_paint_path != NodePath("") and origin == resolved_paint_path:
+			return true
+		if resolved_target_path != NodePath("") and origin == resolved_target_path:
+			return true
+		for extra in resolved_extra_paths:
+			if extra != NodePath("") and origin == extra:
+				return true
+		return String(origin) != "" and String(resolved_paint_path) == String(origin)
 
-	# Attach handler script to target and linked meshes at runtime so the scene doesn't
-	# require a separate ext_resource for it which may cause parse-time errors.
-	# This keeps the scene clean and avoids id conflicts in text resources.
-	var handler_script: Script = null
-	# prefer to preload the handler if present
-	if FileAccess.file_exists("res://grid_painter_handler.gd"):
-		handler_script = preload("res://grid_painter_handler.gd")
-	if handler_script:
-		var tnode := get_node_or_null(target_mesh)
-		if tnode and tnode is MeshInstance3D:
-			tnode.set_script(handler_script)
-			# set painter property for handler to point back to this GridPainter
-			if tnode.has_method("set"):
-				tnode.set("painter", self.get_path())
-		var lnode := get_node_or_null(linked_mesh)
-		if lnode and lnode is MeshInstance3D:
-			lnode.set_script(handler_script)
-			if lnode.has_method("set"):
-				lnode.set("painter", self.get_path())
+var _surfaces: Dictionary = {}
+var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _handler_script: Script = null
+var _save_path: String = "user://grid_painter_surfaces.json"
 
-	# If configured to use player target, ensure it is resolved and texture applied to the final target.
-	if load_for_player:
-		# Defer resolution until scene is populated (XRPlayer or target may not be in the tree yet)
-		call_deferred("_ensure_player_target_applied")
-
-func _reset_grid() -> void:
-	_grid_colors = []
-	for y in range(_grid_h()):
-		var row := []
-		for x in range(_grid_w()):
-			row.append(Color(0,0,0,0))
-		_grid_colors.append(row)
-	# rebuild cached texture
-	_texture = null
-
-func randomize_grid() -> void:
-	"""Fill the grid with random colors (per-cell random RGB, alpha=1).
-	Matches the behavior of `subdivided_cube` random paint generation.
-	"""
+func _ready() -> void:
 	_rng.randomize()
-	for y in range(_grid_h()):
-		for x in range(_grid_w()):
-			_grid_colors[y][x] = Color(_rng.randf(), _rng.randf(), _rng.randf(), 1.0)
-	# Generated new texture
-	_texture = _build_texture_from_grid()
+	_load_handler_script()
+	_register_all_surfaces()
+	load_grid_data(_save_path)
+	if player_root_path != NodePath("") and SaveManager:
+		_maybe_load_head_from_save_manager()
+	_resolve_all_surface_nodes()
+	_attach_handler_scripts()
+	_apply_all_surface_textures()
 
-func _build_texture_from_grid() -> ImageTexture:
-	"""Create an ImageTexture from _grid_colors using tile_pixels per cell.
-
-	Supports rectangular grids via `grid_size_x` and `grid_size_y`.
-	"""
-	var w := int(_grid_w() * TILE_PIXELS)
-	var h := int(_grid_h() * TILE_PIXELS)
-	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
-	for gy in range(_grid_h()):
-		for gx in range(_grid_w()):
-			var c: Color = _grid_colors[gy][gx]
-			# fill tile
-			for py in range(TILE_PIXELS):
-				for px in range(TILE_PIXELS):
-					img.set_pixel(gx * TILE_PIXELS + px, gy * TILE_PIXELS + py, c)
-	# No explicit lock/unlock needed in Godot 4; Image.set_pixel is safe to call directly.
-	return ImageTexture.create_from_image(img)
-
-
-func _resolve_player_target() -> void:
-	"""Find the requested player target (head/body/hand) and set `target_mesh` to it.
-	"""
-	if player_root_path == NodePath(""):
+func _load_handler_script() -> void:
+	if _handler_script:
 		return
-	var root_node: Node = get_node_or_null(player_root_path)
-	if not root_node:
-		# try a global lookup under the scene root
-		var root: Node = get_tree().get_current_scene()
-		if root:
-			root_node = root.get_node_or_null(player_root_path)
-	if not root_node:
+	if FileAccess.file_exists("res://grid_painter_handler.gd"):
+		_handler_script = preload("res://grid_painter_handler.gd")
+
+func _register_all_surfaces() -> void:
+	_surfaces.clear()
+	_register_default_surface()
+	if load_for_player:
+		var left_previews: Array[NodePath] = []
+		if left_hand_preview_mesh != NodePath(""):
+			left_previews.append(left_hand_preview_mesh)
+		if left_hand_preview_mesh_secondary != NodePath(""):
+			left_previews.append(left_hand_preview_mesh_secondary)
+		_register_player_surface(SURFACE_LEFT_HAND, left_hand_target, left_hand_path, left_hand_subdivisions, left_previews)
+		var right_previews: Array[NodePath] = []
+		if right_hand_preview_mesh != NodePath(""):
+			right_previews.append(right_hand_preview_mesh)
+		_register_player_surface(SURFACE_RIGHT_HAND, right_hand_target, right_hand_path, right_hand_subdivisions, right_previews)
+		var head_previews: Array[NodePath] = []
+		if head_preview_mesh != NodePath(""):
+			head_previews.append(head_preview_mesh)
+		_register_player_surface(SURFACE_HEAD, head_target, head_path, head_subdivisions, head_previews)
+		var body_previews: Array[NodePath] = []
+		if body_preview_mesh != NodePath(""):
+			body_previews.append(body_preview_mesh)
+		_register_player_surface(SURFACE_BODY, body_target, body_path, body_subdivisions, body_previews)
+
+func _register_default_surface() -> void:
+	if target_mesh == NodePath("") and linked_mesh == NodePath(""):
 		return
-	# find node by name recursively from the given root
-	var found: Node = _find_node_recursive(root_node, player_target_name)
-	if found and found is MeshInstance3D:
-		# set this as our target (keep it as a NodePath so apply_texture works normally)
-		target_mesh = found.get_path()
+	var extras: Array[NodePath] = []
+	if linked_mesh != NodePath(""):
+		extras.append(linked_mesh)
+	var surface := _create_surface(SURFACE_DEFAULT, target_mesh, target_mesh, subdivisions_axis, false, extras)
+	_surfaces[SURFACE_DEFAULT] = surface
 
-func apply_texture_to_node(node: MeshInstance3D) -> void:
-	if not node:
+func _register_player_surface(id: String, target: NodePath, painter_path: NodePath, subdivs: Vector3i, preview_paths: Array[NodePath] = []) -> void:
+	if target == NodePath("") and painter_path == NodePath(""):
 		return
-	if not _texture:
-		_texture = _build_texture_from_grid()
-		# Assign generated cube mesh with correct UVs if available so the origin has the correct UV layout too
-	if _face_cell_dims.size() == 6 and _face_offsets.size() == 6:
-		var cube_mesh := _generate_cube_mesh_with_uvs(Vector3(1, 1, 1))
-		if cube_mesh:
-			node.mesh = cube_mesh
-	var mat := StandardMaterial3D.new()
-	mat.albedo_texture = _texture
-	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	if "cull_mode" in mat:
-		mat.cull_mode = BaseMaterial3D.CULL_BACK
-	node.material_override = mat
+	var surface := _create_surface(id, target, painter_path, subdivs, true)
+	surface.preview_meshes = preview_paths.duplicate()
+	_surfaces[id] = surface
 
-func resolve_and_apply_player_target() -> void:
-	"""Public helper to resolve the player target (if `load_for_player` is true) and apply the current texture."""
-	if not load_for_player:
-		return
-	_ensure_player_target_applied()
+func _create_surface(id: String, target: NodePath, painter_path: NodePath, subdivs: Vector3i, use_player: bool, extras: Array[NodePath] = []) -> SurfaceSlot:
+	var surface := SurfaceSlot.new()
+	surface.id = id
+	surface.target_relative = target
+	surface.paint_relative = painter_path if painter_path != NodePath("") else target
+	surface.extra_targets = extras.duplicate()
+	surface.subdivisions_axis = subdivs
+	surface.use_player_root = use_player
+	_apply_subdivisions_to_surface(surface, subdivs)
+	return surface
 
-func _load_from_save_manager() -> void:
-	if not SaveManager:
-		return
-	var paint_data: Dictionary = SaveManager.load_head_paint()
-	if paint_data.is_empty():
-		return
-	# paint_data uses per-face cell colors (faces x rows x cols)
-	var saved_subdivisions: Variant = paint_data.get("subdivisions", subdivisions_axis)
-	# Deserialize subdivisions if needed
-	var saved_axis: Variant = saved_subdivisions
-	if saved_axis is Array:
-		saved_axis = Vector3i(int(saved_axis[0]), int(saved_axis[1]), int(saved_axis[2]))
-	elif saved_axis is Dictionary and saved_axis.has("x"):
-		saved_axis = Vector3i(int(saved_axis["x"]), int(saved_axis["y"]), int(saved_axis["z"]))
-	# If subdivisions mismatch, ignore
-	set_subdivisions_from_axis(saved_axis)
-	var saved_colors: Array = paint_data.get("cell_colors", [])
-	if saved_colors.size() == FACE_DEFS.size():
-		# convert face-array to grid atlas for this painter
-		_convert_saved_face_colors_to_grid(saved_colors)
-		_texture = _build_texture_from_grid()
-		apply_texture()
-
-func _convert_saved_face_colors_to_grid(saved_colors: Array) -> void:
-	# Ensure we have face dims/offsets
-	if _face_cell_dims.size() != 6 or _face_offsets.size() != 6:
-		set_subdivisions_from_axis(subdivisions_axis)
-	# Initialize grid
-	_reset_grid()
-	for fi in range(min(saved_colors.size(), FACE_DEFS.size())):
-		var face_colors: Array = saved_colors[fi]
-		if not (face_colors is Array):
-			continue
-	# dims is not needed in this conversion; only offset is used to map face cells
-		var offset: Vector2i = _face_offsets[fi]
-		for y in range(face_colors.size()):
-			for x in range(face_colors[y].size()):
-				var c: Color = face_colors[y][x]
-				if c is Color:
-					var gx: int = offset.x + x
-					var gy: int = offset.y + y
-					if gx >= 0 and gy >= 0 and gy < _grid_h() and gx < _grid_w():
-						_grid_colors[gy][gx] = c
-
-func _convert_grid_to_face_colors() -> Array:
-	"""Convert our atlas grid (_grid_colors) into a per-face array compatible with SaveManager/subdivided_cube."""
-	var out: Array = []
-	if _face_cell_dims.size() != 6 or _face_offsets.size() != 6:
-		return out
-	for fi in range(FACE_DEFS.size()):
-		var dims: Vector2i = _face_cell_dims[fi]
-		var offset: Vector2i = _face_offsets[fi]
-		var face_arr: Array = []
-		for y in range(dims.y):
-			var row: Array = []
-			for x in range(dims.x):
-				var gx: int = offset.x + x
-				var gy: int = offset.y + y
-				if gy >= 0 and gy < _grid_h() and gx >= 0 and gx < _grid_w():
-					row.append(_grid_colors[gy][gx])
-				else:
-					row.append(Color(0,0,0,0))
-			face_arr.append(row)
-		out.append(face_arr)
-	return out
-func _find_node_recursive(start: Node, target_name: String) -> Node:
-	if start == null:
-		return null
-	for child in start.get_children():
-		if child is Node:
-			if child.name == target_name:
-				return child
-			var res: Node = _find_node_recursive(child, target_name)
-			if res:
-				return res
-	return null
-
-func _ensure_player_target_applied() -> void:
-	# Resolve player target if requested, then re-apply textures using the standard path (target_mesh)
-	if not load_for_player:
-		return
-	_resolve_player_target()
-	# After resolving, if we have a target, apply texture to it just like apply_texture does
-	var tn := get_node_or_null(target_mesh)
-	if tn and tn is MeshInstance3D:
-		if not _texture:
-			_texture = _build_texture_from_grid()
-		apply_texture_to_node(tn as MeshInstance3D)
-	else:
-		# if player not found, log a warning — user can call `_ensure_player_target_applied()` manually if needed
-		push_warning("GridPainter: Player target '%s' not found under %s" % [player_target_name, str(player_root_path)])
-	
-
-func apply_texture(to_target: bool = true, to_linked: bool = true) -> void:
-	"""Apply the built texture to `target_mesh` and `linked_mesh` materials.
-	`target_mesh` path is required to be a MeshInstance3D node, as is `linked_mesh`.
-	Also generates and applies a cube mesh with proper UVs for the atlas layout.
-	"""
-	if not _texture:
-		_texture = _build_texture_from_grid()
-	
-	# Generate cube mesh with correct UVs if face dims are initialized
-	var cube_mesh: ArrayMesh = null
-	if _face_cell_dims.size() == 6 and _face_offsets.size() == 6:
-		cube_mesh = _generate_cube_mesh_with_uvs(Vector3(1, 1, 1))
-	
-	if to_target and target_mesh != NodePath(""):
-		var node := get_node_or_null(target_mesh)
-		if node and node is MeshInstance3D:
-			# Apply the cube mesh with correct UVs
-			if cube_mesh:
-				node.mesh = cube_mesh
-			
-			var mat := StandardMaterial3D.new()
-			mat.albedo_texture = _texture
-			mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-			if "cull_mode" in mat:
-				mat.cull_mode = BaseMaterial3D.CULL_BACK
-			node.material_override = mat
-		else:
-			push_warning("GridPainter: target_mesh is not a MeshInstance3D: %s" % [target_mesh])
-	if to_linked and linked_mesh != NodePath(""):
-		var ln := get_node_or_null(linked_mesh)
-		if ln and ln is MeshInstance3D:
-			# Apply the cube mesh with correct UVs
-			if cube_mesh:
-				ln.mesh = cube_mesh
-			
-			var lmat := StandardMaterial3D.new()
-			lmat.albedo_texture = _texture
-			lmat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-			lmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-			if "cull_mode" in lmat:
-				lmat.cull_mode = BaseMaterial3D.CULL_BACK
-			ln.material_override = lmat
-		else:
-			push_warning("GridPainter: linked_mesh is not a MeshInstance3D: %s" % [linked_mesh])
-
-func get_cell_color(x: int, y: int) -> Color:
-	if x < 0 or x >= _grid_w() or y < 0 or y >= _grid_h():
-		return Color(0,0,0,0)
-	return _grid_colors[y][x]
-
-func set_cell_color(x: int, y: int, c: Color, origin: NodePath = NodePath("")) -> void:
-	if x < 0 or x >= _grid_w() or y < 0 or y >= _grid_h():
-		return
-	_grid_colors[y][x] = c
-	# rebuild only that tile
-	_texture = _build_texture_from_grid()
-	# If target mesh exists, update automatically
-	apply_texture()
-	# Also apply to the origin mesh (where the paint event came from) so local painting updates the immediate mesh
-	if origin != NodePath(""):
-		var o := get_node_or_null(origin)
-		if o and o is MeshInstance3D:
-			apply_texture_to_node(o as MeshInstance3D)
-	# Save the grid data after change
-	save_grid_data()
-
-func fill_color(c: Color) -> void:
-	for y in range(_grid_h()):
-		for x in range(_grid_w()):
-			_grid_colors[y][x] = c
-	_texture = _build_texture_from_grid()
-	apply_texture()
-
-func paint_at_uv(uv: Vector2, color: Color, origin: NodePath = NodePath("")) -> void:
-	"""Paint a cell given UV coordinates in 0..1 range. 
-	This assumes the target/linked mesh uses UVs matching the NxN grid layout (each cell covers 1/grid_size across U and V).
-	"""
-	if uv.x < 0 or uv.x > 1 or uv.y < 0 or uv.y > 1:
-		return
-	var gx := int(clamp(floor(uv.x * _grid_w()), 0, _grid_w() - 1))
-	var gy := int(clamp(floor(uv.y * _grid_h()), 0, _grid_h() - 1))
-	set_cell_color(gx, gy, color, origin)
-
-func save_grid_to_disk(path: String) -> void:
-	# saves as PNG
-	if not _texture:
-		_texture = _build_texture_from_grid()
-	var img := _texture.get_image()
-	img.save_png(path)
-
-func save_grid_data(path: String = "user://grid_painter_save.json") -> void:
-	"""Save the grid colors and subdivisions to a JSON file for persistence."""
-	var grid_data = []
-	for row in _grid_colors:
-		var row_data = []
-		for c in row:
-			row_data.append({"r": c.r, "g": c.g, "b": c.b, "a": c.a})
-		grid_data.append(row_data)
-	var data = {
-		"grid": grid_data,
-		"subdivisions": {
-			"x": subdivisions_axis.x,
-			"y": subdivisions_axis.y,
-			"z": subdivisions_axis.z
-		}
-	}
-	var file = FileAccess.open(path, FileAccess.WRITE)
-	if file:
-		file.store_string(JSON.stringify(data))
-		file.close()
-	else:
-		push_error("GridPainter: Failed to save grid data to " + path)
-	# Optionally save to SaveManager (convert atlas into per-face layout before saving)
-	if save_to_save_manager and SaveManager and _face_cell_dims.size() == 6 and _face_offsets.size() == 6:
-		var face_colors := _convert_grid_to_face_colors()
-		SaveManager.save_head_paint(face_colors, subdivisions_axis)
-
-func load_grid_data(path: String = "user://grid_painter_save.json") -> void:
-	"""Load the grid colors and subdivisions from a JSON file."""
-	if not FileAccess.file_exists(path):
-		return
-	var file = FileAccess.open(path, FileAccess.READ)
-	if not file:
-		push_error("GridPainter: Failed to load grid data from " + path)
-		return
-	var json = JSON.new()
-	var error = json.parse(file.get_as_text())
-	file.close()
-	if error != OK:
-		push_error("GridPainter: Failed to parse save file: " + str(error))
-		return
-	var data = json.get_data()
-	if "subdivisions" in data:
-		subdivisions_axis = Vector3i(data["subdivisions"]["x"], data["subdivisions"]["y"], data["subdivisions"]["z"])
-		set_subdivisions_from_axis(subdivisions_axis)
-	if "grid" in data:
-		var saved_grid = data["grid"]
-		# Check if sizes match
-		if saved_grid.size() == _grid_h() and saved_grid.size() > 0 and saved_grid[0].size() == _grid_w():
-			# Load colors from dicts or strings
-			for y in range(saved_grid.size()):
-				for x in range(saved_grid[y].size()):
-					var cd = saved_grid[y][x]
-					if cd is Dictionary:
-						_grid_colors[y][x] = Color(cd["r"], cd["g"], cd["b"], cd["a"])
-					elif cd is String:
-						# Parse the string like "(r, g, b, a)"
-						var parts = cd.trim_prefix("(").trim_suffix(")").split(", ")
-						if parts.size() == 4:
-							_grid_colors[y][x] = Color(float(parts[0]), float(parts[1]), float(parts[2]), float(parts[3]))
-						else:
-							_grid_colors[y][x] = Color(0, 0, 0, 0)  # default
-					else:
-						_grid_colors[y][x] = Color(0, 0, 0, 0)  # default
-		else:
-			push_warning("GridPainter: Saved grid size doesn't match current subdivisions, keeping current grid")
-	_texture = _build_texture_from_grid()
-
-
-# --- New: support subdivisions per-axis helper (for cube-like workflows)
-@export var subdivisions_axis: Vector3i = Vector3i(8, 8, 1)
-
-func set_subdivisions_from_axis(axis_counts: Vector3i) -> void:
-	"""Helper: set grid X/Y from a Vector3i subdivisions axis (x -> grid_size_x, y -> grid_size_y).
-	This keeps the 2D grid painter compatible with simple cube workflows where Z is unused for the atlas.
-	"""
-	# If axis_counts is provided, compute per-face dims and then compute
-	# atlas width/height (in cells) so the generated texture matches
-	# how `subdivided_cube` arranges faces into the atlas.
-	if axis_counts == null:
-		# default to the exported subdivisions_axis if caller didn't provide one
-		axis_counts = subdivisions_axis
-
-	# Compute per-face dims similar to subdivided_cube
-	var axis_counts_clamped := Vector3i(max(1, int(axis_counts.x)), max(1, int(axis_counts.y)), max(1, int(axis_counts.z)))
+func _apply_subdivisions_to_surface(surface: SurfaceSlot, axis_counts: Vector3i) -> void:
+	var counts := Vector3i(max(1, axis_counts.x), max(1, axis_counts.y), max(1, axis_counts.z))
 	var face_dims: Array = []
 	for face in FACE_DEFS:
-		var u_div := _count_for_axis(face["u"], axis_counts_clamped)
-		var v_div := _count_for_axis(face["v"], axis_counts_clamped)
+		var u_div := _count_for_axis(face["u"], counts)
+		var v_div := _count_for_axis(face["v"], counts)
 		face_dims.append(Vector2i(u_div, v_div))
-
-	# Arrange faces into the same 3x2 layout used by subdivided_cube._generate_texture_from_cells
-	# Arrange faces into rows (tight packing per-face across each row)
-	var row_faces := [[3, 4, 2], [1, 0, 5]]
-
-	# For each row, compute each face's width (face_dims[fi].x) and the row height (max of face y dims)
-	var row_widths: Array = []
-	var row_face_x_offsets: Array = [] # array of arrays for per-face x offsets in each row
-	var row_heights: Array = []
-	for row_idx in range(row_faces.size()):
-		var faces: Array = row_faces[row_idx]
-		var offsets: Array = []
-		var acc_x: int = 0
-		for j in range(faces.size()):
-			var fi: int = int(faces[j])
-			offsets.append(acc_x)
-			acc_x += int(face_dims[fi].x)
-		row_face_x_offsets.append(offsets)
-		row_widths.append(acc_x)
-		# row height is max y among faces in the row
-		var rh: int = 0
-		for j in range(faces.size()):
-			var fi2: int = int(faces[j])
-			rh = max(rh, int(face_dims[fi2].y))
-		row_heights.append(rh)
-
-	# total atlas size in cells: width is the widest row, height is sum of row heights
+	var row_faces: Array = [[3, 4, 2], [1, 0, 5]]
+	var row_widths: Array[int] = []
+	var row_face_offsets: Array = []
+	var row_heights: Array[int] = []
+	for faces in row_faces:
+		var offsets: Array[int] = []
+		var acc := 0
+		for fi in faces:
+			offsets.append(acc)
+			acc += face_dims[fi].x
+		row_face_offsets.append(offsets)
+		row_widths.append(acc)
+		var row_h := 0
+		for fi in faces:
+			row_h = max(row_h, face_dims[fi].y)
+		row_heights.append(row_h)
 	var tex_w := 0
 	for w in row_widths:
 		tex_w = max(tex_w, w)
 	var tex_h := 0
 	for h in row_heights:
 		tex_h += h
-
-	_grid_size_x = max(1, tex_w)
-	_grid_size_y = max(1, tex_h)
-
-	# rebuild internal grid to match new dims
-	# compute per-face offsets (x,y in cells) for this packing
-	_face_cell_dims = face_dims
-	_face_offsets.clear()
+	surface.grid_size_x = max(1, tex_w)
+	surface.grid_size_y = max(1, tex_h)
+	surface.face_cell_dims = face_dims
+	surface.face_offsets = []
 	var y_acc := 0
-	for row_i in range(row_faces.size()):
-		var faces: Array = row_faces[row_i]
-		for fi_i in range(faces.size()):
-			var _fi: int = int(faces[fi_i])
-			var ox: int = int(row_face_x_offsets[row_i][fi_i])
-			_face_offsets.append(Vector2i(ox, y_acc))
-		y_acc += int(row_heights[row_i])
+	for row_idx in range(row_faces.size()):
+		var faces: Array = row_faces[row_idx]
+		var offsets: Array = row_face_offsets[row_idx]
+		for idx in range(faces.size()):
+			surface.face_offsets.append(Vector2i(offsets[idx], y_acc))
+		y_acc += row_heights[row_idx]
+	_reset_surface(surface)
 
-	_reset_grid()
-	_texture = _build_texture_from_grid()
+func _reset_surface(surface: SurfaceSlot) -> void:
+	surface.grid_colors = []
+	for y in range(surface.grid_h()):
+		var row: Array = []
+		for x in range(surface.grid_w()):
+			row.append(Color(0, 0, 0, 0))
+		surface.grid_colors.append(row)
+	surface.texture = null
 
+func _resolve_all_surface_nodes() -> void:
+	for surface in _surfaces.values():
+		if surface is SurfaceSlot:
+			_resolve_surface_paths(surface)
 
-func _grid_w() -> int:
-	# Primary width: internal computed grid size
-	if _grid_size_x > 0:
-		return _grid_size_x
-	return 1
+func _resolve_surface_paths(surface: SurfaceSlot) -> void:
+	var base := _get_surface_base(surface)
+	if base == null:
+		return
+	if surface.target_relative != NodePath(""):
+		var target_node := base.get_node_or_null(surface.target_relative)
+		if target_node and target_node is MeshInstance3D:
+			surface.resolved_target_path = target_node.get_path()
+	if surface.paint_relative != NodePath(""):
+		var paint_node := base.get_node_or_null(surface.paint_relative)
+		if paint_node and paint_node is MeshInstance3D:
+			surface.resolved_paint_path = paint_node.get_path()
+	surface.resolved_extra_paths = []
+	for extra in surface.extra_targets:
+		var extra_node := base.get_node_or_null(extra)
+		if extra_node and extra_node is MeshInstance3D:
+			surface.resolved_extra_paths.append(extra_node.get_path())
+		else:
+			surface.resolved_extra_paths.append(NodePath(""))
+	for preview_path in surface.preview_meshes:
+		if preview_path == NodePath(""):
+			continue
+		var preview_node := get_node_or_null(preview_path)
+		if preview_node and preview_node is MeshInstance3D:
+			surface.resolved_extra_paths.append(preview_node.get_path())
 
-func _grid_h() -> int:
-	# Primary height: internal computed grid size
-	if _grid_size_y > 0:
-		return _grid_size_y
-	return 1
+func _get_surface_base(surface: SurfaceSlot) -> Node:
+	return _get_player_root() if surface.use_player_root else self
 
-# Editor helpers
-func _exit_tree():
-	# Save grid data when the node exits
-	save_grid_data()
-
-# Simple sanity methods making script usable from in-editor with buttons
-func _editor_randomize_grid() -> void: randomize_grid(); apply_texture()
-func _editor_apply_texture() -> void: apply_texture()
-func _editor_save_grid_png(path: String = "res://grid_painter_output.png") -> void: save_grid_to_disk(path)
-
-func _editor_apply_subdivisions() -> void:
-	"""Editor helper: apply the exported `subdivisions_axis`, randomize colors, and apply texture.
-	Call this from the Editor to force the GridPainter to update when you change `subdivisions_axis`.
-	"""
-	set_subdivisions_from_axis(subdivisions_axis)
-	randomize_grid()
-	apply_texture()
-
-func _generate_cube_mesh_with_uvs(cube_size: Vector3 = Vector3(1, 1, 1)) -> ArrayMesh:
-	"""Generate a cube mesh with UVs mapped to the tight-packed atlas layout.
-	Each face uses its correct subdivision dims from _face_cell_dims and _face_offsets.
-	"""
-	if _face_cell_dims.size() != 6 or _face_offsets.size() != 6:
-		push_error("GridPainter: face dims/offsets not initialized. Call set_subdivisions_from_axis first.")
+func _get_player_root() -> Node:
+	if player_root_path == NodePath(""):
 		return null
-	
+	var from_self := get_node_or_null(player_root_path)
+	if from_self:
+		return from_self
+	var root := get_tree().get_current_scene()
+	return root.get_node_or_null(player_root_path) if root else null
+
+func _attach_handler_scripts() -> void:
+	if not _handler_script:
+		return
+	for surface in _surfaces.values():
+		if not (surface is SurfaceSlot):
+			continue
+		var targets: Array = []
+		var tnode := _resolve_surface_node(surface, true)
+		if tnode:
+			targets.append(tnode)
+		var paint_node := _resolve_surface_node(surface, false)
+		if paint_node and paint_node not in targets:
+			targets.append(paint_node)
+		for idx in range(surface.resolved_extra_paths.size()):
+			var extra_node := _resolve_surface_node(surface, true, idx)
+			if extra_node and extra_node not in targets:
+				targets.append(extra_node)
+		for node in targets:
+			if node and node is MeshInstance3D:
+				node.set_script(_handler_script)
+				if node.has_method("set"):
+					node.set("painter", self.get_path())
+
+func _apply_all_surface_textures() -> void:
+	for id in _surfaces.keys():
+		_apply_surface_texture(_get_surface(id), true, true)
+
+func _apply_surface_texture(surface: SurfaceSlot, apply_primary: bool = true, apply_extras: bool = true) -> void:
+	if not surface:
+		return
+	if not surface.texture:
+		surface.texture = _build_texture_from_surface(surface)
+	if apply_primary:
+		var target_node := _resolve_surface_node(surface, true)
+		if target_node:
+			var cube_mesh := _build_cube_mesh_for_node(surface, target_node)
+			_assign_texture_to_mesh(target_node, surface.texture, cube_mesh)
+	if apply_extras:
+		for idx in range(surface.resolved_extra_paths.size()):
+			var extra_node := _resolve_surface_node(surface, true, idx)
+			if extra_node:
+				var cube_mesh := _build_cube_mesh_for_node(surface, extra_node)
+				_assign_texture_to_mesh(extra_node, surface.texture, cube_mesh)
+
+func _build_cube_mesh_for_node(surface: SurfaceSlot, node: MeshInstance3D) -> ArrayMesh:
+	var cube_size := _get_mesh_size_for_node(node)
+	return _generate_cube_mesh_with_uvs_for_surface(surface, cube_size)
+
+func _get_mesh_size_for_node(node: MeshInstance3D) -> Vector3:
+	var default_size := Vector3.ONE
+	if not node or not node.mesh:
+		return default_size
+	var aabb := node.mesh.get_aabb()
+	var size := aabb.size
+	# Ensure we don't end up with a zero-size cube if the mesh had collapsed geometry.
+	if size.x <= 0.0001:
+		size.x = 1.0
+	if size.y <= 0.0001:
+		size.y = 1.0
+	if size.z <= 0.0001:
+		size.z = 1.0
+	return size
+
+func _resolve_surface_node(surface: SurfaceSlot, is_primary: bool, extra_index: int = -1) -> MeshInstance3D:
+	var path := NodePath("")
+	if extra_index >= 0:
+		if extra_index < surface.resolved_extra_paths.size():
+			path = surface.resolved_extra_paths[extra_index]
+	elif is_primary:
+		path = surface.resolved_target_path
+	else:
+		path = surface.resolved_paint_path if surface.resolved_paint_path != NodePath("") else surface.resolved_target_path
+	if path == NodePath(""):
+		return null
+	var node := get_node_or_null(path)
+	return node if node and node is MeshInstance3D else null
+
+func _assign_texture_to_mesh(node: MeshInstance3D, texture: ImageTexture, cube_mesh: ArrayMesh) -> void:
+	if cube_mesh:
+		node.mesh = cube_mesh
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = texture
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	if "cull_mode" in mat:
+		mat.cull_mode = BaseMaterial3D.CULL_BACK
+	node.material_override = mat
+
+func _build_texture_from_surface(surface: SurfaceSlot) -> ImageTexture:
+	var w := int(surface.grid_w() * TILE_PIXELS)
+	var h := int(surface.grid_h() * TILE_PIXELS)
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	for gy in range(surface.grid_h()):
+		for gx in range(surface.grid_w()):
+			var color: Color = surface.grid_colors[gy][gx]
+			for py in range(TILE_PIXELS):
+				for px in range(TILE_PIXELS):
+					img.set_pixel(gx * TILE_PIXELS + px, gy * TILE_PIXELS + py, color)
+	return ImageTexture.create_from_image(img)
+
+func _generate_cube_mesh_with_uvs_for_surface(surface: SurfaceSlot, cube_size: Vector3 = Vector3(1, 1, 1)) -> ArrayMesh:
+	if surface.face_cell_dims.size() != 6 or surface.face_offsets.size() != 6:
+		return null
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	
-	var atlas_w: float = float(_grid_w())
-	var atlas_h: float = float(_grid_h())
-	
-	# Generate each face with proper UVs
+	var atlas_w := float(surface.grid_w())
+	var atlas_h := float(surface.grid_h())
 	for fi in range(FACE_DEFS.size()):
 		var face: Dictionary = FACE_DEFS[fi]
 		var n: Vector3 = face["n"]
 		var u: Vector3 = face["u"]
 		var v: Vector3 = face["v"]
-		
-		# Face dims and offset in atlas (in cells)
-		var dims: Vector2i = _face_cell_dims[fi]
-		var offset: Vector2i = _face_offsets[fi]
-		
-		# UV coords in atlas (0..1 range)
-		var uv_x0: float = float(offset.x) / atlas_w
-		var uv_y0: float = float(offset.y) / atlas_h
-		var uv_x1: float = float(offset.x + dims.x) / atlas_w
-		var uv_y1: float = float(offset.y + dims.y) / atlas_h
-		
-		# Quad corners in 3D space
-		var p00: Vector3 = ((u * -0.5) + (v * -0.5) + n * 0.5) * cube_size
-		var p10: Vector3 = ((u * 0.5) + (v * -0.5) + n * 0.5) * cube_size
-		var p11: Vector3 = ((u * 0.5) + (v * 0.5) + n * 0.5) * cube_size
-		var p01: Vector3 = ((u * -0.5) + (v * 0.5) + n * 0.5) * cube_size
-		
-		var normal: Vector3 = n.normalized()
-		
-		# Triangles in counter-clockwise order for outward normal
-		# triangle 1: p00, p01, p11
+		var dims: Vector2i = surface.face_cell_dims[fi]
+		var offset: Vector2i = surface.face_offsets[fi]
+		var uv_x0 := float(offset.x) / atlas_w
+		var uv_y0 := float(offset.y) / atlas_h
+		var uv_x1 := float(offset.x + dims.x) / atlas_w
+		var uv_y1 := float(offset.y + dims.y) / atlas_h
+		var p00 := ((u * -0.5) + (v * -0.5) + n * 0.5) * cube_size
+		var p10 := ((u * 0.5) + (v * -0.5) + n * 0.5) * cube_size
+		var p11 := ((u * 0.5) + (v * 0.5) + n * 0.5) * cube_size
+		var p01 := ((u * -0.5) + (v * 0.5) + n * 0.5) * cube_size
+		var normal := n.normalized()
 		st.set_normal(normal)
 		st.set_uv(Vector2(uv_x0, uv_y0))
 		st.add_vertex(p00)
@@ -599,7 +387,6 @@ func _generate_cube_mesh_with_uvs(cube_size: Vector3 = Vector3(1, 1, 1)) -> Arra
 		st.set_normal(normal)
 		st.set_uv(Vector2(uv_x1, uv_y1))
 		st.add_vertex(p11)
-		# triangle 2: p00, p11, p10
 		st.set_normal(normal)
 		st.set_uv(Vector2(uv_x0, uv_y0))
 		st.add_vertex(p00)
@@ -609,17 +396,245 @@ func _generate_cube_mesh_with_uvs(cube_size: Vector3 = Vector3(1, 1, 1)) -> Arra
 		st.set_normal(normal)
 		st.set_uv(Vector2(uv_x1, uv_y0))
 		st.add_vertex(p10)
-	
 	return st.commit()
 
-# Optional: expose as callable tool methods for EditorPlugin or remote calls
-@export var developer_mode: bool = false
+func randomize_grid(surface_id: String = SURFACE_DEFAULT) -> void:
+	var surface := _get_surface(surface_id)
+	if not surface:
+		return
+	_rng.randomize()
+	for y in range(surface.grid_h()):
+		for x in range(surface.grid_w()):
+			surface.grid_colors[y][x] = Color(_rng.randf(), _rng.randf(), _rng.randf(), 1.0)
+	surface.texture = _build_texture_from_surface(surface)
+	_apply_surface_texture(surface)
 
-func debug_print_grid() -> void:
+func apply_texture(to_target: bool = true, to_linked: bool = true, surface_id: String = SURFACE_DEFAULT) -> void:
+	var surface := _get_surface(surface_id)
+	if not surface:
+		return
+	_apply_surface_texture(surface, to_target, to_linked)
+
+func get_cell_color(x: int, y: int, surface_id: String = SURFACE_DEFAULT) -> Color:
+	var surface := _get_surface(surface_id)
+	if not surface or x < 0 or y < 0 or x >= surface.grid_w() or y >= surface.grid_h():
+		return Color(0, 0, 0, 0)
+	return surface.grid_colors[y][x]
+
+func set_cell_color(x: int, y: int, color: Color, origin: NodePath = NodePath(""), surface_id: String = SURFACE_DEFAULT) -> void:
+	var surface := _get_surface(surface_id)
+	if not surface:
+		surface = _surface_for_origin(origin)
+	if not surface or x < 0 or y < 0 or x >= surface.grid_w() or y >= surface.grid_h():
+		return
+	surface.grid_colors[y][x] = color
+	surface.texture = _build_texture_from_surface(surface)
+	_apply_surface_texture(surface)
+	if origin != NodePath(""):
+		var origin_node := get_node_or_null(origin)
+		if origin_node and origin_node is MeshInstance3D:
+			_assign_texture_to_mesh(origin_node, surface.texture, null)
+
+
+func fill_color(color: Color, surface_id: String = SURFACE_DEFAULT) -> void:
+	var surface := _get_surface(surface_id)
+	if not surface:
+		return
+	for y in range(surface.grid_h()):
+		for x in range(surface.grid_w()):
+			surface.grid_colors[y][x] = color
+	surface.texture = _build_texture_from_surface(surface)
+	_apply_surface_texture(surface)
+	save_grid_data(_save_path)
+
+func paint_at_uv(uv: Vector2, color: Color, origin: NodePath = NodePath(""), surface_id: String = "") -> void:
+	if uv.x < 0 or uv.x > 1 or uv.y < 0 or uv.y > 1:
+		return
+	var surface: SurfaceSlot = null
+	if surface_id != "":
+		surface = _get_surface(surface_id)
+	else:
+		surface = _surface_for_origin(origin)
+	if not surface:
+		surface = _get_surface(SURFACE_DEFAULT)
+	if not surface:
+		return
+	var gx := int(clamp(floor(uv.x * surface.grid_w()), 0, surface.grid_w() - 1))
+	var gy := int(clamp(floor(uv.y * surface.grid_h()), 0, surface.grid_h() - 1))
+	set_cell_color(gx, gy, color, origin, surface.id)
+
+func save_grid_data(path: String = _save_path) -> void:
+	var payload := {}
+	for id in _surfaces.keys():
+		var surface := _get_surface(id)
+		if surface:
+			payload[id] = _serialize_surface(surface)
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file:
+		file.store_string(JSON.stringify({"surfaces": payload}))
+		file.close()
+	if SaveManager:
+		var head_surface := _get_surface(SURFACE_HEAD)
+		if head_surface and head_surface.face_cell_dims.size() == 6:
+			var face_colors := _convert_grid_to_face_colors(head_surface)
+			SaveManager.save_head_paint(face_colors, head_surface.subdivisions_axis)
+
+func load_grid_data(path: String = _save_path) -> void:
+	if not FileAccess.file_exists(path):
+		return
+	var file := FileAccess.open(path, FileAccess.READ)
+	if not file:
+		return
+	var json := JSON.new()
+	var err := json.parse(file.get_as_text())
+	file.close()
+	if err != OK:
+		push_warning("GridPainter: Unable to parse surface save file")
+		return
+	var data: Variant = json.get_data()
+	if not data.has("surfaces"):
+		return
+	for id in data["surfaces"].keys():
+		var surface := _get_surface(id)
+		if surface:
+			_deserialize_surface(surface, data["surfaces"][id])
+			surface.texture = _build_texture_from_surface(surface)
+
+func _serialize_surface(surface: SurfaceSlot) -> Dictionary:
+	var grid_rows := []
+	for row in surface.grid_colors:
+		var row_data := []
+		for c in row:
+			row_data.append({"r": c.r, "g": c.g, "b": c.b, "a": c.a})
+		grid_rows.append(row_data)
+	return {
+		"subdivisions": {"x": surface.subdivisions_axis.x, "y": surface.subdivisions_axis.y, "z": surface.subdivisions_axis.z},
+		"grid": grid_rows
+	}
+
+func _deserialize_surface(surface: SurfaceSlot, payload: Dictionary) -> void:
+	if payload.has("subdivisions"):
+		var subs: Dictionary = payload.get("subdivisions", {})
+		var axis := Vector3i(int(subs.get("x", surface.subdivisions_axis.x)), int(subs.get("y", surface.subdivisions_axis.y)), int(subs.get("z", surface.subdivisions_axis.z)))
+		surface.subdivisions_axis = axis
+		_apply_subdivisions_to_surface(surface, axis)
+	if payload.has("grid"):
+		var rows = payload["grid"]
+		for y in range(min(rows.size(), surface.grid_h())):
+			var row_data = rows[y]
+			for x in range(min(row_data.size(), surface.grid_w())):
+				var cd = row_data[x]
+				surface.grid_colors[y][x] = Color(cd["r"], cd["g"], cd["b"], cd["a"])
+
+func _maybe_load_head_from_save_manager() -> void:
+	if not SaveManager:
+		return
+	var surface := _get_surface(SURFACE_HEAD)
+	if not surface:
+		return
+	var paint_data := SaveManager.load_head_paint()
+	if paint_data.is_empty():
+		return
+	var subs_variant: Variant = paint_data.get("subdivisions", surface.subdivisions_axis)
+	var subs: Vector3i = subs_variant if subs_variant is Vector3i else surface.subdivisions_axis
+	surface.subdivisions_axis = subs
+	_apply_subdivisions_to_surface(surface, subs)
+	var saved_colors: Array = paint_data.get("cell_colors", [])
+	if saved_colors.size() == FACE_DEFS.size():
+		_convert_saved_face_colors_to_grid(surface, saved_colors)
+		surface.texture = _build_texture_from_surface(surface)
+
+func _convert_saved_face_colors_to_grid(surface: SurfaceSlot, saved_colors: Array) -> void:
+	if surface.face_cell_dims.size() != 6 or surface.face_offsets.size() != 6:
+		_apply_subdivisions_to_surface(surface, surface.subdivisions_axis)
+	_reset_surface(surface)
+	for fi in range(min(saved_colors.size(), FACE_DEFS.size())):
+		var offset: Vector2i = surface.face_offsets[fi]
+		var rows: Array = saved_colors[fi]
+		for y in range(rows.size()):
+			var row: Array = rows[y]
+			for x in range(row.size()):
+				var gx := offset.x + x
+				var gy := offset.y + y
+				if gx >= 0 and gy >= 0 and gx < surface.grid_w() and gy < surface.grid_h():
+					surface.grid_colors[gy][gx] = row[x]
+
+func _convert_grid_to_face_colors(surface: SurfaceSlot) -> Array:
+	var out: Array = []
+	if surface.face_cell_dims.size() != 6 or surface.face_offsets.size() != 6:
+		return out
+	for fi in range(FACE_DEFS.size()):
+		var dims: Vector2i = surface.face_cell_dims[fi]
+		var offset: Vector2i = surface.face_offsets[fi]
+		var face_rows: Array = []
+		for y in range(dims.y):
+			var row: Array = []
+			for x in range(dims.x):
+				var gx := offset.x + x
+				var gy := offset.y + y
+				row.append(surface.grid_colors[gy][gx])
+			face_rows.append(row)
+		out.append(face_rows)
+	return out
+
+func set_subdivisions_from_axis(axis_counts: Vector3i, surface_id: String = SURFACE_DEFAULT) -> void:
+	var surface := _get_surface(surface_id)
+	if not surface:
+		return
+	surface.subdivisions_axis = axis_counts
+	_apply_subdivisions_to_surface(surface, axis_counts)
+	surface.texture = _build_texture_from_surface(surface)
+	_apply_surface_texture(surface)
+
+func _count_for_axis(axis: Vector3, axis_counts: Vector3i) -> int:
+	var abs_axis := axis.abs()
+	if abs_axis.x > 0.5:
+		return axis_counts.x
+	if abs_axis.y > 0.5:
+		return axis_counts.y
+	return axis_counts.z
+
+func _surface_for_origin(origin: NodePath) -> SurfaceSlot:
+	if origin == NodePath(""):
+		return null
+	for surface in _surfaces.values():
+		if surface is SurfaceSlot and surface.matches_origin(origin):
+			return surface
+	return null
+
+func _get_surface(id: String) -> SurfaceSlot:
+	return _surfaces.get(id, null)
+
+func _exit_tree() -> void:
+	save_grid_data(_save_path)
+
+func _editor_randomize_grid(surface_id: String = SURFACE_DEFAULT) -> void:
+	randomize_grid(surface_id)
+
+func _editor_apply_texture(surface_id: String = SURFACE_DEFAULT) -> void:
+	apply_texture(true, true, surface_id)
+
+func _editor_save_grid_png(path: String = "res://grid_painter_output.png", surface_id: String = SURFACE_DEFAULT) -> void:
+	var surface := _get_surface(surface_id)
+	if not surface:
+		return
+	if not surface.texture:
+		surface.texture = _build_texture_from_surface(surface)
+	surface.texture.get_image().save_png(path)
+
+func _editor_apply_subdivisions(surface_id: String = SURFACE_DEFAULT) -> void:
+	set_subdivisions_from_axis(subdivisions_axis, surface_id)
+	randomize_grid(surface_id)
+	apply_texture(true, true, surface_id)
+
+func debug_print_grid(surface_id: String = SURFACE_DEFAULT) -> void:
 	if not developer_mode:
 		return
-	for y in range(_grid_h()):
+	var surface := _get_surface(surface_id)
+	if not surface:
+		return
+	for y in range(surface.grid_h()):
 		var line := ""
-		for x in range(_grid_w()):
-			line += "%s " % [_grid_colors[y][x]]
+		for x in range(surface.grid_w()):
+			line += "%s " % [surface.grid_colors[y][x]]
 		print(line)

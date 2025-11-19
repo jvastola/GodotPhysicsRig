@@ -71,8 +71,7 @@ mass = 2.0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.92117, 0)
 shape = SubResource("CapsuleShape3D_body")
 
-[node name="HeadMesh2" type="MeshInstance3D" parent="PlayerBody/CollisionShape3D"]
-visible = false
+[node name="BodyMesh" type="MeshInstance3D" parent="PlayerBody/CollisionShape3D"]
 cast_shadow = 0
 mesh = SubResource("SphereMesh_head")
 skeleton = NodePath("../../XROrigin3D/XRCamera3D")
