@@ -1,4 +1,4 @@
-[gd_scene load_steps=25 format=3 uid="uid://cpq6v7yqk8y8j"]
+[gd_scene load_steps=26 format=3 uid="uid://cpq6v7yqk8y8j"]
 
 [ext_resource type="Script" uid="uid://02kpb1kqm303" path="res://xr_player.gd" id="1_player"]
 [ext_resource type="Script" uid="uid://3ir0c0htxlqh" path="res://xr_origin_3d.gd" id="2_xr_origin"]
@@ -8,6 +8,7 @@
 [ext_resource type="Script" uid="uid://u2otyj4gjtl2" path="res://hand_pointer.gd" id="6_pointer"]
 [ext_resource type="PackedScene" uid="uid://b2gkx1eim00mw" path="res://UIViewport3D.tscn" id="7_ui_viewport"]
 [ext_resource type="Script" uid="uid://cblrw6wmmg7gp" path="res://grid_snap_indicator.gd" id="8_grid_snap"]
+[ext_resource type="PackedScene" uid="uid://bn7dgs6t6u07m" path="res://BuildCube.tscn" id="9_build_cube"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_l588l"]
 size = Vector3(0.3, 0.3, 0.2)
@@ -64,6 +65,8 @@ script = ExtResource("1_player")
 desktop_extra_collider_offset = Vector3(0, 0, 0)
 turn_mode = 1
 smooth_turn_speed = 180.0
+
+[node name="BuildRoot" type="Node3D" parent="."]
 
 [node name="PlayerBody" type="RigidBody3D" parent="." groups=["player"]]
 collision_layer = 2
@@ -178,9 +181,12 @@ mesh = SubResource("CylinderMesh_pointer_hit")
 [node name="GridSnapIndicator" type="Node3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer"]
 script = ExtResource("8_grid_snap")
 follow_mode = "always"
+align_with_surface_normal = true
 maintain_visibility_without_hit = true
 pointer_node_path = NodePath("..")
-sync_grid_size_from_pointer = true
+build_mode_enabled = true
+build_cube_scene = ExtResource("9_build_cube")
+build_parent_path = NodePath("../../../../../BuildRoot")
 raycast_path = NodePath("../PointerRayCast")
 hide_without_hit = false
 
