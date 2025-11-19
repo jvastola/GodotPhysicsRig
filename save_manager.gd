@@ -11,32 +11,6 @@ var _autosave_timer := 0.0
 const AUTOSAVE_INTERVAL := 2.0  # Auto-save every 2 seconds if dirty
 
 
-func _serialize_subdivision_meta(meta: Variant) -> Variant:
-	"""Convert subdivision metadata to JSON-friendly data (array of ints when possible)."""
-	if meta is Vector3i:
-		return [meta.x, meta.y, meta.z]
-	elif meta is Vector3:
-		return [int(meta.x), int(meta.y), int(meta.z)]
-	elif meta is Array and meta.size() >= 3:
-		return [int(meta[0]), int(meta[1]), int(meta[2])]
-	elif meta is Dictionary and meta.has("x") and meta.has("y") and meta.has("z"):
-		return [int(meta["x"]), int(meta["y"]), int(meta["z"])]
-	return int(meta)
-
-
-func _deserialize_subdivision_meta(meta: Variant) -> Variant:
-	"""Convert saved subdivision metadata back into Vector3i when possible."""
-	if meta is Vector3i:
-		return meta
-	elif meta is Vector3:
-		return Vector3i(int(meta.x), int(meta.y), int(meta.z))
-	elif meta is Dictionary and meta.has("x") and meta.has("y") and meta.has("z"):
-		return Vector3i(int(meta["x"]), int(meta["y"]), int(meta["z"]))
-	elif meta is Array and meta.size() >= 3:
-		return Vector3i(int(meta[0]), int(meta[1]), int(meta[2]))
-	return int(meta)
-
-
 func _ready() -> void:
 	# Load save data on startup
 	load_game_state()
@@ -90,61 +64,6 @@ func load_game_state() -> void:
 	else:
 		push_error("SaveManager: Failed to read save file: ", FileAccess.get_open_error())
 		_save_data = {}
-
-
-# --- HEAD PAINT PERSISTENCE ---
-
-func save_head_paint(cell_colors: Array, subdivisions_meta: Variant) -> void:
-	"""Save head mesh paint state"""
-	# Convert Color objects to arrays for JSON serialization
-	var serialized_colors := []
-	for face in cell_colors:
-		var face_data := []
-		for row in face:
-			var row_data := []
-			for color in row:
-				if color is Color:
-					row_data.append([color.r, color.g, color.b, color.a])
-				else:
-					row_data.append([1.0, 1.0, 1.0, 1.0])  # Default white
-			face_data.append(row_data)
-		serialized_colors.append(face_data)
-	
-	var serialized_subdivisions: Variant = _serialize_subdivision_meta(subdivisions_meta)
-	_save_data["head_paint"] = {
-		"subdivisions": serialized_subdivisions,
-		"cell_colors": serialized_colors
-	}
-	_save_dirty = true
-	print("SaveManager: Head paint state marked for save (subdivisions=", serialized_subdivisions, ")")
-
-
-func load_head_paint() -> Dictionary:
-	"""Load head mesh paint state. Returns {subdivisions: Variant, cell_colors: Array}"""
-	if not _save_data.has("head_paint"):
-		return {}
-	
-	var paint_data: Dictionary = _save_data["head_paint"]
-	
-	# Convert arrays back to Color objects
-	var cell_colors := []
-	if paint_data.has("cell_colors"):
-		for face in paint_data["cell_colors"]:
-			var face_data := []
-			for row in face:
-				var row_data := []
-				for color_array in row:
-					if color_array is Array and color_array.size() >= 4:
-						row_data.append(Color(color_array[0], color_array[1], color_array[2], color_array[3]))
-					else:
-						row_data.append(Color.WHITE)
-				face_data.append(row_data)
-			cell_colors.append(face_data)
-	
-	return {
-		"subdivisions": _deserialize_subdivision_meta(paint_data.get("subdivisions", 1)),
-		"cell_colors": cell_colors
-	}
 
 
 # --- GRABBED OBJECTS PERSISTENCE ---

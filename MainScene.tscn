@@ -135,7 +135,6 @@ transform = Transform3D(5.28053, 0, 0, 0, 1, 0, 0, 0, 1, 3, 3.34535, -2)
 
 [node name="GridPainterTest" type="Node3D" parent="."]
 script = ExtResource("10_grid_painter")
-load_for_player = false
 left_hand_preview_mesh = NodePath("GridTargetLeft")
 left_hand_subdivisions = Vector3i(4, 4, 4)
 right_hand_preview_mesh = NodePath("GridTargetRight")

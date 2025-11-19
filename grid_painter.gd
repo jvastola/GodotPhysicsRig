@@ -92,11 +92,8 @@ var _save_path: String = "user://grid_painter_surfaces.json"
 func _ready() -> void:
 	_rng.randomize()
 	_load_handler_script()
-	_register_all_surfaces()
 	if load_for_player:
 		load_grid_data(_save_path)
-		if player_root_path != NodePath("") and SaveManager:
-			_maybe_load_head_from_save_manager()
 	_resolve_all_surface_nodes()
 	_attach_handler_scripts()
 	_apply_all_surface_textures()
@@ -106,8 +103,6 @@ func _load_handler_script() -> void:
 		return
 	if FileAccess.file_exists("res://grid_painter_handler.gd"):
 		_handler_script = preload("res://grid_painter_handler.gd")
-
-func _register_all_surfaces() -> void:
 	_surfaces.clear()
 	_surface_aliases.clear()
 	if load_for_player:
@@ -523,11 +518,6 @@ func save_grid_data(path: String = _save_path) -> void:
 	if file:
 		file.store_string(JSON.stringify({"surfaces": payload}))
 		file.close()
-	if SaveManager:
-		var head_surface := _get_surface(SURFACE_HEAD)
-		if head_surface and head_surface.face_cell_dims.size() == 6:
-			var face_colors := _convert_grid_to_face_colors(head_surface)
-			SaveManager.save_head_paint(face_colors, head_surface.subdivisions_axis)
 
 func load_grid_data(path: String = _save_path) -> void:
 	if not FileAccess.file_exists(path):
@@ -575,39 +565,6 @@ func _deserialize_surface(surface: SurfaceSlot, payload: Dictionary) -> void:
 			for x in range(min(row_data.size(), surface.grid_w())):
 				var cd = row_data[x]
 				surface.grid_colors[y][x] = Color(cd["r"], cd["g"], cd["b"], cd["a"])
-
-func _maybe_load_head_from_save_manager() -> void:
-	if not SaveManager:
-		return
-	var surface := _get_surface(SURFACE_HEAD)
-	if not surface:
-		return
-	var paint_data := SaveManager.load_head_paint()
-	if paint_data.is_empty():
-		return
-	var subs_variant: Variant = paint_data.get("subdivisions", surface.subdivisions_axis)
-	var subs: Vector3i = subs_variant if subs_variant is Vector3i else surface.subdivisions_axis
-	surface.subdivisions_axis = subs
-	_apply_subdivisions_to_surface(surface, subs)
-	var saved_colors: Array = paint_data.get("cell_colors", [])
-	if saved_colors.size() == FACE_DEFS.size():
-		_convert_saved_face_colors_to_grid(surface, saved_colors)
-		surface.texture = _build_texture_from_surface(surface)
-
-func _convert_saved_face_colors_to_grid(surface: SurfaceSlot, saved_colors: Array) -> void:
-	if surface.face_cell_dims.size() != 6 or surface.face_offsets.size() != 6:
-		_apply_subdivisions_to_surface(surface, surface.subdivisions_axis)
-	_reset_surface(surface)
-	for fi in range(min(saved_colors.size(), FACE_DEFS.size())):
-		var offset: Vector2i = surface.face_offsets[fi]
-		var rows: Array = saved_colors[fi]
-		for y in range(rows.size()):
-			var row: Array = rows[y]
-			for x in range(row.size()):
-				var gx := offset.x + x
-				var gy := offset.y + y
-				if gx >= 0 and gy >= 0 and gx < surface.grid_w() and gy < surface.grid_h():
-					surface.grid_colors[gy][gx] = row[x]
 
 func _convert_grid_to_face_colors(surface: SurfaceSlot) -> Array:
 	var out: Array = []
