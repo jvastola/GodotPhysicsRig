@@ -25,14 +25,14 @@ const SURFACE_BODY := "body"
 @export var right_hand_subdivisions: Vector3i = Vector3i(4, 4, 1)
 
 @export_subgroup("Head")
-@export_node_path("MeshInstance3D") var head_target: NodePath = NodePath("PlayerBody/XROrigin3D/XRCamera3D/HeadMesh")
-@export_node_path("MeshInstance3D") var head_path: NodePath = NodePath("PlayerBody/XROrigin3D/XRCamera3D/HeadMesh")
+@export_node_path("MeshInstance3D") var head_target: NodePath = NodePath("PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadMesh")
+@export_node_path("MeshInstance3D") var head_path: NodePath = NodePath("PlayerBody/XROrigin3D/XRCamera3D/Headarea/HeadMesh")
 @export_node_path("MeshInstance3D") var head_preview_mesh: NodePath = NodePath("")
 @export var head_subdivisions: Vector3i = Vector3i(8, 8, 2)
 
 @export_subgroup("Body")
-@export_node_path("MeshInstance3D") var body_target: NodePath = NodePath("PlayerBody/CollisionShape3D/BodyMesh")
-@export_node_path("MeshInstance3D") var body_path: NodePath = NodePath("PlayerBody/CollisionShape3D/BodyMesh")
+@export_node_path("MeshInstance3D") var body_target: NodePath = NodePath("PlayerBody/XROrigin3D/XRCamera3D/BodyMesh")
+@export_node_path("MeshInstance3D") var body_path: NodePath = NodePath("PlayerBody/XROrigin3D/XRCamera3D/BodyMesh")
 @export_node_path("MeshInstance3D") var body_preview_mesh: NodePath = NodePath("")
 @export var body_subdivisions: Vector3i = Vector3i(8, 4, 2)
 

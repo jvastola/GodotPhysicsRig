@@ -55,16 +55,12 @@ size = Vector3(0.45, 0.45, 0.45)
 size = Vector3(0.45, 0.45, 0.45)
 
 [sub_resource type="BoxMesh" id="BoxMesh_head_grid"]
-size = Vector3(0.6, 0.6, 0.6)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_head_grid"]
-size = Vector3(0.6, 0.6, 0.6)
 
 [sub_resource type="BoxMesh" id="BoxMesh_body_grid"]
-size = Vector3(0.7, 0.9, 0.3)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_body_grid"]
-size = Vector3(0.7, 0.9, 0.3)
 
 [node name="MainScene" type="Node3D"]
 
@@ -90,7 +86,7 @@ mesh = SubResource("BoxMesh_floor")
 [node name="SpawnPoint" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
 
-[node name="XRPlayer" parent="." instance=ExtResource("1_xrplayer")]
+[node name="GridTargetBodyArea" parent="." instance=ExtResource("1_xrplayer")]
 transform = Transform3D(0.999598, 0, 0, 0, 0.999598, 0, 0, 0, 0.999598, 0, 2, 0)
 
 [node name="Portal" parent="." instance=ExtResource("2_portal")]
@@ -107,15 +103,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.18547, 0.5, -2.96549)
 script = ExtResource("8_viewport_mirror")
 size = Vector2(2, 1.5)
 ResolutionPerUnit = 500
-MainCamPath = NodePath("../XRPlayer/PlayerBody/XROrigin3D/XRCamera3D")
+MainCamPath = NodePath("../GridTargetBodyArea/PlayerBody/XROrigin3D/XRCamera3D")
 MirrorColor = Color(1, 1, 1, 1)
 
 [node name="BlueCube" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.50977, 1, -2.50433)
-mesh = SubResource("BoxMesh_blue_cube")
-
-[node name="BlueCube2" type="MeshInstance3D" parent="."]
-transform = Transform3D(0.304437, 0, 0, 0, 0.81016, 0, 0, 0, 0.549941, -4, 0.140702, -2)
 mesh = SubResource("BoxMesh_blue_cube")
 
 [node name="RedSphere" type="MeshInstance3D" parent="."]
@@ -134,18 +126,21 @@ rope_start_min_length = 0.5
 transform = Transform3D(5.28053, 0, 0, 0, 1, 0, 0, 0, 1, 3, 3.34535, -2)
 
 [node name="GridPainterTest" type="Node3D" parent="."]
+transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, -4.79658, 0, -3.49806)
 script = ExtResource("10_grid_painter")
+player_root_path = NodePath("../GridTargetBodyArea")
 left_hand_preview_mesh = NodePath("GridTargetLeft")
 left_hand_subdivisions = Vector3i(4, 4, 4)
 right_hand_preview_mesh = NodePath("GridTargetRight")
 right_hand_subdivisions = Vector3i(4, 4, 4)
 head_preview_mesh = NodePath("GridTargetHead")
-head_subdivisions = Vector3i(3, 3, 3)
+head_subdivisions = Vector3i(8, 8, 8)
 body_preview_mesh = NodePath("GridTargetBody")
-body_subdivisions = Vector3i(8, 4, 3)
+body_subdivisions = Vector3i(6, 8, 4)
+reset_saved_grid_data_button = true
 
 [node name="GridTargetLeft" type="MeshInstance3D" parent="GridPainterTest"]
-transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, -0.86553, 1, -2)
+transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 0.180541, 0.12471, -2)
 mesh = SubResource("BoxMesh_left_hand_grid")
 
 [node name="GridTargetLeftArea" type="Area3D" parent="GridPainterTest/GridTargetLeft"]
@@ -156,7 +151,7 @@ collision_mask = 32
 shape = SubResource("BoxShape3D_left_hand_grid")
 
 [node name="GridTargetRight" type="MeshInstance3D" parent="GridPainterTest"]
-transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 0.463789, 1, -2)
+transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, -0.534751, 0.128569, -2)
 mesh = SubResource("BoxMesh_right_hand_grid")
 
 [node name="GridTargetRightArea" type="Area3D" parent="GridPainterTest/GridTargetRight"]
@@ -167,7 +162,7 @@ collision_mask = 32
 shape = SubResource("BoxShape3D_right_hand_grid")
 
 [node name="GridTargetHead" type="MeshInstance3D" parent="GridPainterTest"]
-transform = Transform3D(0.7, 0, 0, 0, 0.7, 0, 0, 0, 0.7, -0.174123, 1.89462, -1.91268)
+transform = Transform3D(-0.22, 1.9233e-08, 0, -1.9233e-08, -0.22, 0, 0, 0, 0.22, -0.174122, 0.619416, -2.1022)
 mesh = SubResource("BoxMesh_head_grid")
 
 [node name="GridTargetHeadArea" type="Area3D" parent="GridPainterTest/GridTargetHead"]
@@ -178,7 +173,7 @@ collision_mask = 32
 shape = SubResource("BoxShape3D_head_grid")
 
 [node name="GridTargetBody" type="MeshInstance3D" parent="GridPainterTest"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.167079, 1, -2.018)
+transform = Transform3D(0.3, 0, 0, 0, 0.4, 0, 0, 0, 0.2, -0.167079, 0.247408, -2.018)
 mesh = SubResource("BoxMesh_body_grid")
 
 [node name="GridTargetBodyArea" type="Area3D" parent="GridPainterTest/GridTargetBody"]

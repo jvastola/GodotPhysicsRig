@@ -14,7 +14,7 @@ extends Node3D
 @onready var physics_hand_right: RigidBody3D = $PhysicsHandRight
 @onready var head_area: Area3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea
 @onready var head_collision_shape: CollisionShape3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadCollisionShape
-@onready var head_mesh: MeshInstance3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadMesh
+@onready var head_mesh: MeshInstance3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadMesh
 
 # Player settings
 var player_height := 0.0  # Using headset tracking; keep 0 to avoid artificial offset
