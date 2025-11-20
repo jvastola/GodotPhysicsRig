@@ -115,7 +115,7 @@ class ServerNode extends Node:
             "port": data.get("port", 0),
             "host_name": data.get("host_name", "Host"),
             "player_count": data.get("player_count", 1),
-            "timestamp": Time.get_unix_time_from_system()
+            "timestamp": OS.get_unix_time_from_system()
         }
         _send_response(connection, 200, JSON.stringify({"success": true, "room_code": room_code}))
         print("Room registered: ", room_code)
@@ -165,7 +165,7 @@ class ServerNode extends Node:
         connection.put_data(response.to_utf8_buffer())
 
     func _cleanup_expired_rooms() -> void:
-        var current_time = Time.get_unix_time_from_system()
+        var current_time = OS.get_unix_time_from_system()
         var expired = []
         for room_code in registered_rooms.keys():
             var room = registered_rooms[room_code]
