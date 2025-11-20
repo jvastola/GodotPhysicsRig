@@ -137,7 +137,6 @@ head_preview_mesh = NodePath("GridTargetHead")
 head_subdivisions = Vector3i(8, 8, 8)
 body_preview_mesh = NodePath("GridTargetBody")
 body_subdivisions = Vector3i(6, 8, 4)
-reset_saved_grid_data_button = true
 
 [node name="GridTargetLeft" type="MeshInstance3D" parent="GridPainterTest"]
 transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 0.180541, 0.12471, -2)
