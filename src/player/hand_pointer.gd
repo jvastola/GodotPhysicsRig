@@ -325,12 +325,12 @@ func _compute_hit_scale(distance: float) -> float:
 	var far_scale: float = lerp(scale_factor, hit_far_scale, far_t)
 	return far_scale * _hit_scale_user_multiplier
 
-func _maybe_emit_hit_scale(scale: float) -> void:
-	if not is_finite(scale):
+func _maybe_emit_hit_scale(hit_scale: float) -> void:
+	if not is_finite(hit_scale):
 		return
-	if _last_emitted_hit_scale < 0.0 or abs(scale - _last_emitted_hit_scale) > 0.0005:
-		_last_emitted_hit_scale = scale
-		hit_scale_changed.emit(scale)
+	if _last_emitted_hit_scale < 0.0 or abs(hit_scale - _last_emitted_hit_scale) > 0.0005:
+		_last_emitted_hit_scale = hit_scale
+		hit_scale_changed.emit(hit_scale)
 
 func _build_event(handler: Node, collider: Object, hit_point: Vector3, normal: Vector3, axis_world: Vector3, start: Vector3, distance: float, action_state: Dictionary, controller: XRController3D) -> Dictionary:
 	var event: Dictionary = {

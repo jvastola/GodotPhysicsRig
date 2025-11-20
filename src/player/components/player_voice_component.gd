@@ -57,7 +57,7 @@ func toggle_voice_chat(enabled: bool) -> void:
 	
 	print("PlayerVoiceComponent: Voice chat ", "enabled" if enabled else "disabled")
 
-func _process_voice_chat(delta: float) -> void:
+func _process_voice_chat(_delta: float) -> void:
 	"""Capture and send voice data"""
 	if not voice_enabled or not voice_effect or not network_manager:
 		return

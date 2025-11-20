@@ -121,9 +121,9 @@ func _update_from_raycast() -> void:
 		return
 	# manual mode falls through for external control
 
-func snap_world_position(world_position: Vector3, show: bool = true, surface_normal: Vector3 = Vector3.UP) -> void:
+func snap_world_position(world_position: Vector3, should_show: bool = true, surface_normal: Vector3 = Vector3.UP) -> void:
 	_apply_snapped_position(_snap_to_grid(world_position), surface_normal)
-	if show:
+	if should_show:
 		_set_indicator_visible(true)
 	else:
 		_set_indicator_visible(false)
@@ -138,12 +138,12 @@ func get_last_snapped_position() -> Vector3:
 func has_snapped_position() -> bool:
 	return _has_valid_position
 
-func _snap_to_grid(position: Vector3) -> Vector3:
+func _snap_to_grid(pos: Vector3) -> Vector3:
 	var cell_size: float = max(_grid_size, 0.01)
 	return Vector3(
-		_snap_axis(position.x, cell_size),
-		_snap_axis(position.y, cell_size),
-		_snap_axis(position.z, cell_size)
+		_snap_axis(pos.x, cell_size),
+		_snap_axis(pos.y, cell_size),
+		_snap_axis(pos.z, cell_size)
 	)
 
 func _snap_axis(value: float, cell_size: float) -> float:
@@ -155,11 +155,11 @@ func _apply_indicator_scale() -> void:
 	var size: float = max(_grid_size, 0.01)
 	_indicator_mesh.scale = Vector3.ONE * size
 
-func _apply_snapped_position(snapped: Vector3, surface_normal: Vector3) -> void:
-	_last_snapped_position = snapped
+func _apply_snapped_position(snapped_pos: Vector3, surface_normal: Vector3) -> void:
+	_last_snapped_position = snapped_pos
 	_has_valid_position = true
 	var new_basis: Basis = _derive_basis(surface_normal)
-	var new_transform := Transform3D(new_basis, snapped)
+	var new_transform := Transform3D(new_basis, snapped_pos)
 	global_transform = new_transform
 	_set_indicator_visible(true)
 
@@ -176,10 +176,10 @@ func _apply_indicator_material() -> void:
 	mat.disable_fog = true
 	_indicator_mesh.material_override = mat
 
-func _set_indicator_visible(visible: bool) -> void:
+func _set_indicator_visible(should_be_visible: bool) -> void:
 	if _indicator_mesh:
-		_indicator_mesh.visible = visible
-	self.visible = visible
+		_indicator_mesh.visible = should_be_visible
+	self.visible = should_be_visible
 
 func _snap_from_sample(sample_point: Vector3, has_hit: bool, surface_normal: Vector3) -> void:
 	var should_show: bool = has_hit or not hide_without_hit
@@ -228,10 +228,10 @@ func _connect_pointer_signal() -> void:
 		if not node.is_connected("hit_scale_changed", Callable(self, "_on_pointer_hit_scale_changed")):
 			node.connect("hit_scale_changed", Callable(self, "_on_pointer_hit_scale_changed"))
 
-func _on_pointer_hit_scale_changed(scale: float) -> void:
+func _on_pointer_hit_scale_changed(hit_scale: float) -> void:
 	if not sync_grid_size_from_pointer:
 		return
-	var new_size: float = max(scale * pointer_scale_grid_multiplier, pointer_scale_min_grid_size)
+	var new_size: float = max(hit_scale * pointer_scale_grid_multiplier, pointer_scale_min_grid_size)
 	grid_size = new_size
 
 func _handle_build_mode_toggle() -> void:

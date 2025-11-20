@@ -246,7 +246,7 @@ func _cleanup_expired_rooms() -> void:
 			print("MatchmakingServer: Cleaned up ", expired_rooms.size(), " expired rooms")
 
 
-func _on_http_request_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+func _on_http_request_completed(result: int, _response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	if result != HTTPRequest.RESULT_SUCCESS:
 		push_error("MatchmakingServer: HTTP request failed: ", result)
 		return

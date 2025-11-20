@@ -556,7 +556,7 @@ func _receive_voice_data(audio_data: PackedByteArray) -> void:
 		return
 	
 	# Decompress 16-bit PCM back to float samples
-	var sample_count = audio_data.size() / 4
+	var sample_count = int(float(audio_data.size()) / 4.0)
 	var samples = PackedVector2Array()
 	samples.resize(sample_count)
 	
