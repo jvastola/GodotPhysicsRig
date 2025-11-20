@@ -227,7 +227,7 @@ cast_shadow = 0
 mesh = SubResource("CylinderMesh_pointer_hit")
 
 [node name="DesktopCamera" type="Camera3D" parent="PlayerBody"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.755936, 0)
 
 [node name="CenterPointer" type="Node3D" parent="PlayerBody/DesktopCamera"]
 script = ExtResource("6_pointer")

@@ -16,6 +16,13 @@ extends Node3D
 @onready var head_collision_shape: CollisionShape3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadCollisionShape
 @onready var head_mesh: MeshInstance3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadMesh
 
+# Networking
+const NETWORK_PLAYER_SCENE = preload("res://multiplayer/NetworkPlayer.tscn")
+var network_manager: Node = null
+var remote_players: Dictionary = {} # peer_id -> NetworkPlayer instance
+var update_rate: float = 0.05 # 20 Hz (50ms between updates)
+var time_since_last_update: float = 0.0
+
 # Player settings
 var player_height := 0.0  # Using headset tracking; keep 0 to avoid artificial offset
 var is_vr_mode := false
@@ -57,6 +64,9 @@ func _ready() -> void:
 	
 	# Ensure physics hands are properly connected
 	call_deferred("_setup_physics_hands")
+	
+	# Setup networking
+	_setup_networking()
 
 
 func _setup_physics_hands() -> void:
@@ -80,6 +90,9 @@ func _setup_physics_hands() -> void:
 func _process(delta: float) -> void:
 	if is_vr_mode:
 		_handle_turning(delta)
+	
+	# Update network with player transforms
+	_update_networking(delta)
 
 
 func _physics_process(delta: float) -> void:
@@ -352,3 +365,130 @@ func apply_texture_to_head(texture: ImageTexture) -> void:
 	mat.cull_mode = BaseMaterial3D.CULL_BACK  # Show front faces (outside)
 	head_mesh.material_override = mat
 	print("XRPlayer: Applied texture to head mesh, visible: ", head_mesh.visible, ", mesh: ", head_mesh.mesh)
+
+
+# ============================================================================
+# Networking Functions
+# ============================================================================
+
+func _setup_networking() -> void:
+	"""Initialize networking connections"""
+	network_manager = get_node_or_null("/root/NetworkManager")
+	
+	if not network_manager:
+		print("XRPlayer: NetworkManager not found, multiplayer disabled")
+		return
+	
+	# Connect to network events
+	network_manager.player_connected.connect(_on_player_connected)
+	network_manager.player_disconnected.connect(_on_player_disconnected)
+	
+	print("XRPlayer: Networking initialized")
+
+
+func _update_networking(delta: float) -> void:
+	"""Send player transform updates to network and update remote players"""
+	if not network_manager or not network_manager.multiplayer.multiplayer_peer:
+		return
+	
+	# Throttle updates to update_rate
+	time_since_last_update += delta
+	if time_since_last_update < update_rate:
+		return
+	
+	time_since_last_update = 0.0
+	
+	# Get local player transforms
+	var head_pos = Vector3.ZERO
+	var head_rot = Vector3.ZERO
+	var left_pos = Vector3.ZERO
+	var left_rot = Vector3.ZERO
+	var right_pos = Vector3.ZERO
+	var right_rot = Vector3.ZERO
+	
+	if is_vr_mode and xr_camera:
+		head_pos = xr_camera.global_position
+		head_rot = xr_camera.global_rotation_degrees
+	elif desktop_camera:
+		head_pos = desktop_camera.global_position
+		head_rot = desktop_camera.global_rotation_degrees
+	
+	if is_vr_mode:
+		if left_controller:
+			left_pos = left_controller.global_position
+			left_rot = left_controller.global_rotation_degrees
+		if right_controller:
+			right_pos = right_controller.global_position
+			right_rot = right_controller.global_rotation_degrees
+	else:
+		# Desktop mode - use camera position for hands (or hide them)
+		left_pos = head_pos + Vector3(-0.3, -0.3, 0.0)
+		right_pos = head_pos + Vector3(0.3, -0.3, 0.0)
+	
+	# Get player scale
+	var player_scale = player_body.scale if player_body else Vector3.ONE
+	
+	# Send to NetworkManager
+	network_manager.update_local_player_transform(
+		head_pos, head_rot,
+		left_pos, left_rot,
+		right_pos, right_rot,
+		player_scale
+	)
+	
+	# Update remote player visuals
+	_update_remote_players()
+
+
+func _update_remote_players() -> void:
+	"""Update all remote player visual representations"""
+	if not network_manager:
+		return
+	
+	for peer_id in network_manager.players.keys():
+		# Skip our own ID
+		if peer_id == network_manager.get_multiplayer_id():
+			continue
+		
+		var player_data = network_manager.players[peer_id]
+		
+		# Create remote player if doesn't exist
+		if not remote_players.has(peer_id):
+			_spawn_remote_player(peer_id)
+		
+		# Update remote player transforms
+		if remote_players.has(peer_id):
+			remote_players[peer_id].update_from_network_data(player_data)
+
+
+func _spawn_remote_player(peer_id: int) -> void:
+	"""Spawn a visual representation of a remote player"""
+	var remote_player = NETWORK_PLAYER_SCENE.instantiate()
+	remote_player.peer_id = peer_id
+	remote_player.name = "RemotePlayer_" + str(peer_id)
+	
+	# Add to scene
+	get_tree().root.add_child(remote_player)
+	remote_players[peer_id] = remote_player
+	
+	print("XRPlayer: Spawned remote player ", peer_id)
+
+
+func _despawn_remote_player(peer_id: int) -> void:
+	"""Remove a remote player's visual representation"""
+	if remote_players.has(peer_id):
+		remote_players[peer_id].queue_free()
+		remote_players.erase(peer_id)
+		print("XRPlayer: Despawned remote player ", peer_id)
+
+
+func _on_player_connected(peer_id: int) -> void:
+	"""Handle new player connection"""
+	print("XRPlayer: Player connected: ", peer_id)
+	_spawn_remote_player(peer_id)
+
+
+func _on_player_disconnected(peer_id: int) -> void:
+	"""Handle player disconnection"""
+	print("XRPlayer: Player disconnected: ", peer_id)
+	_despawn_remote_player(peer_id)
