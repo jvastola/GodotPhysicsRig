@@ -1,15 +1,15 @@
 [gd_scene load_steps=27 format=3 uid="uid://cpq6v7yqk8y8j"]
 
-[ext_resource type="Script" uid="uid://02kpb1kqm303" path="res://xr_player.gd" id="1_player"]
+[ext_resource type="Script" uid="uid://02kpb1kqm303" path="res://src/player/xr_player.gd" id="1_player"]
 [ext_resource type="Script" uid="uid://3ir0c0htxlqh" path="res://xr_origin_3d.gd" id="2_xr_origin"]
-[ext_resource type="Script" uid="uid://der68q68jhigr" path="res://physics_hand.gd" id="3_physics_hand"]
+[ext_resource type="Script" uid="uid://der68q68jhigr" path="res://src/player/physics_hand.gd" id="3_physics_hand"]
 [ext_resource type="Script" uid="uid://b8jtkbbgoxbge" path="res://desktop_controller.gd" id="4_desktop"]
 [ext_resource type="Script" uid="uid://chk4ixs7ag67p" path="res://watch_compass.gd" id="5_watch"]
 [ext_resource type="Script" uid="uid://u2otyj4gjtl2" path="res://hand_pointer.gd" id="6_pointer"]
-[ext_resource type="PackedScene" uid="uid://b2gkx1eim00mw" path="res://UIViewport3D.tscn" id="7_ui_viewport"]
+[ext_resource type="PackedScene" uid="uid://b2gkx1eim00mw" path="res://src/ui/UIViewport3D.tscn" id="7_ui_viewport"]
 [ext_resource type="Script" uid="uid://cblrw6wmmg7gp" path="res://grid_snap_indicator.gd" id="8_grid_snap"]
-[ext_resource type="PackedScene" uid="uid://bn7dgs6t6u07m" path="res://BuildCube.tscn" id="9_build_cube"]
-[ext_resource type="Script" uid="uid://bndx0a4k0k8hw" path="res://voxel_chunk_manager.gd" id="11_2d0bc"]
+[ext_resource type="PackedScene" uid="uid://bn7dgs6t6u07m" path="res://src/objects/BuildCube.tscn" id="9_build_cube"]
+[ext_resource type="Script" uid="uid://bndx0a4k0k8hw" path="res://src/systems/voxel_chunk_manager.gd" id="11_2d0bc"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_l588l"]
 size = Vector3(0.3, 0.3, 0.2)
@@ -17,6 +17,7 @@ size = Vector3(0.3, 0.3, 0.2)
 [sub_resource type="BoxMesh" id="BoxMesh_xxbg3"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_l588l"]
+size = Vector3(0.36, 0.36, 0.36)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_xxbg3"]
 

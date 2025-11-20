@@ -111,8 +111,8 @@ func _ready() -> void:
 func _load_handler_script() -> void:
 	if _handler_script:
 		return
-	if FileAccess.file_exists("res://grid_painter_handler.gd"):
-		_handler_script = preload("res://grid_painter_handler.gd")
+	if FileAccess.file_exists("res://src/systems/grid_painter_handler.gd"):
+		_handler_script = preload("res://src/systems/grid_painter_handler.gd")
 	_surfaces.clear()
 	_surface_aliases.clear()
 	if load_for_player:

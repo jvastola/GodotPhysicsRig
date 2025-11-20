@@ -1,9 +1,9 @@
 [gd_scene load_steps=20 format=3 uid="uid://dtvg5mcsdmt1f"]
 
 [ext_resource type="Script" uid="uid://ct42jl8bcsjkj" path="res://floor_interactable.gd" id="1_ra6av"]
-[ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://Portal.tscn" id="2_portal"]
-[ext_resource type="Script" uid="uid://exskxheotyxj" path="res://grabbable.gd" id="3_grabbable"]
-[ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://viewport_mirror.gd" id="5_chm60"]
+[ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://src/objects/Portal.tscn" id="2_portal"]
+[ext_resource type="Script" uid="uid://exskxheotyxj" path="res://src/objects/grabbable.gd" id="3_grabbable"]
+[ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://src/objects/viewport_mirror.gd" id="5_chm60"]
 [ext_resource type="PackedScene" path="res://grabbables/GrabbableCube.tscn" id="6_grabbable_cube"]
 [ext_resource type="PackedScene" path="res://grabbables/GrabbableBall.tscn" id="7_grabbable_ball"]
 [ext_resource type="PackedScene" path="res://grabbables/GrabbableBall2.tscn" id="8_grabbable_ball2"]
@@ -79,7 +79,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
 
 [node name="PortalBack" parent="." instance=ExtResource("2_portal")]
 transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 1.5, 5)
-target_scene = "res://MainScene.tscn"
+target_scene = "res://src/levels/MainScene.tscn"
 portal_color = Color(1, 0.6, 0.3, 0.5)
 
 [node name="PortalLabel" parent="PortalBack" index="3"]

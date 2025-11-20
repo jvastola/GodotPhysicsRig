@@ -1,7 +1,7 @@
 [gd_scene load_steps=15 format=3 uid="uid://7bo04u6obblv"]
 
 [ext_resource type="Script" uid="uid://3ir0c0htxlqh" path="res://xr_origin_3d.gd" id="1_a73qe"]
-[ext_resource type="Script" uid="uid://der68q68jhigr" path="res://physics_hand.gd" id="1_m25rd"]
+[ext_resource type="Script" uid="uid://der68q68jhigr" path="res://src/player/physics_hand.gd" id="1_m25rd"]
 
 [sub_resource type="Environment" id="Environment_a73qe"]
 

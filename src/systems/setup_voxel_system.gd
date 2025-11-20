@@ -8,7 +8,7 @@ func _run() -> void:
 	print("=== VoxelChunkManager Auto-Setup ===")
 	
 	# Load the XRPlayer scene
-	var scene_path := "res://XRPlayer.tscn"
+	var scene_path := "res://src/player/XRPlayer.tscn"
 	var packed_scene := load(scene_path) as PackedScene
 	if not packed_scene:
 		print("ERROR: Could not load XRPlayer.tscn")
@@ -31,7 +31,7 @@ func _run() -> void:
 	# Create VoxelChunkManager node
 	var manager := Node.new()
 	manager.name = "VoxelChunkManager"
-	manager.set_script(load("res://voxel_chunk_manager.gd"))
+	manager.set_script(load("res://src/systems/voxel_chunk_manager.gd"))
 	root.add_child(manager)
 	manager.owner = root
 	print("Created VoxelChunkManager node")

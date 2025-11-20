@@ -74,31 +74,46 @@ grab_mode = 0  # FREE_GRAB
 ### Grabbing Process
 1. Hand calls `grabbable.try_grab(hand)`
 2. Grabbable stores grab offset/rotation based on mode
-3. Gravity disabled, collision mask reduced
-4. Object position/rotation updated in `_physics_process()`
+3. Grabbable stores original collision layer/mask for restoration
+4. Collision shapes and meshes cloned as children of the hand's RigidBody3D
+5. Hand integrates collision shapes through `integrate_grabbed_collision()`
+6. Original object visibility disabled, physics frozen
+
+### Collision Shape Integration (New!)
+Objects now properly integrate with the hand's physics body:
+- Collision shapes are created as **children of the hand's RigidBody3D**
+- Shapes automatically inherit the hand's collision layer (layer 3)
+- Shapes collide with world (layer 1) but not player (layer 2)
+- Original collision layer/mask saved and restored on release
+- Hand actively manages collision shapes for proper physics interaction
 
 ### Following Hand
-Objects use forces (not direct transform setting) to smoothly follow the hand:
-- Position: Spring force toward target position
-- Rotation: Torque toward target rotation
-- Damping: Reduces velocity to prevent oscillation
+Grabbed objects follow the hand through physics:
+- Collision shapes move with the hand as direct children of the RigidBody3D
+- Visual meshes also attached to hand for accurate representation
+- Physics engine handles all collisions automatically
+- No need for manual force application - collision is native
 
 ### Releasing
 When released:
-1. Object inherits hand velocity (linear and angular)
-2. Gravity re-enabled
-3. Collision mask restored
-4. Object flies with throwing motion
+1. Hand calls `grabbable.release()`
+2. Collision shapes removed from hand and cleaned up
+3. Original object restored: visibility, physics, collision settings
+4. Object inherits hand velocity (linear and angular) for throwing
+5. Original collision layer/mask values restored
+6. Object returns to normal physics simulation
+
 
 ## Customization
 
-### Adjust Grab Feel
-In `grabbable.gd` `_follow_hand()` method:
-```gdscript
-var force_strength = 1000.0  # Higher = more responsive, may oscillate
-var damping = 10.0           # Higher = less bouncy
-var torque_strength = 500.0  # Rotation responsiveness
-```
+### Collision Layers
+The grabbing system uses specific collision layers:
+- **Layer 1**: World static objects
+- **Layer 2**: Player body  
+- **Layer 3**: Physics hands (and grabbed object shapes)
+
+When grabbed, object collision shapes are attached to the hand and use layer 3,
+allowing them to collide with the world but not the player body.
 
 ### Change Controller Buttons
 In `physics_hand.gd` `_ready()`:

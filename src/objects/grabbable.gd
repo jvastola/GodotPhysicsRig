@@ -30,15 +30,12 @@ var grab_rotation_offset: Quaternion = Quaternion.IDENTITY
 var grabbed_collision_shapes: Array = []
 var grabbed_mesh_instances: Array = []
 
-# Network sync
-var network_manager: Node = null
-var is_network_owner: bool = true
-var network_update_timer: float = 0.0
-const NETWORK_UPDATE_RATE = 0.05 # 20Hz base rate
-const NETWORK_UPDATE_RATE_SLOW = 0.2 # 5Hz when not moving much
-var last_network_position: Vector3 = Vector3.ZERO
-var last_network_rotation: Quaternion = Quaternion.IDENTITY
-const NETWORK_DELTA_THRESHOLD = 0.01 # Only send if moved > 1cm or rotated
+# Collision layer/mask management for proper physics integration
+var original_collision_layer: int = 0
+var original_collision_mask: int = 0
+
+# Components
+var network_component: GrabbableNetworkComponent
 
 signal grabbed(hand: RigidBody3D)
 signal released()
@@ -48,6 +45,10 @@ func _ready() -> void:
 	# Enable contact monitoring for grab detection
 	contact_monitor = true
 	max_contacts_reported = 10
+	
+	# Store original collision settings for restoration on release
+	original_collision_layer = collision_layer
+	original_collision_mask = collision_mask
 	
 	# Add to grabbable group for easy detection
 	add_to_group("grabbable")
@@ -65,8 +66,8 @@ func _ready() -> void:
 		_scene_of_origin = current_scene.scene_file_path
 		print("Grabbable: ", save_id, " scene of origin: ", _scene_of_origin)
 	
-	# Setup network sync
-	_setup_network_sync()
+	# Setup network component
+	_setup_components()
 	
 	# No need to restore - player persists across scenes so grabbed items stay grabbed
 	
@@ -81,20 +82,34 @@ func _ready() -> void:
 				print("  - first shape parent: ", grabbed_collision_shapes[0].get_parent())
 
 
+func _setup_components() -> void:
+	network_component = GrabbableNetworkComponent.new()
+	network_component.name = "GrabbableNetworkComponent"
+	add_child(network_component)
+	network_component.setup(self, save_id)
+	
+	network_component.network_grab.connect(_on_network_grab)
+	network_component.network_release.connect(_on_network_release)
+	network_component.network_sync.connect(_on_network_sync)
+
+
 func try_grab(hand: RigidBody3D) -> bool:
 	"""Attempt to grab this object with a hand"""
 	if is_grabbed:
 		return false
 	
 	# Check if another player owns this object
-	if network_manager and network_manager.is_object_grabbed_by_other(save_id):
+	if network_component and network_component.network_manager and network_component.network_manager.is_object_grabbed_by_other(save_id):
 		print("Grabbable: ", save_id, " is grabbed by another player")
 		return false
 	
 	is_grabbed = true
 	grabbing_hand = hand
 	original_parent = get_parent()
-	is_network_owner = true
+	
+	if network_component:
+		network_component.set_network_owner(true)
+		network_component.set_grabbed(true)
 	
 	# Sync with hand's held_object
 	if hand.has_method("set") and hand.get("held_object") != self:
@@ -119,25 +134,12 @@ func try_grab(hand: RigidBody3D) -> bool:
 	grabbed_collision_shapes.clear()
 	grabbed_mesh_instances.clear()
 	
-	for child in get_children():
-		if child is CollisionShape3D and child.shape:
-			# Create new collision shape as direct child of hand
-			var new_collision = CollisionShape3D.new()
-			new_collision.shape = child.shape
-			# Transform is relative to this object, need to convert to hand space
-			new_collision.transform = Transform3D(Basis(grab_rotation_offset), grab_offset) * child.transform
-			new_collision.name = name + "_grabbed_collision_" + str(grabbed_collision_shapes.size())
-			hand.add_child(new_collision)
-			grabbed_collision_shapes.append(new_collision)
-			
-		elif child is MeshInstance3D and child.mesh:
-			# Create new mesh instance as visual
-			var new_mesh = MeshInstance3D.new()
-			new_mesh.mesh = child.mesh
-			new_mesh.transform = Transform3D(Basis(grab_rotation_offset), grab_offset) * child.transform
-			new_mesh.name = name + "_grabbed_mesh_" + str(grabbed_mesh_instances.size())
-			hand.add_child(new_mesh)
-			grabbed_mesh_instances.append(new_mesh)
+	_create_hand_collision_shapes(hand)
+	
+	# Notify hand to integrate collision shapes (if hand supports it)
+	if hand.has_method("integrate_grabbed_collision"):
+		hand.integrate_grabbed_collision(grabbed_collision_shapes)
+	
 	
 	# Hide original object (keep it around for release)
 	visible = false
@@ -148,8 +150,8 @@ func try_grab(hand: RigidBody3D) -> bool:
 	freeze = true
 	
 	# Notify network
-	if network_manager and is_network_owner:
-		network_manager.grab_object(save_id)
+	if network_component:
+		network_component.notify_grab(save_id)
 	
 	grabbed.emit(hand)
 	print("Grabbable: Object grabbed by ", hand.name)
@@ -168,10 +170,10 @@ func release() -> void:
 	print("Grabbable: Object released")
 	
 	# Notify network
-	if network_manager and is_network_owner:
-		network_manager.release_object(save_id, global_position, global_transform.basis.get_rotation_quaternion())
-	
-	is_network_owner = false
+	if network_component:
+		network_component.notify_release(save_id, global_position, global_transform.basis.get_rotation_quaternion())
+		network_component.set_network_owner(false)
+		network_component.set_grabbed(false)
 	
 	# Calculate global transform from first grabbed collision shape if available
 	var release_global_transform = global_transform
@@ -216,8 +218,9 @@ func release() -> void:
 	visible = true
 	freeze = false
 	gravity_scale = 1.0
-	collision_layer = 1  # Default layer
-	collision_mask = 1   # Collide with world
+	# Restore original collision settings
+	collision_layer = original_collision_layer
+	collision_mask = original_collision_mask
 	
 	# Set global transform to where the grabbed shape was
 	global_transform = release_global_transform
@@ -248,26 +251,8 @@ func _physics_process(_delta: float) -> void:
 	# No need to update position - it's part of the hand's rigid body now
 	if is_grabbed:
 		# Update network position if we own this object (with delta compression)
-		if is_network_owner and network_manager:
-			network_update_timer += _delta
-			
-			var current_pos = global_position
-			var current_rot = global_transform.basis.get_rotation_quaternion()
-			
-			# Calculate movement delta
-			var pos_delta = current_pos.distance_to(last_network_position)
-			var rot_delta = current_rot.angle_to(last_network_rotation)
-			
-			# Use slower update rate if object is stationary
-			var update_rate = NETWORK_UPDATE_RATE if (pos_delta > NETWORK_DELTA_THRESHOLD or rot_delta > 0.1) else NETWORK_UPDATE_RATE_SLOW
-			
-			if network_update_timer >= update_rate:
-				# Only send if actually moved
-				if pos_delta > NETWORK_DELTA_THRESHOLD or rot_delta > 0.01:
-					network_update_timer = 0.0
-					network_manager.update_grabbed_object(save_id, current_pos, current_rot)
-					last_network_position = current_pos
-					last_network_rotation = current_rot
+		if network_component:
+			network_component.process_network_sync(_delta)
 		
 		# If hand is invalid, auto-release
 		if not is_instance_valid(grabbing_hand):
@@ -282,8 +267,8 @@ func _physics_process(_delta: float) -> void:
 			is_grabbed = false
 			visible = true
 			freeze = false
-			collision_layer = 1
-			collision_mask = 1
+			collision_layer = original_collision_layer
+			collision_mask = original_collision_mask
 			if is_instance_valid(grabbing_hand) and grabbing_hand.has_method("set"):
 				grabbing_hand.set("held_object", null)
 			grabbing_hand = null
@@ -296,8 +281,8 @@ func _physics_process(_delta: float) -> void:
 			is_grabbed = false
 			visible = true
 			freeze = false
-			collision_layer = 1
-			collision_mask = 1
+			collision_layer = original_collision_layer
+			collision_mask = original_collision_mask
 			grabbed_collision_shapes.clear()
 			grabbed_mesh_instances.clear()
 			if is_instance_valid(grabbing_hand) and grabbing_hand.has_method("set"):
@@ -309,6 +294,35 @@ func _physics_process(_delta: float) -> void:
 		# Update invisible body position to follow first grabbed shape
 		if is_instance_valid(grabbed_collision_shapes[0]):
 			global_transform = grabbed_collision_shapes[0].global_transform
+
+
+func _create_hand_collision_shapes(hand: RigidBody3D) -> void:
+	"""Create collision shapes and meshes as children of the hand with proper physics integration"""
+	for child in get_children():
+		if child is CollisionShape3D and child.shape:
+			# Create new collision shape as direct child of hand
+			var new_collision = CollisionShape3D.new()
+			new_collision.shape = child.shape
+			
+			# Transform is relative to this object, need to convert to hand space
+			new_collision.transform = Transform3D(Basis(grab_rotation_offset), grab_offset) * child.transform
+			new_collision.name = name + "_grabbed_collision_" + str(grabbed_collision_shapes.size())
+			
+			# Add to hand first, then configure (required for set_collision_layer_value to work)
+			hand.add_child(new_collision)
+			grabbed_collision_shapes.append(new_collision)
+			
+			# The collision shape inherits the RigidBody3D's layer/mask by being a child
+			# No explicit layer/mask setting needed - it uses the hand's collision settings
+			
+		elif child is MeshInstance3D and child.mesh:
+			# Create new mesh instance as visual
+			var new_mesh = MeshInstance3D.new()
+			new_mesh.mesh = child.mesh
+			new_mesh.transform = Transform3D(Basis(grab_rotation_offset), grab_offset) * child.transform
+			new_mesh.name = name + "_grabbed_mesh_" + str(grabbed_mesh_instances.size())
+			hand.add_child(new_mesh)
+			grabbed_mesh_instances.append(new_mesh)
 
 
 func _on_collision_entered(body: Node) -> void:
@@ -394,63 +408,19 @@ func _save_grab_state(hand: RigidBody3D) -> void:
 	)
 
 
-# ============================================================================
-# Network Sync Functions
-# ============================================================================
-
-func _setup_network_sync() -> void:
-	"""Connect to network manager for multiplayer sync"""
-	network_manager = get_node_or_null("/root/NetworkManager")
-	
-	if not network_manager:
-		return
-	
-	# Connect to network events
-	network_manager.grabbable_grabbed.connect(_on_network_grab)
-	network_manager.grabbable_released.connect(_on_network_release)
-	network_manager.grabbable_sync_update.connect(_on_network_sync)
-	
-	print("Grabbable: ", save_id, " network sync initialized")
-
-
-func _on_network_grab(object_id: String, peer_id: int) -> void:
+func _on_network_grab(peer_id: int) -> void:
 	"""Handle another player grabbing this object"""
-	if object_id != save_id:
-		return
-	
-	# Don't process our own grabs
-	if network_manager and peer_id == network_manager.get_multiplayer_id():
-		return
-	
-	print("Grabbable: ", save_id, " grabbed by remote player ", peer_id)
-	is_network_owner = false
-	
 	# Make object semi-transparent to show it's grabbed by someone else
 	_set_remote_grabbed_visual(true)
 
 
-func _on_network_release(object_id: String, peer_id: int) -> void:
+func _on_network_release(peer_id: int) -> void:
 	"""Handle another player releasing this object"""
-	if object_id != save_id:
-		return
-	
-	# Don't process our own releases
-	if network_manager and peer_id == network_manager.get_multiplayer_id():
-		return
-	
-	print("Grabbable: ", save_id, " released by remote player ", peer_id)
 	_set_remote_grabbed_visual(false)
 
 
-func _on_network_sync(object_id: String, data: Dictionary) -> void:
+func _on_network_sync(data: Dictionary) -> void:
 	"""Receive position update for this object from network"""
-	if object_id != save_id:
-		return
-	
-	# Only update if we don't own it
-	if is_network_owner or is_grabbed:
-		return
-	
 	# Smoothly interpolate to network position
 	if data.has("position"):
 		var target_pos = data["position"]

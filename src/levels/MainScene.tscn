@@ -1,14 +1,13 @@
-[gd_scene load_steps=27 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=26 format=3 uid="uid://6hnibsqm60w3"]
 
-[ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://XRPlayer.tscn" id="1_xrplayer"]
-[ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://Portal.tscn" id="2_portal"]
+[ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
+[ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://src/objects/Portal.tscn" id="2_portal"]
 [ext_resource type="Script" uid="uid://ct42jl8bcsjkj" path="res://floor_interactable.gd" id="4_floor_script"]
-[ext_resource type="PackedScene" uid="uid://b2gkx1eim00mw" path="res://UIViewport3D.tscn" id="5_ui_viewport"]
-[ext_resource type="Shader" uid="uid://chjyjc8300le1" path="res://red_sphere_layered.gdshader" id="6_red_shader"]
+[ext_resource type="PackedScene" uid="uid://b2gkx1eim00mw" path="res://src/ui/UIViewport3D.tscn" id="5_ui_viewport"]
 [ext_resource type="PackedScene" uid="uid://cm8nv7v0apls3" path="res://grabbables/GrappleHook.tscn" id="7_grapple"]
-[ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://viewport_mirror.gd" id="8_viewport_mirror"]
-[ext_resource type="PackedScene" uid="uid://bhun80s4vlhet" path="res://RotatingObject.tscn" id="9_rotating"]
-[ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://grid_painter.gd" id="10_grid_painter"]
+[ext_resource type="Script" uid="uid://dacfvlwh7dwcm" path="res://src/objects/viewport_mirror.gd" id="8_viewport_mirror"]
+[ext_resource type="PackedScene" uid="uid://bhun80s4vlhet" path="res://src/objects/RotatingObject.tscn" id="9_rotating"]
+[ext_resource type="Script" uid="uid://b3e1iih2vth83" path="res://src/systems/grid_painter.gd" id="10_grid_painter"]
 [ext_resource type="PackedScene" uid="uid://b8k3v2oax4mjw" path="res://multiplayer/NetworkUIViewport3D.tscn" id="11_network_ui"]
 
 [sub_resource type="Environment" id="Environment_main"]
@@ -32,9 +31,6 @@ material = SubResource("StandardMaterial3D_blue_cube")
 size = Vector3(0.5, 0.5, 0.5)
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_red_sphere"]
-render_priority = 1
-shader = ExtResource("6_red_shader")
-shader_parameter/albedo_color = Color(1, 0, 0, 1)
 
 [sub_resource type="SphereMesh" id="SphereMesh_red_sphere"]
 material = SubResource("ShaderMaterial_red_sphere")
@@ -98,6 +94,7 @@ use_spawn_point = true
 
 [node name="UIViewport3D" parent="." instance=ExtResource("5_ui_viewport")]
 transform = Transform3D(1.00696, 0, 0, 0, 1.00696, 0, 0, 0, 1.00696, 3.23463, 1, -2)
+script = null
 
 [node name="ViewportMirror" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.18547, 0.5, -2.96549)

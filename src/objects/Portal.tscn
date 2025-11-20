@@ -1,6 +1,6 @@
 [gd_scene load_steps=6 format=3 uid="uid://cyi0m4x7nswyk"]
 
-[ext_resource type="Script" uid="uid://kj2sngpay0sa" path="res://portal.gd" id="1_portal"]
+[ext_resource type="Script" uid="uid://kj2sngpay0sa" path="res://src/objects/portal.gd" id="1_portal"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_portal"]
 transparency = 1

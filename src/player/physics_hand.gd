@@ -310,3 +310,34 @@ func _release_object() -> void:
 			print("PhysicsHand: Released ", obj_name)
 	
 	held_object = null
+
+
+func integrate_grabbed_collision(collision_shapes: Array) -> void:
+	"""Integrate grabbed object collision shapes with this hand's physics body.
+	Called by grabbable objects when they are grabbed.
+	
+	The collision shapes are already children of this RigidBody3D, so they
+	automatically participate in this body's physics simulation using this
+	hand's collision layer (layer 3) and mask settings.
+	"""
+	# Collision shapes added as children automatically use the parent RigidBody3D's
+	# collision layer and mask. The physics_hand is on layer 3 and collides with
+	# layer 1 (world), which is exactly what we want for grabbed objects.
+	#
+	# No additional configuration needed - just log for debugging
+	if collision_shapes.size() > 0:
+		print("PhysicsHand: Integrated ", collision_shapes.size(), " collision shapes from grabbed object")
+
+
+func remove_grabbed_collision(collision_shapes: Array) -> void:
+	"""Remove grabbed object collision shapes from this hand.
+	Called by grabbable objects when they are released.
+	"""
+	for shape in collision_shapes:
+		if is_instance_valid(shape) and shape.get_parent() == self:
+			remove_child(shape)
+			shape.queue_free()
+	
+	if collision_shapes.size() > 0:
+		print("PhysicsHand: Removed ", collision_shapes.size(), " collision shapes")
+

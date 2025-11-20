@@ -38,7 +38,7 @@ var viewport : SubViewport
 
 
 func _enter_tree():
-	var node = preload("res://MirrorContainer.tscn").instantiate()
+	var node = preload("res://src/objects/MirrorContainer.tscn").instantiate()
 	add_child(node)
 
 

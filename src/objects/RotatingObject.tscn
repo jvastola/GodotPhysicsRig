@@ -1,6 +1,6 @@
 [gd_scene load_steps=5 format=3 uid="uid://bhun80s4vlhet"]
 
-[ext_resource type="Script" uid="uid://rb0usqj5fuiq" path="res://rotating_object.gd" id="1_rot_script"]
+[ext_resource type="Script" uid="uid://rb0usqj5fuiq" path="res://src/objects/rotating_object.gd" id="1_rot_script"]
 
 [sub_resource type="BoxShape3D" id="BoxShape_rot"]
 size = Vector3(0.75, 0.75, 0.75)
