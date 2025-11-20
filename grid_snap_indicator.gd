@@ -19,6 +19,8 @@ var _build_parent_path: NodePath = NodePath()
 @export var build_cube_scene: PackedScene
 @export var default_build_color: Color = Color(0.6, 0.6, 0.6, 1.0)
 @export_range(0.1, 5.0, 0.1) var build_scale_multiplier: float = 1.0
+@export var use_voxel_chunks: bool = true
+@export var voxel_chunk_manager_path: NodePath = NodePath()
 @export var build_parent_path: NodePath:
 	set(value):
 		_build_parent_path = value
@@ -51,6 +53,7 @@ var _has_valid_position: bool = false
 var _pointer_node: Node = null
 var _build_parent: Node = null
 var _xr_controller: XRController3D = null
+var _voxel_manager: VoxelChunkManager = null
 
 func _ready() -> void:
 	_raycast = get_node_or_null(raycast_path) as RayCast3D
@@ -68,6 +71,17 @@ func _ready() -> void:
 		if parent is XRController3D:
 			_xr_controller = parent
 			print("GridSnapIndicator: Found XRController3D")
+	
+	# Find or create voxel chunk manager
+	if use_voxel_chunks:
+		if voxel_chunk_manager_path != NodePath():
+			_voxel_manager = get_node_or_null(voxel_chunk_manager_path) as VoxelChunkManager
+		if not _voxel_manager:
+			# Try to find in scene
+			_voxel_manager = get_tree().root.find_child("VoxelChunkManager", true, false) as VoxelChunkManager
+		if _voxel_manager:
+			_voxel_manager.set_voxel_size(grid_size * build_scale_multiplier)
+			print("GridSnapIndicator: Using voxel chunk system")
 
 func _physics_process(delta: float) -> void:
 	if not auto_sample_from_raycast or not _raycast:
@@ -221,23 +235,44 @@ func _handle_build_trigger() -> void:
 	if not build_mode_enabled:
 		return
 	if not _xr_controller:
-		print("GridSnapIndicator: No XRController3D found")
 		return
 	
 	var action: String = "trigger_click"
 	if _pointer_node and "interact_action" in _pointer_node:
 		action = _pointer_node.interact_action
 	
+	# Check for grip button to remove voxels
+	var remove_mode := _xr_controller.is_button_pressed("grip_click")
+	
 	# Use XR controller's action checking instead of InputMap
 	if action != "" and _xr_controller.is_button_pressed(action):
 		# Track if we already spawned this frame to avoid duplicates
 		if not _xr_controller.get_meta("_build_triggered", false):
-			print("GridSnapIndicator: SPAWNING CUBE at ", global_transform.origin)
-			_spawn_build_cube()
+			if remove_mode:
+				_remove_build_cube()
+			else:
+				_spawn_build_cube()
 			_xr_controller.set_meta("_build_triggered", true)
 	else:
 		# Reset trigger state when button is released
 		_xr_controller.set_meta("_build_triggered", false)
+
+## Remove a voxel at the current position
+func _remove_build_cube() -> void:
+	var remove_pos := global_transform.origin
+	
+	# Use voxel chunk system if enabled and available
+	if use_voxel_chunks and _voxel_manager:
+		if _voxel_manager.has_voxel(remove_pos):
+			_voxel_manager.remove_voxel(remove_pos)
+			_voxel_manager.update_dirty_chunks()
+			print("GridSnapIndicator: Removed voxel at ", remove_pos)
+		else:
+			print("GridSnapIndicator: No voxel to remove at ", remove_pos)
+		return
+	
+	# Fallback: find and remove individual cube (not implemented for traditional mode)
+	print("GridSnapIndicator: Voxel removal only works with chunk system")
 
 func _refresh_build_parent() -> void:
 	if not is_inside_tree():
@@ -254,6 +289,16 @@ func _get_build_parent() -> Node:
 	return _build_parent
 
 func _spawn_build_cube() -> void:
+	var spawn_pos := global_transform.origin
+	
+	# Use voxel chunk system if enabled and available
+	if use_voxel_chunks and _voxel_manager:
+		_voxel_manager.add_voxel(spawn_pos)
+		_voxel_manager.update_dirty_chunks()
+		print("GridSnapIndicator: Added voxel at ", spawn_pos)
+		return
+	
+	# Fallback to traditional cube spawning
 	if not build_cube_scene:
 		print("GridSnapIndicator: No build_cube_scene assigned")
 		return
@@ -266,9 +311,9 @@ func _spawn_build_cube() -> void:
 		print("GridSnapIndicator: Failed to instantiate cube")
 		return
 	parent.add_child(cube)
-	cube.global_transform = Transform3D(Basis.IDENTITY, global_transform.origin)
+	cube.global_transform = Transform3D(Basis.IDENTITY, spawn_pos)
 	var scale_factor: float = max(grid_size * build_scale_multiplier, 0.01)
 	if cube is Node3D:
 		var cube_node := cube as Node3D
 		cube_node.scale = Vector3.ONE * scale_factor
-	print("GridSnapIndicator: Successfully spawned cube at ", global_transform.origin, " with scale ", scale_factor)
+	print("GridSnapIndicator: Successfully spawned cube at ", spawn_pos, " with scale ", scale_factor)
