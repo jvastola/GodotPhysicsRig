@@ -74,7 +74,7 @@ class ServerNode extends Node:
                     connection.disconnect_from_host()
                     return
             # Timeout if headers not received in time
-            if (Time.get_ticks_msec() - start_time) > int(timeout * 1000):
+            if (OS.get_ticks_msec() - start_time) > int(timeout * 1000):
                 print("Timeout waiting for complete HTTP headers.")
                 _send_response(connection, 408, JSON.stringify({"error": "Request timeout"}))
                 connection.disconnect_from_host()
