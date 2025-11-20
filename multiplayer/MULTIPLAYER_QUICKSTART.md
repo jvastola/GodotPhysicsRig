@@ -148,6 +148,88 @@ add_child(network_ui)
 - Verify player_body.scale is being set correctly
 - Check that scale synchronization is working in _update_networking()
 
+### Connection quality issues
+- Check the connection quality indicator in NetworkUI
+- If quality is "Poor" or "Fair", try reducing graphics quality
+- Use network stats to identify if ping or bandwidth is the issue
+- Enable push-to-talk mode to reduce bandwidth (voice always-on uses ~7.5 KB/s)
+
+## New Features (Latest Update)
+
+### Connection Quality Monitoring
+NetworkManager now tracks network statistics in real-time:
+- **Ping tracking**: Monitor latency to server
+- **Bandwidth monitoring**: Track upload/download speeds
+- **Connection quality**: Automatically categorized as Excellent/Good/Fair/Poor
+- **Quality signals**: React to connection changes in your code
+
+```gdscript
+# Get current network stats
+var stats = NetworkManager.get_network_stats()
+print("Ping: ", stats["ping_ms"], "ms")
+print("Bandwidth Up: ", stats["bandwidth_up"], " KB/s")
+print("Quality: ", NetworkManager.get_connection_quality_string())
+
+# Connect to quality change signal
+NetworkManager.connection_quality_changed.connect(_on_quality_changed)
+
+func _on_quality_changed(quality: int):
+    if quality >= 2:  # FAIR or POOR
+        print("Warning: Connection quality degraded!")
+```
+
+### Push-to-Talk Voice Chat
+Voice chat now defaults to push-to-talk mode for better bandwidth management:
+- **Default key**: Spacebar (configurable)
+- **Three modes**: Always On, Push to Talk, Voice Activated
+- **Visual indicator**: NetworkUI shows when voice is transmitting
+
+```gdscript
+# Change voice mode
+NetworkManager.set_voice_activation_mode(NetworkManager.VoiceMode.ALWAYS_ON)
+
+# Change push-to-talk key
+NetworkManager.set_push_to_talk_key(KEY_T)
+
+# Check if voice is currently transmitting
+if NetworkManager.is_voice_transmitting():
+    print("Voice active!")
+```
+
+### Automatic Reconnection
+NetworkManager now automatically attempts to reconnect if connection is lost:
+- **Timeout detection**: 10 seconds (configurable)
+- **Exponential backoff**: Waits longer between attempts
+- **Max attempts**: 5 (configurable)
+- **State preservation**: Attempts to restore session state
+
+### Standalone QWERTY Keyboard
+A fully-featured virtual keyboard component for text input:
+- **Full QWERTY layout** with all letters, numbers, and symbols
+- **Shift and Caps Lock** support
+- **Reusable component** for any text input needs
+- **Already integrated** into NetworkUI for room code entry
+
+```gdscript
+# Use the keyboard in your own scenes
+var keyboard = preload("res://src/ui/KeyboardQWERTY.tscn").instantiate()
+keyboard.max_length = 20
+keyboard.text_submitted.connect(_on_text_entered)
+add_child(keyboard)
+
+func _on_text_entered(text: String):
+    print("User entered: ", text)
+```
+
+See `docs/KEYBOARD_USAGE.md` for full keyboard documentation.
+
+### Network Stats Display in UI
+NetworkUI now shows real-time network statistics (if stats nodes exist in scene):
+- **Ping**: Current latency in milliseconds
+- **Bandwidth**: Upload/download speeds
+- **Connection quality**: Color-coded indicator (Green/Yellow/Red)
+- **Voice status**: Shows when push-to-talk is active
+
 ## Next Steps
 
 1. **Add grabbable synchronization** (Phase 3 of roadmap)

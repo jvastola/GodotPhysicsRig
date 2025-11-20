@@ -57,6 +57,51 @@ var microphone_bus_index: int = -1
 const VOICE_SAMPLE_RATE = 16000
 const VOICE_BUFFER_SIZE = 2048
 
+# Connection quality monitoring
+enum ConnectionQuality {
+	EXCELLENT,  # < 50ms ping
+	GOOD,       # 50-100ms ping
+	FAIR,       # 100-200ms ping
+	POOR        # > 200ms ping
+}
+
+var network_stats: Dictionary = {
+	"ping_ms": 0.0,
+	"bandwidth_up": 0.0,  # KB/s
+	"bandwidth_down": 0.0,  # KB/s
+	"packet_loss": 0.0,  # percentage
+	"connection_quality": ConnectionQuality.GOOD
+}
+
+var peer_stats: Dictionary = {}  # peer_id -> stats Dictionary
+var _ping_timer: float = 0.0
+var _ping_check_interval: float = 1.0  # Check ping every second
+var _last_bytes_sent: int = 0
+var _last_bytes_received: int = 0
+
+signal connection_quality_changed(quality: ConnectionQuality)
+signal network_stats_updated(stats: Dictionary)
+
+# Push-to-talk
+enum VoiceMode {
+	ALWAYS_ON,
+	PUSH_TO_TALK,
+	VOICE_ACTIVATED
+}
+
+var voice_mode: VoiceMode = VoiceMode.PUSH_TO_TALK
+var push_to_talk_key: Key = KEY_SPACE
+var is_push_to_talk_pressed: bool = false
+
+# Reconnection
+var connection_timeout: float = 10.0
+var _last_server_response_time: float = 0.0
+var _reconnection_attempt: int = 0
+const MAX_RECONNECTION_ATTEMPTS = 5
+var _last_connection_address: String = ""
+var _last_connection_port: int = 0
+
+
 
 func _ready() -> void:
 	multiplayer.peer_connected.connect(_on_peer_connected)
@@ -71,8 +116,12 @@ func _ready() -> void:
 	# Setup voice chat audio bus
 	_setup_voice_chat()
 	
-	# Enable voice by default
+	# Enable voice with always-on mode by default
 	voice_enabled = true
+	voice_mode = VoiceMode.ALWAYS_ON
+	
+	# Initialize network stats monitoring
+	_last_server_response_time = Time.get_ticks_msec() / 1000.0
 
 
 func _setup_matchmaking() -> void:
@@ -196,6 +245,11 @@ func join_server(address: String, port: int = DEFAULT_PORT) -> Error:
 	
 	multiplayer.multiplayer_peer = peer
 	print("Attempting to connect to ", address, ":", port)
+	
+	# Store connection details for potential reconnection
+	_last_connection_address = address
+	_last_connection_port = port
+	_reconnection_attempt = 0
 	
 	return OK
 
@@ -631,3 +685,179 @@ func _receive_voxel_state(voxels: Array) -> void:
 		if voxel_data.has("pos") and voxel_data.has("color"):
 			voxel_placed_network.emit(voxel_data["pos"], voxel_data["color"])
 	print("NetworkManager: Received ", voxels.size(), " voxels from server")
+
+
+# ============================================================================
+# Connection Quality Monitoring
+# ============================================================================
+
+func _process(delta: float) -> void:
+	"""Monitor network stats and connection quality"""
+	if not peer or not peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+		return
+	
+	# Update ping timer
+	_ping_timer += delta
+	if _ping_timer >= _ping_check_interval:
+		_ping_timer = 0.0
+		_update_network_stats()
+	
+	# Handle push-to-talk
+	if voice_mode == VoiceMode.PUSH_TO_TALK:
+		is_push_to_talk_pressed = Input.is_key_pressed(push_to_talk_key)
+	
+	# Check for connection timeout
+	if not is_server():
+		var current_time = Time.get_ticks_msec() / 1000.0
+		if current_time - _last_server_response_time > connection_timeout:
+			print("NetworkManager: Connection timeout detected")
+			_attempt_reconnection()
+
+
+func _update_network_stats() -> void:
+	"""Calculate and update network statistics"""
+	if not peer:
+		return
+	
+	# Calculate ping (simulated - ENet doesn't expose this directly)
+	# In a real implementation, you'd send ping packets and measure RTT
+	var estimated_ping = _estimate_ping()
+	network_stats["ping_ms"] = estimated_ping
+	
+	# Calculate bandwidth
+	var current_bytes_sent = 0  # Would need ENet extension to get real values
+	var current_bytes_received = 0
+	
+	var bytes_sent_delta = current_bytes_sent - _last_bytes_sent
+	var bytes_received_delta = current_bytes_received - _last_bytes_received
+	
+	network_stats["bandwidth_up"] = bytes_sent_delta / 1024.0 / _ping_check_interval
+	network_stats["bandwidth_down"] = bytes_received_delta / 1024.0 / _ping_check_interval
+	
+	_last_bytes_sent = current_bytes_sent
+	_last_bytes_received = current_bytes_received
+	
+	# Determine connection quality based on ping
+	var old_quality = network_stats["connection_quality"]
+	var new_quality = _calculate_connection_quality(estimated_ping)
+	network_stats["connection_quality"] = new_quality
+	
+	# Emit signals if quality changed
+	if old_quality != new_quality:
+		connection_quality_changed.emit(new_quality)
+	
+	network_stats_updated.emit(network_stats.duplicate())
+
+
+func _estimate_ping() -> float:
+	"""Estimate ping based on transform update timing"""
+	# This is a simplified estimation
+	# In production, you'd implement proper ping packets
+	if not is_server() and players.size() > 0:
+		# Estimate based on update frequency
+		return randf_range(40.0, 120.0)  # Placeholder
+	return 0.0
+
+
+func _calculate_connection_quality(ping_ms: float) -> ConnectionQuality:
+	"""Determine connection quality from ping"""
+	if ping_ms < 50.0:
+		return ConnectionQuality.EXCELLENT
+	elif ping_ms < 100.0:
+		return ConnectionQuality.GOOD
+	elif ping_ms < 200.0:
+		return ConnectionQuality.FAIR
+	else:
+		return ConnectionQuality.POOR
+
+
+func _attempt_reconnection() -> void:
+	"""Try to reconnect to the server"""
+	if _reconnection_attempt >= MAX_RECONNECTION_ATTEMPTS:
+		print("NetworkManager: Max reconnection attempts reached")
+		_on_connection_failed()
+		return
+	
+	_reconnection_attempt += 1
+	print("NetworkManager: Reconnection attempt ", _reconnection_attempt, "/", MAX_RECONNECTION_ATTEMPTS)
+	
+	if _last_connection_address != "" and _last_connection_port > 0:
+		# Disconnect first
+		if peer:
+			peer.close()
+			peer = null
+		
+		# Wait a bit before reconnecting (exponential backoff)
+		await get_tree().create_timer(pow(2, _reconnection_attempt - 1)).timeout
+		
+		# Try to reconnect
+		join_server(_last_connection_address, _last_connection_port)
+
+
+## Public API for network stats
+
+func get_network_stats() -> Dictionary:
+	"""Get current network statistics"""
+	return network_stats.duplicate()
+
+
+func get_connection_quality() -> ConnectionQuality:
+	"""Get current connection quality"""
+	return network_stats["connection_quality"]
+
+
+func get_connection_quality_string() -> String:
+	"""Get connection quality as human-readable string"""
+	match network_stats["connection_quality"]:
+		ConnectionQuality.EXCELLENT:
+			return "Excellent"
+		ConnectionQuality.GOOD:
+			return "Good"
+		ConnectionQuality.FAIR:
+			return "Fair"
+		ConnectionQuality.POOR:
+			return "Poor"
+	return "Unknown"
+
+
+## Push-to-talk API
+
+func set_voice_activation_mode(mode: VoiceMode) -> void:
+	"""Set voice activation mode"""
+	voice_mode = mode
+	print("NetworkManager: Voice mode set to ", _voice_mode_to_string(mode))
+
+
+func set_push_to_talk_key(key: Key) -> void:
+	"""Set the push-to-talk key"""
+	push_to_talk_key = key
+	print("NetworkManager: Push-to-talk key set to ", OS.get_keycode_string(key))
+
+
+func is_voice_transmitting() -> bool:
+	"""Check if voice is currently being transmitted"""
+	if not voice_enabled:
+		return false
+	
+	match voice_mode:
+		VoiceMode.ALWAYS_ON:
+			return true
+		VoiceMode.PUSH_TO_TALK:
+			return is_push_to_talk_pressed
+		VoiceMode.VOICE_ACTIVATED:
+			# Would need audio level detection
+			return false
+	
+	return false
+
+
+func _voice_mode_to_string(mode: VoiceMode) -> String:
+	"""Convert voice mode to string"""
+	match mode:
+		VoiceMode.ALWAYS_ON:
+			return "Always On"
+		VoiceMode.PUSH_TO_TALK:
+			return "Push to Talk"
+		VoiceMode.VOICE_ACTIVATED:
+			return "Voice Activated"
+	return "Unknown"

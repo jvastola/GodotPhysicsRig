@@ -130,3 +130,54 @@ func clear_save_data() -> void:
 	_save_data.clear()
 	save_game_state()
 	print("SaveManager: All save data cleared")
+
+
+# --- CURRENCY SYSTEM ---
+
+func get_currency(type: String) -> int:
+	"""Get amount of specific currency (gold, gems, tokens)"""
+	if not _save_data.has("currency"):
+		_save_data["currency"] = { "gold": 0, "gems": 0, "tokens": 0 }
+	
+	return _save_data["currency"].get(type, 0)
+
+
+func add_currency(type: String, amount: int) -> void:
+	"""Add currency amount"""
+	if not _save_data.has("currency"):
+		_save_data["currency"] = { "gold": 0, "gems": 0, "tokens": 0 }
+	
+	var current = _save_data["currency"].get(type, 0)
+	_save_data["currency"][type] = current + amount
+	_save_dirty = true
+	print("SaveManager: Added ", amount, " ", type, ". New total: ", _save_data["currency"][type])
+
+
+func spend_currency(type: String, amount: int) -> bool:
+	"""Try to spend currency. Returns true if successful."""
+	if not _save_data.has("currency"):
+		_save_data["currency"] = { "gold": 0, "gems": 0, "tokens": 0 }
+	
+	var current = _save_data["currency"].get(type, 0)
+	if current >= amount:
+		_save_data["currency"][type] = current - amount
+		_save_dirty = true
+		print("SaveManager: Spent ", amount, " ", type, ". Remaining: ", _save_data["currency"][type])
+		return true
+	
+	return false
+
+
+# --- INVENTORY SYSTEM ---
+
+func get_inventory() -> Array:
+	"""Get inventory items array"""
+	if not _save_data.has("inventory"):
+		_save_data["inventory"] = []
+	return _save_data["inventory"]
+
+
+func save_inventory(items: Array) -> void:
+	"""Save inventory state"""
+	_save_data["inventory"] = items
+	_save_dirty = true

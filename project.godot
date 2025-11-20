@@ -23,6 +23,7 @@ driver/enable_input=true
 
 GameManager="*res://src/systems/game_manager.gd"
 SaveManager="*res://src/systems/save_manager.gd"
+InventoryManager="*res://src/systems/inventory_manager.gd"
 NetworkManager="*res://multiplayer/network_manager.gd"
 
 [dotnet]

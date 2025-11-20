@@ -1,5 +1,6 @@
-[gd_scene load_steps=27 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=29 format=3 uid="uid://6hnibsqm60w3"]
 
+[ext_resource type="PackedScene" path="res://src/ui/InventoryUIViewport3D.tscn" id="1_inventory_ui"]
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://src/objects/Portal.tscn" id="2_portal"]
 [ext_resource type="Script" uid="uid://cvqfyaebx04gk" path="res://src/objects/floor_interactable.gd" id="4_floor_script"]
@@ -10,6 +11,7 @@
 [ext_resource type="PackedScene" uid="uid://bhun80s4vlhet" path="res://src/objects/RotatingObject.tscn" id="9_rotating"]
 [ext_resource type="Script" uid="uid://b3e1iih2vth83" path="res://src/systems/grid_painter.gd" id="10_grid_painter"]
 [ext_resource type="PackedScene" uid="uid://b8k3v2oax4mjw" path="res://multiplayer/NetworkUIViewport3D.tscn" id="11_network_ui"]
+[ext_resource type="Script" uid="uid://b8r57aadml1x5" path="res://src/debug/inventory_debug.gd" id="12_inventory_debug"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -186,3 +188,9 @@ shape = SubResource("BoxShape3D_body_grid")
 
 [node name="NetworkUIViewport3D" parent="." instance=ExtResource("11_network_ui")]
 transform = Transform3D(0.999479, 0, 0.0322832, 0, 1, 0, -0.0322832, 0, 0.999479, -1.44939, 1.10555, -2.04488)
+
+[node name="InventoryUIViewport3D" parent="." instance=ExtResource("1_inventory_ui")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 1.5, -2)
+
+[node name="InventoryDebug" type="Node" parent="."]
+script = ExtResource("12_inventory_debug")

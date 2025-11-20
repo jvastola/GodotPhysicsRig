@@ -29,6 +29,10 @@ func _setup_voice_chat() -> void:
 	# Add AudioEffectCapture to Voice bus
 	var voice_bus_index = AudioServer.get_bus_index("Voice")
 	if voice_bus_index != -1:
+		# Mute the Voice bus so we don't hear our own microphone
+		# Audio is still captured via AudioEffectCapture, just not played back
+		AudioServer.set_bus_mute(voice_bus_index, true)
+		
 		# Check if capture effect already exists
 		var has_capture = false
 		for i in range(AudioServer.get_bus_effect_count(voice_bus_index)):
@@ -41,7 +45,7 @@ func _setup_voice_chat() -> void:
 			voice_effect = AudioEffectCapture.new()
 			AudioServer.add_bus_effect(voice_bus_index, voice_effect)
 		
-		print("PlayerVoiceComponent: Voice chat initialized")
+		print("PlayerVoiceComponent: Voice chat initialized (bus muted to prevent echo)")
 
 func toggle_voice_chat(enabled: bool) -> void:
 	"""Enable or disable voice chat"""
