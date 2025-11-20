@@ -119,6 +119,17 @@ func _on_network_voxel_removed(world_pos: Vector3) -> void:
 	remove_voxel(world_pos, false)
 
 
+## Get all voxel positions (for syncing to new clients)
+func get_all_voxels() -> Array[Dictionary]:
+	var all_voxels: Array[Dictionary] = []
+	for chunk_coord in _chunks.keys():
+		var chunk: VoxelChunk = _chunks[chunk_coord]
+		for local_pos in chunk.voxels.keys():
+			var world_pos = local_to_world_voxel(local_pos, chunk_coord)
+			all_voxels.append({"pos": world_pos, "color": Color.WHITE})
+	return all_voxels
+
+
 ## Check if a voxel exists at world position
 func has_voxel(world_pos: Vector3) -> bool:
 	var chunk_coord := world_to_chunk(world_pos)
@@ -172,6 +183,12 @@ func chunk_local_to_world(chunk_coord: Vector3i, local_pos: Vector3i) -> Vector3
 	var chunk_origin := Vector3(chunk_coord) * CHUNK_SIZE
 	var world_voxel := (chunk_origin + Vector3(local_pos)) * _voxel_size
 	return world_voxel + Vector3.ONE * _voxel_size * 0.5  # Center of voxel
+
+
+## Convert local voxel position within a chunk to world position (convenience wrapper)
+func local_to_world_voxel(local_pos: Vector3i, chunk_coord: Vector3i) -> Vector3:
+	# Keep parameter order consistent with existing calls that pass local_pos, chunk_coord
+	return chunk_local_to_world(chunk_coord, local_pos)
 
 ## Get or create a chunk at the given coordinate
 func _get_or_create_chunk(chunk_coord: Vector3i) -> VoxelChunk:

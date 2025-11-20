@@ -302,5 +302,5 @@ visible = false
 cast_shadow = 0
 mesh = SubResource("BoxMesh_hand")
 
-[node name="VoxelChunkManager" type="Node" parent="."]
+[node name="VoxelChunkManager" type="Node" parent="." groups=["voxel_manager"]]
 script = ExtResource("11_2d0bc")

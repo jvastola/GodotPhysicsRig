@@ -16,6 +16,11 @@ var current_room_code: String = ""
 var room_code_to_ip: Dictionary = {} # room_code -> {ip, port, host_name, player_count, created_time}
 signal room_code_generated(code: String)
 
+# Matchmaking
+var matchmaking: Node = null
+var use_matchmaking_server: bool = true
+const MATCHMAKING_SERVER_URL = "http://localhost:8080"
+
 var peer: ENetMultiplayerPeer = null
 var players: Dictionary = {} # peer_id -> player_info Dictionary
 var local_player: Node3D = null
@@ -60,8 +65,48 @@ func _ready() -> void:
 	multiplayer.connection_failed.connect(_on_connection_failed)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 	
+	# Setup matchmaking
+	_setup_matchmaking()
+	
 	# Setup voice chat audio bus
 	_setup_voice_chat()
+	
+	# Enable voice by default
+	voice_enabled = true
+
+
+func _setup_matchmaking() -> void:
+	"""Initialize matchmaking server connection"""
+	var matchmaking_script = load("res://multiplayer/matchmaking_server.gd")
+	matchmaking = matchmaking_script.new()
+	add_child(matchmaking)
+	
+	# Use local server for development, or set to false to use remote server
+	matchmaking.matchmaking_url = MATCHMAKING_SERVER_URL
+	
+	# Connect signals
+	matchmaking.room_registered.connect(_on_matchmaking_room_registered)
+	matchmaking.room_found.connect(_on_matchmaking_room_found)
+	
+	print("NetworkManager: Matchmaking initialized")
+
+
+func _on_matchmaking_room_found(success: bool, room_data: Dictionary) -> void:
+	"""Handle room lookup response from matchmaking server"""
+	if success and room_data.has("ip") and room_data.has("port"):
+		print("Matchmaking: Found room at ", room_data["ip"], ":", room_data["port"])
+		join_server(room_data["ip"], room_data["port"])
+	else:
+		push_error("Matchmaking: Failed to find room")
+		connection_failed.emit()
+
+
+func _on_matchmaking_room_registered(success: bool, room_code: String) -> void:
+	"""Handle room registration response from matchmaking server"""
+	if success:
+		print("Matchmaking: Room registered with code ", room_code)
+	else:
+		push_error("Matchmaking: Failed to register room")
 
 
 ## Generate a 6-character room code
@@ -97,6 +142,11 @@ func create_server(port: int = DEFAULT_PORT, use_room_code: bool = true) -> Erro
 			"player_count": 1,
 			"created_time": Time.get_unix_time_from_system()
 		}
+		
+		# Register with matchmaking server
+		if use_matchmaking_server and matchmaking:
+			matchmaking.register_room(current_room_code, local_ip, port, local_player_info.get("name", "Host"))
+		
 		room_code_generated.emit(current_room_code)
 		print("Room code: ", current_room_code, " (IP: ", local_ip, ")")
 	
@@ -120,6 +170,21 @@ func get_local_ip() -> String:
 	return "127.0.0.1"
 
 
+## Join by room code (uses matchmaking)
+func join_by_room_code(room_code: String) -> void:
+	"""Lookup room via matchmaking server and join"""
+	if use_matchmaking_server and matchmaking:
+		matchmaking.lookup_room(room_code)
+	else:
+		# Fallback to local dictionary
+		if room_code_to_ip.has(room_code):
+			var room_data = room_code_to_ip[room_code]
+			join_server(room_data["ip"], room_data["port"])
+		else:
+			push_error("Room code not found: ", room_code)
+			connection_failed.emit()
+
+
 ## Join a server (client)
 func join_server(address: String, port: int = DEFAULT_PORT) -> Error:
 	peer = ENetMultiplayerPeer.new()
@@ -137,6 +202,11 @@ func join_server(address: String, port: int = DEFAULT_PORT) -> Error:
 
 ## Disconnect from network
 func disconnect_from_network() -> void:
+	# Unregister from matchmaking if we were the host
+	if is_server() and use_matchmaking_server and current_room_code != "":
+		matchmaking.unregister_room(current_room_code)
+		current_room_code = ""
+	
 	if peer:
 		peer.close()
 		peer = null
@@ -233,6 +303,9 @@ func _on_peer_connected(id: int) -> void:
 	if is_server():
 		# Initialize player entry
 		players[id] = local_player_info.duplicate(true)
+		
+		# Send full voxel state to new client
+		_sync_voxel_state_to_client.rpc_id(id)
 	
 	player_connected.emit(id)
 
@@ -478,6 +551,10 @@ func _receive_voice_data(audio_data: PackedByteArray) -> void:
 	"""Receive compressed voice data from another player"""
 	var sender_id = multiplayer.get_remote_sender_id()
 	
+	# Don't play our own voice back to ourselves
+	if sender_id == get_multiplayer_id():
+		return
+	
 	# Decompress 16-bit PCM back to float samples
 	var sample_count = audio_data.size() / 4
 	var samples = PackedVector2Array()
@@ -527,3 +604,30 @@ func _notify_voxel_removed(world_pos: Vector3) -> void:
 	"""Receive notification that someone removed a voxel"""
 	voxel_removed_network.emit(world_pos)
 	print("NetworkManager: Voxel removed at ", world_pos, " by peer ", multiplayer.get_remote_sender_id())
+
+
+@rpc("reliable", "call_local", "authority")
+func _sync_voxel_state_to_client() -> void:
+	"""Send all existing voxels to a newly connected client"""
+	if not is_server():
+		return
+	
+	# Find the voxel chunk manager
+	var voxel_manager = get_tree().get_first_node_in_group("voxel_manager")
+	if not voxel_manager or not voxel_manager.has_method("get_all_voxels"):
+		return
+	
+	# Get all voxels and send them to the client
+	var all_voxels = voxel_manager.get_all_voxels()
+	if all_voxels.size() > 0:
+		_receive_voxel_state.rpc_id(multiplayer.get_remote_sender_id(), all_voxels)
+		print("NetworkManager: Sent ", all_voxels.size(), " voxels to new client")
+
+
+@rpc("reliable", "call_remote", "authority")
+func _receive_voxel_state(voxels: Array) -> void:
+	"""Receive full voxel state from server"""
+	for voxel_data in voxels:
+		if voxel_data.has("pos") and voxel_data.has("color"):
+			voxel_placed_network.emit(voxel_data["pos"], voxel_data["color"])
+	print("NetworkManager: Received ", voxels.size(), " voxels from server")

@@ -93,33 +93,31 @@ func _on_join_pressed() -> void:
 	var error: Error
 	
 	if use_room_code and room_code_input and room_code_input.text.length() == 6:
-		# Join by room code
+		# Join by room code using matchmaking
 		var code = room_code_input.text.to_upper()
-		# For now, room codes are local only (no matchmaking server)
-		# In the future, this would query a matchmaking server
-		if network_manager.room_code_to_ip.has(code):
-			var room_info = network_manager.room_code_to_ip[code]
-			error = network_manager.join_server(room_info["ip"], room_info["port"])
-			status_label.text = "Joining room " + code + "..."
-		else:
-			status_label.text = "Room code not found: " + code
-			return
+		status_label.text = "Looking up room " + code + "..."
+		network_manager.join_by_room_code(code)
+		# UI state will be updated by connection callbacks
+		host_button.disabled = true
+		join_button.disabled = true
+		if room_code_input:
+			room_code_input.editable = false
 	else:
 		# Join by IP
 		var address = address_input.text
 		var port = int(port_input.text)
 		error = network_manager.join_server(address, port)
 		status_label.text = "Connecting to " + address + ":" + str(port) + "..."
-	
-	if error == OK:
-		host_button.disabled = true
-		join_button.disabled = true
-		address_input.editable = false
-		port_input.editable = false
-		if room_code_input:
-			room_code_input.editable = false
-	else:
-		status_label.text = "Failed to connect: " + str(error)
+		
+		if error == OK:
+			host_button.disabled = true
+			join_button.disabled = true
+			address_input.editable = false
+			port_input.editable = false
+			if room_code_input:
+				room_code_input.editable = false
+		else:
+			status_label.text = "Failed to connect: " + str(error)
 
 
 func _on_disconnect_pressed() -> void:
