@@ -408,13 +408,13 @@ func _save_grab_state(hand: RigidBody3D) -> void:
 	)
 
 
-func _on_network_grab(peer_id: int) -> void:
+func _on_network_grab(_peer_id: int) -> void:
 	"""Handle another player grabbing this object"""
 	# Make object semi-transparent to show it's grabbed by someone else
 	_set_remote_grabbed_visual(true)
 
 
-func _on_network_release(peer_id: int) -> void:
+func _on_network_release(_peer_id: int) -> void:
 	"""Handle another player releasing this object"""
 	_set_remote_grabbed_visual(false)
 
@@ -433,11 +433,11 @@ func _on_network_sync(data: Dictionary) -> void:
 		global_transform.basis = Basis(interpolated)
 
 
-func _set_remote_grabbed_visual(grabbed: bool) -> void:
+func _set_remote_grabbed_visual(is_grabbed_visual: bool) -> void:
 	"""Visual feedback when object is grabbed by remote player"""
 	for child in get_children():
 		if child is MeshInstance3D:
-			if grabbed:
+			if is_grabbed_visual:
 				# Make semi-transparent
 				if not child.material_override:
 					var mat = StandardMaterial3D.new()

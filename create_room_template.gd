@@ -35,17 +35,17 @@ func _run():
 	light.owner = root
 	
 	# Add Floor
-	var floor = StaticBody3D.new()
-	floor.name = "Floor"
-	floor.position = Vector3(0, -0.5, 0)
-	floor.collision_layer = 1
-	floor.collision_mask = 0
+	var floor_node = StaticBody3D.new()
+	floor_node.name = "Floor"
+	floor_node.position = Vector3(0, -0.5, 0)
+	floor_node.collision_layer = 1
+	floor_node.collision_mask = 0
 	
 	var floor_collision = CollisionShape3D.new()
 	var floor_shape = BoxShape3D.new()
 	floor_shape.size = Vector3(20, 1, 20)
 	floor_collision.shape = floor_shape
-	floor.add_child(floor_collision)
+	floor_node.add_child(floor_collision)
 	floor_collision.owner = root
 	
 	var floor_mesh_inst = MeshInstance3D.new()
@@ -55,8 +55,8 @@ func _run():
 	floor_collision.add_child(floor_mesh_inst)
 	floor_mesh_inst.owner = root
 	
-	root.add_child(floor)
-	floor.owner = root
+	root.add_child(floor_node)
+	floor_node.owner = root
 	
 	# Add SpawnPoint
 	var spawn = Marker3D.new()

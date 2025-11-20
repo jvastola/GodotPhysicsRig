@@ -26,16 +26,16 @@ func setup(p_grabbable: RigidBody3D, p_save_id: String) -> void:
 func set_grabbed(grabbed: bool) -> void:
 	is_grabbed = grabbed
 
-func set_network_owner(owner: bool) -> void:
-	is_network_owner = owner
+func set_network_owner(is_owner: bool) -> void:
+	is_network_owner = is_owner
 
-func notify_grab(save_id: String) -> void:
+func notify_grab(p_save_id: String) -> void:
 	if network_manager and is_network_owner:
-		network_manager.grab_object(save_id)
+		network_manager.grab_object(p_save_id)
 
-func notify_release(save_id: String, position: Vector3, rotation: Quaternion) -> void:
+func notify_release(p_save_id: String, position: Vector3, rotation: Quaternion) -> void:
 	if network_manager and is_network_owner:
-		network_manager.release_object(save_id, position, rotation)
+		network_manager.release_object(p_save_id, position, rotation)
 
 func process_network_sync(delta: float) -> void:
 	# Update network position if we own this object (with delta compression)
