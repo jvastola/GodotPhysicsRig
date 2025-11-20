@@ -66,6 +66,14 @@ text = "Join Game"
 layout_mode = 2
 text = "Disconnect"
 
+[node name="VoiceButton" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+text = "Enable Voice"
+
+[node name="AvatarButton" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+text = "Send Avatar"
+
 [node name="StatusLabel" type="Label" parent="VBoxContainer"]
 layout_mode = 2
 text = "Not connected"

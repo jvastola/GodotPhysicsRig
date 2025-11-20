@@ -1,6 +1,34 @@
+extends RigidBody3D
 
-extends "res://grabbable.gd"
+# Grabbable properties (from Grabbable class)
+enum GrabMode {
+	FREE_GRAB,
+	ANCHOR_GRAB
+}
 
+@export var grab_mode: GrabMode = GrabMode.ANCHOR_GRAB
+@export var grab_anchor_offset: Vector3 = Vector3.ZERO
+@export var grab_anchor_rotation: Vector3 = Vector3.ZERO
+@export var save_id: String = ""
+@export var prototype_scene: PackedScene
+
+var _scene_of_origin: String = ""
+var is_grabbed := false
+var grabbing_hand: RigidBody3D = null
+var original_parent: Node = null
+var grab_offset: Vector3 = Vector3.ZERO
+var grab_rotation_offset: Quaternion = Quaternion.IDENTITY
+var grabbed_collision_shapes: Array = []
+var grabbed_mesh_instances: Array = []
+var network_manager: Node = null
+var is_network_owner: bool = true
+var network_update_timer: float = 0.0
+const NETWORK_UPDATE_RATE = 0.05
+
+signal grabbed(hand: RigidBody3D)
+signal released()
+
+# GrappleHook specific properties
 @export var max_distance: float = 20.0
 @export var impulse_speed: float = 12.0
 @export var winch_speed: float = 4.0
@@ -40,6 +68,9 @@ var _visuals_pending_parent: bool = false
 @export var persist_visuals_across_scenes: bool = true
 
 func _ready() -> void:
+	# Setup network sync for grabbable functionality
+	_setup_network_sync()
+	
 	contact_monitor = true
 	max_contacts_reported = 10
 	add_to_group("grabbable")
@@ -476,6 +507,14 @@ func _physics_process(delta: float) -> void:
 				pass
 			else:
 				_ensure_visuals_parent()
+	
+	# Network sync: Send position updates if we own this object
+	if is_network_owner and network_manager:
+		network_manager.update_grabbed_object(
+			save_id,
+			global_position,
+			global_transform.basis.get_rotation_quaternion()
+		)
 
 func _exit_tree() -> void:
 	_end_grapple()
@@ -591,3 +630,211 @@ func _attach_visuals_to_root() -> void:
 		scheduled = true
 	if scheduled:
 		_visuals_pending_parent = true
+
+
+# ============================================================================
+# Grabbable Functionality (copied from Grabbable class)
+# ============================================================================
+
+func try_grab(hand: RigidBody3D) -> bool:
+	"""Attempt to grab this object with a hand"""
+	if is_grabbed:
+		return false
+	
+	# Check if another player owns this object
+	if network_manager and network_manager.is_object_grabbed_by_other(save_id):
+		print("Grabbable: ", save_id, " is grabbed by another player")
+		return false
+	
+	is_grabbed = true
+	grabbing_hand = hand
+	original_parent = get_parent()
+	is_network_owner = true
+	
+	# Sync with hand's held_object
+	if hand.has_method("set") and hand.get("held_object") != self:
+		hand.set("held_object", self)
+	
+	# Calculate the offset in hand's local space
+	var hand_inv = hand.global_transform.affine_inverse()
+	var obj_to_hand = hand_inv * global_transform
+	
+	if grab_mode == GrabMode.FREE_GRAB:
+		grab_offset = obj_to_hand.origin
+		grab_rotation_offset = obj_to_hand.basis.get_rotation_quaternion()
+	else:  # ANCHOR_GRAB
+		grab_offset = grab_anchor_offset
+		grab_rotation_offset = Quaternion(Vector3.FORWARD, grab_anchor_rotation.z) * \
+							   Quaternion(Vector3.UP, grab_anchor_rotation.y) * \
+							   Quaternion(Vector3.RIGHT, grab_anchor_rotation.x)
+	
+	# Clone collision shapes and meshes as direct children of the hand
+	grabbed_collision_shapes.clear()
+	grabbed_mesh_instances.clear()
+	
+	for child in get_children():
+		if child is CollisionShape3D and child.shape:
+			var new_collision = CollisionShape3D.new()
+			new_collision.shape = child.shape
+			new_collision.transform = Transform3D(Basis(grab_rotation_offset), grab_offset) * child.transform
+			new_collision.name = name + "_grabbed_collision_" + str(grabbed_collision_shapes.size())
+			hand.add_child(new_collision)
+			grabbed_collision_shapes.append(new_collision)
+			
+		elif child is MeshInstance3D and child.mesh:
+			var new_mesh = MeshInstance3D.new()
+			new_mesh.mesh = child.mesh
+			new_mesh.transform = Transform3D(Basis(grab_rotation_offset), grab_offset) * child.transform
+			new_mesh.name = name + "_grabbed_mesh_" + str(grabbed_mesh_instances.size())
+			hand.add_child(new_mesh)
+			grabbed_mesh_instances.append(new_mesh)
+	
+	visible = false
+	collision_layer = 0
+	collision_mask = 0
+	freeze = true
+	
+	# Notify network
+	if network_manager and is_network_owner:
+		network_manager.grab_object(save_id)
+	
+	grabbed.emit(hand)
+	print("Grabbable: Object grabbed by ", hand.name)
+	
+	return true
+
+
+func release() -> void:
+	"""Release the object from the hand"""
+	if not is_grabbed:
+		return
+	
+	print("Grabbable: Object released")
+	
+	# Notify network
+	if network_manager and is_network_owner:
+		network_manager.release_object(save_id, global_position, global_transform.basis.get_rotation_quaternion())
+	
+	is_network_owner = false
+	
+	var release_global_transform = global_transform
+	if grabbed_collision_shapes.size() > 0 and is_instance_valid(grabbed_collision_shapes[0]):
+		release_global_transform = grabbed_collision_shapes[0].global_transform
+	elif is_instance_valid(grabbing_hand):
+		release_global_transform = grabbing_hand.global_transform * Transform3D(Basis(grab_rotation_offset), grab_offset)
+	
+	var hand_velocity = Vector3.ZERO
+	var hand_angular_velocity = Vector3.ZERO
+	
+	if is_instance_valid(grabbing_hand):
+		hand_velocity = grabbing_hand.linear_velocity
+		hand_angular_velocity = grabbing_hand.angular_velocity * 0.5
+		
+		for collision_shape in grabbed_collision_shapes:
+			if is_instance_valid(collision_shape) and collision_shape.get_parent() == grabbing_hand:
+				grabbing_hand.remove_child(collision_shape)
+				collision_shape.queue_free()
+		
+		for mesh_instance in grabbed_mesh_instances:
+			if is_instance_valid(mesh_instance) and mesh_instance.get_parent() == grabbing_hand:
+				grabbing_hand.remove_child(mesh_instance)
+				mesh_instance.queue_free()
+	else:
+		for collision_shape in grabbed_collision_shapes:
+			if is_instance_valid(collision_shape):
+				collision_shape.queue_free()
+		for mesh_instance in grabbed_mesh_instances:
+			if is_instance_valid(mesh_instance):
+				mesh_instance.queue_free()
+	
+	grabbed_collision_shapes.clear()
+	grabbed_mesh_instances.clear()
+	
+	visible = true
+	freeze = false
+	collision_layer = 1
+	collision_mask = 1
+	
+	global_transform = release_global_transform
+	linear_velocity = hand_velocity
+	angular_velocity = hand_angular_velocity
+	
+	if is_instance_valid(grabbing_hand) and grabbing_hand.has_method("set"):
+		grabbing_hand.set("held_object", null)
+	
+	is_grabbed = false
+	grabbing_hand = null
+	
+	released.emit()
+
+
+func _setup_network_sync() -> void:
+	"""Connect to network manager for multiplayer sync"""
+	network_manager = get_node_or_null("/root/NetworkManager")
+	
+	if not network_manager:
+		return
+	
+	network_manager.grabbable_grabbed.connect(_on_network_grab)
+	network_manager.grabbable_released.connect(_on_network_release)
+	network_manager.grabbable_sync_update.connect(_on_network_sync)
+	
+	print("Grabbable: ", save_id, " network sync initialized")
+
+
+func _on_network_grab(object_id: String, peer_id: int) -> void:
+	if object_id != save_id:
+		return
+	
+	if network_manager and peer_id == network_manager.get_multiplayer_id():
+		return
+	
+	print("Grabbable: ", save_id, " grabbed by remote player ", peer_id)
+	is_network_owner = false
+	_set_remote_grabbed_visual(true)
+
+
+func _on_network_release(object_id: String, peer_id: int) -> void:
+	if object_id != save_id:
+		return
+	
+	if network_manager and peer_id == network_manager.get_multiplayer_id():
+		return
+	
+	print("Grabbable: ", save_id, " released by remote player ", peer_id)
+	_set_remote_grabbed_visual(false)
+
+
+func _on_network_sync(object_id: String, data: Dictionary) -> void:
+	if object_id != save_id:
+		return
+	
+	if is_network_owner or is_grabbed:
+		return
+	
+	if data.has("position"):
+		var target_pos = data["position"]
+		global_position = global_position.lerp(target_pos, 0.3)
+	
+	if data.has("rotation"):
+		var target_rot = data["rotation"]
+		var current_quat = global_transform.basis.get_rotation_quaternion()
+		var interpolated = current_quat.slerp(target_rot, 0.3)
+		global_transform.basis = Basis(interpolated)
+
+
+func _set_remote_grabbed_visual(grabbed: bool) -> void:
+	for child in get_children():
+		if child is MeshInstance3D:
+			if grabbed:
+				if not child.material_override:
+					var mat = StandardMaterial3D.new()
+					mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+					mat.albedo_color = Color(1, 1, 1, 0.5)
+					child.material_override = mat
+			else:
+				child.material_override = null
+
+
+func _on_collision_entered(body: Node) -> void:
+	pass

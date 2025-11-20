@@ -1,6 +1,7 @@
 # Grabbable Object
 # Can be picked up by physics hands in VR
 extends RigidBody3D
+class_name Grabbable
 
 enum GrabMode {
 	FREE_GRAB,      # Object maintains its orientation relative to hand
@@ -29,6 +30,12 @@ var grab_rotation_offset: Quaternion = Quaternion.IDENTITY
 var grabbed_collision_shapes: Array = []
 var grabbed_mesh_instances: Array = []
 
+# Network sync
+var network_manager: Node = null
+var is_network_owner: bool = true
+var network_update_timer: float = 0.0
+const NETWORK_UPDATE_RATE = 0.05 # 20Hz
+
 signal grabbed(hand: RigidBody3D)
 signal released()
 
@@ -54,6 +61,9 @@ func _ready() -> void:
 		_scene_of_origin = current_scene.scene_file_path
 		print("Grabbable: ", save_id, " scene of origin: ", _scene_of_origin)
 	
+	# Setup network sync
+	_setup_network_sync()
+	
 	# No need to restore - player persists across scenes so grabbed items stay grabbed
 	
 	# Debug: Check grab state
@@ -72,9 +82,15 @@ func try_grab(hand: RigidBody3D) -> bool:
 	if is_grabbed:
 		return false
 	
+	# Check if another player owns this object
+	if network_manager and network_manager.is_object_grabbed_by_other(save_id):
+		print("Grabbable: ", save_id, " is grabbed by another player")
+		return false
+	
 	is_grabbed = true
 	grabbing_hand = hand
 	original_parent = get_parent()
+	is_network_owner = true
 	
 	# Sync with hand's held_object
 	if hand.has_method("set") and hand.get("held_object") != self:
@@ -127,6 +143,10 @@ func try_grab(hand: RigidBody3D) -> bool:
 	# Freeze it in place
 	freeze = true
 	
+	# Notify network
+	if network_manager and is_network_owner:
+		network_manager.grab_object(save_id)
+	
 	grabbed.emit(hand)
 	print("Grabbable: Object grabbed by ", hand.name)
 	
@@ -142,6 +162,12 @@ func release() -> void:
 		return
 	
 	print("Grabbable: Object released")
+	
+	# Notify network
+	if network_manager and is_network_owner:
+		network_manager.release_object(save_id, global_position, global_transform.basis.get_rotation_quaternion())
+	
+	is_network_owner = false
 	
 	# Calculate global transform from first grabbed collision shape if available
 	var release_global_transform = global_transform
@@ -217,6 +243,13 @@ func _physics_process(_delta: float) -> void:
 	# When grabbed, object is frozen and moves with hand automatically as child
 	# No need to update position - it's part of the hand's rigid body now
 	if is_grabbed:
+		# Update network position if we own this object
+		if is_network_owner and network_manager:
+			network_update_timer += _delta
+			if network_update_timer >= NETWORK_UPDATE_RATE:
+				network_update_timer = 0.0
+				network_manager.update_grabbed_object(save_id, global_position, global_transform.basis.get_rotation_quaternion())
+		
 		# If hand is invalid, auto-release
 		if not is_instance_valid(grabbing_hand):
 			print("Grabbable: Auto-releasing due to invalid hand")
@@ -340,3 +373,88 @@ func _save_grab_state(hand: RigidBody3D) -> void:
 		rel_pos_arr,
 		rel_rot_arr
 	)
+
+
+# ============================================================================
+# Network Sync Functions
+# ============================================================================
+
+func _setup_network_sync() -> void:
+	"""Connect to network manager for multiplayer sync"""
+	network_manager = get_node_or_null("/root/NetworkManager")
+	
+	if not network_manager:
+		return
+	
+	# Connect to network events
+	network_manager.grabbable_grabbed.connect(_on_network_grab)
+	network_manager.grabbable_released.connect(_on_network_release)
+	network_manager.grabbable_sync_update.connect(_on_network_sync)
+	
+	print("Grabbable: ", save_id, " network sync initialized")
+
+
+func _on_network_grab(object_id: String, peer_id: int) -> void:
+	"""Handle another player grabbing this object"""
+	if object_id != save_id:
+		return
+	
+	# Don't process our own grabs
+	if network_manager and peer_id == network_manager.get_multiplayer_id():
+		return
+	
+	print("Grabbable: ", save_id, " grabbed by remote player ", peer_id)
+	is_network_owner = false
+	
+	# Make object semi-transparent to show it's grabbed by someone else
+	_set_remote_grabbed_visual(true)
+
+
+func _on_network_release(object_id: String, peer_id: int) -> void:
+	"""Handle another player releasing this object"""
+	if object_id != save_id:
+		return
+	
+	# Don't process our own releases
+	if network_manager and peer_id == network_manager.get_multiplayer_id():
+		return
+	
+	print("Grabbable: ", save_id, " released by remote player ", peer_id)
+	_set_remote_grabbed_visual(false)
+
+
+func _on_network_sync(object_id: String, data: Dictionary) -> void:
+	"""Receive position update for this object from network"""
+	if object_id != save_id:
+		return
+	
+	# Only update if we don't own it
+	if is_network_owner or is_grabbed:
+		return
+	
+	# Smoothly interpolate to network position
+	if data.has("position"):
+		var target_pos = data["position"]
+		global_position = global_position.lerp(target_pos, 0.3)
+	
+	if data.has("rotation"):
+		var target_rot = data["rotation"]
+		var current_quat = global_transform.basis.get_rotation_quaternion()
+		var interpolated = current_quat.slerp(target_rot, 0.3)
+		global_transform.basis = Basis(interpolated)
+
+
+func _set_remote_grabbed_visual(grabbed: bool) -> void:
+	"""Visual feedback when object is grabbed by remote player"""
+	for child in get_children():
+		if child is MeshInstance3D:
+			if grabbed:
+				# Make semi-transparent
+				if not child.material_override:
+					var mat = StandardMaterial3D.new()
+					mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+					mat.albedo_color = Color(1, 1, 1, 0.5)
+					child.material_override = mat
+			else:
+				# Restore normal appearance
+				child.material_override = null

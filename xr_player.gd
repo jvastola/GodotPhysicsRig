@@ -23,6 +23,12 @@ var remote_players: Dictionary = {} # peer_id -> NetworkPlayer instance
 var update_rate: float = 0.05 # 20 Hz (50ms between updates)
 var time_since_last_update: float = 0.0
 
+# Voice chat
+var microphone: AudioStreamMicrophone = null
+var microphone_player: AudioStreamPlayer = null
+var voice_effect: AudioEffectCapture = null
+var voice_enabled: bool = false
+
 # Player settings
 var player_height := 0.0  # Using headset tracking; keep 0 to avoid artificial offset
 var is_vr_mode := false
@@ -65,6 +71,9 @@ func _ready() -> void:
 	# Ensure physics hands are properly connected
 	call_deferred("_setup_physics_hands")
 	
+	# Add to group for easy finding
+	add_to_group("xr_player")
+	
 	# Setup networking
 	_setup_networking()
 
@@ -93,6 +102,10 @@ func _process(delta: float) -> void:
 	
 	# Update network with player transforms
 	_update_networking(delta)
+	
+	# Process voice chat if enabled
+	if voice_enabled:
+		_process_voice_chat(delta)
 
 
 func _physics_process(delta: float) -> void:
@@ -382,6 +395,10 @@ func _setup_networking() -> void:
 	# Connect to network events
 	network_manager.player_connected.connect(_on_player_connected)
 	network_manager.player_disconnected.connect(_on_player_disconnected)
+	network_manager.avatar_texture_received.connect(_on_avatar_texture_received)
+	
+	# Setup voice chat
+	_setup_voice_chat()
 	
 	print("XRPlayer: Networking initialized")
 
@@ -461,19 +478,6 @@ func _update_remote_players() -> void:
 			remote_players[peer_id].update_from_network_data(player_data)
 
 
-func _spawn_remote_player(peer_id: int) -> void:
-	"""Spawn a visual representation of a remote player"""
-	var remote_player = NETWORK_PLAYER_SCENE.instantiate()
-	remote_player.peer_id = peer_id
-	remote_player.name = "RemotePlayer_" + str(peer_id)
-	
-	# Add to scene
-	get_tree().root.add_child(remote_player)
-	remote_players[peer_id] = remote_player
-	
-	print("XRPlayer: Spawned remote player ", peer_id)
-
-
 func _despawn_remote_player(peer_id: int) -> void:
 	"""Remove a remote player's visual representation"""
 	if remote_players.has(peer_id):
@@ -486,9 +490,172 @@ func _on_player_connected(peer_id: int) -> void:
 	"""Handle new player connection"""
 	print("XRPlayer: Player connected: ", peer_id)
 	_spawn_remote_player(peer_id)
+	
+	# Send our avatar to the new player
+	call_deferred("send_avatar_texture")
 
 
 func _on_player_disconnected(peer_id: int) -> void:
 	"""Handle player disconnection"""
 	print("XRPlayer: Player disconnected: ", peer_id)
 	_despawn_remote_player(peer_id)
+
+
+## Send avatar texture to network
+func send_avatar_texture() -> void:
+	"""Send local player's avatar texture to all other players"""
+	if not network_manager:
+		return
+	
+	# Try multiple ways to find GridPainter
+	var grid_painter = get_node_or_null("GridPainter")
+	if not grid_painter:
+		grid_painter = get_tree().root.get_node_or_null("MainScene/GridPainterTest")
+	if not grid_painter:
+		grid_painter = get_tree().root.get_node_or_null("MainScene/GridPainter")
+	if not grid_painter:
+		# Try finding by type or class name
+		for node in get_tree().get_nodes_in_group("grid_painter"):
+			grid_painter = node
+			break
+	if not grid_painter:
+		# Last resort: search for GridPainter type
+		var root = get_tree().root
+		for child in root.get_children():
+			if child is Node3D:
+				var found = _find_grid_painter_recursive(child)
+				if found:
+					grid_painter = found
+					break
+	
+	if not grid_painter:
+		print("XRPlayer: GridPainter not found, cannot send avatar")
+		return
+	
+	# Get head surface texture
+	if not grid_painter.has_method("_get_surface"):
+		print("XRPlayer: GridPainter doesn't have _get_surface method")
+		return
+	
+	var head_surface = grid_painter._get_surface("head")
+	if not head_surface or not head_surface.texture:
+		print("XRPlayer: No head texture found, paint your head first!")
+		return
+	
+	network_manager.set_local_avatar_texture(head_surface.texture)
+	print("XRPlayer: Sent avatar texture to network")
+
+
+func _find_grid_painter_recursive(node: Node) -> Node:
+	"""Recursively search for GridPainter in the scene tree"""
+	if node.get_script():
+		var script = node.get_script()
+		if script and script.has_method("_get_surface"):
+			return node
+	
+	for child in node.get_children():
+		var found = _find_grid_painter_recursive(child)
+		if found:
+			return found
+	
+	return null
+
+
+## Update remote player avatars when they connect
+func _spawn_remote_player(peer_id: int) -> void:
+	"""Spawn a visual representation of a remote player"""
+	var remote_player = NETWORK_PLAYER_SCENE.instantiate()
+	remote_player.peer_id = peer_id
+	remote_player.name = "RemotePlayer_" + str(peer_id)
+	
+	# Add to scene
+	get_tree().root.add_child(remote_player)
+	remote_players[peer_id] = remote_player
+	
+	print("XRPlayer: Spawned remote player ", peer_id)
+	
+	# Try to apply their avatar texture
+	call_deferred("_apply_remote_avatar", peer_id)
+
+
+func _apply_remote_avatar(peer_id: int) -> void:
+	"""Apply avatar texture to a remote player"""
+	if not network_manager or not remote_players.has(peer_id):
+		return
+	
+	var texture = network_manager.get_player_avatar_texture(peer_id)
+	if texture:
+		remote_players[peer_id].apply_avatar_texture(texture)
+		print("XRPlayer: Applied avatar to remote player ", peer_id)
+
+
+func _on_avatar_texture_received(peer_id: int) -> void:
+	"""Called when a remote player's avatar texture is received"""
+	print("XRPlayer: Avatar texture received for peer ", peer_id)
+	_apply_remote_avatar(peer_id)
+
+
+# ============================================================================
+# Voice Chat Functions
+# ============================================================================
+
+func _setup_voice_chat() -> void:
+	"""Initialize microphone capture for voice chat"""
+	# Create microphone stream
+	microphone = AudioStreamMicrophone.new()
+	
+	# Create audio player for microphone (we just use it for capture)
+	microphone_player = AudioStreamPlayer.new()
+	microphone_player.name = "MicrophonePlayer"
+	microphone_player.stream = microphone
+	microphone_player.bus = "Voice"
+	add_child(microphone_player)
+	
+	# Add AudioEffectCapture to Voice bus
+	var voice_bus_index = AudioServer.get_bus_index("Voice")
+	if voice_bus_index != -1:
+		# Check if capture effect already exists
+		var has_capture = false
+		for i in range(AudioServer.get_bus_effect_count(voice_bus_index)):
+			if AudioServer.get_bus_effect(voice_bus_index, i) is AudioEffectCapture:
+				voice_effect = AudioServer.get_bus_effect(voice_bus_index, i)
+				has_capture = true
+				break
+		
+		if not has_capture:
+			voice_effect = AudioEffectCapture.new()
+			AudioServer.add_bus_effect(voice_bus_index, voice_effect)
+		
+		print("XRPlayer: Voice chat initialized")
+
+
+func toggle_voice_chat(enabled: bool) -> void:
+	"""Enable or disable voice chat"""
+	voice_enabled = enabled
+	
+	if network_manager:
+		network_manager.enable_voice_chat(enabled)
+	
+	if enabled and microphone_player:
+		microphone_player.play()
+	elif microphone_player:
+		microphone_player.stop()
+	
+	print("XRPlayer: Voice chat ", "enabled" if enabled else "disabled")
+
+
+func _process_voice_chat(delta: float) -> void:
+	"""Capture and send voice data"""
+	if not voice_enabled or not voice_effect or not network_manager:
+		return
+	
+	# Get available audio frames from capture
+	var available = voice_effect.get_frames_available()
+	if available > 0:
+		# Get audio samples (limit to reasonable buffer size)
+		var frames_to_get = min(available, 2048)
+		var audio_data = voice_effect.get_buffer(frames_to_get)
+		
+		if audio_data.size() > 0:
+			# Send to network
+			network_manager.send_voice_data(audio_data)

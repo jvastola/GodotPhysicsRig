@@ -8,8 +8,12 @@ extends Control
 @onready var port_input: LineEdit = $VBoxContainer/PortInput
 @onready var status_label: Label = $VBoxContainer/StatusLabel
 @onready var player_list_label: Label = $VBoxContainer/PlayerListLabel
+@onready var voice_button: Button = $VBoxContainer/VoiceButton
+@onready var avatar_button: Button = $VBoxContainer/AvatarButton
 
 var network_manager: Node = null
+var xr_player: Node = null
+var voice_enabled: bool = false
 
 
 func _ready() -> void:
@@ -20,10 +24,19 @@ func _ready() -> void:
 		status_label.text = "ERROR: NetworkManager not found"
 		return
 	
+	# Find XRPlayer
+	await get_tree().process_frame
+	xr_player = get_tree().get_first_node_in_group("xr_player")
+	if not xr_player:
+		# Try to find by name
+		xr_player = get_tree().root.get_node_or_null("MainScene/XRPlayer")
+	
 	# Connect UI signals
 	host_button.pressed.connect(_on_host_pressed)
 	join_button.pressed.connect(_on_join_pressed)
 	disconnect_button.pressed.connect(_on_disconnect_pressed)
+	voice_button.pressed.connect(_on_voice_pressed)
+	avatar_button.pressed.connect(_on_avatar_pressed)
 	
 	# Connect network signals
 	network_manager.player_connected.connect(_on_player_connected)
@@ -36,6 +49,8 @@ func _ready() -> void:
 	address_input.text = "127.0.0.1"
 	port_input.text = "7777"
 	disconnect_button.disabled = true
+	voice_button.text = "Enable Voice"
+	avatar_button.text = "Send Avatar"
 	
 	_update_status()
 
@@ -139,3 +154,23 @@ func _update_player_list() -> void:
 		for peer_id in network_manager.players.keys():
 			var marker = " (You)" if peer_id == network_manager.get_multiplayer_id() else ""
 			player_list_label.text += "  - Player " + str(peer_id) + marker + "\n"
+
+
+func _on_voice_pressed() -> void:
+	voice_enabled = not voice_enabled
+	
+	if xr_player and xr_player.has_method("toggle_voice_chat"):
+		xr_player.toggle_voice_chat(voice_enabled)
+	
+	voice_button.text = "Disable Voice" if voice_enabled else "Enable Voice"
+	print("NetworkUI: Voice chat ", "enabled" if voice_enabled else "disabled")
+
+
+func _on_avatar_pressed() -> void:
+	if xr_player and xr_player.has_method("send_avatar_texture"):
+		xr_player.send_avatar_texture()
+		avatar_button.text = "Avatar Sent!"
+		await get_tree().create_timer(2.0).timeout
+		avatar_button.text = "Send Avatar"
+	else:
+		print("NetworkUI: XRPlayer not found or doesn't have send_avatar_texture method")

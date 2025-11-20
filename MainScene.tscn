@@ -9,7 +9,7 @@
 [ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://viewport_mirror.gd" id="8_viewport_mirror"]
 [ext_resource type="PackedScene" uid="uid://bhun80s4vlhet" path="res://RotatingObject.tscn" id="9_rotating"]
 [ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://grid_painter.gd" id="10_grid_painter"]
-[ext_resource type="PackedScene" path="res://multiplayer/NetworkUIViewport3D.tscn" id="11_network_ui"]
+[ext_resource type="PackedScene" uid="uid://b8k3v2oax4mjw" path="res://multiplayer/NetworkUIViewport3D.tscn" id="11_network_ui"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -184,4 +184,4 @@ collision_mask = 32
 shape = SubResource("BoxShape3D_body_grid")
 
 [node name="NetworkUIViewport3D" parent="." instance=ExtResource("11_network_ui")]
-transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 3.2, 1, 2)
+transform = Transform3D(0.999479, 0, 0.0322832, 0, 1, 0, -0.0322832, 0, 0.999479, -1.44939, 1.10555, -2.04488)

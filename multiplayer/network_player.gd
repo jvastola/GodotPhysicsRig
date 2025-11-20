@@ -23,10 +23,18 @@ var target_scale: Vector3 = Vector3.ONE
 # Label to show player name/ID
 var label_3d: Label3D = null
 
+# Voice chat
+var voice_player: AudioStreamPlayer3D = null
+var voice_playback: AudioStreamGeneratorPlayback = null
+
+# Avatar texture
+var has_custom_avatar: bool = false
+
 
 func _ready() -> void:
 	_create_visuals()
 	_create_name_label()
+	_create_voice_player()
 
 
 func _process(delta: float) -> void:
@@ -42,6 +50,10 @@ func update_from_network_data(player_data: Dictionary) -> void:
 	target_right_hand_position = player_data.get("right_hand_position", Vector3.ZERO)
 	target_right_hand_rotation = player_data.get("right_hand_rotation", Vector3.ZERO)
 	target_scale = player_data.get("player_scale", Vector3.ONE)
+	
+	# Handle voice samples
+	if player_data.has("voice_samples"):
+		_play_voice_samples(player_data["voice_samples"])
 
 
 ## Smoothly interpolate to target transforms
@@ -69,66 +81,68 @@ func _interpolate_transforms(delta: float) -> void:
 	body_visual.global_position = body_visual.global_position.lerp(body_pos, lerp_factor)
 
 
-## Create simple visual meshes for the player
+## Create simple visual meshes for the player (rectangles like XRPlayer)
 func _create_visuals() -> void:
-	# Head - sphere
+	# Head - box/rectangle
 	if not head_visual:
 		head_visual = MeshInstance3D.new()
 		head_visual.name = "Head"
 		add_child(head_visual)
 	
-	var head_mesh = SphereMesh.new()
-	head_mesh.radius = 0.12
-	head_mesh.height = 0.24
+	var head_mesh = BoxMesh.new()
+	head_mesh.size = Vector3(0.22, 0.22, 0.22)
 	head_visual.mesh = head_mesh
 	
 	var head_material = StandardMaterial3D.new()
 	head_material.albedo_color = Color(0.8, 0.6, 0.4) # Skin tone
+	head_material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	head_visual.material_override = head_material
 	
-	# Left hand - smaller sphere
+	# Left hand - box/rectangle
 	if not left_hand_visual:
 		left_hand_visual = MeshInstance3D.new()
 		left_hand_visual.name = "LeftHand"
 		add_child(left_hand_visual)
 	
-	var left_hand_mesh = SphereMesh.new()
-	left_hand_mesh.radius = 0.06
+	var left_hand_mesh = BoxMesh.new()
+	left_hand_mesh.size = Vector3(0.1, 0.1, 0.15)
 	left_hand_visual.mesh = left_hand_mesh
 	
 	var left_material = StandardMaterial3D.new()
 	left_material.albedo_color = Color(0.3, 0.6, 1.0) # Blue for left
+	left_material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	left_hand_visual.material_override = left_material
 	
-	# Right hand - smaller sphere
+	# Right hand - box/rectangle
 	if not right_hand_visual:
 		right_hand_visual = MeshInstance3D.new()
 		right_hand_visual.name = "RightHand"
 		add_child(right_hand_visual)
 	
-	var right_hand_mesh = SphereMesh.new()
-	right_hand_mesh.radius = 0.06
+	var right_hand_mesh = BoxMesh.new()
+	right_hand_mesh.size = Vector3(0.1, 0.1, 0.15)
 	right_hand_visual.mesh = right_hand_mesh
 	
 	var right_material = StandardMaterial3D.new()
 	right_material.albedo_color = Color(1.0, 0.3, 0.3) # Red for right
+	right_material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	right_hand_visual.material_override = right_material
 	
-	# Body - capsule
+	# Body - box/rectangle
 	if not body_visual:
 		body_visual = MeshInstance3D.new()
 		body_visual.name = "Body"
 		add_child(body_visual)
 	
-	var body_mesh = CapsuleMesh.new()
-	body_mesh.radius = 0.15
-	body_mesh.height = 0.6
+	var body_mesh = BoxMesh.new()
+	body_mesh.size = Vector3(0.4, 0.6, 0.2)
 	body_visual.mesh = body_mesh
 	
 	var body_material = StandardMaterial3D.new()
 	body_material.albedo_color = Color(0.4, 0.4, 0.4) # Gray
 	body_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	body_material.albedo_color.a = 0.5
+	body_material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	body_visual.material_override = body_material
 
 
@@ -154,3 +168,53 @@ func _update_label_position() -> void:
 
 func _physics_process(_delta: float) -> void:
 	_update_label_position()
+
+
+## Apply avatar texture to head mesh
+func apply_avatar_texture(texture: ImageTexture) -> void:
+	if not head_visual or not texture:
+		return
+	
+	var mat = StandardMaterial3D.new()
+	mat.albedo_texture = texture
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.cull_mode = BaseMaterial3D.CULL_BACK
+	head_visual.material_override = mat
+	has_custom_avatar = true
+	print("NetworkPlayer: Applied avatar texture to player ", peer_id)
+
+
+## Create voice audio player
+func _create_voice_player() -> void:
+	voice_player = AudioStreamPlayer3D.new()
+	voice_player.name = "VoicePlayer"
+	
+	# Create audio stream generator for voice playback
+	var stream = AudioStreamGenerator.new()
+	stream.mix_rate = 16000 # Match VOICE_SAMPLE_RATE
+	stream.buffer_length = 0.1
+	voice_player.stream = stream
+	voice_player.bus = "Voice"
+	voice_player.autoplay = true
+	voice_player.max_distance = 20.0
+	voice_player.unit_size = 5.0
+	
+	add_child(voice_player)
+	
+	# Get playback for pushing samples
+	voice_player.play()
+	voice_playback = voice_player.get_stream_playback()
+
+
+## Play received voice samples
+func _play_voice_samples(samples: PackedVector2Array) -> void:
+	if not voice_playback or samples.size() == 0:
+		return
+	
+	# Push samples to playback buffer
+	var available_frames = voice_playback.get_frames_available()
+	var frames_to_push = min(samples.size(), available_frames)
+	
+	for i in range(frames_to_push):
+		voice_playback.push_frame(samples[i])
