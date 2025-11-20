@@ -21,6 +21,9 @@ Make server persistent (systemd)
 2. Reload and enable:
    sudo systemctl daemon-reload
    sudo systemctl enable --now godot-matchmaking.service
+3. Ensure the environment file points to the script (used by the unit). If `/etc/default/godot-matchmaking` is not present, create it:
+   sudo bash -c 'echo "GODOT_PROJECT_PATH=/home/ubuntu/GodotPhysicsRig/server_standalone.gd" > /etc/default/godot-matchmaking'
+   sudo systemctl restart godot-matchmaking.service
 3. Check logs:
    sudo journalctl -u godot-matchmaking.service -f
 
