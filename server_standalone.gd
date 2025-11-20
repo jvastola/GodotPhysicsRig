@@ -61,7 +61,7 @@ class ServerNode extends Node:
         var request = ""
         var max_header_size = 8192 # 8 KB max header size
         var timeout = 2.0 # seconds
-        var start_time = Time.get_ticks_msec()
+        var start_time = OS.get_ticks_msec()
         while true:
             var available = connection.get_available_bytes()
             if available > 0:
@@ -70,7 +70,7 @@ class ServerNode extends Node:
                 if request.find("\r\n\r\n") != -1 or request.find("\n\n") != -1:
                     break
                 if request.length() > max_header_size:
-            _send_response(connection, 400, JSON.stringify({"error": "Bad request"}))
+                    _send_response(connection, 400, JSON.stringify({"error": "Bad request"}))
                     connection.disconnect_from_host()
                     return
             # Timeout if headers not received in time
