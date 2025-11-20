@@ -11,6 +11,11 @@ signal server_disconnected()
 const DEFAULT_PORT = 7777
 const MAX_CLIENTS = 8
 
+# Room code system
+var current_room_code: String = ""
+var room_code_to_ip: Dictionary = {} # room_code -> {ip, port, host_name, player_count, created_time}
+signal room_code_generated(code: String)
+
 var peer: ENetMultiplayerPeer = null
 var players: Dictionary = {} # peer_id -> player_info Dictionary
 var local_player: Node3D = null
@@ -37,6 +42,10 @@ signal grabbable_sync_update(object_id: String, data: Dictionary)
 # Avatar signals
 signal avatar_texture_received(peer_id: int)
 
+# Voxel sync signals
+signal voxel_placed_network(world_pos: Vector3, color: Color)
+signal voxel_removed_network(world_pos: Vector3)
+
 # Voice chat
 var voice_enabled: bool = false
 var microphone_bus_index: int = -1
@@ -55,8 +64,17 @@ func _ready() -> void:
 	_setup_voice_chat()
 
 
-## Create a server (host)
-func create_server(port: int = DEFAULT_PORT) -> Error:
+## Generate a 6-character room code
+func generate_room_code() -> String:
+	const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" # Removed confusing chars (I, O, 0, 1)
+	var code = ""
+	for i in range(6):
+		code += CHARS[randi() % CHARS.length()]
+	return code
+
+
+## Create a server (host) with optional room code
+func create_server(port: int = DEFAULT_PORT, use_room_code: bool = true) -> Error:
 	peer = ENetMultiplayerPeer.new()
 	var error = peer.create_server(port, MAX_CLIENTS)
 	
@@ -67,10 +85,39 @@ func create_server(port: int = DEFAULT_PORT) -> Error:
 	multiplayer.multiplayer_peer = peer
 	print("Server created on port ", port)
 	
+	# Generate room code if requested
+	if use_room_code:
+		current_room_code = generate_room_code()
+		# Get local IP
+		var local_ip = get_local_ip()
+		room_code_to_ip[current_room_code] = {
+			"ip": local_ip,
+			"port": port,
+			"host_name": local_player_info.get("name", "Host"),
+			"player_count": 1,
+			"created_time": Time.get_unix_time_from_system()
+		}
+		room_code_generated.emit(current_room_code)
+		print("Room code: ", current_room_code, " (IP: ", local_ip, ")")
+	
 	# Host is also a player
 	_register_local_player()
 	
 	return OK
+
+
+## Get local IP address
+func get_local_ip() -> String:
+	var addresses = IP.get_local_addresses()
+	for addr in addresses:
+		# Prefer IPv4 local network addresses
+		if addr.begins_with("192.168.") or addr.begins_with("10.") or addr.begins_with("172."):
+			return addr
+	# Fallback to first non-localhost address
+	for addr in addresses:
+		if addr != "127.0.0.1" and not addr.contains(":"):
+			return addr
+	return "127.0.0.1"
 
 
 ## Join a server (client)
@@ -405,38 +452,78 @@ func enable_voice_chat(enable: bool) -> void:
 
 
 func send_voice_data(audio_data: PackedVector2Array) -> void:
-	"""Send voice audio data to all other players"""
+	"""Send voice audio data to all other players with compression"""
 	if not voice_enabled or not multiplayer.multiplayer_peer:
 		return
 	
-	# Convert to PackedByteArray for network transmission
+	# Compress to 16-bit PCM instead of 32-bit float (4x smaller)
 	var byte_array = PackedByteArray()
-	byte_array.resize(audio_data.size() * 8) # 2 floats per Vector2, 4 bytes per float
+	byte_array.resize(audio_data.size() * 4) # 2 int16 per Vector2, 2 bytes per int16
 	
 	for i in range(audio_data.size()):
 		var sample = audio_data[i]
-		byte_array.encode_float(i * 8, sample.x)
-		byte_array.encode_float(i * 8 + 4, sample.y)
+		# Convert float [-1.0, 1.0] to int16 [-32768, 32767]
+		var left_int = int(clamp(sample.x, -1.0, 1.0) * 32767.0)
+		var right_int = int(clamp(sample.y, -1.0, 1.0) * 32767.0)
+		
+		# Encode as 16-bit integers
+		byte_array.encode_s16(i * 4, left_int)
+		byte_array.encode_s16(i * 4 + 2, right_int)
 	
 	_receive_voice_data.rpc_id(0, byte_array)
 
 
 @rpc("unreliable", "call_remote", "any_peer")
 func _receive_voice_data(audio_data: PackedByteArray) -> void:
-	"""Receive voice data from another player"""
+	"""Receive compressed voice data from another player"""
 	var sender_id = multiplayer.get_remote_sender_id()
 	
-	# Convert back to audio samples
-	var sample_count = audio_data.size() / 8
+	# Decompress 16-bit PCM back to float samples
+	var sample_count = audio_data.size() / 4
 	var samples = PackedVector2Array()
 	samples.resize(sample_count)
 	
 	for i in range(sample_count):
-		var left = audio_data.decode_float(i * 8)
-		var right = audio_data.decode_float(i * 8 + 4)
+		# Decode 16-bit integers
+		var left_int = audio_data.decode_s16(i * 4)
+		var right_int = audio_data.decode_s16(i * 4 + 2)
+		
+		# Convert int16 back to float [-1.0, 1.0]
+		var left = float(left_int) / 32767.0
+		var right = float(right_int) / 32767.0
 		samples[i] = Vector2(left, right)
 	
 	# Emit signal for audio playback
 	# XRPlayer will handle playing this through the remote player's AudioStreamPlayer3D
 	if players.has(sender_id):
 		players[sender_id]["voice_samples"] = samples
+
+
+# ============================================================================
+# Voxel Build Sync
+# ============================================================================
+
+func sync_voxel_placed(world_pos: Vector3, color: Color) -> void:
+	"""Notify network that a voxel was placed"""
+	if multiplayer.multiplayer_peer and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+		_notify_voxel_placed.rpc_id(0, world_pos, color)
+
+
+func sync_voxel_removed(world_pos: Vector3) -> void:
+	"""Notify network that a voxel was removed"""
+	if multiplayer.multiplayer_peer and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+		_notify_voxel_removed.rpc_id(0, world_pos)
+
+
+@rpc("reliable", "call_remote", "any_peer")
+func _notify_voxel_placed(world_pos: Vector3, color: Color) -> void:
+	"""Receive notification that someone placed a voxel"""
+	voxel_placed_network.emit(world_pos, color)
+	print("NetworkManager: Voxel placed at ", world_pos, " by peer ", multiplayer.get_remote_sender_id())
+
+
+@rpc("reliable", "call_remote", "any_peer")
+func _notify_voxel_removed(world_pos: Vector3) -> void:
+	"""Receive notification that someone removed a voxel"""
+	voxel_removed_network.emit(world_pos)
+	print("NetworkManager: Voxel removed at ", world_pos, " by peer ", multiplayer.get_remote_sender_id())

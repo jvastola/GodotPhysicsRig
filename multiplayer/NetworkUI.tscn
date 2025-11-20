@@ -46,8 +46,19 @@ text = "Multiplayer"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="UseRoomCodeCheck" type="CheckButton" parent="VBoxContainer"]
+layout_mode = 2
+button_pressed = true
+text = "Use Room Code"
+
+[node name="RoomCodeInput" type="LineEdit" parent="VBoxContainer"]
+layout_mode = 2
+placeholder_text = "Room Code (6 chars)"
+max_length = 6
+
 [node name="AddressInput" type="LineEdit" parent="VBoxContainer"]
 layout_mode = 2
+visible = false
 placeholder_text = "Server Address"
 
 [node name="PortInput" type="LineEdit" parent="VBoxContainer"]

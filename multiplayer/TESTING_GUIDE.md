@@ -3,45 +3,58 @@
 ## What's New? 🎉
 
 1. **Avatar Sync** - See each other's custom painted heads
-2. **Grabbable Sync** - Objects sync across network with ownership
-3. **Voice Chat** - Talk to each other with 3D spatial audio!
+2. **Grabbable Sync** - Objects sync across network with ownership (optimized!)
+3. **Voice Chat** - Talk to each other with 3D spatial audio (compressed!)
+4. **Room Codes** - Join games with simple 6-character codes
+5. **Voxel Build Sync** - Build together in real-time!
 
 ## Quick Test (2 Devices, Same Network)
 
 ### Device 1 (Host)
 1. Open game
-2. Click "Host Game"
-3. Paint your head (optional, but recommended)
-4. Click "Send Avatar"
-5. Click "Enable Voice"
-6. Start talking!
-7. Grab a ball or cube
+2. Make sure "Use Room Code" is checked
+3. Click "Host Game"
+4. **Share the 6-character room code shown on screen!**
+5. Paint your head (optional, but recommended)
+6. Click "Send Avatar"
+7. Click "Enable Voice"
+8. Start talking!
+9. Grab a ball or cube
+10. Place some voxels (if using VoxelTool)
 
 ### Device 2 (Client)  
 1. Open game
-2. Enter host's IP address (e.g., "192.168.1.100")
-3. Click "Join Game"
-4. Paint your head (different colors)
-5. Click "Send Avatar"
-6. Click "Enable Voice"
-7. You should:
+2. Make sure "Use Room Code" is checked
+3. **Enter the 6-character room code** from Device 1
+4. Click "Join Room"
+5. Paint your head (different colors)
+6. Click "Send Avatar"
+7. Click "Enable Voice"
+8. You should:
    - ✅ See host's avatar texture on their head
    - ✅ Hear host talking (voice comes from their position!)
    - ✅ See the ball/cube moving as host holds it
    - ❌ NOT be able to grab the ball while host holds it
    - ✅ See semi-transparent ball while host holds it
+   - ✅ See voxels appear when host places them
+   
+**Alternative:** Uncheck "Use Room Code" to join by IP address (old method)
 
 ### Both Players
 - Walk around - notice voice comes from the correct direction
-- Release and re-grab objects - smooth ownership transfer
+- Release and re-grab objects - smoother than before!
 - Try grabbing same object - only one succeeds!
+- Build voxels together - see instant replication
+- Notice smoother object sync with adaptive update rates
 
 ## Buttons Explained
 
 | Button | What It Does |
 |--------|--------------|
-| **Host Game** | Create server (you're player 1) |
-| **Join Game** | Connect to server as client |
+| **Use Room Code** | Toggle between room code and IP-based joining |
+| **Host Game** | Create server & generate room code |
+| **Join Room** | Connect using 6-char room code |
+| **Join Server** | Connect using IP (when room code off) |
 | **Disconnect** | Leave the game |
 | **Enable Voice** | Turn on microphone (others hear you) |
 | **Disable Voice** | Turn off microphone (mute) |
@@ -92,26 +105,36 @@
 - **Multiple talkers**: All players can talk at once
 - **Low latency**: ~100-200ms typical delay
 
-## Performance Notes
+## Performance Notes (Improved!)
 
-- **Voice uses**: ~30 KB/s per talking player
-- **8 players all talking**: ~240 KB/s = 2 Mbps (should be fine on WiFi)
-- **Grabbed objects**: 20 updates/second per object
+- **Voice uses**: ~7.5 KB/s per talking player (4x compression via PCM16)
+- **8 players all talking**: ~60 KB/s = 0.5 Mbps (much better!)
+- **Grabbed objects**: Adaptive 5-20 Hz (slower when stationary)
+- **Voxel builds**: Reliable sync, minimal bandwidth
 - **Avatar send**: One-time ~10 KB (only when clicking button or connecting)
 
 ## Known Limitations
 
-1. **No voice compression** - Uses raw audio (future: Opus codec)
+1. **Room codes are local-only** - No matchmaking server yet (works on LAN)
 2. **No echo cancellation** - Use headphones or mute when not talking
 3. **No push-to-talk** - Voice is always on when enabled
 4. **Single-authority grabbables** - No collaborative carrying (yet)
+5. **PCM16 compression** - Better than before, but not as good as Opus would be
 
-## Next Features (Phase 4+)
+## Completed Features ✅
 
-- 🧱 Voxel build sync
-- 🎫 Room codes (join by code instead of IP)
-- 🎧 Voice compression (Opus)
-- 📦 More optimized grabbable sync
+- ✅ Voxel build sync - Build together in real-time
+- ✅ Room codes - 6-character codes for easy joining (LAN only)
+- ✅ Voice compression - PCM16 (4x smaller than before)
+- ✅ Optimized grabbable sync - Adaptive update rates & delta compression
+
+## Future Enhancements (Phase 5+)
+
+- 🌐 Matchmaking server (room codes work globally, not just LAN)
+- 🎧 True Opus codec (requires GDExtension)
+- 🎙️ Push-to-talk support
+- 🤝 Collaborative object carrying
+- 📊 Network stats overlay (ping, bandwidth, packet loss)
 
 ---
 

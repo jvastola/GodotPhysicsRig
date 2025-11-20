@@ -36,7 +36,12 @@ var _chunks: Dictionary = {}
 # Voxel grid size (size of each individual voxel cube)
 var _voxel_size: float = 1.0
 
+# Network sync
+var network_manager: Node = null
+
 signal chunk_updated(chunk_coord: Vector3i)
+signal voxel_placed(world_pos: Vector3, color: Color)
+signal voxel_removed(world_pos: Vector3)
 
 class VoxelChunk:
 	var coord: Vector3i  # Chunk coordinate
@@ -50,14 +55,21 @@ class VoxelChunk:
 		coord = chunk_coord
 
 func _ready() -> void:
-	pass
+	# Setup network sync
+	network_manager = get_node_or_null("/root/NetworkManager")
+	if network_manager:
+		# Connect to receive voxel updates from network
+		if network_manager.has_signal("voxel_placed_network"):
+			network_manager.voxel_placed_network.connect(_on_network_voxel_placed)
+		if network_manager.has_signal("voxel_removed_network"):
+			network_manager.voxel_removed_network.connect(_on_network_voxel_removed)
 
 ## Set the size of individual voxels
 func set_voxel_size(size: float) -> void:
 	_voxel_size = size
 
 ## Add a voxel at world position
-func add_voxel(world_pos: Vector3) -> void:
+func add_voxel(world_pos: Vector3, color: Color = Color.WHITE, sync_network: bool = true) -> void:
 	var chunk_coord := world_to_chunk(world_pos)
 	var local_pos := world_to_local_voxel(world_pos, chunk_coord)
 	
@@ -66,9 +78,15 @@ func add_voxel(world_pos: Vector3) -> void:
 		chunk.voxels[local_pos] = true
 		chunk.dirty = true
 		_mark_neighbors_dirty(chunk_coord, local_pos)
+		
+		# Sync to network
+		if sync_network and network_manager and network_manager.has_method("sync_voxel_placed"):
+			network_manager.sync_voxel_placed(world_pos, color)
+		
+		voxel_placed.emit(world_pos, color)
 
 ## Remove a voxel at world position
-func remove_voxel(world_pos: Vector3) -> void:
+func remove_voxel(world_pos: Vector3, sync_network: bool = true) -> void:
 	var chunk_coord := world_to_chunk(world_pos)
 	var local_pos := world_to_local_voxel(world_pos, chunk_coord)
 	
@@ -80,9 +98,26 @@ func remove_voxel(world_pos: Vector3) -> void:
 		chunk.dirty = true
 		_mark_neighbors_dirty(chunk_coord, local_pos)
 		
+		# Sync to network
+		if sync_network and network_manager and network_manager.has_method("sync_voxel_removed"):
+			network_manager.sync_voxel_removed(world_pos)
+		
+		voxel_removed.emit(world_pos)
+		
 		# Remove chunk if empty
 		if chunk.voxels.is_empty():
 			_remove_chunk(chunk_coord)
+
+
+## Handle voxel placement from network (don't re-sync)
+func _on_network_voxel_placed(world_pos: Vector3, color: Color) -> void:
+	add_voxel(world_pos, color, false)
+
+
+## Handle voxel removal from network (don't re-sync)
+func _on_network_voxel_removed(world_pos: Vector3) -> void:
+	remove_voxel(world_pos, false)
+
 
 ## Check if a voxel exists at world position
 func has_voxel(world_pos: Vector3) -> bool:

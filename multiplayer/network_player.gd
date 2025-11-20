@@ -4,6 +4,8 @@ extends Node3D
 
 @export var peer_id: int = -1
 @export var interpolation_speed: float = 15.0
+@export var use_interpolation_buffer: bool = true
+@export var buffer_size: int = 3
 
 # Visual representations
 @onready var head_visual: MeshInstance3D = $Head
@@ -19,6 +21,11 @@ var target_left_hand_rotation: Vector3 = Vector3.ZERO
 var target_right_hand_position: Vector3 = Vector3.ZERO
 var target_right_hand_rotation: Vector3 = Vector3.ZERO
 var target_scale: Vector3 = Vector3.ONE
+
+# Interpolation buffer for smoother movement
+var position_buffer: Array = []
+var rotation_buffer: Array = []
+var buffer_index: int = 0
 
 # Label to show player name/ID
 var label_3d: Label3D = null
@@ -43,8 +50,33 @@ func _process(delta: float) -> void:
 
 ## Update target transforms from network data
 func update_from_network_data(player_data: Dictionary) -> void:
-	target_head_position = player_data.get("head_position", Vector3.ZERO)
-	target_head_rotation = player_data.get("head_rotation", Vector3.ZERO)
+	var new_head_pos = player_data.get("head_position", Vector3.ZERO)
+	var new_head_rot = player_data.get("head_rotation", Vector3.ZERO)
+	
+	# Use interpolation buffer for smoother movement
+	if use_interpolation_buffer:
+		# Add to buffer
+		position_buffer.append(new_head_pos)
+		rotation_buffer.append(new_head_rot)
+		
+		# Keep buffer size limited
+		if position_buffer.size() > buffer_size:
+			position_buffer.pop_front()
+			rotation_buffer.pop_front()
+		
+		# Average the buffer for smoother result
+		var avg_pos = Vector3.ZERO
+		var avg_rot = Vector3.ZERO
+		for pos in position_buffer:
+			avg_pos += pos
+		for rot in rotation_buffer:
+			avg_rot += rot
+		target_head_position = avg_pos / position_buffer.size()
+		target_head_rotation = avg_rot / rotation_buffer.size()
+	else:
+		target_head_position = new_head_pos
+		target_head_rotation = new_head_rot
+	
 	target_left_hand_position = player_data.get("left_hand_position", Vector3.ZERO)
 	target_left_hand_rotation = player_data.get("left_hand_rotation", Vector3.ZERO)
 	target_right_hand_position = player_data.get("right_hand_position", Vector3.ZERO)

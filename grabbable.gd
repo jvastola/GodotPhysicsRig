@@ -34,7 +34,11 @@ var grabbed_mesh_instances: Array = []
 var network_manager: Node = null
 var is_network_owner: bool = true
 var network_update_timer: float = 0.0
-const NETWORK_UPDATE_RATE = 0.05 # 20Hz
+const NETWORK_UPDATE_RATE = 0.05 # 20Hz base rate
+const NETWORK_UPDATE_RATE_SLOW = 0.2 # 5Hz when not moving much
+var last_network_position: Vector3 = Vector3.ZERO
+var last_network_rotation: Quaternion = Quaternion.IDENTITY
+const NETWORK_DELTA_THRESHOLD = 0.01 # Only send if moved > 1cm or rotated
 
 signal grabbed(hand: RigidBody3D)
 signal released()
@@ -243,12 +247,27 @@ func _physics_process(_delta: float) -> void:
 	# When grabbed, object is frozen and moves with hand automatically as child
 	# No need to update position - it's part of the hand's rigid body now
 	if is_grabbed:
-		# Update network position if we own this object
+		# Update network position if we own this object (with delta compression)
 		if is_network_owner and network_manager:
 			network_update_timer += _delta
-			if network_update_timer >= NETWORK_UPDATE_RATE:
-				network_update_timer = 0.0
-				network_manager.update_grabbed_object(save_id, global_position, global_transform.basis.get_rotation_quaternion())
+			
+			var current_pos = global_position
+			var current_rot = global_transform.basis.get_rotation_quaternion()
+			
+			# Calculate movement delta
+			var pos_delta = current_pos.distance_to(last_network_position)
+			var rot_delta = current_rot.angle_to(last_network_rotation)
+			
+			# Use slower update rate if object is stationary
+			var update_rate = NETWORK_UPDATE_RATE if (pos_delta > NETWORK_DELTA_THRESHOLD or rot_delta > 0.1) else NETWORK_UPDATE_RATE_SLOW
+			
+			if network_update_timer >= update_rate:
+				# Only send if actually moved
+				if pos_delta > NETWORK_DELTA_THRESHOLD or rot_delta > 0.01:
+					network_update_timer = 0.0
+					network_manager.update_grabbed_object(save_id, current_pos, current_rot)
+					last_network_position = current_pos
+					last_network_rotation = current_rot
 		
 		# If hand is invalid, auto-release
 		if not is_instance_valid(grabbing_hand):
