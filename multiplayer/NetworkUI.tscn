@@ -56,6 +56,10 @@ layout_mode = 2
 placeholder_text = "Room Code (6 chars)"
 max_length = 6
 
+[node name="KeyboardButton" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+text = "Keyboard"
+
 [node name="AddressInput" type="LineEdit" parent="VBoxContainer"]
 layout_mode = 2
 visible = false

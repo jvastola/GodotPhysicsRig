@@ -8,6 +8,9 @@ extends Control
 @onready var room_code_input: LineEdit = $VBoxContainer/RoomCodeInput
 @onready var port_input: LineEdit = $VBoxContainer/PortInput
 @onready var use_room_code_check: CheckButton = $VBoxContainer/UseRoomCodeCheck
+@onready var keyboard_button: Button = $VBoxContainer/KeyboardButton
+
+var virtual_keyboard: Node = null
 @onready var status_label: Label = $VBoxContainer/StatusLabel
 @onready var player_list_label: Label = $VBoxContainer/PlayerListLabel
 @onready var voice_button: Button = $VBoxContainer/VoiceButton
@@ -42,6 +45,7 @@ func _ready() -> void:
 	avatar_button.pressed.connect(_on_avatar_pressed)
 	if use_room_code_check:
 		use_room_code_check.toggled.connect(_on_use_room_code_toggled)
+	keyboard_button.pressed.connect(_on_keyboard_button_pressed)
 	
 	# Connect network signals
 	network_manager.player_connected.connect(_on_player_connected)
@@ -220,10 +224,36 @@ func _update_input_visibility() -> void:
 		room_code_input.visible = true
 		address_input.visible = false
 		join_button.text = "Join Room"
+		keyboard_button.visible = true
 	else:
 		room_code_input.visible = false
 		address_input.visible = true
 		join_button.text = "Join Server"
+		keyboard_button.visible = false
+func _on_keyboard_button_pressed() -> void:
+	if virtual_keyboard:
+		virtual_keyboard.queue_free()
+		virtual_keyboard = null
+		return
+
+	var keyboard_scene = preload("res://ui/VirtualKeyboard2D.tscn")
+	virtual_keyboard = keyboard_scene.instantiate()
+	add_child(virtual_keyboard)
+
+	# Connect the code_entered signal to update the room code input
+	virtual_keyboard.code_entered.connect(_on_keyboard_code_entered)
+
+	# Optionally, position the keyboard near the room code input
+	virtual_keyboard.position = room_code_input.position + Vector2(0, room_code_input.size.y + 10)
+
+func _on_keyboard_code_entered(code: String) -> void:
+	if room_code_input:
+		room_code_input.text = code
+		room_code_input.set_caret_column(code.length())
+	# Hide keyboard after entry
+	if virtual_keyboard:
+		virtual_keyboard.queue_free()
+		virtual_keyboard = null
 
 
 func _on_room_code_generated(code: String) -> void:
