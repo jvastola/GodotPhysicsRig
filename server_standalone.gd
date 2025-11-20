@@ -33,7 +33,7 @@ class ServerNode extends Node:
         set_process(true)
 
     func _process(_delta: float) -> void:
-        var now = Time.get_unix_time_from_system()
+        var now = OS.get_unix_time_from_system()
         if now - _last_heartbeat_s > 10:
             _last_heartbeat_s = now
             print("Matchmaking heartbeat — process is alive. Registered rooms: ", registered_rooms.size())
@@ -69,6 +69,7 @@ class ServerNode extends Node:
                 # Check for end of HTTP headers
                 if request.find("\r\n\r\n") != -1 or request.find("\n\n") != -1:
                     break
+                # Protect against runaway header sizes
                 if request.length() > max_header_size:
                     _send_response(connection, 400, JSON.stringify({"error": "Bad request"}))
                     connection.disconnect_from_host()
