@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://o3ymbnfdh106"]
+
+[ext_resource type="Script" uid="uid://07higaa50lh0" path="res://matchmaking_server_app/matchmaking_server_main.gd" id="1"]
+
+[node name="MatchmakingServer" type="Node"]
+script = ExtResource("1")

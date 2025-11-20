@@ -88,16 +88,21 @@ func unregister_room(room_code: String) -> void:
 
 
 ## Start local matchmaking server (for development/LAN)
-func start_local_server(port: int = 8080) -> Error:
+## 
+## Parameters:
+##   port (int): The port to listen on. Default is 8080.
+##   bind_address (String): The address to bind the server to. Default is "0.0.0.0".
+## 
+## Returns:
+##   Error: OK on success, or error code on failure.
+func start_local_server(port: int = 8080, bind_address: String = "0.0.0.0") -> Error:
 	tcp_server = TCPServer.new()
-	var error = tcp_server.listen(port)
-	
+	var error = tcp_server.listen(port, bind_address)
 	if error != OK:
-		push_error("MatchmakingServer: Failed to start server on port ", port)
+		push_error("MatchmakingServer: Failed to start server on port ", port, " and address ", bind_address)
 		return error
-	
 	is_server_mode = true
-	print("MatchmakingServer: Local server started on port ", port)
+	print("MatchmakingServer: Local server started on port ", port, " and address ", bind_address)
 	return OK
 
 

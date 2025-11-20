@@ -1,0 +1,17 @@
+[Unit]
+Description=Godot Headless Matchmaking Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# NOTE: Update GODOT_PROJECT_PATH in /etc/default/godot-matchmaking or as appropriate for your deployment.
+EnvironmentFile=-/etc/default/godot-matchmaking
+ExecStart=/usr/local/bin/godot --headless --script $GODOT_PROJECT_PATH
+User=ubuntu
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target
