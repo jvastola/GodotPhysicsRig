@@ -184,8 +184,19 @@ func _set_indicator_visible(visible: bool) -> void:
 func _snap_from_sample(sample_point: Vector3, has_hit: bool, surface_normal: Vector3) -> void:
 	var should_show: bool = has_hit or not hide_without_hit
 	var adjusted_point: Vector3 = sample_point
+	
+	# Check if we're in remove mode
+	var remove_mode := false
+	if _xr_controller:
+		remove_mode = _xr_controller.is_button_pressed("grip_click")
+	
 	if has_hit and surface_normal.length_squared() > 0.0 and surface_normal_offset > 0.0:
-		adjusted_point += surface_normal.normalized() * surface_normal_offset
+		if remove_mode:
+			# In remove mode, position indicator inside the hit object (negative direction)
+			adjusted_point -= surface_normal.normalized() * surface_normal_offset
+		else:
+			# In build mode, position indicator outside the hit object (positive direction)
+			adjusted_point += surface_normal.normalized() * surface_normal_offset
 	_apply_snapped_position(_snap_to_grid(adjusted_point), surface_normal)
 	if not should_show and hide_without_hit and not maintain_visibility_without_hit:
 		_set_indicator_visible(false)
