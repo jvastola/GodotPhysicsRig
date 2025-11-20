@@ -181,10 +181,8 @@ mesh = SubResource("CylinderMesh_pointer_hit")
 [node name="GridSnapIndicator" type="Node3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer"]
 script = ExtResource("8_grid_snap")
 follow_mode = "always"
-align_with_surface_normal = true
 maintain_visibility_without_hit = true
 pointer_node_path = NodePath("..")
-build_mode_enabled = true
 build_cube_scene = ExtResource("9_build_cube")
 build_parent_path = NodePath("../../../../../BuildRoot")
 raycast_path = NodePath("../PointerRayCast")

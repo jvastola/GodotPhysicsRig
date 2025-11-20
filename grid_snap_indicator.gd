@@ -14,8 +14,8 @@ var _build_parent_path: NodePath = NodePath()
 @export_range(0.01, 10.0, 0.01) var pointer_scale_grid_multiplier: float = 1.0
 @export_range(0.005, 2.0, 0.005) var pointer_scale_min_grid_size: float = 0.01
 @export_range(0.0, 0.25, 0.001) var surface_normal_offset: float = 0.01
-@export var build_mode_enabled: bool = false
-@export var build_mode_toggle_action: String = "build_mode_toggle"
+@export var build_mode_enabled: bool = true
+@export var build_mode_toggle_action: String = ""
 @export var build_cube_scene: PackedScene
 @export var default_build_color: Color = Color(0.6, 0.6, 0.6, 1.0)
 @export_range(0.1, 5.0, 0.1) var build_scale_multiplier: float = 1.0
@@ -50,6 +50,7 @@ var _last_snapped_position: Vector3 = Vector3.ZERO
 var _has_valid_position: bool = false
 var _pointer_node: Node = null
 var _build_parent: Node = null
+var _xr_controller: XRController3D = null
 
 func _ready() -> void:
 	_raycast = get_node_or_null(raycast_path) as RayCast3D
@@ -60,6 +61,13 @@ func _ready() -> void:
 	_connect_pointer_signal()
 	_refresh_build_parent()
 	_set_indicator_visible(false)
+	# Find XRController3D parent (this GridSnapIndicator is child of HandPointer which is child of XRController3D)
+	var parent = get_parent()
+	if parent:
+		parent = parent.get_parent()
+		if parent is XRController3D:
+			_xr_controller = parent
+			print("GridSnapIndicator: Found XRController3D")
 
 func _physics_process(delta: float) -> void:
 	if not auto_sample_from_raycast or not _raycast:
@@ -74,6 +82,7 @@ func _physics_process(delta: float) -> void:
 
 func _process(_delta: float) -> void:
 	_handle_build_mode_toggle()
+	_handle_build_trigger()
 
 func _update_from_raycast() -> void:
 	if not _raycast:
@@ -193,24 +202,12 @@ func _connect_pointer_signal() -> void:
 	if node.has_signal("hit_scale_changed"):
 		if not node.is_connected("hit_scale_changed", Callable(self, "_on_pointer_hit_scale_changed")):
 			node.connect("hit_scale_changed", Callable(self, "_on_pointer_hit_scale_changed"))
-	if node.has_signal("pointer_event"):
-		if not node.is_connected("pointer_event", Callable(self, "_on_pointer_event")):
-			node.connect("pointer_event", Callable(self, "_on_pointer_event"))
 
 func _on_pointer_hit_scale_changed(scale: float) -> void:
 	if not sync_grid_size_from_pointer:
 		return
 	var new_size: float = max(scale * pointer_scale_grid_multiplier, pointer_scale_min_grid_size)
 	grid_size = new_size
-
-func _on_pointer_event(event: Dictionary) -> void:
-	if not build_mode_enabled:
-		return
-	if event.get("type", "") != "press":
-		return
-	if not event.get("action_just_pressed", false):
-		return
-	_spawn_build_cube(event)
 
 func _handle_build_mode_toggle() -> void:
 	if build_mode_toggle_action == "":
@@ -219,6 +216,28 @@ func _handle_build_mode_toggle() -> void:
 		return
 	if Input.is_action_just_pressed(build_mode_toggle_action):
 		build_mode_enabled = not build_mode_enabled
+
+func _handle_build_trigger() -> void:
+	if not build_mode_enabled:
+		return
+	if not _xr_controller:
+		print("GridSnapIndicator: No XRController3D found")
+		return
+	
+	var action: String = "trigger_click"
+	if _pointer_node and "interact_action" in _pointer_node:
+		action = _pointer_node.interact_action
+	
+	# Use XR controller's action checking instead of InputMap
+	if action != "" and _xr_controller.is_button_pressed(action):
+		# Track if we already spawned this frame to avoid duplicates
+		if not _xr_controller.get_meta("_build_triggered", false):
+			print("GridSnapIndicator: SPAWNING CUBE at ", global_transform.origin)
+			_spawn_build_cube()
+			_xr_controller.set_meta("_build_triggered", true)
+	else:
+		# Reset trigger state when button is released
+		_xr_controller.set_meta("_build_triggered", false)
 
 func _refresh_build_parent() -> void:
 	if not is_inside_tree():
@@ -234,51 +253,22 @@ func _get_build_parent() -> Node:
 	_refresh_build_parent()
 	return _build_parent
 
-func _spawn_build_cube(event: Dictionary) -> void:
+func _spawn_build_cube() -> void:
 	if not build_cube_scene:
+		print("GridSnapIndicator: No build_cube_scene assigned")
 		return
 	var parent := _get_build_parent()
 	if not parent:
+		print("GridSnapIndicator: No build parent found")
 		return
 	var cube := build_cube_scene.instantiate()
 	if not cube:
+		print("GridSnapIndicator: Failed to instantiate cube")
 		return
 	parent.add_child(cube)
-	var target_position: Vector3 = _determine_build_position(event)
-	var color: Color = _get_pointer_color(event)
-	var transform := Transform3D(Basis.IDENTITY, target_position)
-	cube.global_transform = transform
+	cube.global_transform = Transform3D(Basis.IDENTITY, global_transform.origin)
 	var scale_factor: float = max(grid_size * build_scale_multiplier, 0.01)
 	if cube is Node3D:
 		var cube_node := cube as Node3D
 		cube_node.scale = Vector3.ONE * scale_factor
-	if cube.has_method("set_build_color"):
-		cube.call("set_build_color", color)
-	else:
-		_apply_color_to_mesh(cube, color)
-
-func _determine_build_position(event: Dictionary) -> Vector3:
-	if _has_valid_position:
-		return _last_snapped_position
-	return event.get("global_position", global_transform.origin)
-
-func _get_pointer_color(event: Dictionary) -> Color:
-	if event.has("pointer_color"):
-		return event["pointer_color"]
-	return default_build_color
-
-func _apply_color_to_mesh(node: Node, color: Color) -> void:
-	var mesh: MeshInstance3D = node.get_node_or_null("MeshInstance3D") as MeshInstance3D
-	if not mesh and node is Node3D:
-		for child in (node as Node3D).get_children():
-			if child is MeshInstance3D:
-				mesh = child
-				break
-	if not mesh:
-		return
-	var mat: StandardMaterial3D = mesh.material_override as StandardMaterial3D
-	if not mat:
-		mat = StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = color
-	mesh.material_override = mat
+	print("GridSnapIndicator: Successfully spawned cube at ", global_transform.origin, " with scale ", scale_factor)
