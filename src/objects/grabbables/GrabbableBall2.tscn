@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://grabbable_ball2"]
 
-[ext_resource path="res://grabbable.gd" type="Script" id="1"]
+[ext_resource path="res://src/objects/grabbable.gd" type="Script" id="1"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_slkg3"]
 size = Vector3(0.1, 1, 0.1)

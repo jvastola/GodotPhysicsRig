@@ -428,22 +428,16 @@ func _find_spawn_point(scene_root: Node, spawn_name: String = "SpawnPoint") -> N
 
 
 func _find_prototype_scene_for_save_id(save_id: String) -> String:
-	"""Search `res://grabbables` for a PackedScene whose root node matches the saved id.
-	Returns the resource path or empty string if not found."""
-	var dir := DirAccess.open("res://grabbables")
-	if not dir:
-		return ""
-
-	dir.list_dir_begin()
-	var file_name := dir.get_next()
-	var attempts := 0
-	while file_name != "":
-		attempts += 1
-		if attempts > 500:
-			break
-		if not dir.current_is_dir():
-			if file_name.ends_with(".tscn"):
-				var path := "res://grabbables/" + file_name
+	"""Search `res://src/objects/grabbables` for a PackedScene whose root node matches the saved id.
+	If found, instantiate it. Otherwise return null."""
+	
+	var dir := DirAccess.open("res://src/objects/grabbables")
+	if dir:
+		dir.list_dir_begin()
+		var file_name = dir.get_next()
+		while file_name != "":
+			if not dir.current_is_dir() and file_name.ends_with(".tscn"):
+				var path: String = "res://src/objects/grabbables/" + file_name
 				var res = ResourceLoader.load(path)
 				if res and res is PackedScene:
 					var tmp = res.instantiate()

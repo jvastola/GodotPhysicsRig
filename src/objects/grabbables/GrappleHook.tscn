@@ -1,6 +1,6 @@
 [gd_scene load_steps=4 format=3 uid="uid://cm8nv7v0apls3"]
 
-[ext_resource type="Script" uid="uid://bx5q8iwiu37d2" path="res://grabbables/GrappleHook.gd" id="1"]
+[ext_resource type="Script" uid="uid://bx5q8iwiu37d2" path="res://src/objects/grabbables/GrappleHook.gd" id="1"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_grapple"]
 size = Vector3(0.075, 0.025, 0.2)

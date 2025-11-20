@@ -105,4 +105,3 @@ func Mirror_transform(n : Vector3, d : Vector3) -> Transform3D:
 	offset = 2 * n.dot(d) * n
 	
 	return Transform3D(Basis(basisX, basisY, basisZ), offset)
-

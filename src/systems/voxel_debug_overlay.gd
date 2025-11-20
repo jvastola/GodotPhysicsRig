@@ -47,9 +47,10 @@ func _process(delta: float) -> void:
 	text += "Voxel Size: %.3f\n" % _voxel_manager._voxel_size
 	
 	# Memory estimation
-	var node_count := stats.chunks * 3  # StaticBody + MeshInstance + CollisionShape per chunk
-	var old_node_count := stats.voxels * 3  # What it would be without chunking
-	var reduction := 100.0 * (1.0 - float(node_count) / max(old_node_count, 1))
+	# Memory estimation
+	var node_count: int = int(stats.chunks) * 3  # StaticBody + MeshInstance + CollisionShape per chunk
+	var old_node_count: int = int(stats.voxels) * 3  # What it would be without chunking
+	var reduction: float = 100.0 * (1.0 - float(node_count) / max(old_node_count, 1))
 	text += "\nNode Count: %d (vs %d)\n" % [node_count, old_node_count]
 	text += "Reduction: %.2f%%\n" % reduction
 	

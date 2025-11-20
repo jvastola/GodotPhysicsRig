@@ -1,12 +1,12 @@
 [gd_scene load_steps=20 format=3 uid="uid://dtvg5mcsdmt1f"]
 
-[ext_resource type="Script" uid="uid://ct42jl8bcsjkj" path="res://floor_interactable.gd" id="1_ra6av"]
+[ext_resource type="Script" uid="uid://ct42jl8bcsjkj" path="res://src/objects/floor_interactable.gd" id="1_ra6av"]
 [ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://src/objects/Portal.tscn" id="2_portal"]
 [ext_resource type="Script" uid="uid://exskxheotyxj" path="res://src/objects/grabbable.gd" id="3_grabbable"]
 [ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://src/objects/viewport_mirror.gd" id="5_chm60"]
-[ext_resource type="PackedScene" path="res://grabbables/GrabbableCube.tscn" id="6_grabbable_cube"]
-[ext_resource type="PackedScene" path="res://grabbables/GrabbableBall.tscn" id="7_grabbable_ball"]
-[ext_resource type="PackedScene" path="res://grabbables/GrabbableBall2.tscn" id="8_grabbable_ball2"]
+[ext_resource type="PackedScene" path="res://src/objects/grabbables/GrabbableCube.tscn" id="6_grabbable_cube"]
+[ext_resource type="PackedScene" path="res://src/objects/grabbables/GrabbableBall.tscn" id="7_grabbable_ball"]
+[ext_resource type="PackedScene" path="res://src/objects/grabbables/GrabbableBall2.tscn" id="8_grabbable_ball2"]
 
 [sub_resource type="Environment" id="Environment_second"]
 background_mode = 1

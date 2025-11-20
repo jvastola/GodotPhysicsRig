@@ -1,0 +1,73 @@
+Godot Engine v4.4.1.stable.mono.official.49a5bc7b6 - https://godotengine.org
+[1;31mERROR:[0;91m Method/function failed. Returning: false
+[0;90m   at: initialize (modules/openxr/openxr_api.cpp:1624)[0m
+[1;33mWARNING:[0;93m OpenXR was requested but failed to start.
+Please check if your HMD is connected.
+Godot will start in normal mode.
+
+[0;90m     at: initialize_openxr_module (modules/openxr/register_types.cpp:175)[0m
+
+[1;33mWARNING:[0;93m res://src/player/XRPlayer.tscn:3 - ext_resource, invalid UID: uid://02kpb1kqm303 - using text path instead: res://src/player/xr_player.gd
+[0;90m     at: load (scene/resources/resource_format_text.cpp:447)[0m
+[1;35mSCRIPT ERROR:[0;95m Parse Error: Could not find type "PlayerNetworkComponent" in the current scope.
+[0;90m          at: GDScript::reload (res://src/player/xr_player.gd:20)[0m
+[1;35mSCRIPT ERROR:[0;95m Parse Error: Could not find type "PlayerVoiceComponent" in the current scope.
+[0;90m          at: GDScript::reload (res://src/player/xr_player.gd:21)[0m
+[1;35mSCRIPT ERROR:[0;95m Parse Error: Could not find type "PlayerMovementComponent" in the current scope.
+[0;90m          at: GDScript::reload (res://src/player/xr_player.gd:22)[0m
+[1;35mSCRIPT ERROR:[0;95m Parse Error: Identifier "PlayerNetworkComponent" not declared in the current scope.
+[0;90m          at: GDScript::reload (res://src/player/xr_player.gd:61)[0m
+[1;35mSCRIPT ERROR:[0;95m Parse Error: Identifier "PlayerVoiceComponent" not declared in the current scope.
+[0;90m          at: GDScript::reload (res://src/player/xr_player.gd:67)[0m
+[1;35mSCRIPT ERROR:[0;95m Parse Error: Identifier "PlayerMovementComponent" not declared in the current scope.
+[0;90m          at: GDScript::reload (res://src/player/xr_player.gd:73)[0m
+[1;31mERROR:[0;91m Failed to load script "res://src/player/xr_player.gd" with error "Parse error".
+[0;90m   at: load (modules/gdscript/gdscript.cpp:3022)[0m
+[1;33mWARNING:[0;93m res://src/player/XRPlayer.tscn:4 - ext_resource, invalid UID: uid://3ir0c0htxlqh - using text path instead: res://src/player/xr_origin_3d.gd
+[0;90m     at: load (scene/resources/resource_format_text.cpp:447)[0m
+[1;33mWARNING:[0;93m res://src/player/XRPlayer.tscn:5 - ext_resource, invalid UID: uid://der68q68jhigr - using text path instead: res://src/player/physics_hand.gd
+[0;90m     at: load (scene/resources/resource_format_text.cpp:447)[0m
+[1;33mWARNING:[0;93m res://src/player/XRPlayer.tscn:6 - ext_resource, invalid UID: uid://b8jtkbbgoxbge - using text path instead: res://src/player/desktop_controller.gd
+[0;90m     at: load (scene/resources/resource_format_text.cpp:447)[0m
+[1;33mWARNING:[0;93m res://src/player/XRPlayer.tscn:7 - ext_resource, invalid UID: uid://chk4ixs7ag67p - using text path instead: res://src/objects/watch_compass.gd
+[0;90m     at: load (scene/resources/resource_format_text.cpp:447)[0m
+[1;33mWARNING:[0;93m res://src/player/XRPlayer.tscn:8 - ext_resource, invalid UID: uid://u2otyj4gjtl2 - using text path instead: res://src/player/hand_pointer.gd
+[0;90m     at: load (scene/resources/resource_format_text.cpp:447)[0m
+[1;33mWARNING:[0;93m res://src/ui/UIViewport3D.tscn:3 - ext_resource, invalid UID: uid://d20mjy3mr3gyp - using text path instead: res://src/ui/ui_viewport_3d.gd
+[0;90m     at: load (scene/resources/resource_format_text.cpp:447)[0m
+[1;33mWARNING:[0;93m res://src/player/XRPlayer.tscn:10 - ext_resource, invalid UID: uid://cblrw6wmmg7gp - using text path instead: res://src/systems/grid_snap_indicator.gd
+[0;90m     at: load (scene/resources/resource_format_text.cpp:447)[0m
+[1;35mSCRIPT ERROR:[0;95m Parse Error: Could not find type "VoxelChunkManager" in the current scope.
+[0;90m          at: GDScript::reload (res://src/systems/grid_snap_indicator.gd:56)[0m
+[1;35mSCRIPT ERROR:[0;95m Parse Error: Could not find type "VoxelChunkManager" in the current scope.
+[0;90m          at: GDScript::reload (res://src/systems/grid_snap_indicator.gd:78)[0m
+[1;35mSCRIPT ERROR:[0;95m Parse Error: Could not find type "VoxelChunkManager" in the current scope.
+[0;90m          at: GDScript::reload (res://src/systems/grid_snap_indicator.gd:81)[0m
+[1;31mERROR:[0;91m Failed to load script "res://src/systems/grid_snap_indicator.gd" with error "Parse error".
+[0;90m   at: load (modules/gdscript/gdscript.cpp:3022)[0m
+[1;33mWARNING:[0;93m res://src/objects/BuildCube.tscn:3 - ext_resource, invalid UID: uid://bu4mb2coukop0 - using text path instead: res://src/objects/build_cube.gd
+[0;90m     at: load (scene/resources/resource_format_text.cpp:447)[0m
+[1;33mWARNING:[0;93m res://src/player/XRPlayer.tscn:12 - ext_resource, invalid UID: uid://bndx0a4k0k8hw - using text path instead: res://src/systems/voxel_chunk_manager.gd
+[0;90m     at: load (scene/resources/resource_format_text.cpp:447)[0m
+[1;33mWARNING:[0;93m res://src/objects/Portal.tscn:3 - ext_resource, invalid UID: uid://kj2sngpay0sa - using text path instead: res://src/objects/portal.gd
+[0;90m     at: load (scene/resources/resource_format_text.cpp:447)[0m
+[1;31mERROR:[0;91m Attempt to open script 'res://floor_interactable.gd' resulted in error 'File not found'.
+[0;90m   at: load_source_code (modules/gdscript/gdscript.cpp:1115)[0m
+[1;31mERROR:[0;91m Failed loading resource: res://floor_interactable.gd. Make sure resources have been imported by opening the project in the editor at least once.
+[0;90m   at: _load (core/io/resource_loader.cpp:344)[0m
+[1;33mWARNING:[0;93m res://assets/materials/MirrorMaterial.tres:3 - ext_resource, invalid UID: uid://bnotavhg8dvho - using text path instead: res://assets/shaders/Mirror.gdshader
+[0;90m     at: load (scene/resources/resource_format_text.cpp:447)[0m
+[1;33mWARNING:[0;93m res://src/objects/RotatingObject.tscn:3 - ext_resource, invalid UID: uid://rb0usqj5fuiq - using text path instead: res://src/objects/rotating_object.gd
+[0;90m     at: load (scene/resources/resource_format_text.cpp:447)[0m
+[1;31mERROR:[0;91m res://src/levels/MainScene.tscn:75 - Parse Error: [ext_resource] referenced non-existent resource at: res://floor_interactable.gd.
+[0;90m   at: _printerr (scene/resources/resource_format_text.cpp:39)[0m
+GameManager: Ready
+SaveManager: Loaded save data: ["head_paint"]
+SaveManager: Initialized, save file: user://save_data.json
+NetworkManager: Matchmaking initialized
+NetworkManager: Created Voice audio bus
+OpenXR not instantiated! Running in desktop mode.
+Grabbable:  network sync initialized
+GameManager: Initial world tracked: MainScene
+GameManager: Initial player tracked: GridTargetBodyArea
+GameManager: _deferred_restore_saved_grabs running

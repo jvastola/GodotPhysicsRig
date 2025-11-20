@@ -1,6 +1,6 @@
 [gd_resource type="ShaderMaterial" load_steps=3 format=3 uid="uid://pwg43ddp6opt"]
 
-[ext_resource type="Shader" uid="uid://bnotavhg8dvho" path="res://Mirror.gdshader" id="1"]
+[ext_resource type="Shader" uid="uid://bnotavhg8dvho" path="res://assets/shaders/Mirror.gdshader" id="1"]
 
 [sub_resource type="ViewportTexture" id="12"]
 viewport_path = NodePath("Viewport")

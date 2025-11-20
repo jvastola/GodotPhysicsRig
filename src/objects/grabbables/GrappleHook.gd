@@ -12,7 +12,7 @@ enum GrabMode {
 @export var save_id: String = ""
 @export var prototype_scene: PackedScene
 
-var _scene_of_origin: String = ""
+
 var is_grabbed := false
 var grabbing_hand: RigidBody3D = null
 var original_parent: Node = null
@@ -87,7 +87,7 @@ func _ready() -> void:
 	elif persist_visuals_across_scenes:
 		# If the user didn't set GrappleVisuals as an autoload, create it now
 		# so visuals persist across scenes for this grapple instance.
-		var gv_script = preload("res://grabbables/GrappleVisuals.gd")
+		var gv_script = preload("res://src/objects/grabbables/GrappleVisuals.gd")
 		if gv_script and not get_node_or_null("/root/GrappleVisuals"):
 			var gv = gv_script.new()
 			gv.name = "GrappleVisuals"
@@ -823,10 +823,10 @@ func _on_network_sync(object_id: String, data: Dictionary) -> void:
 		global_transform.basis = Basis(interpolated)
 
 
-func _set_remote_grabbed_visual(grabbed: bool) -> void:
+func _set_remote_grabbed_visual(is_grabbed_visual: bool) -> void:
 	for child in get_children():
 		if child is MeshInstance3D:
-			if grabbed:
+			if is_grabbed_visual:
 				if not child.material_override:
 					var mat = StandardMaterial3D.new()
 					mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -836,5 +836,5 @@ func _set_remote_grabbed_visual(grabbed: bool) -> void:
 				child.material_override = null
 
 
-func _on_collision_entered(body: Node) -> void:
+func _on_collision_entered(_body: Node) -> void:
 	pass
