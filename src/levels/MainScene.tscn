@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=15 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -10,6 +10,7 @@
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/DizzySphere.tscn" id="9_dizzy_sphere"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/SpeedBooster.tscn" id="10_speed_booster"]
 [ext_resource type="PackedScene" uid="uid://b8k3v2oax4mjw" path="res://multiplayer/NetworkUIViewport3D.tscn" id="11_network_ui"]
+[ext_resource type="PackedScene" path="res://src/objects/GridLineDisplay.tscn" id="12_grid_display"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -112,3 +113,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 1.5, 0)
 
 [node name="SpeedBooster" parent="." instance=ExtResource("10_speed_booster")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -1.5)
+
+[node name="GridLineDisplay" parent="." instance=ExtResource("12_grid_display")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, 0)
+grid_size = 100
+height_noise_scale = 0.0

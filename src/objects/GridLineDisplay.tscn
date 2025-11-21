@@ -1,0 +1,15 @@
+[gd_scene load_steps=2 format=3 uid="uid://cnhqkr7y8k7qb"]
+
+[ext_resource type="Script" path="res://src/objects/grid_line_display.gd" id="1_h2p3f"]
+
+[node name="GridLineDisplay" type="Node3D"]
+script = ExtResource("1_h2p3f")
+grid_size = 10
+cell_size = 1.0
+height_noise_scale = 0.5
+noise_frequency = 0.3
+zone1_distance = 5.0
+zone2_distance = 7.0
+line_height_offset = 1.0
+line_color = Color(0, 1, 1, 1)
+line_width = 0.02
