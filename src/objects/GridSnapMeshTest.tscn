@@ -1,0 +1,26 @@
+[gd_scene load_steps=5 format=3 uid="uid://cxwlwukm003la"]
+
+[ext_resource type="Script" uid="uid://dsk0t0enshn36" path="res://src/objects/grid_snap_mesh_test.gd" id="1_test"]
+[ext_resource type="PackedScene" uid="uid://b60rl4dw2d13k" path="res://src/objects/GridSnapMesh.tscn" id="2_grid_snap"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_floor"]
+size = Vector2(20, 20)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor"]
+albedo_color = Color(0.3, 0.3, 0.3, 1)
+
+[node name="GridSnapMeshTest" type="Node3D"]
+script = ExtResource("1_test")
+
+[node name="GridSnapMesh" parent="." instance=ExtResource("2_grid_snap")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+
+[node name="Floor" type="MeshInstance3D" parent="."]
+mesh = SubResource("PlaneMesh_floor")
+surface_material_override/0 = SubResource("StandardMaterial3D_floor")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 5, 7)
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, -0.75, 0.433013, 0, 5, 0)
