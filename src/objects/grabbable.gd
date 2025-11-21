@@ -69,6 +69,9 @@ func _ready() -> void:
 	# Setup network component
 	_setup_components()
 	
+	# Setup interaction component for new interaction system
+	_setup_interactable_component()
+	
 	# No need to restore - player persists across scenes so grabbed items stay grabbed
 	
 	# Debug: Check grab state
@@ -91,6 +94,48 @@ func _setup_components() -> void:
 	network_component.network_grab.connect(_on_network_grab)
 	network_component.network_release.connect(_on_network_release)
 	network_component.network_sync.connect(_on_network_sync)
+
+
+func _setup_interactable_component() -> void:
+	"""Setup BaseInteractable component for new interaction system"""
+	var interactable = BaseInteractable.new()
+	interactable.name = "InteractableComponent"
+	add_child(interactable)
+	
+	# Configure interactable
+	interactable.interaction_layers = 1 << 5  # Layer 6
+	interactable.select_mode = BaseInteractable.SelectMode.SINGLE
+	interactable.highlight_on_hover = true
+	
+	# Connect to interaction signals
+	interactable.selected.connect(_on_interactable_selected)
+	interactable.deselected.connect(_on_interactable_deselected)
+
+
+func _on_interactable_selected(interactor: BaseInteractor) -> void:
+	"""Called when an interactor selects this grabbable"""
+	# Try to grab - need to find the hand from the interactor
+	var hand = _find_hand_from_interactor(interactor)
+	if hand:
+		try_grab(hand)
+
+
+func _on_interactable_deselected(_interactor: BaseInteractor) -> void:
+	"""Called when an interactor deselects this grabbable"""
+	# Release if we're grabbed
+	if is_grabbed:
+		release()
+
+
+func _find_hand_from_interactor(interactor: BaseInteractor) -> RigidBody3D:
+	"""Find the physics hand associated with an interactor"""
+	# Walk up the tree to find a RigidBody3D in the physics_hand group
+	var node = interactor as Node
+	while node:
+		if node is RigidBody3D and node.is_in_group("physics_hand"):
+			return node as RigidBody3D
+		node = node.get_parent()
+	return null
 
 
 func try_grab(hand: RigidBody3D) -> bool:

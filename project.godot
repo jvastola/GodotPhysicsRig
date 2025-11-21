@@ -25,6 +25,7 @@ GameManager="*res://src/systems/game_manager.gd"
 SaveManager="*res://src/systems/save_manager.gd"
 InventoryManager="*res://src/systems/inventory_manager.gd"
 NetworkManager="*res://multiplayer/network_manager.gd"
+InteractionManager="*res://src/systems/interactions/interaction_manager.gd"
 
 [dotnet]
 
@@ -79,6 +80,7 @@ build_mode_toggle={
 3d_physics/layer_2="player"
 3d_physics/layer_3="hand"
 3d_physics/layer_4="portal"
+3d_physics/layer_6="interactable"
 
 [physics]
 
