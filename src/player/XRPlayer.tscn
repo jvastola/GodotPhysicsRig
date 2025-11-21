@@ -1,4 +1,4 @@
-[gd_scene load_steps=27 format=3 uid="uid://cpq6v7yqk8y8j"]
+[gd_scene load_steps=28 format=3 uid="uid://cpq6v7yqk8y8j"]
 
 [ext_resource type="Script" uid="uid://cp2rqqlp75g6c" path="res://src/player/xr_player.gd" id="1_player"]
 [ext_resource type="Script" uid="uid://ctf4856v8f65j" path="res://src/player/xr_origin_3d.gd" id="2_xr_origin"]
@@ -10,6 +10,7 @@
 [ext_resource type="Script" uid="uid://c7d7ugfdk2g8f" path="res://src/systems/grid_snap_indicator.gd" id="8_grid_snap"]
 [ext_resource type="PackedScene" uid="uid://bn7dgs6t6u07m" path="res://src/objects/BuildCube.tscn" id="9_build_cube"]
 [ext_resource type="Script" uid="uid://dh7nhbtbxywoc" path="res://src/systems/voxel_chunk_manager.gd" id="11_2d0bc"]
+[ext_resource type="Script" uid="uid://dr821xg418lpi" path="res://src/player/components/player_movement_component.gd" id="12_movement"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_l588l"]
 size = Vector3(0.3, 0.3, 0.2)
@@ -123,7 +124,7 @@ show_line = false
 show_hitpoint = false
 
 [node name="UIViewportWatch" parent="PlayerBody/XROrigin3D/LeftController/Watch" instance=ExtResource("7_ui_viewport")]
-transform = Transform3D(0.0999999, 7.00352e-10, 9.78694e-10, -1.19201e-09, 0.0464455, 0.0885596, 1.65669e-10, -0.0885596, 0.0464455, 1.36133e-10, 0.058575, -0.118114)
+transform = Transform3D(0.12, 0, 0, 0, 0.055748, 0.106271, 0, -0.106271, 0.055748, 0, 0.058575, -0.118114)
 
 [node name="WatchFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch"]
 cast_shadow = 0
@@ -300,6 +301,10 @@ transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
 visible = false
 cast_shadow = 0
 mesh = SubResource("BoxMesh_hand")
+
+[node name="PlayerMovementComponent" type="Node" parent="."]
+script = ExtResource("12_movement")
+turn_mode = 1
 
 [node name="VoxelChunkManager" type="Node" parent="." groups=["voxel_manager"]]
 script = ExtResource("11_2d0bc")

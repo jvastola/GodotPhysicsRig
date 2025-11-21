@@ -20,10 +20,15 @@ var _is_hovering: bool = false
 var _is_pressed: bool = false
 
 func _ready() -> void:
+	print("UIViewport3D: _ready() called")
+	print("UIViewport3D: viewport = ", viewport)
+	print("UIViewport3D: mesh_instance = ", mesh_instance)
+	
 	if pointer_group != StringName(""):
 		add_to_group(pointer_group)
 	
 	if viewport:
+		print("UIViewport3D: Setting viewport size to ", ui_size)
 		viewport.size = Vector2i(int(ui_size.x), int(ui_size.y))
 		viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 		viewport.transparent_bg = true
@@ -32,18 +37,31 @@ func _ready() -> void:
 		# when the UI is rendered to a SubViewport/mesh in 3D space.
 		viewport.gui_embed_subwindows = true
 		
+		print("UIViewport3D: Viewport configured. Children count: ", viewport.get_child_count())
+		for i in viewport.get_child_count():
+			var child = viewport.get_child(i)
+			print("UIViewport3D: Child ", i, ": ", child.name, " (", child.get_class(), ")")
+			if child.get_script():
+				print("  - Has script: ", child.get_script().resource_path)
+		
 		# Connect button signals for debug output
 		_connect_button_signals()
+	else:
+		print("UIViewport3D: ERROR - viewport is null!")
 
 	# Cache static body collision layer so we can toggle interaction cleanly
 	if _static_body:
 		_saved_static_body_layer = _static_body.collision_layer
+		print("UIViewport3D: StaticBody collision layer: ", _saved_static_body_layer)
 
 	# Ensure the mesh_instance visibility and collision are consistent
 	# (mesh visibility is visual only; collisions are controlled by the StaticBody)
 	if mesh_instance and _static_body:
 		mesh_instance.visible = true
 		_static_body.collision_layer = _saved_static_body_layer
+		print("UIViewport3D: MeshInstance visible, StaticBody enabled")
+	
+	print("UIViewport3D: _ready() complete")
 
 func _connect_button_signals() -> void:
 	var button1: Button = viewport.get_node_or_null("UIPanel/VBoxContainer/Button1") as Button

@@ -7,8 +7,6 @@ layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_right = 128.0
-offset_bottom = 72.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
@@ -20,48 +18,29 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.2, 0.2, 0.25, 0)
+color = Color(0.15, 0.15, 0.18, 0.95)
 
-[node name="BlackPlanePanel" type="Panel" parent="."]
+[node name="BackPanel" type="Panel" parent="."]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -200.0
-offset_top = -150.0
-offset_right = 200.0
-offset_bottom = 150.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
 grow_horizontal = 2
 grow_vertical = 2
-
-[node name="BlackPlaneRect" type="ColorRect" parent="BlackPlanePanel"]
-layout_mode = 1
-anchors_preset = -1
-anchor_left = -0.725
-anchor_top = -0.333
-anchor_right = 1.772
-anchor_bottom = 1.421
-offset_left = 24.0
-offset_top = -0.0999985
-offset_right = 0.199951
-offset_bottom = -16.3
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0, 0, 0, 1)
 
 [node name="TabContainer" type="TabContainer" parent="."]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -435.0
-offset_top = -230.0
-offset_right = 130.0
-offset_bottom = 203.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 15.0
+offset_top = 15.0
+offset_right = -15.0
+offset_bottom = -15.0
 grow_horizontal = 2
 grow_vertical = 2
 current_tab = 0
@@ -71,25 +50,33 @@ layout_mode = 2
 theme_override_constants/separation = 8
 metadata/_tab_index = 0
 
+[node name="TestLabel1" type="Label" parent="TabContainer/TurnVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "UI IS WORKING!"
+horizontal_alignment = 1
+
+[node name="TestLabel2" type="Label" parent="TabContainer/TurnVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "If you can read this, the viewport is rendering."
+
+[node name="TestLabel3" type="Label" parent="TabContainer/TurnVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Settings will populate when PlayerMovementComponent is found."
+
+[node name="TestButton" type="Button" parent="TabContainer/TurnVBox"]
+layout_mode = 2
+text = "Test Button - Click Me"
+
 [node name="PlayerVBox" type="VBoxContainer" parent="TabContainer"]
 visible = false
 layout_mode = 2
 theme_override_constants/separation = 8
 metadata/_tab_index = 1
 
-[node name="TurnVBox#Label" type="Label" parent="."]
+[node name="TestLabel4" type="Label" parent="TabContainer/PlayerVBox"]
 layout_mode = 2
-text = "Test UI Panel"
+text = "Player Settings Tab"
 horizontal_alignment = 1
-
-[node name="TurnVBox#Button1" type="Button" parent="."]
-layout_mode = 2
-text = "Button 1"
-
-[node name="TurnVBox#Button2" type="Button" parent="."]
-layout_mode = 2
-text = "Button 2"
-
-[node name="PlayerVBox#Button3" type="Button" parent="."]
-layout_mode = 2
-text = "Button 3"

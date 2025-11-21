@@ -5,12 +5,12 @@
 [ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://src/objects/Portal.tscn" id="2_portal"]
 [ext_resource type="Script" uid="uid://cvqfyaebx04gk" path="res://src/objects/floor_interactable.gd" id="4_floor_script"]
 [ext_resource type="PackedScene" uid="uid://b60rl4dw2d13k" path="res://src/objects/GridSnapMesh.tscn" id="6_hjxlr"]
-[ext_resource type="PackedScene" path="res://src/objects/grabbables/GravityInverter.tscn" id="7_gravity_inverter"]
-[ext_resource type="PackedScene" path="res://src/objects/grabbables/CameraFlipper.tscn" id="8_camera_flipper"]
-[ext_resource type="PackedScene" path="res://src/objects/grabbables/DizzySphere.tscn" id="9_dizzy_sphere"]
-[ext_resource type="PackedScene" path="res://src/objects/grabbables/SpeedBooster.tscn" id="10_speed_booster"]
+[ext_resource type="PackedScene" uid="uid://dve0k8qfhgyma" path="res://src/objects/grabbables/GravityInverter.tscn" id="7_gravity_inverter"]
+[ext_resource type="PackedScene" uid="uid://c4jv0mg3xpn45" path="res://src/objects/grabbables/CameraFlipper.tscn" id="8_camera_flipper"]
+[ext_resource type="PackedScene" uid="uid://crqvm2hbh8k5p" path="res://src/objects/grabbables/DizzySphere.tscn" id="9_dizzy_sphere"]
+[ext_resource type="PackedScene" uid="uid://bq7h5xn8vwfkj" path="res://src/objects/grabbables/SpeedBooster.tscn" id="10_speed_booster"]
 [ext_resource type="PackedScene" uid="uid://b8k3v2oax4mjw" path="res://multiplayer/NetworkUIViewport3D.tscn" id="11_network_ui"]
-[ext_resource type="PackedScene" path="res://src/objects/GridLineDisplay.tscn" id="12_grid_display"]
+[ext_resource type="PackedScene" uid="uid://cnhqkr7y8k7qb" path="res://src/objects/GridLineDisplay.tscn" id="12_grid_display"]
 
 [sub_resource type="Environment" id="Environment_main"]
 

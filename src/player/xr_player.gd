@@ -69,10 +69,12 @@ func _setup_components() -> void:
 	add_child(voice_component)
 	voice_component.setup(network_component.network_manager)
 	
-	# Movement Component
-	movement_component = PlayerMovementComponent.new()
-	movement_component.name = "PlayerMovementComponent"
-	add_child(movement_component)
+	# Movement Component - check if it already exists in scene first
+	movement_component = get_node_or_null("PlayerMovementComponent")
+	if not movement_component:
+		movement_component = PlayerMovementComponent.new()
+		movement_component.name = "PlayerMovementComponent"
+		add_child(movement_component)
 	movement_component.setup(player_body, right_controller)
 
 
