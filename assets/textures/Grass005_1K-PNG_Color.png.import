@@ -3,8 +3,8 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://du3b31c0lk6v0"
-path.bptc="res://.godot/imported/Grass005_1K-PNG_Color.png-e566cdf2985d27b266e2825d3d25ad6c.bptc.ctex"
-path.astc="res://.godot/imported/Grass005_1K-PNG_Color.png-e566cdf2985d27b266e2825d3d25ad6c.astc.ctex"
+path.s3tc="res://.godot/imported/Grass005_1K-PNG_Color.png-e566cdf2985d27b266e2825d3d25ad6c.s3tc.ctex"
+path.etc2="res://.godot/imported/Grass005_1K-PNG_Color.png-e566cdf2985d27b266e2825d3d25ad6c.etc2.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
@@ -13,13 +13,13 @@ metadata={
 [deps]
 
 source_file="res://assets/textures/Grass005_1K-PNG_Color.png"
-dest_files=["res://.godot/imported/Grass005_1K-PNG_Color.png-e566cdf2985d27b266e2825d3d25ad6c.bptc.ctex", "res://.godot/imported/Grass005_1K-PNG_Color.png-e566cdf2985d27b266e2825d3d25ad6c.astc.ctex"]
+dest_files=["res://.godot/imported/Grass005_1K-PNG_Color.png-e566cdf2985d27b266e2825d3d25ad6c.s3tc.ctex", "res://.godot/imported/Grass005_1K-PNG_Color.png-e566cdf2985d27b266e2825d3d25ad6c.etc2.ctex"]
 
 [params]
 
 compress/mode=2
-compress/high_quality=true
-compress/lossy_quality=0.5
+compress/high_quality=false
+compress/lossy_quality=0.7
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
