@@ -70,7 +70,7 @@ app.post('/room', (req, res) => {
   // Store room data
   rooms.set(room_code, {
     ip,
-    port,
+    port: parseInt(port),  // Ensure it's an integer
     host_name: host_name || 'Host',
     player_count: 1,
     timestamp: timestamp || getCurrentTimestamp()
