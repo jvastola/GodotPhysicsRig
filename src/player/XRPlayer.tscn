@@ -1,15 +1,15 @@
 [gd_scene load_steps=27 format=3 uid="uid://cpq6v7yqk8y8j"]
 
-[ext_resource type="Script" uid="uid://02kpb1kqm303" path="res://src/player/xr_player.gd" id="1_player"]
-[ext_resource type="Script" uid="uid://3ir0c0htxlqh" path="res://src/player/xr_origin_3d.gd" id="2_xr_origin"]
-[ext_resource type="Script" uid="uid://der68q68jhigr" path="res://src/player/physics_hand.gd" id="3_physics_hand"]
-[ext_resource type="Script" uid="uid://b8jtkbbgoxbge" path="res://src/player/desktop_controller.gd" id="4_desktop"]
-[ext_resource type="Script" uid="uid://chk4ixs7ag67p" path="res://src/objects/watch_compass.gd" id="5_watch"]
-[ext_resource type="Script" uid="uid://u2otyj4gjtl2" path="res://src/player/hand_pointer.gd" id="6_pointer"]
+[ext_resource type="Script" uid="uid://cp2rqqlp75g6c" path="res://src/player/xr_player.gd" id="1_player"]
+[ext_resource type="Script" uid="uid://ctf4856v8f65j" path="res://src/player/xr_origin_3d.gd" id="2_xr_origin"]
+[ext_resource type="Script" uid="uid://coktjl2e68ifs" path="res://src/player/physics_hand.gd" id="3_physics_hand"]
+[ext_resource type="Script" uid="uid://b0ncs507wux1w" path="res://src/player/desktop_controller.gd" id="4_desktop"]
+[ext_resource type="Script" uid="uid://deum3u4irqnyx" path="res://src/objects/watch_compass.gd" id="5_watch"]
+[ext_resource type="Script" uid="uid://d0gh2ivuh4osn" path="res://src/player/hand_pointer.gd" id="6_pointer"]
 [ext_resource type="PackedScene" uid="uid://b2gkx1eim00mw" path="res://src/ui/UIViewport3D.tscn" id="7_ui_viewport"]
-[ext_resource type="Script" uid="uid://cblrw6wmmg7gp" path="res://src/systems/grid_snap_indicator.gd" id="8_grid_snap"]
+[ext_resource type="Script" uid="uid://c7d7ugfdk2g8f" path="res://src/systems/grid_snap_indicator.gd" id="8_grid_snap"]
 [ext_resource type="PackedScene" uid="uid://bn7dgs6t6u07m" path="res://src/objects/BuildCube.tscn" id="9_build_cube"]
-[ext_resource type="Script" uid="uid://bndx0a4k0k8hw" path="res://src/systems/voxel_chunk_manager.gd" id="11_2d0bc"]
+[ext_resource type="Script" uid="uid://dh7nhbtbxywoc" path="res://src/systems/voxel_chunk_manager.gd" id="11_2d0bc"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_l588l"]
 size = Vector3(0.3, 0.3, 0.2)
@@ -65,8 +65,6 @@ height = 1.2
 [node name="XRPlayer" type="Node3D"]
 script = ExtResource("1_player")
 desktop_extra_collider_offset = Vector3(0, 0, 0)
-turn_mode = 1
-smooth_turn_speed = 180.0
 
 [node name="BuildRoot" type="Node3D" parent="."]
 
@@ -127,6 +125,7 @@ show_hitpoint = false
 
 [node name="UIViewportWatch" parent="PlayerBody/XROrigin3D/LeftController/Watch" instance=ExtResource("7_ui_viewport")]
 transform = Transform3D(0.0999999, 7.00354e-10, 9.78694e-10, -1.19201e-09, 0.0464455, 0.0885596, 1.65669e-10, -0.0885596, 0.0464455, 1.36133e-10, 0.058575, -0.118114)
+ui_size = Vector2(1280, 720)
 
 [node name="WatchFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch"]
 cast_shadow = 0
@@ -208,6 +207,7 @@ mesh = SubResource("BoxMesh_hand")
 [node name="HandPointer" type="Node3D" parent="PlayerBody/XROrigin3D/RightController"]
 script = ExtResource("6_pointer")
 ray_length = 1.5
+ray_visibility_mode = "on_hit_and_trigger"
 hit_min_scale = 0.2
 hit_max_scale = 1.0
 

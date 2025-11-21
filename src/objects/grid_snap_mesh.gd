@@ -117,14 +117,6 @@ func _create_convex_mesh(vertices: PackedVector3Array) -> void:
 	if vertices.size() < 4:
 		return  # Need at least 4 vertices for a volume
 	
-	# Use Godot's built-in convex hull generation
-	var surface_tool = SurfaceTool.new()
-	surface_tool.begin(Mesh.PRIMITIVE_TRIANGLES)
-	
-	# Create arrays for the mesh
-	var arrays = []
-	arrays.resize(Mesh.ARRAY_MAX)
-	
 	# Generate convex hull triangles using a simple approach
 	var triangles = _generate_convex_hull_triangles(vertices)
 	
@@ -132,6 +124,13 @@ func _create_convex_mesh(vertices: PackedVector3Array) -> void:
 	var final_vertices = PackedVector3Array()
 	var final_normals = PackedVector3Array()
 	var final_uvs = PackedVector2Array()
+	
+	# Calculate centroid for winding order correction
+	var centroid = Vector3.ZERO
+	for v in vertices:
+		centroid += v
+	if vertices.size() > 0:
+		centroid /= vertices.size()
 	
 	for tri in triangles:
 		var v0 = vertices[tri[0]]
@@ -142,6 +141,15 @@ func _create_convex_mesh(vertices: PackedVector3Array) -> void:
 		var edge1 = v1 - v0
 		var edge2 = v2 - v0
 		var normal = edge1.cross(edge2).normalized()
+		
+		# Check winding order: normal should point away from centroid
+		# Vector from centroid to face (using v0 is sufficient)
+		if normal.dot(v0 - centroid) < 0:
+			# Flip winding
+			var temp = v1
+			v1 = v2
+			v2 = temp
+			normal = -normal
 		
 		# Add each vertex of the triangle
 		final_vertices.append(v0)
@@ -156,7 +164,9 @@ func _create_convex_mesh(vertices: PackedVector3Array) -> void:
 		final_uvs.append(Vector2(1, 0))
 		final_uvs.append(Vector2(0.5, 1))
 	
-	# Set the arrays
+	# Create arrays for the mesh
+	var arrays = []
+	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = final_vertices
 	arrays[Mesh.ARRAY_NORMAL] = final_normals
 	arrays[Mesh.ARRAY_TEX_UV] = final_uvs

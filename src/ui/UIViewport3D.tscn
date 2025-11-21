@@ -1,6 +1,6 @@
 [gd_scene load_steps=7 format=3 uid="uid://b2gkx1eim00mw"]
 
-[ext_resource type="Script" uid="uid://d20mjy3mr3gyp" path="res://src/ui/ui_viewport_3d.gd" id="1_ui_script"]
+[ext_resource type="Script" uid="uid://dcednjyo6sb8j" path="res://src/ui/ui_viewport_3d.gd" id="1_ui_script"]
 [ext_resource type="PackedScene" uid="uid://buvibmbg15qul" path="res://src/ui/UIPanel.tscn" id="2_ui_panel"]
 
 [sub_resource type="ViewportTexture" id="ViewportTexture_ui"]
@@ -23,9 +23,11 @@ script = ExtResource("1_ui_script")
 
 [node name="SubViewport" type="SubViewport" parent="."]
 transparent_bg = true
+size = Vector2i(1280, 720)
 render_target_update_mode = 4
 
 [node name="UIPanel" parent="SubViewport" instance=ExtResource("2_ui_panel")]
+script = null
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
 material_override = SubResource("StandardMaterial3D_ui")

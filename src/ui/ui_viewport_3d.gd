@@ -27,7 +27,10 @@ func _ready() -> void:
 		viewport.size = Vector2i(int(ui_size.x), int(ui_size.y))
 		viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 		viewport.transparent_bg = true
-		viewport.gui_embed_subwindows = false
+		# Embed subwindow popups (OptionButton, ContextMenu, etc) into the SubViewport so
+		# popup controls (PopupMenu, OptionButton menu) render and receive input correctly
+		# when the UI is rendered to a SubViewport/mesh in 3D space.
+		viewport.gui_embed_subwindows = true
 		
 		# Connect button signals for debug output
 		_connect_button_signals()

@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3 uid="uid://b60rl4dw2d13k"]
 
-[ext_resource type="Script" path="res://src/objects/grid_snap_mesh.gd" id="1_grid_snap"]
+[ext_resource type="Script" uid="uid://mx6ueldh6iu5" path="res://src/objects/grid_snap_mesh.gd" id="1_grid_snap"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_grid_snap"]
 albedo_color = Color(0.8, 0.3, 0.9, 1)
@@ -13,7 +13,6 @@ emission_energy_multiplier = 0.8
 [node name="GridSnapMesh" type="RigidBody3D" groups=["grabbable"]]
 mass = 0.3
 script = ExtResource("1_grid_snap")
-grid_size = 0.25
 vertex_count = 16
 shape_radius = 0.25
 mesh_material = SubResource("StandardMaterial3D_grid_snap")
