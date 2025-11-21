@@ -92,3 +92,7 @@ font_size = 48
 transform = Transform3D(0.999479, 0, 0.0322832, 0, 1, 0, -0.0322832, 0, 0.999479, -1.44939, 1.10555, -2.04488)
 
 [node name="GridSnapMesh" parent="." instance=ExtResource("6_hjxlr")]
+gravity_scale = 0.1
+vertex_count = 12
+shape_radius = 0.1
+grab_mode = 0

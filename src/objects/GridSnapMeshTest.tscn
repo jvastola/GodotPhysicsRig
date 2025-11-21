@@ -14,6 +14,8 @@ script = ExtResource("1_test")
 
 [node name="GridSnapMesh" parent="." instance=ExtResource("2_grid_snap")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+vertex_count = 12
+shape_radius = 0.3
 
 [node name="Floor" type="MeshInstance3D" parent="."]
 mesh = SubResource("PlaneMesh_floor")

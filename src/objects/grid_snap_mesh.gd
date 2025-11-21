@@ -13,6 +13,15 @@ extends Grabbable
 ## Material for the mesh
 @export var mesh_material: Material
 
+## Invert face normals (flip inside-out)
+@export var invert_faces: bool = false
+
+## Make mesh double-sided
+@export var double_sided: bool = false
+
+## Use smooth normals instead of flat shading
+@export var smooth_normals: bool = false
+
 var array_mesh: ArrayMesh
 var initial_vertices: PackedVector3Array
 var last_position: Vector3
@@ -132,6 +141,37 @@ func _create_convex_mesh(vertices: PackedVector3Array) -> void:
 	if vertices.size() > 0:
 		centroid /= vertices.size()
 	
+	# If smooth normals, we need to average normals per vertex
+	var vertex_normals = {}  # Dictionary mapping vertex position to accumulated normal
+	
+	if smooth_normals:
+		# First pass: accumulate normals for each vertex position
+		for tri in triangles:
+			var v0 = vertices[tri[0]]
+			var v1 = vertices[tri[1]]
+			var v2 = vertices[tri[2]]
+			
+			var edge1 = v1 - v0
+			var edge2 = v2 - v0
+			var normal = edge1.cross(edge2).normalized()
+			
+			# Check winding order
+			if normal.dot(v0 - centroid) < 0:
+				normal = -normal
+			
+			# Apply invert option
+			if invert_faces:
+				normal = -normal
+			
+			# Accumulate normals for each vertex
+			for vertex in [v0, v1, v2]:
+				var key = _vector_to_key(vertex)
+				if key in vertex_normals:
+					vertex_normals[key] += normal
+				else:
+					vertex_normals[key] = normal
+	
+	# Second pass: build the mesh
 	for tri in triangles:
 		var v0 = vertices[tri[0]]
 		var v1 = vertices[tri[1]]
@@ -143,26 +183,58 @@ func _create_convex_mesh(vertices: PackedVector3Array) -> void:
 		var normal = edge1.cross(edge2).normalized()
 		
 		# Check winding order: normal should point away from centroid
-		# Vector from centroid to face (using v0 is sufficient)
-		if normal.dot(v0 - centroid) < 0:
+		var should_flip = normal.dot(v0 - centroid) < 0
+		if should_flip:
 			# Flip winding
 			var temp = v1
 			v1 = v2
 			v2 = temp
 			normal = -normal
 		
-		# Add each vertex of the triangle
+		# Apply invert option
+		if invert_faces:
+			normal = -normal
+			# Also flip winding if inverting
+			var temp = v1
+			v1 = v2
+			v2 = temp
+		
+		# Get normals (smooth or flat)
+		var n0 = normal
+		var n1 = normal
+		var n2 = normal
+		
+		if smooth_normals:
+			n0 = vertex_normals[_vector_to_key(v0)].normalized()
+			n1 = vertex_normals[_vector_to_key(v1)].normalized()
+			n2 = vertex_normals[_vector_to_key(v2)].normalized()
+		
+		# Add front face
 		final_vertices.append(v0)
 		final_vertices.append(v1)
 		final_vertices.append(v2)
 		
-		final_normals.append(normal)
-		final_normals.append(normal)
-		final_normals.append(normal)
+		final_normals.append(n0)
+		final_normals.append(n1)
+		final_normals.append(n2)
 		
 		final_uvs.append(Vector2(0, 0))
 		final_uvs.append(Vector2(1, 0))
 		final_uvs.append(Vector2(0.5, 1))
+		
+		# Add back face if double-sided
+		if double_sided:
+			final_vertices.append(v0)
+			final_vertices.append(v2)  # Reversed winding
+			final_vertices.append(v1)
+			
+			final_normals.append(-n0)
+			final_normals.append(-n2)
+			final_normals.append(-n1)
+			
+			final_uvs.append(Vector2(0, 0))
+			final_uvs.append(Vector2(0.5, 1))
+			final_uvs.append(Vector2(1, 0))
 	
 	# Create arrays for the mesh
 	var arrays = []
@@ -177,6 +249,10 @@ func _create_convex_mesh(vertices: PackedVector3Array) -> void:
 	# Apply material
 	if mesh_material:
 		array_mesh.surface_set_material(0, mesh_material)
+
+func _vector_to_key(v: Vector3) -> String:
+	# Create a unique key for vertex position (for normal averaging)
+	return "%.4f,%.4f,%.4f" % [v.x, v.y, v.z]
 
 func _generate_convex_hull_triangles(vertices: PackedVector3Array) -> Array:
 	# Use a ConvexPolygonShape3D to generate the hull, then extract triangles
