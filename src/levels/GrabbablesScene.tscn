@@ -1,0 +1,170 @@
+[gd_scene load_steps=20 format=3 uid="uid://ctam55k3jq6cl"]
+
+[ext_resource type="Script" uid="uid://ct42jl8bcsjkj" path="res://src/objects/floor_interactable.gd" id="1_ra6av"]
+[ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://src/objects/Portal.tscn" id="2_portal"]
+[ext_resource type="Script" uid="uid://exskxheotyxj" path="res://src/objects/grabbable.gd" id="3_grabbable"]
+[ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://src/objects/viewport_mirror.gd" id="5_chm60"]
+[ext_resource type="PackedScene" path="res://src/objects/grabbables/GrabbableCube.tscn" id="6_grabbable_cube"]
+[ext_resource type="PackedScene" path="res://src/objects/grabbables/GrabbableBall.tscn" id="7_grabbable_ball"]
+[ext_resource type="PackedScene" path="res://src/objects/grabbables/GrabbableBall2.tscn" id="8_grabbable_ball2"]
+[ext_resource type="PackedScene" path="res://src/objects/VoxelTool.tscn" id="9_voxel_tool"]
+
+[sub_resource type="Environment" id="Environment_second"]
+background_mode = 1
+background_color = Color(0.2, 0.3, 0.4, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_floor2"]
+size = Vector3(15, 1, 15)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor2"]
+albedo_color = Color(0.6, 0.4, 0.3, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_floor2"]
+material = SubResource("StandardMaterial3D_floor2")
+size = Vector3(15, 1, 15)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_cube"]
+size = Vector3(0.3, 0.3, 0.3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cube"]
+albedo_color = Color(0.8, 0.2, 0.2, 1)
+metallic = 0.5
+roughness = 0.3
+
+[sub_resource type="BoxMesh" id="BoxMesh_cube"]
+material = SubResource("StandardMaterial3D_cube")
+size = Vector3(0.3, 0.3, 0.3)
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_ball"]
+radius = 0.15
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ball"]
+albedo_color = Color(0.2, 0.6, 0.9, 1)
+metallic = 0.3
+roughness = 0.2
+
+[sub_resource type="SphereMesh" id="SphereMesh_ball"]
+material = SubResource("StandardMaterial3D_ball")
+radius = 0.15
+height = 0.3
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_slkg3"]
+size = Vector3(0.1, 1, 0.1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ra6av"]
+size = Vector3(0.1, 1, 0.1)
+
+[node name="GrabbablesScene" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_second")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866023, -0.433016, 0.250001, 0, 0.499998, 0.866027, -0.500003, -0.749999, 0.43301, 0, 5, 0)
+light_color = Color(1, 0.9, 0.8, 1)
+shadow_enabled = true
+
+[node name="Floor" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+collision_mask = 0
+script = ExtResource("1_ra6av")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+shape = SubResource("BoxShape3D_floor2")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
+mesh = SubResource("BoxMesh_floor2")
+
+[node name="SpawnPoint" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+
+[node name="Portal" parent="." instance=ExtResource("2_portal")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -5.60082)
+target_scene = "res://src/levels/MainScene.tscn"
+portal_color = Color(0.696713, 0.153061, 0.812148, 0.5)
+use_spawn_point = true
+spawn_point_name = "SpawnPoint"
+
+[node name="WelcomeLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+text = "Second Room!"
+font_size = 64
+outline_size = 16
+
+[node name="GrabbableCube" type="RigidBody3D" parent="." groups=["grabbable"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1.5, 0)
+mass = 0.5
+contact_monitor = true
+max_contacts_reported = 4
+script = ExtResource("3_grabbable")
+save_id = "GrabbableCube"
+prototype_scene = ExtResource("6_grabbable_cube")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GrabbableCube"]
+shape = SubResource("BoxShape3D_cube")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="GrabbableCube"]
+mesh = SubResource("BoxMesh_cube")
+
+[node name="Label3D" type="Label3D" parent="GrabbableCube"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+text = "Anchor Grab"
+font_size = 24
+outline_size = 8
+
+[node name="GrabbableBall" type="RigidBody3D" parent="." groups=["grabbable"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1.5, 0)
+mass = 0.1
+gravity_scale = 0.3
+contact_monitor = true
+max_contacts_reported = 4
+script = ExtResource("3_grabbable")
+grab_mode = 0
+save_id = "GrabbableBall"
+prototype_scene = ExtResource("7_grabbable_ball")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GrabbableBall"]
+shape = SubResource("SphereShape3D_ball")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="GrabbableBall"]
+mesh = SubResource("SphereMesh_ball")
+
+[node name="Label3D" type="Label3D" parent="GrabbableBall"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+text = "Free Grab"
+font_size = 24
+outline_size = 8
+
+[node name="GrabbableBall2" type="RigidBody3D" parent="." groups=["grabbable"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1.5, 0)
+mass = 0.1
+gravity_scale = 0.3
+contact_monitor = true
+max_contacts_reported = 4
+script = ExtResource("3_grabbable")
+grab_mode = 0
+save_id = "GrabbableBall2"
+prototype_scene = ExtResource("8_grabbable_ball2")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GrabbableBall2"]
+shape = SubResource("BoxShape3D_slkg3")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="GrabbableBall2"]
+mesh = SubResource("BoxMesh_ra6av")
+
+[node name="Label3D" type="Label3D" parent="GrabbableBall2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+text = "Free Grab"
+font_size = 24
+outline_size = 8
+
+[node name="VoxelTool" parent="." instance=ExtResource("9_voxel_tool")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -3)
+
+[node name="ViewportMirror" type="Node3D" parent="."]
+transform = Transform3D(0.184826, 0, 0.982771, 0, 1, 0, -0.982771, 0, 0.184826, -4.32121, 0.881646, 0)
+script = ExtResource("5_chm60")
+size = Vector2(2, 1.5)
+ResolutionPerUnit = 500
+MainCamPath = NodePath("../XRPlayer/PlayerBody/XROrigin3D/XRCamera3D")
+MirrorColor = Color(1, 1, 1, 1)

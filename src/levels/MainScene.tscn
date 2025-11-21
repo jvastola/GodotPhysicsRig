@@ -77,5 +77,16 @@ transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 1.2
 text = "Inventory Room"
 font_size = 48
 
+[node name="PortalGrabbables" parent="." instance=ExtResource("2_portal")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -9)
+target_scene = "res://src/levels/GrabbablesScene.tscn"
+portal_color = Color(1, 0.5, 0, 0.5)
+use_spawn_point = true
+
+[node name="PortalLabel2" type="Label3D" parent="PortalGrabbables"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+text = "Grabbables Room"
+font_size = 48
+
 [node name="NetworkUIViewport3D" parent="." instance=ExtResource("11_network_ui")]
 transform = Transform3D(0.999479, 0, 0.0322832, 0, 1, 0, -0.0322832, 0, 0.999479, -1.44939, 1.10555, -2.04488)
