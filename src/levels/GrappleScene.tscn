@@ -1,0 +1,127 @@
+[gd_scene load_steps=29 format=3 uid="uid://6lgchuidsfsd"]
+
+[ext_resource type="PackedScene" uid="uid://dj4y7k8m3nxq2" path="res://src/ui/InventoryUIViewport3D.tscn" id="1_inventory_ui"]
+[ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
+[ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://src/objects/Portal.tscn" id="2_portal"]
+[ext_resource type="Script" uid="uid://cvqfyaebx04gk" path="res://src/objects/floor_interactable.gd" id="4_floor_script"]
+[ext_resource type="PackedScene" uid="uid://b2gkx1eim00mw" path="res://src/ui/UIViewport3D.tscn" id="5_ui_viewport"]
+[ext_resource type="Shader" uid="uid://dr5h6mrlbi74h" path="res://assets/shaders/red_sphere_layered.gdshader" id="6_brh7a"]
+[ext_resource type="PackedScene" uid="uid://cm8nv7v0apls3" path="res://src/objects/grabbables/GrappleHook.tscn" id="7_grapple"]
+[ext_resource type="Script" uid="uid://dacfvlwh7dwcm" path="res://src/objects/viewport_mirror.gd" id="8_viewport_mirror"]
+[ext_resource type="PackedScene" uid="uid://bhun80s4vlhet" path="res://src/objects/RotatingObject.tscn" id="9_rotating"]
+[ext_resource type="Script" uid="uid://b3e1iih2vth83" path="res://src/systems/grid_painter.gd" id="10_grid_painter"]
+[ext_resource type="PackedScene" uid="uid://b8k3v2oax4mjw" path="res://multiplayer/NetworkUIViewport3D.tscn" id="11_network_ui"]
+[ext_resource type="Script" uid="uid://b8r57aadml1x5" path="res://src/debug/inventory_debug.gd" id="12_inventory_debug"]
+
+[sub_resource type="Environment" id="Environment_main"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_floor"]
+size = Vector3(20, 1, 20)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor"]
+albedo_color = Color(0.322343, 0.283225, 0.582868, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_floor"]
+material = SubResource("StandardMaterial3D_floor")
+size = Vector3(20, 1, 20)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_blue_cube"]
+albedo_color = Color(0, 0, 1, 1)
+roughness = 0.5
+
+[sub_resource type="BoxMesh" id="BoxMesh_blue_cube"]
+material = SubResource("StandardMaterial3D_blue_cube")
+size = Vector3(0.5, 0.5, 0.5)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_red_sphere"]
+render_priority = 1
+shader = ExtResource("6_brh7a")
+shader_parameter/albedo_color = Color(1, 0, 0, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_red_sphere"]
+material = SubResource("ShaderMaterial_red_sphere")
+radius = 0.25
+height = 0.5
+radial_segments = 32
+rings = 16
+
+[sub_resource type="BoxMesh" id="BoxMesh_left_hand_grid"]
+size = Vector3(0.45, 0.45, 0.45)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_left_hand_grid"]
+size = Vector3(0.45, 0.45, 0.45)
+
+[sub_resource type="BoxMesh" id="BoxMesh_right_hand_grid"]
+size = Vector3(0.45, 0.45, 0.45)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_right_hand_grid"]
+size = Vector3(0.45, 0.45, 0.45)
+
+[sub_resource type="BoxMesh" id="BoxMesh_head_grid"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_head_grid"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_body_grid"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body_grid"]
+
+[node name="GrappleScene" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_main")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.866024, -0.433016, 0.250001, 0.460194, -0.494776, 0.737169, -0.195511, 0.753454, 0.627759, 0, 5, 5.02959)
+shadow_enabled = true
+
+[node name="Floor" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.7, 0)
+collision_layer = 33
+collision_mask = 0
+script = ExtResource("4_floor_script")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+shape = SubResource("BoxShape3D_floor")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
+mesh = SubResource("BoxMesh_floor")
+
+[node name="SpawnPoint" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+
+[node name="XRPlayer" parent="." instance=ExtResource("1_xrplayer")]
+transform = Transform3D(0.999598, 0, 0, 0, 0.999598, 0, 0, 0, 0.999598, 0, 2, 0)
+
+[node name="Portal" parent="." instance=ExtResource("2_portal")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -5.60082)
+target_scene = "res://src/levels/MainScene.tscn"
+portal_color = Color(1, 0.6, 0.3, 0.5)
+use_spawn_point = true
+
+
+
+[node name="BlueCube" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.50977, 1, -2.50433)
+mesh = SubResource("BoxMesh_blue_cube")
+
+[node name="RedSphere" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.54871, 1, -2.5)
+layers = 3
+mesh = SubResource("SphereMesh_red_sphere")
+
+[node name="GrappleHook" parent="." instance=ExtResource("7_grapple")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.406114, -0.259245)
+rope_sag_factor = 0.05
+rope_end_stiffness = 0.5
+rope_mid_sag_bias = 0.5
+rope_start_min_length = 0.5
+
+[node name="RotatingObject" parent="." instance=ExtResource("9_rotating")]
+transform = Transform3D(5.28053, 0, 0, 0, 1, 0, 0, 0, 1, 3, 3.34535, -2)
+
+
+
+[node name="NetworkUIViewport3D" parent="." instance=ExtResource("11_network_ui")]
+transform = Transform3D(0.999479, 0, 0.0322832, 0, 1, 0, -0.0322832, 0, 0.999479, -1.44939, 1.10555, -2.04488)
+
+
