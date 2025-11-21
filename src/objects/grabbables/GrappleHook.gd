@@ -6,7 +6,7 @@ enum GrabMode {
 	ANCHOR_GRAB
 }
 
-@export var grab_mode: GrabMode = GrabMode.ANCHOR_GRAB
+@export var grab_mode: GrabMode = GrabMode.FREE_GRAB
 @export var grab_anchor_offset: Vector3 = Vector3.ZERO
 @export var grab_anchor_rotation: Vector3 = Vector3.ZERO
 @export var save_id: String = ""
@@ -79,6 +79,15 @@ func _ready() -> void:
 	grabbed.connect(_on_grabbed)
 	released.connect(_on_released)
 
+	# Get the HitTargetMarker node from the scene
+	var hit_target_marker = get_node_or_null("HitTargetMarker")
+	if hit_target_marker:
+		_hitmarker = hit_target_marker.get_node_or_null("MarkerMesh")
+		if _hitmarker:
+			_hitmarker.visible = false
+			if enable_debug_logs:
+				print("GrappleHook: Using scene hitmarker node")
+	
 	# Detect global visuals manager (autoload) and use it if available
 	_global_visuals = get_node_or_null("/root/GrappleVisuals")
 	if _global_visuals:
@@ -97,24 +106,8 @@ func _ready() -> void:
 			_use_global_visuals = true
 			# init segments after the new node is added to the scene tree so _ready() has run
 			_global_visuals.call_deferred("init_segments", rope_segments)
-	else:
-		# Create a simple world-space hitmarker (a small emissive sphere)
-		var sphere = SphereMesh.new()
-		# Set radius inside the else scope
-		sphere.radius = hitmarker_radius
-		var mi = MeshInstance3D.new()
-		mi.mesh = sphere
-		var mat = StandardMaterial3D.new()
-		mat.albedo_color = hitmarker_color
-		mat.emission_enabled = true
-		mat.emission = hitmarker_color
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mi.material_override = mat
-		mi.visible = false
-		mi.name = "GrappleHitmarker"
-		_hitmarker = mi
-	# Add hitmarker to the scene tree root so it persists across scene changes
-	# Use call_deferred because the scene tree may be busy setting up children when _ready runs.
+	
+	# No longer creating hitmarker programmatically - using scene node instead
 	# ensure root is available before attempting to attach visuals
 	var root = get_tree().root
 	if not root:
@@ -518,13 +511,10 @@ func _physics_process(delta: float) -> void:
 
 func _exit_tree() -> void:
 	_end_grapple()
+	# Hitmarker is now a scene node (child of this GrappleHook), so it will be cleaned up automatically
+	# Just hide it if needed
 	if is_instance_valid(_hitmarker):
-		if persist_visuals_across_scenes:
-			# If visuals are persistent across scenes we keep them in the tree.
-			# Do not auto-hide here; let the global visuals manager or game flow control visibility.
-			pass
-		else:
-			_hitmarker.queue_free()
+		_hitmarker.visible = false
 	if is_instance_valid(_rope_visual):
 		if persist_visuals_across_scenes:
 			# Keep the visuals when persisting across scenes.
@@ -565,16 +555,11 @@ func _exit_tree() -> void:
 
 func _ensure_visuals_parent() -> void:
 	# Reparent to get_tree().root so visuals persist across scene changes or editor reloads
+	# NOTE: _hitmarker is now a scene node (child of GrappleHook), so we don't reparent it
 	var root = get_tree().root
 	var _scheduled: bool = false
-	if is_instance_valid(_hitmarker) and _hitmarker.get_parent() != root:
-		if _visuals_pending_parent:
-			# already waiting for add_child to execute
-			pass
-		else:
-			if _hitmarker.get_parent():
-				_hitmarker.get_parent().remove_child(_hitmarker)
-			root.call_deferred("add_child", _hitmarker)
+	# Skip hitmarker reparenting - it's a scene node now
+	
 	if is_instance_valid(_rope_visual) and _rope_visual.get_parent() != root:
 		if _visuals_pending_parent:
 			pass
@@ -593,7 +578,7 @@ func _ensure_visuals_parent() -> void:
 			root.call_deferred("add_child", _rope_container)
 			_visuals_pending_parent = true
 	# Clear pending if visuals are already attached
-	if is_instance_valid(_hitmarker) and _hitmarker.get_parent() == root and is_instance_valid(_rope_visual) and _rope_visual.get_parent() == root and is_instance_valid(_rope_container) and _rope_container.get_parent() == root:
+	if is_instance_valid(_rope_visual) and _rope_visual.get_parent() == root and is_instance_valid(_rope_container) and _rope_container.get_parent() == root:
 		_visuals_pending_parent = false
 	# If using the line visual then include it in the check
 	if use_line_visual and is_instance_valid(_rope_line_instance) and _rope_line_instance.get_parent() == root:
@@ -605,6 +590,7 @@ func _ensure_visuals_parent() -> void:
 
 func _attach_visuals_to_root() -> void:
 	# Helper to attach the visuals once using call_deferred; prevents duplicated add_child calls
+	# NOTE: _hitmarker is now a scene node (child of GrappleHook), so we don't reparent it
 	if _visuals_pending_parent:
 		return
 	_visuals_pending_parent = true
@@ -616,9 +602,8 @@ func _attach_visuals_to_root() -> void:
 	var scheduled: bool = false
 	if not root:
 		return
-	if is_instance_valid(_hitmarker) and _hitmarker.get_parent() == null:
-		root.call_deferred("add_child", _hitmarker)
-		scheduled = true
+	# Skip hitmarker - it's a scene node now
+	
 	if is_instance_valid(_rope_visual) and _rope_visual.get_parent() == null:
 		root.call_deferred("add_child", _rope_visual)
 		scheduled = true
