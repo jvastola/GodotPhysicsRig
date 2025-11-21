@@ -19,7 +19,7 @@ signal room_code_generated(code: String)
 # Matchmaking
 var matchmaking: Node = null
 var use_matchmaking_server: bool = true
-const MATCHMAKING_SERVER_URL = "http://localhost:8080"
+const MATCHMAKING_SERVER_URL = "http://158.101.21.99:8080"
 
 var peer: ENetMultiplayerPeer = null
 var players: Dictionary = {} # peer_id -> player_info Dictionary

@@ -2,7 +2,7 @@ extends Node
 ## MatchmakingServer - Simple HTTP-based matchmaking for room codes
 ## This can run as a standalone Godot headless server or use external HTTP API
 
-const DEFAULT_MATCHMAKING_URL = "http://localhost:8080"
+const DEFAULT_MATCHMAKING_URL = "http://158.101.21.99:8080"
 const ROOM_EXPIRY_TIME = 3600 # 1 hour
 
 var matchmaking_url: String = DEFAULT_MATCHMAKING_URL
@@ -34,7 +34,6 @@ func register_room(room_code: String, ip: String, port: int, host_name: String) 
 	
 	# Remote server mode - send HTTP request
 	var json = JSON.stringify({
-		"action": "register",
 		"room_code": room_code,
 		"ip": ip,
 		"port": port,
@@ -44,7 +43,7 @@ func register_room(room_code: String, ip: String, port: int, host_name: String) 
 	
 	var headers = ["Content-Type: application/json"]
 	http_request.request(matchmaking_url + "/room", headers, HTTPClient.METHOD_POST, json)
-	print("MatchmakingServer: Registering room ", room_code)
+	print("MatchmakingServer: Registering room ", room_code, " to ", matchmaking_url)
 
 
 ## Lookup a room by code
@@ -260,10 +259,13 @@ func _on_http_request_completed(result: int, _response_code: int, _headers: Pack
 	
 	var data = json.get_data()
 	
-	# Determine which signal to emit based on response
-	if data.has("room_code") and data.has("ip"):
-		room_found.emit(true, data)
-	elif data.is_array():
+	# Determine which signal to emit based on response type
+	if data is Array:
+		# Response is an array (list of rooms)
 		rooms_listed.emit(data)
-	elif data.has("success"):
+	elif data is Dictionary and data.has("room_code") and data.has("ip"):
+		# Response is a room lookup result
+		room_found.emit(true, data)
+	elif data is Dictionary and data.has("success"):
+		# Response is a registration/deletion confirmation
 		room_registered.emit(data["success"], data.get("room_code", ""))
