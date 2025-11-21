@@ -1,0 +1,29 @@
+[gd_scene load_steps=5 format=3 uid="uid://c4jv0mg3xpn45"]
+
+[ext_resource type="Script" path="res://src/objects/grabbables/CameraFlipper.gd" id="1_script"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1"]
+size = Vector3(0.25, 0.25, 0.25)
+
+[sub_resource type="BoxMesh" id="BoxMesh_1"]
+size = Vector3(0.25, 0.25, 0.25)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1"]
+albedo_color = Color(1, 0.3, 0.1, 1)
+metallic = 0.7
+roughness = 0.2
+emission_enabled = true
+emission = Color(0.9, 0.2, 0, 1)
+emission_energy_multiplier = 1.5
+
+[node name="CameraFlipper" type="RigidBody3D" groups=["grabbable"]]
+mass = 0.4
+script = ExtResource("1_script")
+save_id = "camera_flipper"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("StandardMaterial3D_1")
+mesh = SubResource("BoxMesh_1")
