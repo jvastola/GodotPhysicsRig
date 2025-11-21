@@ -3,7 +3,7 @@ extends Node
 # Grapple visuals manager — create and keep visuals on scene root so they persist across scene changes.
 # Add this script as an Autoload (Project Settings > Autoload) with a name like 'GrappleVisuals' to use it automatically.
 
-@export var hitmarker_radius: float = 0.06
+@export var hitmarker_size: Vector3 = Vector3(0.12, 0.12, 0.12)
 @export var hitmarker_color: Color = Color8(255, 100, 50)
 @export var rope_thickness: float = 0.02
 @export var rope_color: Color = Color8(255, 200, 80)
@@ -32,9 +32,9 @@ func _add_child_to_root_deferred(node: Node) -> void:
 func _ready():
 	# Create hitmarker
 	hitmarker = MeshInstance3D.new()
-	var sphere = SphereMesh.new()
-	sphere.radius = hitmarker_radius
-	hitmarker.mesh = sphere
+	var box = BoxMesh.new()
+	box.size = hitmarker_size
+	hitmarker.mesh = box
 	var mat = StandardMaterial3D.new()
 	mat.albedo_color = hitmarker_color
 	mat.emission_enabled = true
@@ -79,10 +79,24 @@ func clear_segments():
 	segments.clear()
 
 
-func show_hitmarker(pos: Vector3):
+func show_hitmarker(pos: Vector3, normal: Vector3 = Vector3.UP):
 	if not is_instance_valid(hitmarker):
 		return
-	hitmarker.global_transform = Transform3D(Basis(), pos)
+	
+	# Create a basis that aligns to the hit normal
+	var y_axis = normal.normalized()
+	var x_axis: Vector3
+	
+	# Choose a reference vector that's not parallel to the normal
+	if abs(y_axis.dot(Vector3.UP)) < 0.999:
+		x_axis = Vector3.UP.cross(y_axis).normalized()
+	else:
+		x_axis = Vector3.FORWARD.cross(y_axis).normalized()
+	
+	var z_axis = y_axis.cross(x_axis).normalized()
+	var basis = Basis(x_axis, y_axis, z_axis)
+	
+	hitmarker.global_transform = Transform3D(basis, pos)
 	hitmarker.visible = true
 
 func hide_hitmarker():
