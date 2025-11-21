@@ -205,7 +205,7 @@ func create_server(port: int = DEFAULT_PORT, use_room_code: bool = true) -> Erro
 	return OK
 
 
-## Get local IP address
+## Get local IP address (for LAN)
 func get_local_ip() -> String:
 	var addresses = IP.get_local_addresses()
 	for addr in addresses:
@@ -217,6 +217,14 @@ func get_local_ip() -> String:
 		if addr != "127.0.0.1" and not addr.contains(":"):
 			return addr
 	return "127.0.0.1"
+
+
+## Get public IP address (for internet play via matchmaking)
+func get_public_ip() -> String:
+	# For cloud matchmaking, use a placeholder that clients will replace with server IP
+	# The actual connection happens via the matchmaking server's returned IP
+	# This is just for registration purposes
+	return "0.0.0.0"  # Placeholder - clients connect via matchmaking lookup
 
 
 ## Join by room code (uses matchmaking)

@@ -262,10 +262,19 @@ func _on_http_request_completed(result: int, _response_code: int, _headers: Pack
 	# Determine which signal to emit based on response type
 	if data is Array:
 		# Response is an array (list of rooms)
+		print("MatchmakingServer: Received room list with ", data.size(), " rooms")
 		rooms_listed.emit(data)
-	elif data is Dictionary and data.has("room_code") and data.has("ip"):
-		# Response is a room lookup result
+	elif data is Dictionary and data.has("ip") and data.has("port"):
+		# Response is a room lookup result (has ip and port)
+		print("MatchmakingServer: Room found at ", data["ip"], ":", data["port"])
 		room_found.emit(true, data)
+	elif data is Dictionary and data.has("error"):
+		# Response is an error (room not found)
+		print("MatchmakingServer: ", data["error"])
+		room_found.emit(false, {})
 	elif data is Dictionary and data.has("success"):
 		# Response is a registration/deletion confirmation
+		print("MatchmakingServer: Operation ", "successful" if data["success"] else "failed")
 		room_registered.emit(data["success"], data.get("room_code", ""))
+	else:
+		push_error("MatchmakingServer: Unexpected response format: ", data)
