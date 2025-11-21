@@ -55,53 +55,173 @@ func _generate_random_vertices() -> void:
 
 func _create_mesh() -> void:
 	array_mesh = ArrayMesh.new()
-	var surface_tool = SurfaceTool.new()
 	
-	surface_tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# Get unique snapped vertices
+	var snapped_vertices = _get_unique_snapped_vertices()
 	
-	# Create a convex hull-like structure by connecting center to outer points
-	var center_idx = 0
+	# Create mesh from snapped vertices using convex hull
+	_create_convex_mesh(snapped_vertices)
 	
-	# Build triangles connecting adjacent outer vertices through the center
-	for i in range(1, initial_vertices.size()):
-		var next_idx = (i % (initial_vertices.size() - 1)) + 1
-		
-		# Get snapped positions
-		var v0 = _snap_vertex_to_grid(initial_vertices[center_idx])
-		var v1 = _snap_vertex_to_grid(initial_vertices[i])
-		var v2 = _snap_vertex_to_grid(initial_vertices[next_idx])
-		
-		# Calculate normal for this face
-		var edge1 = v1 - v0
-		var edge2 = v2 - v0
-		var normal = edge1.cross(edge2).normalized()
-		
-		# Add vertices with UVs and normals
-		surface_tool.set_normal(normal)
-		surface_tool.set_uv(Vector2(0.5, 0.5))
-		surface_tool.add_vertex(v0)
-		
-		surface_tool.set_normal(normal)
-		surface_tool.set_uv(Vector2(0, 0))
-		surface_tool.add_vertex(v1)
-		
-		surface_tool.set_normal(normal)
-		surface_tool.set_uv(Vector2(1, 0))
-		surface_tool.add_vertex(v2)
-	
-	# Apply material if available
-	if mesh_material:
-		surface_tool.set_material(mesh_material)
-	
-	# Generate normals and tangents (will use the ones we set)
-	surface_tool.generate_normals()
-	
-	# Commit to the mesh
-	surface_tool.commit(array_mesh)
 	mesh_instance.mesh = array_mesh
 	
 	# Update collision shape to match mesh
 	_update_collision_shape()
+
+func _get_unique_snapped_vertices() -> PackedVector3Array:
+	# Track which grid positions are used
+	var used_grid_positions = {}
+	var result = PackedVector3Array()
+	
+	for vertex in initial_vertices:
+		var snapped_pos = _snap_vertex_to_grid(vertex)
+		
+		# Create a key for this grid position
+		var grid_key = _vector_to_grid_key(snapped_pos)
+		
+		# If this position is already used, try to find a nearby free position
+		if grid_key in used_grid_positions:
+			snapped_pos = _find_nearby_free_grid_position(snapped_pos, used_grid_positions)
+			grid_key = _vector_to_grid_key(snapped_pos)
+		
+		used_grid_positions[grid_key] = true
+		result.append(snapped_pos)
+	
+	return result
+
+func _vector_to_grid_key(pos: Vector3) -> String:
+	# Convert position to a string key for dictionary lookup
+	return "%d,%d,%d" % [
+		int(round(pos.x / grid_size)),
+		int(round(pos.y / grid_size)),
+		int(round(pos.z / grid_size))
+	]
+
+func _find_nearby_free_grid_position(original_pos: Vector3, used_positions: Dictionary) -> Vector3:
+	# Try to find a nearby grid position that's not occupied
+	var offsets = [
+		Vector3(grid_size, 0, 0), Vector3(-grid_size, 0, 0),
+		Vector3(0, grid_size, 0), Vector3(0, -grid_size, 0),
+		Vector3(0, 0, grid_size), Vector3(0, 0, -grid_size),
+	]
+	
+	for offset in offsets:
+		var test_pos = original_pos + offset
+		var key = _vector_to_grid_key(test_pos)
+		if not (key in used_positions):
+			return test_pos
+	
+	# If all immediate neighbors are taken, just use a diagonal offset
+	return original_pos + Vector3(grid_size, grid_size, 0)
+
+func _create_convex_mesh(vertices: PackedVector3Array) -> void:
+	if vertices.size() < 4:
+		return  # Need at least 4 vertices for a volume
+	
+	# Use Godot's built-in convex hull generation
+	var surface_tool = SurfaceTool.new()
+	surface_tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	
+	# Create arrays for the mesh
+	var arrays = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	
+	# Generate convex hull triangles using a simple approach
+	var triangles = _generate_convex_hull_triangles(vertices)
+	
+	# Build mesh from triangles
+	var final_vertices = PackedVector3Array()
+	var final_normals = PackedVector3Array()
+	var final_uvs = PackedVector2Array()
+	
+	for tri in triangles:
+		var v0 = vertices[tri[0]]
+		var v1 = vertices[tri[1]]
+		var v2 = vertices[tri[2]]
+		
+		# Calculate normal
+		var edge1 = v1 - v0
+		var edge2 = v2 - v0
+		var normal = edge1.cross(edge2).normalized()
+		
+		# Add each vertex of the triangle
+		final_vertices.append(v0)
+		final_vertices.append(v1)
+		final_vertices.append(v2)
+		
+		final_normals.append(normal)
+		final_normals.append(normal)
+		final_normals.append(normal)
+		
+		final_uvs.append(Vector2(0, 0))
+		final_uvs.append(Vector2(1, 0))
+		final_uvs.append(Vector2(0.5, 1))
+	
+	# Set the arrays
+	arrays[Mesh.ARRAY_VERTEX] = final_vertices
+	arrays[Mesh.ARRAY_NORMAL] = final_normals
+	arrays[Mesh.ARRAY_TEX_UV] = final_uvs
+	
+	# Add the mesh surface
+	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	
+	# Apply material
+	if mesh_material:
+		array_mesh.surface_set_material(0, mesh_material)
+
+func _generate_convex_hull_triangles(vertices: PackedVector3Array) -> Array:
+	# Use a ConvexPolygonShape3D to generate the hull, then extract triangles
+	var hull_shape = ConvexPolygonShape3D.new()
+	hull_shape.points = vertices
+	
+	# For rendering, we'll use a simpler approach: create a mesh from the points
+	# by connecting to centroid and between neighbors
+	var triangles = []
+	var _centroid = Vector3.ZERO
+	for v in vertices:
+		_centroid += v
+	_centroid /= vertices.size()
+	
+	# Find the convex hull using a gift wrapping approach (simplified)
+	# For simplicity, we'll create triangles by connecting vertices
+	for i in range(vertices.size()):
+		for j in range(i + 1, vertices.size()):
+			for k in range(j + 1, vertices.size()):
+				# Check if this triangle is on the convex hull
+				if _is_hull_triangle(vertices, i, j, k):
+					triangles.append([i, j, k])
+	
+	return triangles
+
+func _is_hull_triangle(vertices: PackedVector3Array, i: int, j: int, k: int) -> bool:
+	# A triangle is on the hull if all other points are on one side
+	var v0 = vertices[i]
+	var v1 = vertices[j]
+	var v2 = vertices[k]
+	
+	var edge1 = v1 - v0
+	var edge2 = v2 - v0
+	var normal = edge1.cross(edge2)
+	
+	if normal.length_squared() < 0.0001:
+		return false  # Degenerate triangle
+	
+	var positive_count = 0
+	var negative_count = 0
+	
+	for idx in range(vertices.size()):
+		if idx == i or idx == j or idx == k:
+			continue
+		
+		var to_point = vertices[idx] - v0
+		var dot = normal.dot(to_point)
+		
+		if dot > 0.0001:
+			positive_count += 1
+		elif dot < -0.0001:
+			negative_count += 1
+	
+	# Triangle is on hull if all points are on one side (or on the plane)
+	return positive_count == 0 or negative_count == 0
 
 func _update_collision_shape() -> void:
 	# Find or create collision shape
@@ -111,11 +231,9 @@ func _update_collision_shape() -> void:
 		collision_shape.name = "CollisionShape3D"
 		add_child(collision_shape)
 	
-	# Create a convex collision shape from the vertices
+	# Create a convex collision shape from the unique snapped vertices
 	var shape = ConvexPolygonShape3D.new()
-	var snapped_points = PackedVector3Array()
-	for vertex in initial_vertices:
-		snapped_points.append(_snap_vertex_to_grid(vertex))
+	var snapped_points = _get_unique_snapped_vertices()
 	shape.points = snapped_points
 	collision_shape.shape = shape
 
@@ -143,48 +261,11 @@ func _update_mesh_vertices() -> void:
 	# Clear the existing mesh
 	array_mesh.clear_surfaces()
 	
-	# Recreate the surface with updated vertices
-	var surface_tool = SurfaceTool.new()
-	surface_tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# Get unique snapped vertices for current position
+	var snapped_vertices = _get_unique_snapped_vertices()
 	
-	# Create triangles connecting center to outer points
-	var center_idx = 0
-	
-	for i in range(1, initial_vertices.size()):
-		var next_idx = (i % (initial_vertices.size() - 1)) + 1
-		
-		# Get snapped positions
-		var v0 = _snap_vertex_to_grid(initial_vertices[center_idx])
-		var v1 = _snap_vertex_to_grid(initial_vertices[i])
-		var v2 = _snap_vertex_to_grid(initial_vertices[next_idx])
-		
-		# Calculate normal for this face
-		var edge1 = v1 - v0
-		var edge2 = v2 - v0
-		var normal = edge1.cross(edge2).normalized()
-		
-		# Add vertices with UVs and normals
-		surface_tool.set_normal(normal)
-		surface_tool.set_uv(Vector2(0.5, 0.5))
-		surface_tool.add_vertex(v0)
-		
-		surface_tool.set_normal(normal)
-		surface_tool.set_uv(Vector2(0, 0))
-		surface_tool.add_vertex(v1)
-		
-		surface_tool.set_normal(normal)
-		surface_tool.set_uv(Vector2(1, 0))
-		surface_tool.add_vertex(v2)
-	
-	# Apply material if available
-	if mesh_material:
-		surface_tool.set_material(mesh_material)
-	
-	# Generate normals
-	surface_tool.generate_normals()
-	
-	# Commit to the mesh
-	surface_tool.commit(array_mesh)
+	# Recreate mesh with updated vertices
+	_create_convex_mesh(snapped_vertices)
 	
 	# Update collision shape
 	_update_collision_shape()
