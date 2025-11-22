@@ -8,6 +8,9 @@ signal connection_failed()
 signal connection_succeeded()
 signal server_disconnected()
 
+# Nakama integration (scalable relay networking)
+var use_nakama: bool = false  # Set to true to use Nakama instead of P2P
+
 const DEFAULT_PORT = 7777
 const MAX_CLIENTS = 8
 
@@ -21,8 +24,7 @@ var matchmaking: Node = null
 var use_matchmaking_server: bool = true
 const MATCHMAKING_SERVER_URL = "http://158.101.21.99:8080"
 
-# Nakama integration (scalable relay networking)
-var use_nakama: bool = false  # Set to true to use Nakama instead of P2P
+
 
 var peer: ENetMultiplayerPeer = null
 var players: Dictionary = {} # peer_id -> player_info Dictionary
@@ -125,6 +127,16 @@ func _ready() -> void:
 	
 	# Initialize network stats monitoring
 	_last_server_response_time = Time.get_ticks_msec() / 1000.0
+	
+	# Connect to Nakama events if available
+	# (Handled by _setup_nakama_integration)
+	
+	# Setup Nakama signals (deferred to ensure NakamaManager autoload is ready)
+	call_deferred("_setup_nakama_integration")
+	
+	# Connect Nakama signals
+	if NakamaManager:
+		NakamaManager.match_state_received.connect(_on_nakama_match_state_received)
 
 
 func _setup_matchmaking() -> void:
@@ -141,6 +153,20 @@ func _setup_matchmaking() -> void:
 	matchmaking.room_found.connect(_on_matchmaking_room_found)
 	
 	print("NetworkManager: Matchmaking initialized")
+
+
+func _setup_nakama_integration() -> void:
+	"""Connect to NakamaManager signals"""
+	if NakamaManager:
+		if not NakamaManager.match_joined.is_connected(_on_nakama_match_joined):
+			NakamaManager.match_joined.connect(_on_nakama_match_joined)
+		if not NakamaManager.match_left.is_connected(_on_nakama_match_left):
+			NakamaManager.match_left.connect(_on_nakama_match_left)
+		if not NakamaManager.match_presence.is_connected(_on_nakama_match_presence):
+			NakamaManager.match_presence.connect(_on_nakama_match_presence)
+		if not NakamaManager.match_state_received.is_connected(_on_nakama_match_state_received):
+			NakamaManager.match_state_received.connect(_on_nakama_match_state_received)
+		print("NetworkManager: Nakama integration initialized")
 
 
 func _on_matchmaking_room_found(success: bool, room_data: Dictionary) -> void:
@@ -291,6 +317,13 @@ func get_multiplayer_id() -> int:
 	return multiplayer.get_unique_id()
 
 
+## Get our Nakama User ID
+func get_nakama_user_id() -> String:
+	if NakamaManager:
+		return NakamaManager.local_user_id
+	return ""
+
+
 ## Register the local player node
 func _register_local_player() -> void:
 	var peer_id = multiplayer.get_unique_id()
@@ -314,12 +347,29 @@ func update_local_player_transform(head_pos: Vector3, head_rot: Vector3,
 	
 	# Update our entry in players dictionary
 	var peer_id = multiplayer.get_unique_id()
-	if players.has(peer_id):
-		players[peer_id] = local_player_info.duplicate(true)
+	if use_nakama:
+		var nakama_id = get_nakama_user_id()
+		if not nakama_id.is_empty():
+			players[nakama_id] = local_player_info.duplicate(true)
+			
+			# Send via Nakama
+			var transform_data = {
+				"hp": _vec3_to_dict(head_pos),
+				"hr": _vec3_to_dict(head_rot),
+				"lp": _vec3_to_dict(left_pos),
+				"lr": _vec3_to_dict(left_rot),
+				"rp": _vec3_to_dict(right_pos),
+				"rr": _vec3_to_dict(right_rot),
+				"s": _vec3_to_dict(scale)
+			}
+			NakamaManager.send_match_state(NakamaManager.MatchOpCode.PLAYER_TRANSFORM, transform_data)
+	else:
+		if players.has(peer_id):
+			players[peer_id] = local_player_info.duplicate(true)
 	
 	# Send to all other players (unreliable for performance)
 	# Only send if peer is actually connected
-	if multiplayer.multiplayer_peer and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+	if not use_nakama and multiplayer.multiplayer_peer and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
 		_send_player_transform.rpc_id(0, head_pos, head_rot, left_pos, left_rot, right_pos, right_rot, scale)
 
 
@@ -411,6 +461,78 @@ func _on_server_disconnected() -> void:
 
 
 # ============================================================================
+# Nakama Event Callbacks
+# ============================================================================
+
+func _on_nakama_match_joined(match_id: String) -> void:
+	print("NetworkManager: Joined Nakama match: ", match_id)
+	use_nakama = true
+	
+	# DON'T add ourselves to the players dictionary - this prevents duplicate spawns
+	# The local player is already tracked separately via local_player_info
+	
+	# Notify listeners
+	connection_succeeded.emit()
+
+func _on_nakama_match_left() -> void:
+	print("NetworkManager: Left Nakama match")
+	players.clear()
+	grabbed_objects.clear()
+	server_disconnected.emit()
+
+func _on_nakama_match_presence(joins: Array, leaves: Array) -> void:
+	var my_id = get_nakama_user_id()
+	print("NetworkManager: Match presence - my ID: ", my_id, ", joins: ", joins.size())
+	
+	for join in joins:
+		var user_id = join.get("user_id", "")
+		print("NetworkManager: Checking join - user_id: '", user_id, "', is_empty: ", user_id.is_empty(), ", equals_mine: ", (user_id == my_id))
+		
+		# Skip if empty OR if this is us
+		if user_id.is_empty() or user_id == my_id:
+			print("NetworkManager: SKIPPING user_id: ", user_id)
+			continue
+		
+		print("NetworkManager: Nakama player joined: ", user_id)
+		# Initialize player data
+		players[user_id] = local_player_info.duplicate(true)
+		player_connected.emit(user_id)
+		
+	for leave in leaves:
+		var user_id = leave.get("user_id", "")
+		if user_id != my_id and not user_id.is_empty():
+			print("NetworkManager: Nakama player left: ", user_id)
+			if players.has(user_id):
+				players.erase(user_id)
+			player_disconnected.emit(user_id)
+
+
+
+func _handle_nakama_player_transform(sender_id: String, data: Dictionary) -> void:
+	if not players.has(sender_id):
+		players[sender_id] = local_player_info.duplicate(true)
+	
+	var p = players[sender_id]
+	
+	# Update player data from received dictionary
+	# We use short keys "hp", "hr", etc. to save bandwidth
+	if data.has("hp"): p.head_position = _dict_to_vec3(data.hp)
+	if data.has("hr"): p.head_rotation = _dict_to_vec3(data.hr)
+	if data.has("lp"): p.left_hand_position = _dict_to_vec3(data.lp)
+	if data.has("lr"): p.left_hand_rotation = _dict_to_vec3(data.lr)
+	if data.has("rp"): p.right_hand_position = _dict_to_vec3(data.rp)
+	if data.has("rr"): p.right_hand_rotation = _dict_to_vec3(data.rr)
+	if data.has("s"): p.player_scale = _dict_to_vec3(data.s)
+
+
+func _vec3_to_dict(v: Vector3) -> Dictionary:
+	return {"x": snappedf(v.x, 0.001), "y": snappedf(v.y, 0.001), "z": snappedf(v.z, 0.001)}
+
+func _dict_to_vec3(d: Dictionary) -> Vector3:
+	return Vector3(d.get("x", 0), d.get("y", 0), d.get("z", 0))
+
+
+# ============================================================================
 # Avatar Texture Sync
 # ============================================================================
 
@@ -451,8 +573,8 @@ func _send_avatar_texture(texture_data: PackedByteArray) -> void:
 	avatar_texture_received.emit(sender_id)
 
 
-func get_player_avatar_texture(peer_id: int) -> ImageTexture:
-	"""Get avatar texture for a specific player"""
+func get_player_avatar_texture(peer_id: Variant) -> ImageTexture:
+	"""Get avatar texture for a specific player (supports both int and String peer IDs)"""
 	if not players.has(peer_id):
 		return null
 	
@@ -608,16 +730,35 @@ func send_voice_data(audio_data: PackedVector2Array) -> void:
 		byte_array.encode_s16(i * 4, left_int)
 		byte_array.encode_s16(i * 4 + 2, right_int)
 	
-	_receive_voice_data.rpc_id(0, byte_array)
+	if use_nakama:
+		NakamaManager.send_match_state(NakamaManager.MatchOpCode.VOICE_DATA, byte_array)
+	else:
+		_receive_voice_data.rpc_id(0, byte_array)
 
 
 @rpc("unreliable", "call_remote", "any_peer")
 func _receive_voice_data(audio_data: PackedByteArray) -> void:
-	"""Receive compressed voice data from another player"""
+	"""Receive compressed voice data from another player (ENet)"""
 	var sender_id = multiplayer.get_remote_sender_id()
-	
+	_process_incoming_voice_data(audio_data, sender_id)
+
+
+func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Variant) -> void:
+	"""Handle incoming match state from Nakama"""
+	if op_code == NakamaManager.MatchOpCode.PLAYER_TRANSFORM:
+		if data is Dictionary:
+			_handle_nakama_player_transform(peer_id, data)
+	elif op_code == NakamaManager.MatchOpCode.VOICE_DATA:
+		if data is PackedByteArray:
+			_process_incoming_voice_data(data, peer_id)
+
+
+func _process_incoming_voice_data(audio_data: PackedByteArray, sender_id: Variant) -> void:
+	"""Process voice data from any source (ENet or Nakama)"""
 	# Don't play our own voice back to ourselves
-	if sender_id == get_multiplayer_id():
+	# Note: For Nakama, sender_id is String. For ENet, it's int.
+	# We need to compare correctly.
+	if str(sender_id) == str(get_multiplayer_id()) or str(sender_id) == NakamaManager.local_user_id:
 		return
 	
 	# Decompress 16-bit PCM back to float samples
@@ -637,6 +778,12 @@ func _receive_voice_data(audio_data: PackedByteArray) -> void:
 	
 	# Emit signal for audio playback
 	# XRPlayer will handle playing this through the remote player's AudioStreamPlayer3D
+	
+	# Ensure player exists in dictionary (might be a new Nakama player)
+	if not players.has(sender_id):
+		# Create a basic entry if missing so we can hear them
+		players[sender_id] = local_player_info.duplicate(true)
+		
 	if players.has(sender_id):
 		players[sender_id]["voice_samples"] = samples
 
@@ -696,6 +843,76 @@ func _receive_voxel_state(voxels: Array) -> void:
 		if voxel_data.has("pos") and voxel_data.has("color"):
 			voxel_placed_network.emit(voxel_data["pos"], voxel_data["color"])
 	print("NetworkManager: Received ", voxels.size(), " voxels from server")
+
+
+# ============================================================================
+# Nakama Integration
+# ============================================================================
+
+func _on_nakama_match_state(peer_id: String, op_code: int, data: Dictionary) -> void:
+	"""Handle incoming Nakama match state"""
+	if not use_nakama:
+		return
+		
+	# Map Nakama op codes to local signals
+	# Note: NakamaManager is autoloaded, so we can access the enum directly if we wanted,
+	# but to avoid circular dependency issues during load, we'll use the integer values
+	# defined in NakamaManager (VOXEL_PLACE = 5, VOXEL_REMOVE = 6)
+	
+	if op_code == 5: # VOXEL_PLACE
+		if data.has("pos") and data.has("color"):
+			var pos_str = data["pos"]
+			var color_str = data["color"]
+			
+			# Parse vector and color from string/dict if needed, or use directly if they preserved type
+			# JSON parsing usually results in strings for complex types unless handled
+			var pos = _parse_vector3(pos_str)
+			var color = _parse_color(color_str)
+			
+			voxel_placed_network.emit(pos, color)
+			print("NetworkManager (Nakama): Voxel placed at ", pos, " by ", peer_id)
+			
+	elif op_code == 6: # VOXEL_REMOVE
+		if data.has("pos"):
+			var pos = _parse_vector3(data["pos"])
+			voxel_removed_network.emit(pos)
+			print("NetworkManager (Nakama): Voxel removed at ", pos, " by ", peer_id)
+			
+	elif op_code == 8: # VOXEL_BATCH
+		if data.has("updates") and data["updates"] is Array:
+			for update in data["updates"]:
+				var type = update.get("t", 0) # 0=place, 1=remove
+				var pos = _parse_vector3(update.get("p", Vector3.ZERO))
+				
+				if type == 0: # Place
+					var color = _parse_color(update.get("c", Color.WHITE))
+					voxel_placed_network.emit(pos, color)
+				elif type == 1: # Remove
+					voxel_removed_network.emit(pos)
+			print("NetworkManager (Nakama): Processed voxel batch of size ", data["updates"].size(), " from ", peer_id)
+
+
+func _parse_vector3(data) -> Vector3:
+	if data is Vector3:
+		return data
+	elif data is String:
+		# simplistic parsing "x,y,z" or similar
+		var parts = data.replace("(", "").replace(")", "").split(",")
+		if parts.size() >= 3:
+			return Vector3(float(parts[0]), float(parts[1]), float(parts[2]))
+	elif data is Dictionary:
+		return Vector3(data.get("x", 0), data.get("y", 0), data.get("z", 0))
+	return Vector3.ZERO
+
+
+func _parse_color(data) -> Color:
+	if data is Color:
+		return data
+	elif data is String:
+		return Color(data)
+	elif data is Dictionary:
+		return Color(data.get("r", 1), data.get("g", 1), data.get("b", 1), data.get("a", 1))
+	return Color.WHITE
 
 
 # ============================================================================

@@ -144,14 +144,18 @@ func _on_match_state(peer_id, op_code, data):
 			op_name = "TRANSFORM"
 		NakamaManager.MatchOpCode.GRABBABLE_GRAB:
 			op_name = "GRAB"
+		NakamaManager.MatchOpCode.VOICE_DATA:
+			op_name = "VOICE"
 		_:
 			op_name = "OP_" + str(op_code)
 	
 	log_console("← Received [" + op_name + "] from " + peer_id.substr(0, 8) + "...")
-	if data.has("test_id"):
+	if data is Dictionary and data.has("test_id"):
 		log_console("  Test ID: " + str(data.test_id))
-	if data.has("position"):
+	if data is Dictionary and data.has("position"):
 		log_console("  Position: " + str(data.position))
+	if data is PackedByteArray:
+		log_console("  Data: " + str(data.size()) + " bytes (Raw)")
 
 
 func _on_match_error(error):
@@ -197,6 +201,22 @@ func _on_test_pressed():
 	log_console("→ Sent test data")
 
 
+func _test_voice():
+	log_console("\n[TEST] Sending fake voice data...")
+	
+	# Create fake audio data (100 samples of silence/noise)
+	var dummy_audio = PackedByteArray()
+	dummy_audio.resize(400) # 100 samples * 4 bytes
+	for i in range(400):
+		dummy_audio[i] = randi() % 256
+		
+	NakamaManager.send_match_state(
+		NakamaManager.MatchOpCode.VOICE_DATA,
+		dummy_audio
+	)
+	log_console("→ Sent " + str(dummy_audio.size()) + " bytes of voice data")
+
+
 func _input(event):
 	if event is InputEventKey and event.pressed:
 		match event.keycode:
@@ -212,6 +232,9 @@ func _input(event):
 			KEY_T:
 				if not test_button.disabled:
 					_on_test_pressed()
+			KEY_V:
+				if not test_button.disabled:
+					_test_voice()
 
 
 func _process(_delta):

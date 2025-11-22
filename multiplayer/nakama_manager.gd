@@ -12,6 +12,7 @@ signal match_presence(joins, leaves)
 signal match_state_received(peer_id, op_code, data)
 signal connection_lost()
 signal connection_restored()
+signal match_list_received(matches)
 
 # Nakama connection settings
 var nakama_host: String = "localhost"
@@ -20,11 +21,15 @@ var nakama_server_key: String = "defaultkey"
 var nakama_use_ssl: bool = false
 
 # HTTP client for REST API
+# HTTP client for REST API (for authentication)
 var http_client: HTTPRequest
 
 # WebSocket for real-time connection
 var socket: WebSocketPeer
 var is_socket_connected: bool = false
+
+# HTTPRequest for REST API calls like match listing
+var http_request: HTTPRequest = null
 
 # Session data
 var session: Dictionary = {}
@@ -44,7 +49,8 @@ enum MatchOpCode {
 	GRABBABLE_UPDATE = 4,
 	VOXEL_PLACE = 5,
 	VOXEL_REMOVE = 6,
-	VOICE_DATA = 7
+	VOICE_DATA = 7,
+	VOXEL_BATCH = 8
 }
 
 
@@ -60,6 +66,11 @@ func _ready() -> void:
 	# Generate device ID if not exists
 	device_id = _get_or_create_device_id()
 	print("NakamaManager: Initialized with device ID: ", device_id)
+	
+	# Create HTTPRequest node for REST API calls
+	http_request = HTTPRequest.new()
+	add_child(http_request)
+	http_request.request_completed.connect(_on_match_list_http_completed)
 
 
 func _process(_delta: float) -> void:
@@ -162,6 +173,8 @@ func create_match() -> void:
 
 ## Join a match by ID
 func join_match(match_id: String) -> void:
+	print("NakamaManager: join_match called with: '", match_id, "' (length: ", match_id.length(), ")")
+	
 	if not is_socket_connected:
 		push_error("NakamaManager: Socket not connected")
 		return
@@ -194,18 +207,50 @@ func leave_match() -> void:
 	print("NakamaManager: Left match")
 
 
+## List available matches
+func list_matches(min_players: int = 0, max_players: int = 10, limit: int = 20) -> void:
+	"""Request list of available matches from Nakama using HTTP REST API"""
+	if not is_authenticated or not session:
+		push_error("NakamaManager: Cannot list matches - not authenticated")
+		match_list_received.emit([])
+		return
+	
+	# Build URL - don't filter by min/max size to see all matches including empty ones
+	var url = "http://" + nakama_host + ":" + str(nakama_port) + "/v2/match"
+	var query = "?limit=" + str(limit)
+	# NOTE: Removed authoritative filter and size filters to see ALL matches
+	
+	url += query
+	
+	var headers = [
+		"Authorization: Bearer " + session.token
+	]
+	
+	print("NakamaManager: Requesting match list from: ", url)
+	var error = http_request.request(url, headers, HTTPClient.METHOD_GET)
+	if error != OK:
+		push_error("NakamaManager: HTTP request failed: ", error)
+		match_list_received.emit([])
+
+
 ## Send match state to other players
-func send_match_state(op_code: int, data: Dictionary) -> void:
+func send_match_state(op_code: int, data: Variant) -> void:
 	if current_match_id.is_empty():
 		return
 	
 	if not is_socket_connected:
 		return
 	
-	# Encode data as JSON then base64 (Nakama protocol requirement)
-	var json_data = JSON.stringify(data)
-	var data_bytes = json_data.to_utf8_buffer()
-	var data_base64 = Marshalls.raw_to_base64(data_bytes)
+	var data_base64 = ""
+	
+	# Optimize: If data is already bytes, skip JSON serialization
+	if data is PackedByteArray:
+		data_base64 = Marshalls.raw_to_base64(data)
+	else:
+		# Encode data as JSON then base64 (Nakama protocol requirement)
+		var json_data = JSON.stringify(data)
+		var data_bytes = json_data.to_utf8_buffer()
+		data_base64 = Marshalls.raw_to_base64(data_bytes)
 	
 	var envelope = {
 		"match_data_send": {
@@ -240,6 +285,8 @@ func _process_socket_message(packet: PackedByteArray) -> void:
 		_handle_match_presence(data.match_presence_event)
 	elif data.has("match_data"):
 		_handle_match_data(data.match_data)
+	elif data.has("matches"):
+		_handle_match_list(data)
 	elif data.has("error"):
 		push_error("NakamaManager: Server error: ", data.error)
 		match_error.emit(data.error)
@@ -267,17 +314,20 @@ func _handle_match_presence(presence_data: Dictionary) -> void:
 	var joins = presence_data.get("joins", [])
 	var leaves = presence_data.get("leaves", [])
 	
-	# Update match_peers (exclude ourselves)
+	# IMPORTANT: Set local_user_id FIRST before processing any joins
+	# This prevents us from adding ourselves to match_peers
 	for join in joins:
 		var user_id = join.get("user_id", "")
-		
-		# Set local_user_id if we don't have it yet (this is us joining)
 		if local_user_id.is_empty():
+			# This is us joining - set our ID immediately
 			local_user_id = user_id
-			# Remove ourselves from match_peers if we were added during match join
-			if match_peers.has(user_id):
-				match_peers.erase(user_id)
-		elif user_id != local_user_id:
+			print("NakamaManager: Set local user ID: ", local_user_id)
+			break  # Exit early since we found ourselves
+	
+	# Now update match_peers (exclude ourselves)
+	for join in joins:
+		var user_id = join.get("user_id", "")
+		if user_id != local_user_id and not user_id.is_empty():
 			match_peers[user_id] = join
 			print("NakamaManager: Player joined: ", user_id)
 	
@@ -290,23 +340,40 @@ func _handle_match_presence(presence_data: Dictionary) -> void:
 	match_presence.emit(joins, leaves)
 
 
+func _handle_match_list(list_data: Dictionary) -> void:
+	"""Handle match list response from server"""
+	var matches = list_data.get("matches", [])
+	print("NakamaManager: Received ", matches.size(), " available matches")
+	match_list_received.emit(matches)
+
+
 func _handle_match_data(match_data_msg: Dictionary) -> void:
-	var op_code = match_data_msg.get("op_code", 0)
+	var op_code = int(match_data_msg.get("op_code", 0))
 	var data_base64 = match_data_msg.get("data", "")
 	var sender_id = match_data_msg.get("presence", {}).get("user_id", "")
 	
 	# Decode base64 then parse JSON
+	# Decode base64 to raw bytes
 	var data_bytes = Marshalls.base64_to_raw(data_base64)
-	var data_str = data_bytes.get_string_from_utf8()
 	
-	var json = JSON.new()
-	var error = json.parse(data_str)
+	var data = null
 	
-	if error != OK:
-		push_error("NakamaManager: Failed to parse match data")
-		return
+	# For voice data, we want the raw bytes (it's already compressed audio)
+	if op_code == MatchOpCode.VOICE_DATA:
+		data = data_bytes
+	else:
+		# For other op codes, parse as JSON
+		var data_str = data_bytes.get_string_from_utf8()
+		var json = JSON.new()
+		var error = json.parse(data_str)
+		
+		if error == OK:
+			data = json.get_data()
+		else:
+			push_warning("NakamaManager: Failed to parse match data as JSON for op_code " + str(op_code))
+			# Fallback to raw bytes if JSON parse fails
+			data = data_bytes
 	
-	var data = json.get_data()
 	match_state_received.emit(sender_id, op_code, data)
 
 
@@ -364,3 +431,39 @@ func _on_http_request_completed(result: int, response_code: int, _headers: Packe
 	else:
 		push_error("NakamaManager: Unexpected response format")
 		authentication_failed.emit("Invalid response")
+
+
+func _on_match_list_http_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+	"""Handle HTTP response from Nakama REST API (match list)"""
+	print("NakamaManager: HTTP response - result: ", result, ", code: ", response_code)
+	
+	if result != HTTPRequest.RESULT_SUCCESS:
+		push_error("NakamaManager: HTTP request failed with result: ", result)
+		match_list_received.emit([])
+		return
+	
+	if response_code != 200:
+		push_error("NakamaManager: HTTP request returned code: ", response_code)
+		var body_str = body.get_string_from_utf8()
+		print("NakamaManager: Response body: ", body_str)
+		match_list_received.emit([])
+		return
+	
+	var json_str = body.get_string_from_utf8()
+	print("NakamaManager: Raw response: ", json_str)
+	
+	var json = JSON.new()
+	var parse_error = json.parse(json_str)
+	
+	if parse_error != OK:
+		push_error("NakamaManager: Failed to parse HTTP response")
+		match_list_received.emit([])
+		return
+	
+	var data = json.get_data()
+	var matches = data.get("matches", [])
+	
+	print("NakamaManager: Received ", matches.size(), " matches via HTTP")
+	if matches.size() > 0:
+		print("NakamaManager: First match: ", matches[0])
+	match_list_received.emit(matches)

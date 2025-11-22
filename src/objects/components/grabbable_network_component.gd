@@ -88,6 +88,51 @@ func _on_network_grab(object_id: String, peer_id: int) -> void:
 	
 	network_grab.emit(peer_id)
 
+func _on_nakama_match_state(sender_id: String, op_code: int, data: Variant) -> void:
+	"""Handle incoming Nakama match state"""
+	if not NakamaManager:
+		return
+		
+	# Filter for this object
+	# Data should be a dictionary for grabbable events
+	if not data is Dictionary:
+		return
+		
+	if data.get("object_id") != save_id:
+		return
+	
+	# Map Nakama op codes to local actions
+	match op_code:
+		NakamaManager.MatchOpCode.GRABBABLE_GRAB:
+			print("GrabbableNetworkComponent: ", save_id, " grabbed by Nakama peer ", sender_id)
+			is_network_owner = false
+			# We use a hash of the string for the int peer_id signal
+			network_grab.emit(sender_id.hash())
+			
+		NakamaManager.MatchOpCode.GRABBABLE_RELEASE:
+			print("GrabbableNetworkComponent: ", save_id, " released by Nakama peer ", sender_id)
+			
+			# Sync final position if provided
+			if data.has("pos") and data.has("rot"):
+				var sync_data = {}
+				sync_data["position"] = _parse_vector3(data["pos"])
+				sync_data["rotation"] = _parse_quaternion(data["rot"])
+				network_sync.emit(sync_data)
+				
+			network_release.emit(sender_id.hash())
+			
+		NakamaManager.MatchOpCode.GRABBABLE_UPDATE:
+			if is_network_owner or is_grabbed:
+				return
+				
+			var sync_data = {}
+			if data.has("pos"):
+				sync_data["position"] = _parse_vector3(data["pos"])
+			if data.has("rot"):
+				sync_data["rotation"] = _parse_quaternion(data["rot"])
+			
+			network_sync.emit(sync_data)
+
 func _on_network_release(object_id: String, peer_id: int) -> void:
 	"""Handle another player releasing this object"""
 	if object_id != save_id:
@@ -111,3 +156,9 @@ func _on_network_sync(object_id: String, data: Dictionary) -> void:
 		return
 	
 	network_sync.emit(data)
+
+func _parse_vector3(data: Dictionary) -> Vector3:
+	return Vector3(data.get("x", 0), data.get("y", 0), data.get("z", 0))
+
+func _parse_quaternion(data: Dictionary) -> Quaternion:
+	return Quaternion(data.get("x", 0), data.get("y", 0), data.get("z", 0), data.get("w", 1))

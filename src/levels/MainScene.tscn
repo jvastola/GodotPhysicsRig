@@ -117,5 +117,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -1.5)
 
 [node name="GridLineDisplay" parent="." instance=ExtResource("12_grid_display")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, 0)
+visible = false
 grid_size = 100
 height_noise_scale = 0.0

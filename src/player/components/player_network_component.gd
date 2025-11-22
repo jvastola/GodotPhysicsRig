@@ -1,14 +1,14 @@
 class_name PlayerNetworkComponent
 extends Node
 
-signal player_connected(peer_id: int)
-signal player_disconnected(peer_id: int)
-signal avatar_texture_received(peer_id: int)
+signal player_connected(peer_id: Variant)
+signal player_disconnected(peer_id: Variant)
+signal avatar_texture_received(peer_id: Variant)
 
 const NETWORK_PLAYER_SCENE = preload("res://multiplayer/NetworkPlayer.tscn")
 
 var network_manager: Node = null
-var remote_players: Dictionary = {} # peer_id -> NetworkPlayer instance
+var remote_players: Dictionary = {} # peer_id (Variant) -> NetworkPlayer instance
 var update_rate: float = 0.05 # 20 Hz (50ms between updates)
 var time_since_last_update: float = 0.0
 
@@ -110,7 +110,11 @@ func _update_remote_players() -> void:
 	
 	for peer_id in network_manager.players.keys():
 		# Skip our own ID
-		if peer_id == network_manager.get_multiplayer_id():
+		var local_id = network_manager.get_multiplayer_id()
+		if network_manager.use_nakama:
+			local_id = network_manager.get_nakama_user_id()
+			
+		if str(peer_id) == str(local_id):
 			continue
 		
 		var player_data = network_manager.players[peer_id]
@@ -123,15 +127,24 @@ func _update_remote_players() -> void:
 		if remote_players.has(peer_id):
 			remote_players[peer_id].update_from_network_data(player_data)
 
-func _despawn_remote_player(peer_id: int) -> void:
+func _despawn_remote_player(peer_id: Variant) -> void:
 	"""Remove a remote player's visual representation"""
 	if remote_players.has(peer_id):
 		remote_players[peer_id].queue_free()
 		remote_players.erase(peer_id)
 		print("PlayerNetworkComponent: Despawned remote player ", peer_id)
 
-func _on_player_connected(peer_id: int) -> void:
+func _on_player_connected(peer_id: Variant) -> void:
 	"""Handle new player connection"""
+	# Skip if this is us
+	var local_id = network_manager.get_multiplayer_id()
+	if network_manager.use_nakama:
+		local_id = network_manager.get_nakama_user_id()
+	
+	if str(peer_id) == str(local_id) or (peer_id is String and local_id is String and peer_id == local_id):
+		print("PlayerNetworkComponent: Skipping spawn for local player")
+		return
+	
 	print("PlayerNetworkComponent: Player connected: ", peer_id)
 	_spawn_remote_player(peer_id)
 	
@@ -140,7 +153,7 @@ func _on_player_connected(peer_id: int) -> void:
 	# Send our avatar to the new player
 	call_deferred("send_avatar_texture")
 
-func _on_player_disconnected(peer_id: int) -> void:
+func _on_player_disconnected(peer_id: Variant) -> void:
 	"""Handle player disconnection"""
 	print("PlayerNetworkComponent: Player disconnected: ", peer_id)
 	_despawn_remote_player(peer_id)
@@ -205,7 +218,7 @@ func _find_grid_painter_recursive(node: Node) -> Node:
 	return null
 
 ## Update remote player avatars when they connect
-func _spawn_remote_player(peer_id: int) -> void:
+func _spawn_remote_player(peer_id: Variant) -> void:
 	"""Spawn a visual representation of a remote player"""
 	var remote_player = NETWORK_PLAYER_SCENE.instantiate()
 	remote_player.peer_id = peer_id
@@ -220,7 +233,7 @@ func _spawn_remote_player(peer_id: int) -> void:
 	# Try to apply their avatar texture
 	call_deferred("_apply_remote_avatar", peer_id)
 
-func _apply_remote_avatar(peer_id: int) -> void:
+func _apply_remote_avatar(peer_id: Variant) -> void:
 	"""Apply avatar texture to a remote player"""
 	if not network_manager or not remote_players.has(peer_id):
 		return
@@ -230,7 +243,7 @@ func _apply_remote_avatar(peer_id: int) -> void:
 		remote_players[peer_id].apply_avatar_texture(texture)
 		print("PlayerNetworkComponent: Applied avatar to remote player ", peer_id)
 
-func _on_avatar_texture_received(peer_id: int) -> void:
+func _on_avatar_texture_received(peer_id: Variant) -> void:
 	"""Called when a remote player's avatar texture is received"""
 	print("PlayerNetworkComponent: Avatar texture received for peer ", peer_id)
 	_apply_remote_avatar(peer_id)

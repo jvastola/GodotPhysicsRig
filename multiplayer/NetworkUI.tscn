@@ -1,6 +1,25 @@
-[gd_scene load_steps=2 format=3 uid="uid://cr7v4m2k8w5fx"]
+[gd_scene load_steps=4 format=3 uid="uid://cr7v4m2k8w5fx"]
 
 [ext_resource type="Script" path="res://multiplayer/network_ui.gd" id="1"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.1, 0.1, 0.12, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.3, 0.6, 0.9, 0.8)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_color = Color(0, 0, 0, 0.5)
+shadow_size = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_header"]
+bg_color = Color(0.2, 0.4, 0.7, 0.3)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
 
 [node name="NetworkUI" type="Control"]
 layout_mode = 3
@@ -18,82 +37,166 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -200.0
-offset_top = -200.0
-offset_right = 200.0
-offset_bottom = 200.0
+offset_left = -220.0
+offset_top = -280.0
+offset_right = 220.0
+offset_bottom = 280.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
 
-[node name="VBoxContainer" type="VBoxContainer" parent="."]
+[node name="HeaderPanel" type="Panel" parent="Panel"]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -180.0
-offset_top = -180.0
-offset_right = 180.0
-offset_bottom = 180.0
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 60.0
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_header")
+
+[node name="TitleLabel" type="Label" parent="Panel/HeaderPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 10
-
-[node name="TitleLabel" type="Label" parent="VBoxContainer"]
-layout_mode = 2
-text = "Multiplayer"
+theme_override_colors/font_color = Color(0.9, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 24
+text = "🌐 NAKAMA MULTIPLAYER"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="UseRoomCodeCheck" type="CheckButton" parent="VBoxContainer"]
-layout_mode = 2
-button_pressed = true
-text = "Use Room Code"
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 70.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
 
-[node name="RoomCodeInput" type="LineEdit" parent="VBoxContainer"]
+[node name="StatusLabel" type="Label" parent="Panel/VBoxContainer"]
 layout_mode = 2
-placeholder_text = "Room Code (6 chars)"
-max_length = 6
-
-[node name="KeyboardButton" type="Button" parent="VBoxContainer"]
-layout_mode = 2
-text = "Keyboard"
-
-[node name="AddressInput" type="LineEdit" parent="VBoxContainer"]
-layout_mode = 2
-visible = false
-placeholder_text = "Server Address"
-
-[node name="PortInput" type="LineEdit" parent="VBoxContainer"]
-layout_mode = 2
-placeholder_text = "Port"
-
-[node name="HostButton" type="Button" parent="VBoxContainer"]
-layout_mode = 2
-text = "Host Game"
-
-[node name="JoinButton" type="Button" parent="VBoxContainer"]
-layout_mode = 2
-text = "Join Game"
-
-[node name="DisconnectButton" type="Button" parent="VBoxContainer"]
-layout_mode = 2
-text = "Disconnect"
-
-[node name="VoiceButton" type="Button" parent="VBoxContainer"]
-layout_mode = 2
-text = "Enable Voice"
-
-[node name="AvatarButton" type="Button" parent="VBoxContainer"]
-layout_mode = 2
-text = "Send Avatar"
-
-[node name="StatusLabel" type="Label" parent="VBoxContainer"]
-layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 14
 text = "Not connected"
 horizontal_alignment = 1
+autowrap_mode = 2
 
-[node name="PlayerListLabel" type="Label" parent="VBoxContainer"]
+[node name="HSeparator1" type="HSeparator" parent="Panel/VBoxContainer"]
 layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="RoomCodeInput" type="LineEdit" parent="Panel/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_placeholder_color = Color(0.5, 0.5, 0.6, 1)
+theme_override_font_sizes/font_size = 16
+placeholder_text = "Enter Match ID..."
+max_length = 64
+alignment = 1
+caret_blink = true
+
+[node name="KeyboardButton" type="Button" parent="Panel/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "⌨️ Open Keyboard"
+
+[node name="HSeparator2" type="HSeparator" parent="Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="ButtonsContainer" type="HBoxContainer" parent="Panel/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="HostButton" type="Button" parent="Panel/VBoxContainer/ButtonsContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.2, 1, 0.4, 1)
+theme_override_font_sizes/font_size = 16
+text = "🎮 Host"
+
+[node name="JoinButton" type="Button" parent="Panel/VBoxContainer/ButtonsContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.4, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 16
+text = "🔗 Join"
+
+[node name="DisconnectButton" type="Button" parent="Panel/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.4, 0.4, 1)
+theme_override_font_sizes/font_size = 14
+text = "⏏️ Disconnect"
+
+[node name="HSeparator3" type="HSeparator" parent="Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="FeaturesContainer" type="HBoxContainer" parent="Panel/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="VoiceButton" type="Button" parent="Panel/VBoxContainer/FeaturesContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.8, 0.3, 1)
+theme_override_font_sizes/font_size = 14
+text = "🎤 Voice"
+
+[node name="AvatarButton" type="Button" parent="Panel/VBoxContainer/FeaturesContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.8, 0.5, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "👤 Avatar"
+
+[node name="HSeparator4" type="HSeparator" parent="Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="PlayerListLabel" type="Label" parent="Panel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 13
 text = "Players: 0"
+vertical_alignment = 1
+
+[node name="HSeparator5" type="HSeparator" parent="Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="RoomListHeaderContainer" type="HBoxContainer" parent="Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="RoomListLabel" type="Label" parent="Panel/VBoxContainer/RoomListHeaderContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.8, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "📡 Available Rooms"
+
+[node name="RefreshButton" type="Button" parent="Panel/VBoxContainer/RoomListHeaderContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 1, 0.8, 1)
+theme_override_font_sizes/font_size = 12
+text = "🔄"
+
+[node name="RoomListScroll" type="ScrollContainer" parent="Panel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 100)
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="RoomListVBox" type="VBoxContainer" parent="Panel/VBoxContainer/RoomListScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 5
+
+[node name="PortInput" type="LineEdit" parent="Panel/VBoxContainer"]
+visible = false
+layout_mode = 2
+placeholder_text = "Port"

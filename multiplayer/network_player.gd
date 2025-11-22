@@ -2,7 +2,7 @@ extends Node3D
 ## NetworkPlayer - Represents a remote player in the network
 ## Handles interpolation and visualization of networked player transforms
 
-@export var peer_id: int = -1
+@export var peer_id: Variant = -1
 @export var interpolation_speed: float = 15.0
 @export var use_interpolation_buffer: bool = true
 @export var buffer_size: int = 3

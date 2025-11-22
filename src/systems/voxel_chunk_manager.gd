@@ -38,6 +38,13 @@ var _voxel_size: float = 1.0
 
 # Network sync
 var network_manager: Node = null
+var nakama_manager: Node = null
+
+# Batching
+var _voxel_queue: Array = [] # Array of {type: 0/1, pos: Vector3, color: Color}
+var _batch_timer: float = 0.0
+const BATCH_INTERVAL: float = 0.05 # 50ms
+const MAX_BATCH_SIZE: int = 20
 
 signal chunk_updated(chunk_coord: Vector3i)
 signal voxel_placed(world_pos: Vector3, color: Color)
@@ -57,12 +64,20 @@ class VoxelChunk:
 func _ready() -> void:
 	# Setup network sync
 	network_manager = get_node_or_null("/root/NetworkManager")
+	nakama_manager = get_node_or_null("/root/NakamaManager")
+	
 	if network_manager:
 		# Connect to receive voxel updates from network
 		if network_manager.has_signal("voxel_placed_network"):
 			network_manager.voxel_placed_network.connect(_on_network_voxel_placed)
 		if network_manager.has_signal("voxel_removed_network"):
 			network_manager.voxel_removed_network.connect(_on_network_voxel_removed)
+
+func _process(delta: float) -> void:
+	if _voxel_queue.size() > 0:
+		_batch_timer += delta
+		if _batch_timer >= BATCH_INTERVAL or _voxel_queue.size() >= MAX_BATCH_SIZE:
+			_flush_voxel_queue()
 
 ## Set the size of individual voxels
 func set_voxel_size(size: float) -> void:
@@ -80,8 +95,13 @@ func add_voxel(world_pos: Vector3, color: Color = Color.WHITE, sync_network: boo
 		_mark_neighbors_dirty(chunk_coord, local_pos)
 		
 		# Sync to network
-		if sync_network and network_manager and network_manager.has_method("sync_voxel_placed"):
-			network_manager.sync_voxel_placed(world_pos, color)
+		if sync_network:
+			if network_manager and network_manager.get("use_nakama") and nakama_manager:
+				# Queue for Nakama batching
+				_queue_voxel_update(0, world_pos, color)
+			elif network_manager and network_manager.has_method("sync_voxel_placed"):
+				# Send via ENet
+				network_manager.sync_voxel_placed(world_pos, color)
 		
 		voxel_placed.emit(world_pos, color)
 
@@ -99,8 +119,13 @@ func remove_voxel(world_pos: Vector3, sync_network: bool = true) -> void:
 		_mark_neighbors_dirty(chunk_coord, local_pos)
 		
 		# Sync to network
-		if sync_network and network_manager and network_manager.has_method("sync_voxel_removed"):
-			network_manager.sync_voxel_removed(world_pos)
+		if sync_network:
+			if network_manager and network_manager.get("use_nakama") and nakama_manager:
+				# Queue for Nakama batching
+				_queue_voxel_update(1, world_pos)
+			elif network_manager and network_manager.has_method("sync_voxel_removed"):
+				# Send via ENet
+				network_manager.sync_voxel_removed(world_pos)
 		
 		voxel_removed.emit(world_pos)
 		
@@ -399,3 +424,25 @@ func get_stats() -> Dictionary:
 		"voxels": total_voxels,
 		"avg_voxels_per_chunk": float(total_voxels) / max(total_chunks, 1)
 	}
+
+
+func _queue_voxel_update(type: int, pos: Vector3, color: Color = Color.WHITE) -> void:
+	_voxel_queue.append({
+		"t": type,
+		"p": pos,
+		"c": color
+	})
+
+
+func _flush_voxel_queue() -> void:
+	if _voxel_queue.is_empty() or not nakama_manager:
+		return
+		
+	# Send batch
+	nakama_manager.send_match_state(
+		8, # VOXEL_BATCH
+		{"updates": _voxel_queue.duplicate()}
+	)
+	
+	_voxel_queue.clear()
+	_batch_timer = 0.0
