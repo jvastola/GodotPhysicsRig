@@ -21,6 +21,9 @@ var matchmaking: Node = null
 var use_matchmaking_server: bool = true
 const MATCHMAKING_SERVER_URL = "http://158.101.21.99:8080"
 
+# Nakama integration (scalable relay networking)
+var use_nakama: bool = false  # Set to true to use Nakama instead of P2P
+
 var peer: ENetMultiplayerPeer = null
 var players: Dictionary = {} # peer_id -> player_info Dictionary
 var local_player: Node3D = null

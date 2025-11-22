@@ -25,6 +25,7 @@ GameManager="*res://src/systems/game_manager.gd"
 SaveManager="*res://src/systems/save_manager.gd"
 InventoryManager="*res://src/systems/inventory_manager.gd"
 NetworkManager="*res://multiplayer/network_manager.gd"
+NakamaManager="*res://multiplayer/nakama_manager.gd"
 InteractionManager="*res://src/systems/interactions/interaction_manager.gd"
 
 [dotnet]
