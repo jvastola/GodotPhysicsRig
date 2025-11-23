@@ -57,25 +57,24 @@ func _ready() -> void:
 
 
 func _setup_components() -> void:
-	# Network Component
-	network_component = PlayerNetworkComponent.new()
-	network_component.name = "PlayerNetworkComponent"
-	add_child(network_component)
-	network_component.setup(player_body, xr_camera, desktop_camera, left_controller, right_controller)
+	# Get components from scene (they're now part of the XRPlayer.tscn)
+	network_component = get_node_or_null("PlayerNetworkComponent")
+	if network_component:
+		network_component.setup(player_body, xr_camera, desktop_camera, left_controller, right_controller)
+	else:
+		push_warning("XRPlayer: PlayerNetworkComponent not found in scene")
 	
 	# Voice Component
-	voice_component = PlayerVoiceComponent.new()
-	voice_component.name = "PlayerVoiceComponent"
-	add_child(voice_component)
-	voice_component.setup(network_component.network_manager)
+	voice_component = get_node_or_null("PlayerVoiceComponent")
+	if voice_component and network_component:
+		voice_component.setup(network_component.network_manager)
+	elif not voice_component:
+		push_warning("XRPlayer: PlayerVoiceComponent not found in scene")
 	
 	# Movement Component - check if it already exists in scene first
 	movement_component = get_node_or_null("PlayerMovementComponent")
-	if not movement_component:
-		movement_component = PlayerMovementComponent.new()
-		movement_component.name = "PlayerMovementComponent"
-		add_child(movement_component)
-	movement_component.setup(player_body, right_controller)
+	if movement_component:
+		movement_component.setup(player_body, right_controller)
 
 
 func _setup_physics_hands() -> void:

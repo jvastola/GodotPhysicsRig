@@ -7,6 +7,7 @@ signal player_disconnected(peer_id: int)
 signal connection_failed()
 signal connection_succeeded()
 signal server_disconnected()
+signal send_local_avatar()
 
 # Nakama integration (scalable relay networking)
 var use_nakama: bool = false  # Set to true to use Nakama instead of P2P
@@ -473,6 +474,10 @@ func _on_nakama_match_joined(match_id: String) -> void:
 	
 	# Notify listeners
 	connection_succeeded.emit()
+	
+	# Trigger avatar send after a short delay to ensure everything is set up
+	await get_tree().create_timer(0.5).timeout
+	send_local_avatar.emit()
 
 func _on_nakama_match_left() -> void:
 	print("NetworkManager: Left Nakama match")
@@ -509,6 +514,7 @@ func _on_nakama_match_presence(joins: Array, leaves: Array) -> void:
 
 
 func _handle_nakama_player_transform(sender_id: String, data: Dictionary) -> void:
+	"""Handle incoming player transform data from Nakama"""
 	if not players.has(sender_id):
 		players[sender_id] = local_player_info.duplicate(true)
 	
@@ -528,8 +534,28 @@ func _handle_nakama_player_transform(sender_id: String, data: Dictionary) -> voi
 func _vec3_to_dict(v: Vector3) -> Dictionary:
 	return {"x": snappedf(v.x, 0.001), "y": snappedf(v.y, 0.001), "z": snappedf(v.z, 0.001)}
 
+
 func _dict_to_vec3(d: Dictionary) -> Vector3:
 	return Vector3(d.get("x", 0), d.get("y", 0), d.get("z", 0))
+
+
+func _handle_nakama_avatar_data(sender_id: String, data: Dictionary) -> void:
+	"""Handle incoming avatar texture data from Nakama"""
+	if not data.has("texture"):
+		return
+	
+	# Decode base64 texture data
+	var texture_data = Marshalls.base64_to_raw(data["texture"])
+	
+	# Store in player data
+	if not players.has(sender_id):
+		players[sender_id] = local_player_info.duplicate(true)
+	
+	players[sender_id].avatar_texture_data = texture_data
+	print("NetworkManager: Received avatar texture from ", sender_id, " via Nakama (", texture_data.size(), " bytes)")
+	
+	# Emit signal so PlayerNetworkComponent can apply it
+	avatar_texture_received.emit(sender_id)
 
 
 # ============================================================================
@@ -537,25 +563,26 @@ func _dict_to_vec3(d: Dictionary) -> Vector3:
 # ============================================================================
 
 func set_local_avatar_texture(texture: ImageTexture) -> void:
-	"""Send avatar texture to all other players"""
-	if not texture or not texture.get_image():
-		return
-	
+	"""Set the local player's avatar texture and broadcast to other players"""
 	var image = texture.get_image()
 	var texture_data = image.save_png_to_buffer()
 	
-	local_player_info.avatar_texture_data = texture_data
-	
-	# Update our entry
+	# Store locally
 	var peer_id = multiplayer.get_unique_id()
 	if players.has(peer_id):
 		players[peer_id].avatar_texture_data = texture_data
 	
-	# Send to all other players
-	if multiplayer.multiplayer_peer:
+	# Send via Nakama
+	if use_nakama and NakamaManager:
+		var avatar_data = {
+			"texture": Marshalls.raw_to_base64(texture_data)
+		}
+		NakamaManager.send_match_state(NakamaManager.MatchOpCode.AVATAR_DATA, avatar_data)
+		print("NetworkManager: Sent avatar texture via Nakama (", texture_data.size(), " bytes)")
+	# Fallback to ENet RPC
+	elif multiplayer.multiplayer_peer:
 		_send_avatar_texture.rpc_id(0, texture_data)
-	
-	print("NetworkManager: Sent avatar texture (", texture_data.size(), " bytes)")
+		print("NetworkManager: Sent avatar texture via ENet (", texture_data.size(), " bytes)")
 
 
 @rpc("reliable", "call_remote", "any_peer")
@@ -751,6 +778,9 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 	elif op_code == NakamaManager.MatchOpCode.VOICE_DATA:
 		if data is PackedByteArray:
 			_process_incoming_voice_data(data, peer_id)
+	elif op_code == NakamaManager.MatchOpCode.AVATAR_DATA:
+		if data is Dictionary:
+			_handle_nakama_avatar_data(peer_id, data)
 
 
 func _process_incoming_voice_data(audio_data: PackedByteArray, sender_id: Variant) -> void:

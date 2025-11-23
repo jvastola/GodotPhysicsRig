@@ -103,25 +103,34 @@ func _on_nakama_match_state(sender_id: String, op_code: int, data: Variant) -> v
 	
 	# Map Nakama op codes to local actions
 	match op_code:
-		NakamaManager.MatchOpCode.GRABBABLE_GRAB:
+		NakamaManager.MatchOpCode.GRAB_OBJECT:
 			print("GrabbableNetworkComponent: ", save_id, " grabbed by Nakama peer ", sender_id)
 			is_network_owner = false
 			# We use a hash of the string for the int peer_id signal
 			network_grab.emit(sender_id.hash())
 			
-		NakamaManager.MatchOpCode.GRABBABLE_RELEASE:
+		NakamaManager.MatchOpCode.RELEASE_OBJECT:
 			print("GrabbableNetworkComponent: ", save_id, " released by Nakama peer ", sender_id)
 			
-			# Sync final position if provided
-			if data.has("pos") and data.has("rot"):
-				var sync_data = {}
+			# Sync final position/rotation from data
+			var sync_data = {} # Initialize sync_data here
+			if data.has("pos"):
 				sync_data["position"] = _parse_vector3(data["pos"])
+			if data.has("rot"):
 				sync_data["rotation"] = _parse_quaternion(data["rot"])
+			if data.has("lin_vel"):
+				sync_data["linear_velocity"] = _parse_vector3(data["lin_vel"])
+			if data.has("ang_vel"):
+				sync_data["angular_velocity"] = _parse_vector3(data["ang_vel"])
+			
+			# Only emit sync if there's actual data to sync
+			if not sync_data.is_empty():
 				network_sync.emit(sync_data)
-				
+			
+			is_network_owner = false
 			network_release.emit(sender_id.hash())
 			
-		NakamaManager.MatchOpCode.GRABBABLE_UPDATE:
+		NakamaManager.MatchOpCode.OBJECT_UPDATE:
 			if is_network_owner or is_grabbed:
 				return
 				

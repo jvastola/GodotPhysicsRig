@@ -1,4 +1,4 @@
-[gd_scene load_steps=28 format=3 uid="uid://cpq6v7yqk8y8j"]
+[gd_scene load_steps=31 format=3 uid="uid://cpq6v7yqk8y8j"]
 
 [ext_resource type="Script" uid="uid://cp2rqqlp75g6c" path="res://src/player/xr_player.gd" id="1_player"]
 [ext_resource type="Script" uid="uid://ctf4856v8f65j" path="res://src/player/xr_origin_3d.gd" id="2_xr_origin"]
@@ -11,6 +11,9 @@
 [ext_resource type="PackedScene" uid="uid://bn7dgs6t6u07m" path="res://src/objects/BuildCube.tscn" id="9_build_cube"]
 [ext_resource type="Script" uid="uid://dh7nhbtbxywoc" path="res://src/systems/voxel_chunk_manager.gd" id="11_2d0bc"]
 [ext_resource type="Script" uid="uid://dr821xg418lpi" path="res://src/player/components/player_movement_component.gd" id="12_movement"]
+[ext_resource type="Script" uid="uid://b3e1iih2vth83" path="res://src/systems/grid_painter.gd" id="13_grid_painter"]
+[ext_resource type="Script" uid="uid://04sudajutma5" path="res://src/player/components/player_network_component.gd" id="14_network_comp"]
+[ext_resource type="Script" uid="uid://cxk34sx374uym" path="res://src/player/components/player_voice_component.gd" id="15_voice_comp"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_l588l"]
 size = Vector3(0.3, 0.3, 0.2)
@@ -308,3 +311,14 @@ turn_mode = 1
 
 [node name="VoxelChunkManager" type="Node" parent="." groups=["voxel_manager"]]
 script = ExtResource("11_2d0bc")
+
+[node name="GridPainter" type="Node3D" parent="."]
+script = ExtResource("13_grid_painter")
+player_root_path = NodePath("..")
+head_path = NodePath("PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadMesh")
+
+[node name="PlayerNetworkComponent" type="Node" parent="."]
+script = ExtResource("14_network_comp")
+
+[node name="PlayerVoiceComponent" type="Node" parent="."]
+script = ExtResource("15_voice_comp")

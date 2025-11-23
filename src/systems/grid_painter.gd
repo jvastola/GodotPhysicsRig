@@ -100,13 +100,18 @@ var _handler_script: Script = null
 var _save_path: String = "user://grid_painter_surfaces.json"
 
 func _ready() -> void:
+	print("GridPainter: _ready() called, load_for_player: ", load_for_player)
 	_rng.randomize()
 	_load_handler_script()
 	if load_for_player:
+		print("GridPainter: Loading saved grid data from: ", _save_path)
 		load_grid_data(_save_path)
+	print("GridPainter: Resolving surface nodes...")
 	_resolve_all_surface_nodes()
 	_attach_handler_scripts()
+	print("GridPainter: Applying all surface textures, surfaces count: ", _surfaces.size())
 	_apply_all_surface_textures()
+	print("GridPainter: _ready() complete")
 
 func _load_handler_script() -> void:
 	if _handler_script:
@@ -334,14 +339,19 @@ func _apply_all_surface_textures() -> void:
 
 func _apply_surface_texture(surface: SurfaceSlot, apply_primary: bool = true, apply_extras: bool = true) -> void:
 	if not surface:
+		print("GridPainter: _apply_surface_texture - surface is null")
 		return
+	print("GridPainter: Applying texture for surface: ", surface.id)
 	if not surface.texture:
 		surface.texture = _build_texture_from_surface(surface)
 	if apply_primary:
 		var target_node := _resolve_surface_node(surface, true)
 		if target_node:
+			print("GridPainter: Found target node for ", surface.id, ": ", target_node.name)
 			var cube_mesh := _build_cube_mesh_for_node(surface, target_node)
 			_assign_texture_to_mesh(target_node, surface.texture, cube_mesh)
+		else:
+			print("GridPainter: No target node found for ", surface.id)
 	if apply_extras:
 		for idx in range(surface.resolved_extra_paths.size()):
 			var extra_node := _resolve_surface_node(surface, true, idx)

@@ -44,13 +44,14 @@ var match_peers: Dictionary = {}  # peer_id -> presence (EXCLUDING self)
 # Op codes for match state (must match across all clients)
 enum MatchOpCode {
 	PLAYER_TRANSFORM = 1,
-	GRABBABLE_GRAB = 2,
-	GRABBABLE_RELEASE = 3,
-	GRABBABLE_UPDATE = 4,
+	GRAB_OBJECT = 2,
+	RELEASE_OBJECT = 3,
+	OBJECT_UPDATE = 4,
 	VOXEL_PLACE = 5,
 	VOXEL_REMOVE = 6,
-	VOICE_DATA = 7,
-	VOXEL_BATCH = 8
+	VOXEL_BATCH = 7,
+	VOICE_DATA = 8,
+	AVATAR_DATA = 9
 }
 
 

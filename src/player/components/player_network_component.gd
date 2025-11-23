@@ -36,17 +36,17 @@ func _process(delta: float) -> void:
 	_update_networking(delta)
 
 func _setup_networking() -> void:
-	"""Initialize networking connections"""
-	network_manager = get_node_or_null("/root/NetworkManager")
-	
+	"""Initialize network connections and signals"""
+	network_manager = get_node("/root/NetworkManager")
 	if not network_manager:
-		print("PlayerNetworkComponent: NetworkManager not found, multiplayer disabled")
+		push_error("PlayerNetworkComponent: NetworkManager not found")
 		return
 	
-	# Connect to network events
+	# Connect signals
 	network_manager.player_connected.connect(_on_player_connected)
 	network_manager.player_disconnected.connect(_on_player_disconnected)
 	network_manager.avatar_texture_received.connect(_on_avatar_texture_received)
+	network_manager.send_local_avatar.connect(send_avatar_texture)
 	
 	print("PlayerNetworkComponent: Networking initialized")
 
@@ -165,32 +165,34 @@ func send_avatar_texture() -> void:
 	if not network_manager:
 		return
 	
-	# Try multiple ways to find GridPainter
-	var grid_painter = get_node_or_null("../GridPainter") # Assuming sibling or similar
+	# GridPainter should be a sibling component or child of the player
+	var grid_painter: GridPainter = null
+	
+	# Try getting it from parent's children (sibling)
+	var parent = get_parent()
+	if parent:
+		for child in parent.get_children():
+			if child is GridPainter:
+				grid_painter = child
+				break
+	
+	# Try getting it from scene tree by class
 	if not grid_painter:
-		grid_painter = get_tree().root.get_node_or_null("MainScene/GridPainterTest")
-	if not grid_painter:
-		grid_painter = get_tree().root.get_node_or_null("MainScene/GridPainter")
-	if not grid_painter:
-		# Try finding by type or class name
-		for node in get_tree().get_nodes_in_group("grid_painter"):
-			grid_painter = node
-			break
-	if not grid_painter:
-		# Last resort: search for GridPainter type
-		var root = get_tree().root
-		for child in root.get_children():
-			if child is Node3D:
-				var found = _find_grid_painter_recursive(child)
-				if found:
-					grid_painter = found
+		var players = get_tree().get_nodes_in_group("player")
+		for player in players:
+			for child in player.get_children():
+				if child is GridPainter:
+					grid_painter = child
 					break
+			if grid_painter:
+				break
 	
 	if not grid_painter:
 		print("PlayerNetworkComponent: GridPainter not found, cannot send avatar")
 		return
 	
-	# Get head surface texture
+	# Get head surface texture only (for now, send just head)
+	# TODO: In the future, we could send all surfaces or combine them
 	if not grid_painter.has_method("_get_surface"):
 		print("PlayerNetworkComponent: GridPainter doesn't have _get_surface method")
 		return
