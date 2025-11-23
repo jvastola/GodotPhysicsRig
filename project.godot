@@ -96,6 +96,6 @@ textures/vram_compression/import_etc2_astc=true
 
 [xr]
 
-openxr/enabled=true
+openxr/enabled=false
 openxr/foveation_level=3
 shaders/enabled=true

@@ -275,35 +275,62 @@ func apply_avatar_texture(texture: ImageTexture) -> void:
 
 
 ## Create voice audio player
+## Create voice audio player
 func _create_voice_player() -> void:
 	voice_player = AudioStreamPlayer3D.new()
 	voice_player.name = "VoicePlayer"
 	
 	# Create audio stream generator for voice playback
 	var stream = AudioStreamGenerator.new()
-	stream.mix_rate = 16000 # Match VOICE_SAMPLE_RATE
-	stream.buffer_length = 0.1
+	# Use the project's mix rate to ensure correct playback speed/pitch
+	# Since we capture at this rate without resampling
+	stream.mix_rate = AudioServer.get_mix_rate()
+	stream.buffer_length = 0.5 # Increased buffer to handle network jitter
 	voice_player.stream = stream
-	voice_player.bus = "Voice"
+	voice_player.bus = "VoiceOutput" # Use Output bus (unmuted)
 	voice_player.autoplay = true
 	voice_player.max_distance = 20.0
 	voice_player.unit_size = 5.0
 	
 	add_child(voice_player)
 	
+	print("NetworkPlayer [", peer_id, "]: Created voice player")
+	print("  - Stream: ", stream)
+	print("  - Bus: ", voice_player.bus)
+	print("  - Autoplay: ", voice_player.autoplay)
+	print("  - Max distance: ", voice_player.max_distance)
+	
 	# Get playback for pushing samples
 	voice_player.play()
 	voice_playback = voice_player.get_stream_playback()
+	
+	print("  - Playing: ", voice_player.playing)
+	print("  - Stream playback: ", voice_playback)
+	print("  - Stream playback valid: ", voice_playback != null)
 
 
 ## Play received voice samples
 func _play_voice_samples(samples: PackedVector2Array) -> void:
-	if not voice_playback or samples.size() == 0:
+	if not voice_playback:
+		print("NetworkPlayer [", peer_id, "]: No voice_playback!")
+		return
+		
+	if samples.size() == 0:
 		return
 	
 	# Push samples to playback buffer
 	var available_frames = voice_playback.get_frames_available()
 	var frames_to_push = min(samples.size(), available_frames)
 	
-	for i in range(frames_to_push):
-		voice_playback.push_frame(samples[i])
+	if frames_to_push > 0:
+		for i in range(frames_to_push):
+			voice_playback.push_frame(samples[i])
+		print("NetworkPlayer [", peer_id, "]: Pushed ", frames_to_push, "/", samples.size(), " frames (available: ", available_frames, ")")
+		print("  - Player position: ", voice_player.global_position)
+		print("  - Player playing: ", voice_player.playing)
+		print("  - Player volume_db: ", voice_player.volume_db)
+		print("  - Voice bus index: ", AudioServer.get_bus_index("Voice"))
+		print("  - Voice bus muted: ", AudioServer.is_bus_mute(AudioServer.get_bus_index("Voice")))
+		print("  - Voice bus volume: ", AudioServer.get_bus_volume_db(AudioServer.get_bus_index("Voice")))
+	else:
+		print("NetworkPlayer [", peer_id, "]: No available frames in buffer (need ", samples.size(), " but have 0)")

@@ -752,19 +752,37 @@ func get_object_owner(object_id: String) -> int:
 # ============================================================================
 
 func _setup_voice_chat() -> void:
-	"""Initialize voice chat audio bus"""
-	# Check if Voice bus exists, create if not
+	"""Initialize voice chat audio buses"""
 	var bus_count = AudioServer.get_bus_count()
-	var voice_bus = AudioServer.get_bus_index("Voice")
 	
-	if voice_bus == -1:
-		# Create Voice bus
+	# 1. Setup VoiceInput bus (Microphone -> Capture)
+	# We mute this bus so we don't hear ourselves, but Capture effect still works
+	var input_bus = AudioServer.get_bus_index("VoiceInput")
+	if input_bus == -1:
 		AudioServer.add_bus(bus_count)
-		AudioServer.set_bus_name(bus_count, "Voice")
-		voice_bus = bus_count
-		print("NetworkManager: Created Voice audio bus")
+		AudioServer.set_bus_name(bus_count, "VoiceInput")
+		input_bus = bus_count
+		print("NetworkManager: Created VoiceInput audio bus")
+		bus_count += 1
 	
-	microphone_bus_index = voice_bus
+	AudioServer.set_bus_mute(input_bus, true) # Mute so we don't hear self
+	AudioServer.set_bus_volume_db(input_bus, 0.0)
+	AudioServer.set_bus_send(input_bus, "Master")
+	
+	# 2. Setup VoiceOutput bus (Remote Players -> Master)
+	# We want to hear this!
+	var output_bus = AudioServer.get_bus_index("VoiceOutput")
+	if output_bus == -1:
+		AudioServer.add_bus(bus_count)
+		AudioServer.set_bus_name(bus_count, "VoiceOutput")
+		output_bus = bus_count
+		print("NetworkManager: Created VoiceOutput audio bus")
+	
+	AudioServer.set_bus_mute(output_bus, false) # Unmute to hear others
+	AudioServer.set_bus_volume_db(output_bus, 0.0)
+	AudioServer.set_bus_send(output_bus, "Master")
+	
+	print("NetworkManager: Voice buses configured - Input (Muted), Output (Unmuted)")
 
 
 func enable_voice_chat(enable: bool) -> void:
@@ -775,7 +793,11 @@ func enable_voice_chat(enable: bool) -> void:
 
 func send_voice_data(audio_data: PackedVector2Array) -> void:
 	"""Send voice audio data to all other players with compression"""
-	if not voice_enabled or not multiplayer.multiplayer_peer:
+	if not voice_enabled:
+		return
+	
+	# Check if we have a way to send (either Nakama or ENet)
+	if not use_nakama and not multiplayer.multiplayer_peer:
 		return
 	
 	# Compress to 16-bit PCM instead of 32-bit float (4x smaller)
@@ -823,8 +845,11 @@ func _process_incoming_voice_data(audio_data: PackedByteArray, sender_id: Varian
 	# Don't play our own voice back to ourselves
 	# Note: For Nakama, sender_id is String. For ENet, it's int.
 	# We need to compare correctly.
-	if str(sender_id) == str(get_multiplayer_id()) or str(sender_id) == NakamaManager.local_user_id:
-		return
+	# TEMPORARILY DISABLED FOR TESTING - UNCOMMENT TO PREVENT ECHO
+	#if str(sender_id) == str(get_multiplayer_id()) or str(sender_id) == NakamaManager.local_user_id:
+	#	return
+	
+	print("NetworkManager: Received ", audio_data.size(), " bytes of voice data from ", sender_id)
 	
 	# Decompress 16-bit PCM back to float samples
 	var sample_count = int(float(audio_data.size()) / 4.0)
@@ -851,6 +876,7 @@ func _process_incoming_voice_data(audio_data: PackedByteArray, sender_id: Varian
 		
 	if players.has(sender_id):
 		players[sender_id]["voice_samples"] = samples
+		print("NetworkManager: Stored ", samples.size(), " voice samples for player ", sender_id)
 
 
 # ============================================================================

@@ -23,29 +23,26 @@ func _setup_voice_chat() -> void:
 	microphone_player = AudioStreamPlayer.new()
 	microphone_player.name = "MicrophonePlayer"
 	microphone_player.stream = microphone
-	microphone_player.bus = "Voice"
+	microphone_player.bus = "VoiceInput" # Use Input bus (muted locally)
+	microphone_player.volume_db = 0.0  # Full volume for capture
 	add_child(microphone_player)
 	
-	# Add AudioEffectCapture to Voice bus
-	var voice_bus_index = AudioServer.get_bus_index("Voice")
-	if voice_bus_index != -1:
-		# Mute the Voice bus so we don't hear our own microphone
-		# Audio is still captured via AudioEffectCapture, just not played back
-		AudioServer.set_bus_mute(voice_bus_index, true)
-		
+	# Add AudioEffectCapture to VoiceInput bus
+	var input_bus_index = AudioServer.get_bus_index("VoiceInput")
+	if input_bus_index != -1:
 		# Check if capture effect already exists
 		var has_capture = false
-		for i in range(AudioServer.get_bus_effect_count(voice_bus_index)):
-			if AudioServer.get_bus_effect(voice_bus_index, i) is AudioEffectCapture:
-				voice_effect = AudioServer.get_bus_effect(voice_bus_index, i)
+		for i in range(AudioServer.get_bus_effect_count(input_bus_index)):
+			if AudioServer.get_bus_effect(input_bus_index, i) is AudioEffectCapture:
+				voice_effect = AudioServer.get_bus_effect(input_bus_index, i)
 				has_capture = true
 				break
 		
 		if not has_capture:
 			voice_effect = AudioEffectCapture.new()
-			AudioServer.add_bus_effect(voice_bus_index, voice_effect)
+			AudioServer.add_bus_effect(input_bus_index, voice_effect)
 		
-		print("PlayerVoiceComponent: Voice chat initialized (bus muted to prevent echo)")
+		print("PlayerVoiceComponent: Voice chat initialized on VoiceInput bus")
 
 func toggle_voice_chat(enabled: bool) -> void:
 	"""Enable or disable voice chat"""
@@ -53,6 +50,12 @@ func toggle_voice_chat(enabled: bool) -> void:
 	
 	if network_manager:
 		network_manager.enable_voice_chat(enabled)
+	
+	# Ensure VoiceOutput bus is unmuted so we can hear remote players
+	var output_bus_index = AudioServer.get_bus_index("VoiceOutput")
+	if output_bus_index != -1:
+		AudioServer.set_bus_mute(output_bus_index, false)
+		#print("PlayerVoiceComponent: VoiceOutput bus unmuted")
 	
 	if enabled and microphone_player:
 		microphone_player.play()
@@ -76,3 +79,4 @@ func _process_voice_chat(_delta: float) -> void:
 		if audio_data.size() > 0:
 			# Send to network
 			network_manager.send_voice_data(audio_data)
+			#print("PlayerVoiceComponent: Sent ", audio_data.size(), " voice samples")
