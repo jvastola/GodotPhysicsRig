@@ -8,8 +8,9 @@ var voice_effect: AudioEffectCapture = null
 var voice_enabled: bool = false
 
 # Audio Processing Settings
+# Audio Processing Settings
 const TARGET_SAMPLE_RATE = 22050 # Downsample to this rate
-const VAD_THRESHOLD = 0.005 # RMS threshold for voice activity
+var vad_threshold: float = 0.005 # RMS threshold for voice activity (adjustable)
 const VAD_HANGOVER_TIME = 0.2 # Keep sending for 0.2s after silence
 const BATCH_DURATION = 0.05 # Send packets every 50ms
 
@@ -19,6 +20,7 @@ var _batch_timer: float = 0.0
 var _vad_active: bool = false
 var _vad_hangover_timer: float = 0.0
 var _system_mix_rate: float = 44100.0 # Will be updated from AudioServer
+var _current_rms: float = 0.0 # For UI visualization
 
 func setup(p_network_manager: Node) -> void:
 	network_manager = p_network_manager
@@ -50,6 +52,28 @@ func _setup_voice_chat() -> void:
 				voice_effect = AudioServer.get_bus_effect(input_bus_index, i)
 				has_capture = true
 				break
+		
+		# Add Professional Audio Chain (HighPass -> Compressor -> Limiter -> Capture)
+		
+		# 1. High Pass Filter (Remove rumble/wind)
+		var high_pass = AudioEffectHighPassFilter.new()
+		high_pass.cutoff_hz = 80.0
+		AudioServer.add_bus_effect(input_bus_index, high_pass)
+		
+		# 2. Compressor (Level out volume)
+		var compressor = AudioEffectCompressor.new()
+		compressor.threshold = -20.0
+		compressor.ratio = 4.0
+		compressor.gain = 10.0
+		compressor.attack_us = 20.0
+		compressor.release_ms = 250.0
+		AudioServer.add_bus_effect(input_bus_index, compressor)
+		
+		# 3. Limiter (Prevent clipping)
+		var limiter = AudioEffectLimiter.new()
+		limiter.ceiling_db = -1.0
+		limiter.threshold_db = -1.0
+		AudioServer.add_bus_effect(input_bus_index, limiter)
 		
 		if not has_capture:
 			voice_effect = AudioEffectCapture.new()
@@ -148,4 +172,13 @@ func _check_vad(samples: PackedVector2Array) -> bool:
 		sum_squares += val * val
 		
 	var rms = sqrt(sum_squares / samples.size())
-	return rms > VAD_THRESHOLD
+	_current_rms = rms # Store for UI
+	return rms > vad_threshold
+
+# UI Helpers
+func get_current_rms() -> float:
+	return _current_rms
+
+func set_vad_threshold(value: float) -> void:
+	vad_threshold = value
+
