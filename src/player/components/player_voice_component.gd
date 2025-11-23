@@ -7,6 +7,19 @@ var microphone_player: AudioStreamPlayer = null
 var voice_effect: AudioEffectCapture = null
 var voice_enabled: bool = false
 
+# Audio Processing Settings
+const TARGET_SAMPLE_RATE = 22050 # Downsample to this rate
+const VAD_THRESHOLD = 0.005 # RMS threshold for voice activity
+const VAD_HANGOVER_TIME = 0.2 # Keep sending for 0.2s after silence
+const BATCH_DURATION = 0.05 # Send packets every 50ms
+
+# State
+var _sample_buffer: PackedVector2Array = PackedVector2Array()
+var _batch_timer: float = 0.0
+var _vad_active: bool = false
+var _vad_hangover_timer: float = 0.0
+var _system_mix_rate: float = 44100.0 # Will be updated from AudioServer
+
 func setup(p_network_manager: Node) -> void:
 	network_manager = p_network_manager
 	_setup_voice_chat()
@@ -42,7 +55,8 @@ func _setup_voice_chat() -> void:
 			voice_effect = AudioEffectCapture.new()
 			AudioServer.add_bus_effect(input_bus_index, voice_effect)
 		
-		print("PlayerVoiceComponent: Voice chat initialized on VoiceInput bus")
+		_system_mix_rate = AudioServer.get_mix_rate()
+		print("PlayerVoiceComponent: Voice chat initialized on VoiceInput bus. System Rate: ", _system_mix_rate)
 
 func toggle_voice_chat(enabled: bool) -> void:
 	"""Enable or disable voice chat"""
@@ -64,19 +78,74 @@ func toggle_voice_chat(enabled: bool) -> void:
 	
 	print("PlayerVoiceComponent: Voice chat ", "enabled" if enabled else "disabled")
 
-func _process_voice_chat(_delta: float) -> void:
-	"""Capture and send voice data"""
+func _process_voice_chat(delta: float) -> void:
+	"""Capture, process, and send voice data"""
 	if not voice_enabled or not voice_effect or not network_manager:
 		return
+	
+	# Update batch timer
+	_batch_timer += delta
 	
 	# Get available audio frames from capture
 	var available = voice_effect.get_frames_available()
 	if available > 0:
-		# Get audio samples (limit to reasonable buffer size)
-		var frames_to_get = min(available, 2048)
-		var audio_data = voice_effect.get_buffer(frames_to_get)
+		var audio_data = voice_effect.get_buffer(available)
 		
 		if audio_data.size() > 0:
-			# Send to network
-			network_manager.send_voice_data(audio_data)
-			#print("PlayerVoiceComponent: Sent ", audio_data.size(), " voice samples")
+			# 1. Resample if needed (simple decimation for speed)
+			# Note: Proper resampling requires a filter, but for voice chat decimation is often "good enough"
+			# if we capture at 44.1/48 and want 22.05.
+			var resampled_data = _resample_audio(audio_data)
+			
+			# 2. Voice Activity Detection (VAD)
+			if _check_vad(resampled_data):
+				_vad_active = true
+				_vad_hangover_timer = VAD_HANGOVER_TIME
+			elif _vad_active:
+				_vad_hangover_timer -= delta * (float(audio_data.size()) / _system_mix_rate) # Approx time passed in audio
+				if _vad_hangover_timer <= 0:
+					_vad_active = false
+			
+			# 3. Buffer data if VAD is active
+			if _vad_active:
+				_sample_buffer.append_array(resampled_data)
+	
+	# 4. Send batch if timer expired and we have data
+	if _batch_timer >= BATCH_DURATION:
+		_batch_timer = 0.0
+		if _sample_buffer.size() > 0:
+			network_manager.send_voice_data(_sample_buffer)
+			#print("PlayerVoiceComponent: Sent batch of ", _sample_buffer.size(), " samples")
+			_sample_buffer.clear()
+
+
+func _resample_audio(input_samples: PackedVector2Array) -> PackedVector2Array:
+	"""Downsample audio to TARGET_SAMPLE_RATE"""
+	if _system_mix_rate <= TARGET_SAMPLE_RATE:
+		return input_samples
+		
+	var ratio = _system_mix_rate / float(TARGET_SAMPLE_RATE)
+	var new_size = int(input_samples.size() / ratio)
+	var output = PackedVector2Array()
+	output.resize(new_size)
+	
+	# Simple nearest-neighbor/decimation for performance
+	# For better quality, we'd use linear interpolation or a filter
+	for i in range(new_size):
+		var src_idx = int(i * ratio)
+		if src_idx < input_samples.size():
+			output[i] = input_samples[src_idx]
+			
+	return output
+
+
+func _check_vad(samples: PackedVector2Array) -> bool:
+	"""Check if audio samples contain voice (RMS threshold)"""
+	var sum_squares = 0.0
+	for sample in samples:
+		# Average of left/right channels
+		var val = (sample.x + sample.y) * 0.5
+		sum_squares += val * val
+		
+	var rms = sqrt(sum_squares / samples.size())
+	return rms > VAD_THRESHOLD
