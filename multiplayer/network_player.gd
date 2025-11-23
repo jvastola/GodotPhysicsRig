@@ -202,7 +202,66 @@ func _physics_process(_delta: float) -> void:
 	_update_label_position()
 
 
-## Apply avatar texture to head mesh
+## Apply avatar textures to player meshes
+func apply_avatar_textures(textures_data: Dictionary) -> void:
+	"""Apply avatar textures to head, body, and hands meshes"""
+	if textures_data.is_empty():
+		return
+	
+	# Apply head texture
+	if textures_data.has("head"):
+		var texture = _create_texture_from_data(textures_data["head"])
+		if texture and head_visual:
+			var mat = StandardMaterial3D.new()
+			mat.albedo_texture = texture
+			mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			mat.cull_mode = BaseMaterial3D.CULL_BACK
+			head_visual.material_override = mat
+			has_custom_avatar = true
+	
+	# Apply body texture
+	if textures_data.has("body"):
+		var texture = _create_texture_from_data(textures_data["body"])
+		if texture and body_visual:
+			var mat = StandardMaterial3D.new()
+			mat.albedo_texture = texture
+			mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			mat.cull_mode = BaseMaterial3D.CULL_BACK
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat.albedo_color.a = 0.8
+			body_visual.material_override = mat
+	
+	# Apply hands texture (same for both hands)
+	if textures_data.has("hands"):
+		var texture = _create_texture_from_data(textures_data["hands"])
+		if texture:
+			var mat = StandardMaterial3D.new()
+			mat.albedo_texture = texture
+			mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			mat.cull_mode = BaseMaterial3D.CULL_BACK
+			
+			if left_hand_visual:
+				left_hand_visual.material_override = mat.duplicate()
+			if right_hand_visual:
+				right_hand_visual.material_override = mat.duplicate()
+	
+	print("NetworkPlayer: Applied ", textures_data.size(), " avatar textures to player ", peer_id)
+
+
+func _create_texture_from_data(texture_data: PackedByteArray) -> ImageTexture:
+	"""Create an ImageTexture from PNG byte data"""
+	var image = Image.new()
+	var error = image.load_png_from_buffer(texture_data)
+	if error != OK:
+		push_error("NetworkPlayer: Failed to load texture from data")
+		return null
+	return ImageTexture.create_from_image(image)
+
+
+## Apply avatar texture to head mesh (legacy function for compatibility)
 func apply_avatar_texture(texture: ImageTexture) -> void:
 	if not head_visual or not texture:
 		return

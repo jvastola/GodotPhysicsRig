@@ -226,7 +226,7 @@ func _update_player_list() -> void:
 			if network_manager.use_nakama:
 				is_local = (str(peer_id) == network_manager.get_nakama_user_id())
 			else:
-				is_local = (peer_id == network_manager.get_multiplayer_id())
+				is_local = (str(peer_id) == str(network_manager.get_multiplayer_id()))
 			
 			var marker = " (You)" if is_local else ""
 			var display_id = str(peer_id).substr(0, 8) if peer_id is String else str(peer_id)

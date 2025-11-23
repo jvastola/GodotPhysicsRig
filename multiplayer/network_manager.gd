@@ -541,26 +541,61 @@ func _dict_to_vec3(d: Dictionary) -> Vector3:
 
 func _handle_nakama_avatar_data(sender_id: String, data: Dictionary) -> void:
 	"""Handle incoming avatar texture data from Nakama"""
-	if not data.has("texture"):
+	if data.is_empty():
 		return
-	
-	# Decode base64 texture data
-	var texture_data = Marshalls.base64_to_raw(data["texture"])
 	
 	# Store in player data
 	if not players.has(sender_id):
 		players[sender_id] = local_player_info.duplicate(true)
 	
-	players[sender_id].avatar_texture_data = texture_data
-	print("NetworkManager: Received avatar texture from ", sender_id, " via Nakama (", texture_data.size(), " bytes)")
+	# Initialize avatar_textures dictionary if not exists
+	if not players[sender_id].has("avatar_textures"):
+		players[sender_id].avatar_textures = {}
 	
-	# Emit signal so PlayerNetworkComponent can apply it
+	var total_bytes = 0
+	
+	# Decode all avatar surfaces (head, body, hands)
+	for surface_name in data:
+		var texture_base64 = data[surface_name]
+		var texture_data = Marshalls.base64_to_raw(texture_base64)
+		players[sender_id].avatar_textures[surface_name] = texture_data
+		total_bytes += texture_data.size()
+	
+	print("NetworkManager: Received ", data.size(), " avatar textures from ", sender_id, " via Nakama (", total_bytes, " bytes)")
+	
+	# Emit signal so PlayerNetworkComponent can apply them
 	avatar_texture_received.emit(sender_id)
 
 
 # ============================================================================
 # Avatar Texture Sync
 # ============================================================================
+
+func set_local_avatar_textures(textures: Dictionary) -> void:
+	"""Set the local player's avatar textures (head, body, hands) and broadcast to other players"""
+	# Convert all textures to base64-encoded PNG data
+	var avatar_data = {}
+	var total_bytes = 0
+	
+	for surface_name in textures:
+		var texture: ImageTexture = textures[surface_name]
+		var image = texture.get_image()
+		var texture_data = image.save_png_to_buffer()
+		avatar_data[surface_name] = Marshalls.raw_to_base64(texture_data)
+		total_bytes += texture_data.size()
+	
+	# Send via Nakama
+	if use_nakama and NakamaManager:
+		NakamaManager.send_match_state(NakamaManager.MatchOpCode.AVATAR_DATA, avatar_data)
+		print("NetworkManager: Sent ", textures.size(), " avatar textures via Nakama (", total_bytes, " bytes)")
+	# Fallback to ENet RPC (only sends head for compatibility)
+	elif multiplayer.multiplayer_peer and textures.has("head"):
+		var head_texture: ImageTexture = textures["head"]
+		var image = head_texture.get_image()
+		var texture_data = image.save_png_to_buffer()
+		_send_avatar_texture.rpc_id(0, texture_data)
+		print("NetworkManager: Sent head avatar texture via ENet (", texture_data.size(), " bytes)")
+
 
 func set_local_avatar_texture(texture: ImageTexture) -> void:
 	"""Set the local player's avatar texture and broadcast to other players"""

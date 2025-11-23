@@ -161,7 +161,7 @@ func _on_player_disconnected(peer_id: Variant) -> void:
 
 ## Send avatar texture to network
 func send_avatar_texture() -> void:
-	"""Send local player's avatar texture to all other players"""
+	"""Send local player's avatar textures (head, body, hands) to all other players"""
 	if not network_manager:
 		return
 	
@@ -191,19 +191,35 @@ func send_avatar_texture() -> void:
 		print("PlayerNetworkComponent: GridPainter not found, cannot send avatar")
 		return
 	
-	# Get head surface texture only (for now, send just head)
-	# TODO: In the future, we could send all surfaces or combine them
 	if not grid_painter.has_method("_get_surface"):
 		print("PlayerNetworkComponent: GridPainter doesn't have _get_surface method")
 		return
 	
+	# Collect all avatar surfaces (head, body, hands)
+	var avatar_textures = {}
+	
+	# Get head texture
 	var head_surface = grid_painter._get_surface("head")
-	if not head_surface or not head_surface.texture:
-		print("PlayerNetworkComponent: No head texture found, paint your head first!")
+	if head_surface and head_surface.texture:
+		avatar_textures["head"] = head_surface.texture
+	
+	# Get body texture
+	var body_surface = grid_painter._get_surface("body")
+	if body_surface and body_surface.texture:
+		avatar_textures["body"] = body_surface.texture
+	
+	# Get hand texture (left_hand is shared with right_hand if link_hands is true)
+	var hand_surface = grid_painter._get_surface("left_hand")
+	if hand_surface and hand_surface.texture:
+		avatar_textures["hands"] = hand_surface.texture
+	
+	if avatar_textures.is_empty():
+		print("PlayerNetworkComponent: No avatar textures found, paint your character first!")
 		return
 	
-	network_manager.set_local_avatar_texture(head_surface.texture)
-	print("PlayerNetworkComponent: Sent avatar texture to network")
+	# Send all textures to network
+	network_manager.set_local_avatar_textures(avatar_textures)
+	print("PlayerNetworkComponent: Sent ", avatar_textures.size(), " avatar textures to network")
 
 func _find_grid_painter_recursive(node: Node) -> Node:
 	"""Recursively search for GridPainter in the scene tree"""
@@ -240,13 +256,44 @@ func _apply_remote_avatar(peer_id: Variant) -> void:
 	if not network_manager or not remote_players.has(peer_id):
 		return
 	
-	var texture = network_manager.get_player_avatar_texture(peer_id)
-	if texture:
-		remote_players[peer_id].apply_avatar_texture(texture)
-		print("PlayerNetworkComponent: Applied avatar to remote player ", peer_id)
+	# Check if we have player data
+	if not network_manager.players.has(peer_id):
+		return
+	
+	var player_data = network_manager.players[peer_id]
+	
+	# Try new multi-surface format first
+	if player_data.has("avatar_textures") and not player_data.avatar_textures.is_empty():
+		remote_players[peer_id].apply_avatar_textures(player_data.avatar_textures)
+		print("PlayerNetworkComponent: Applied ", player_data.avatar_textures.size(), " avatar textures to remote player ", peer_id)
+	# Fallback to legacy single texture
+	elif player_data.has("avatar_texture_data"):
+		var texture = network_manager.get_player_avatar_texture(peer_id)
+		if texture:
+			remote_players[peer_id].apply_avatar_texture(texture)
+			print("PlayerNetworkComponent: Applied legacy avatar to remote player ", peer_id)
 
 func _on_avatar_texture_received(peer_id: Variant) -> void:
-	"""Called when a remote player's avatar texture is received"""
+	"""Handle avatar texture received for a remote player"""
 	print("PlayerNetworkComponent: Avatar texture received for peer ", peer_id)
-	_apply_remote_avatar(peer_id)
+	
+	# If player already spawned, apply the texture directly
+	if remote_players.has(peer_id):
+		# Access player data from NetworkManager's players dictionary
+		if network_manager.players.has(peer_id):
+			var player_data = network_manager.players[peer_id]
+			
+			# Try new multi-surface format first
+			if player_data.has("avatar_textures"):
+				remote_players[peer_id].apply_avatar_textures(player_data.avatar_textures)
+				print("PlayerNetworkComponent: Applied avatar to remote player ", peer_id)
+			# Fallback to legacy single texture if available
+			elif player_data.has("avatar_texture_data"):
+				var texture = network_manager.get_player_avatar_texture(peer_id)
+				if texture:
+					remote_players[peer_id].apply_avatar_texture(texture)
+					print("PlayerNetworkComponent: Applied legacy avatar to remote player ", peer_id)
+	else:
+		# Player not spawned yet, will be applied when spawned
+		print("PlayerNetworkComponent: Player ", peer_id, " not yet spawned, avatar will be applied on spawn")
 	avatar_texture_received.emit(peer_id)
