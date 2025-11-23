@@ -229,8 +229,6 @@ func apply_avatar_textures(textures_data: Dictionary) -> void:
 			mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 			mat.cull_mode = BaseMaterial3D.CULL_BACK
-			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			mat.albedo_color.a = 0.8
 			body_visual.material_override = mat
 	
 	# Apply hands texture (same for both hands)
