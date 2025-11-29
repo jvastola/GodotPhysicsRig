@@ -397,9 +397,15 @@ func _process(delta):
 		if p_data.get("pos_label"):
 			var network_player = _find_network_player(p_id)
 			if network_player:
-				var pos = network_player.global_position
-				p_data["pos_label"].text = "Pos: (%.1f, %.1f, %.1f)" % [pos.x, pos.y, pos.z]
-				p_data["pos_label"].modulate = Color.GREEN
+				# NetworkPlayer root stays at (0,0,0), use head visual position instead
+				var head = network_player.get_node_or_null("Head")
+				if head:
+					var pos = head.global_position
+					p_data["pos_label"].text = "Pos: (%.1f, %.1f, %.1f)" % [pos.x, pos.y, pos.z]
+					p_data["pos_label"].modulate = Color.GREEN
+				else:
+					p_data["pos_label"].text = "Pos: No Head Visual"
+					p_data["pos_label"].modulate = Color.ORANGE
 			else:
 				p_data["pos_label"].text = "Pos: Not Found"
 				p_data["pos_label"].modulate = Color.RED
