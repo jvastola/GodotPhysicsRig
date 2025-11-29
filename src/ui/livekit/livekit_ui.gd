@@ -161,6 +161,17 @@ func _ready():
 	auto_connect_button.pressed.connect(_on_auto_connect_pressed)
 	sandbox_http_request.request_completed.connect(_on_sandbox_request_completed)
 	
+	# Create "Generate Token" button for easy token generation
+	var gen_token_button = Button.new()
+	gen_token_button.text = "🎫 Generate Token"
+	gen_token_button.tooltip_text = "Generate a LiveKit token using your Nakama user ID"
+	gen_token_button.pressed.connect(_on_generate_token_pressed)
+	
+	# Add it to the Buttons container (same as Connect/Disconnect buttons)
+	var buttons_container = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection/Buttons
+	buttons_container.add_child(gen_token_button)
+	buttons_container.move_child(gen_token_button, 2)  # Place after Connect/Disconnect, before AutoConnect
+	
 	# Create Input Device Selector
 	var device_row = HBoxContainer.new()
 	device_container.add_child(device_row)
@@ -224,6 +235,9 @@ func _ready():
 	# Set local server values for easy testing
 	server_entry.text = "ws://localhost:7880"
 	token_entry.text = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjQxODc2NDcsImlzcyI6ImRldmtleSIsIm5iZiI6MTc2NDEwMTI0Nywic3ViIjoiY2xpZW50LTEiLCJ2aWRlbyI6eyJyb29tIjoidGVzdC1yb29tIiwicm9vbUpvaW4iOnRydWUsImNhblB1Ymxpc2giOnRydWUsImNhblN1YnNjcmliZSI6dHJ1ZX19.tR0faOukMG6GJFXrCRVtPmEJhnbig_pirRyjcqvqy3M"
+	
+	# Add Nakama ID helper info
+	_update_nakama_id_hint()
 	
 	status_label.text = "Ready to connect"
 	print("✅ LiveKit Audio UI Ready!")
@@ -328,9 +342,16 @@ func _setup_audio():
 	print("   - Volume: ", AudioServer.get_bus_volume_db(audio_bus_idx))
 
 var _debug_timer = 0.0
+var _hint_update_timer = 0.0  # Timer for updating Nakama ID hint
 func _process(delta):
 	# Always process mic audio for visualization and local feedback
 	_process_mic_audio()
+	
+	# Update Nakama ID hint periodically (every 2 seconds)
+	_hint_update_timer += delta
+	if _hint_update_timer > 2.0:
+		_hint_update_timer = 0.0
+		_update_nakama_id_hint()
 	
 	# Debug audio state every 2 seconds
 	_debug_timer += delta
@@ -839,3 +860,142 @@ func _on_update_name_pressed():
 	var new_name = username_entry.text.strip_edges()
 	if not new_name.is_empty():
 		_update_local_username(new_name)
+
+
+# ============================================================================
+# JWT Token Generation
+# ============================================================================
+
+func _generate_livekit_token(participant_id: String, room_name: String = "test-room") -> String:
+	"""Generate a LiveKit JWT access token using HS256"""
+	# LiveKit credentials (must match server config)
+	const API_KEY = "devkey"
+	const API_SECRET = "secret"
+	const TOKEN_VALIDITY_HOURS = 24
+	
+	# Current time
+	var now = Time.get_unix_time_from_system()
+	var exp = now + (TOKEN_VALIDITY_HOURS * 3600)
+	
+	# JWT Header (HS256 algorithm)
+	var header = {
+		"alg": "HS256",
+		"typ": "JWT"
+	}
+	
+	# JWT Claims (Payload)
+	var claims = {
+		"exp": exp,
+		"iss": API_KEY,
+		"nbf": now,
+		"sub": participant_id,  # CRITICAL: This must match Nakama user_id
+		"video": {
+			"room": room_name,
+			"roomJoin": true,
+			"canPublish": true,
+			"canSubscribe": true
+		}
+	}
+	
+	# Encode header and payload as base64url
+	var header_json = JSON.stringify(header)
+	var claims_json = JSON.stringify(claims)
+	
+	var header_b64 = _base64url_encode(header_json.to_utf8_buffer())
+	var payload_b64 = _base64url_encode(claims_json.to_utf8_buffer())
+	
+	# Create signing input
+	var signing_input = header_b64 + "." + payload_b64
+	
+	# Generate HMAC-SHA256 signature
+	var signature = _hmac_sha256(signing_input.to_utf8_buffer(), API_SECRET.to_utf8_buffer())
+	var signature_b64 = _base64url_encode(signature)
+	
+	# Construct final JWT
+	var jwt = signing_input + "." + signature_b64
+	
+	return jwt
+
+
+func _base64url_encode(data: PackedByteArray) -> String:
+	"""Encode data as base64url (JWT standard)"""
+	var b64 = Marshalls.raw_to_base64(data)
+	# Convert base64 to base64url: replace +/= with -_
+	b64 = b64.replace("+", "-")
+	b64 = b64.replace("/", "_")
+	b64 = b64.replace("=", "")  # Remove padding
+	return b64
+
+
+func _hmac_sha256(message: PackedByteArray, key: PackedByteArray) -> PackedByteArray:
+	"""Compute HMAC-SHA256"""
+	var ctx = HMACContext.new()
+	ctx.start(HashingContext.HASH_SHA256, key)
+	ctx.update(message)
+	return ctx.finish()
+
+
+func _on_generate_token_pressed():
+	"""Generate a LiveKit token using the Nakama user ID"""
+	var network_manager = get_node_or_null("/root/NetworkManager")
+	if not network_manager:
+		status_label.text = "❌ Error: NetworkManager not found"
+		return
+	
+	var nakama_id = network_manager.get_nakama_user_id()
+	if nakama_id.is_empty():
+		status_label.text = "⚠️ Connect to Nakama first to generate token"
+		return
+	
+	# Generate token
+	var token = _generate_livekit_token(nakama_id, "test-room")
+	
+	# Fill in the token entry
+	token_entry.text = token
+	
+	status_label.text = "✅ Token generated for: " + nakama_id
+	print("🎫 Generated LiveKit token for Nakama ID: ", nakama_id)
+
+
+func _update_nakama_id_hint():
+	"""Display Nakama user ID to help with LiveKit token generation"""
+	# Find or create the hint label
+	var hint_container = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection
+	var existing_hint = hint_container.get_node_or_null("NakamaIDHint")
+	
+	# Get NetworkManager
+	var network_manager = get_node_or_null("/root/NetworkManager")
+	if not network_manager:
+		print("⚠️ [LiveKit UI] NetworkManager not found - hint cannot be updated")
+		if existing_hint:
+			existing_hint.queue_free()
+		return
+	
+	var nakama_id = network_manager.get_nakama_user_id()
+	print("📋 [LiveKit UI] Nakama ID check: '", nakama_id, "' (empty: ", nakama_id.is_empty(), ")")
+	
+	# Create hint label if it doesn't exist
+	if not existing_hint:
+		existing_hint = Label.new()
+		existing_hint.name = "NakamaIDHint"
+		existing_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		existing_hint.add_theme_font_size_override("font_size", 12)
+		existing_hint.add_theme_color_override("font_color", Color.WHITE)
+		# Add some padding for visibility
+		existing_hint.add_theme_constant_override("line_spacing", 4)
+		hint_container.add_child(existing_hint)
+		hint_container.move_child(existing_hint, hint_container.get_child_count() - 1)
+		print("✅ [LiveKit UI] Created Nakama ID hint label")
+	
+	# Update hint text based on Nakama connection status
+	if nakama_id.is_empty():
+		existing_hint.text = "💡 Tip: Connect to Nakama first, then click 'Generate Token' below"
+		existing_hint.modulate = Color(1.0, 1.0, 0.6)  # Yellow
+		print("   → Hint: Not connected to Nakama")
+	else:
+		existing_hint.text = "ℹ️ Nakama ID: %s\n✨ Click 'Generate Token' to auto-fill your token!" % nakama_id
+		existing_hint.modulate = Color(0.6, 1.0, 0.6)  # Green
+		print("   → Hint: Showing Nakama ID: ", nakama_id)
+	
+	# Ensure hint is visible
+	existing_hint.visible = true
