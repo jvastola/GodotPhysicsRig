@@ -67,11 +67,6 @@ height = 1.2
 
 [node name="XRPlayer" type="Node3D"]
 script = ExtResource("1_player")
-head_radius = null
-show_head_mesh = null
-desktop_extra_collider_enabled = null
-desktop_extra_collider_height = null
-desktop_extra_collider_radius = null
 desktop_extra_collider_offset = Vector3(0, 0, 0)
 
 [node name="BuildRoot" type="Node3D" parent="."]

@@ -850,24 +850,34 @@ func _receive_voxel_state(voxels: Array) -> void:
 # Nakama Integration
 # ============================================================================
 
-func _on_nakama_match_state(peer_id: String, op_code: int, data: Dictionary) -> void:
-	"""Handle incoming Nakama match state"""
+func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Variant) -> void:
+	"""Handle incoming match state from Nakama"""
 	if not use_nakama:
 		return
 		
+	# Handle Player Transform
+	if op_code == NakamaManager.MatchOpCode.PLAYER_TRANSFORM:
+		if data is Dictionary:
+			_handle_nakama_player_transform(peer_id, data)
+			
+	# Handle Avatar Data
+	elif op_code == NakamaManager.MatchOpCode.AVATAR_DATA:
+		if data is Dictionary:
+			_handle_nakama_avatar_data(peer_id, data)
+			
 	# Note: Voice data (VOICE_DATA op code) removed - voice now handled by LiveKit
-	# Map Nakama op codes to local signals
+	
+	# Handle Voxel Events
 	# Note: NakamaManager is autoloaded, so we can access the enum directly if we wanted,
 	# but to avoid circular dependency issues during load, we'll use the integer values
 	# defined in NakamaManager (VOXEL_PLACE = 5, VOXEL_REMOVE = 6)
 	
-	if op_code == 5: # VOXEL_PLACE
-		if data.has("pos") and data.has("color"):
+	elif op_code == 5: # VOXEL_PLACE
+		if data is Dictionary and data.has("pos") and data.has("color"):
 			var pos_str = data["pos"]
 			var color_str = data["color"]
 			
-			# Parse vector and color from string/dict if needed, or use directly if they preserved type
-			# JSON parsing usually results in strings for complex types unless handled
+			# Parse vector and color from string/dict if needed
 			var pos = _parse_vector3(pos_str)
 			var color = _parse_color(color_str)
 			
@@ -875,13 +885,13 @@ func _on_nakama_match_state(peer_id: String, op_code: int, data: Dictionary) -> 
 			print("NetworkManager (Nakama): Voxel placed at ", pos, " by ", peer_id)
 			
 	elif op_code == 6: # VOXEL_REMOVE
-		if data.has("pos"):
+		if data is Dictionary and data.has("pos"):
 			var pos = _parse_vector3(data["pos"])
 			voxel_removed_network.emit(pos)
 			print("NetworkManager (Nakama): Voxel removed at ", pos, " by ", peer_id)
 			
 	elif op_code == 8: # VOXEL_BATCH
-		if data.has("updates") and data["updates"] is Array:
+		if data is Dictionary and data.has("updates") and data["updates"] is Array:
 			for update in data["updates"]:
 				var type = update.get("t", 0) # 0=place, 1=remove
 				var pos = _parse_vector3(update.get("p", Vector3.ZERO))

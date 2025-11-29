@@ -115,13 +115,13 @@ func _find_node_by_script(node: Node, script_name: String) -> Node:
 	return null
 
 
-func _find_node_by_class(node: Node, class_name: String) -> Node:
+func _find_node_by_class(node: Node, target_class_name: String) -> Node:
 	"""Recursively find a node by its class name"""
-	if node.get_class() == class_name:
+	if node.get_class() == target_class_name:
 		return node
 	
 	for child in node.get_children():
-		var result = _find_node_by_class(child, class_name)
+		var result = _find_node_by_class(child, target_class_name)
 		if result:
 			return result
 	
