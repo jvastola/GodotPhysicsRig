@@ -244,6 +244,18 @@ func _ready():
 	
 
 func _on_auto_connect_pressed():
+	# Get Nakama ID for proper participant identity
+	var network_manager = get_node_or_null("/root/NetworkManager")
+	if not network_manager:
+		status_label.text = "❌ Error: NetworkManager not found"
+		return
+	
+	var nakama_id = network_manager.get_nakama_user_id()
+	if nakama_id.is_empty():
+		status_label.text = "⚠️ Connect to Nakama first for Auto Connect"
+		print("⚠️ Auto Connect requires Nakama connection for ID sync")
+		return
+	
 	status_label.text = "⏳ Fetching Sandbox Token..."
 	connect_button.disabled = true
 	auto_connect_button.disabled = true
@@ -253,10 +265,14 @@ func _on_auto_connect_pressed():
 		"X-Sandbox-ID: godot-247cr9",
 		"Content-Type: application/json"
 	]
+	
+	# Use Nakama ID as participant name for ID synchronization
 	var body = JSON.stringify({
 		"room_name": "godot-demo",
-		"participant_name": "user-" + str(randi() % 10000)
+		"participant_name": nakama_id  # CRITICAL: Use Nakama ID here!
 	})
+	
+	print("🔗 Auto Connect: Requesting sandbox token with Nakama ID: ", nakama_id)
 	
 	var error = sandbox_http_request.request(url, headers, HTTPClient.METHOD_POST, body)
 	if error != OK:
