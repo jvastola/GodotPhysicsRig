@@ -107,9 +107,9 @@ func _interpolate_transforms(delta: float) -> void:
 	# Interpolate scale
 	scale = scale.lerp(target_scale, lerp_factor)
 	
-	# Update body position (midpoint between hands at chest height)
-	var body_pos = (target_left_hand_position + target_right_hand_position) / 2.0
-	body_pos.y = target_head_position.y - 0.3 # Slightly below head
+	# Update body position (directly below head at chest height)
+	var body_pos = target_head_position
+	body_pos.y = target_head_position.y - 0.3 # Chest height (slightly below head)
 	body_visual.global_position = body_visual.global_position.lerp(body_pos, lerp_factor)
 
 
