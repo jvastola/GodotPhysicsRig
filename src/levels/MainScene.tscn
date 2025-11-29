@@ -1,4 +1,4 @@
-1[gd_scene load_steps=16 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=16 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
