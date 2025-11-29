@@ -1,0 +1,24 @@
+[configuration]
+entry_symbol = "gdext_rust_init"
+compatibility_minimum = 4.2
+reloadable = true
+
+[libraries]
+windows.debug.x86_64 = "res://addons/godot-livekit/bin/windows/godot_livekit.dll"
+windows.release.x86_64 = "res://addons/godot-livekit/bin/windows/godot_livekit.dll"
+linux.debug.x86_64 = "res://addons/godot-livekit/bin/linux/libgodot_livekit.so"
+linux.release.x86_64 = "res://addons/godot-livekit/bin/linux/libgodot_livekit.so"
+macos.debug = "res://addons/godot-livekit/bin/macos/libgodot_livekit.dylib"
+macos.release = "res://addons/godot-livekit/bin/macos/libgodot_livekit.dylib"
+android.debug.arm64 = "res://addons/godot-livekit/bin/android/libgodot_livekit.so"
+android.release.arm64 = "res://addons/godot-livekit/bin/android/libgodot_livekit.so"
+
+[dependencies]
+windows.debug.x86_64 = {}
+windows.release.x86_64 = {}
+linux.debug.x86_64 = {}
+linux.release.x86_64 = {}
+macos.debug = {}
+macos.release = {}
+android.debug.arm64 = {}
+android.release.arm64 = {}

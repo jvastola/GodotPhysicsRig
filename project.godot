@@ -37,6 +37,10 @@ project/assembly_name="PhysicsHand"
 version_control/plugin_name="GitPlugin"
 version_control/autoload_on_startup=true
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/godot-livekit/plugin.cfg")
+
 [input]
 
 move_forward={
@@ -96,6 +100,6 @@ textures/vram_compression/import_etc2_astc=true
 
 [xr]
 
-openxr/enabled=false
+openxr/enabled=true
 openxr/foveation_level=3
 shaders/enabled=true

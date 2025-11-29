@@ -1,0 +1,334 @@
+[gd_scene load_steps=9 format=3 uid="uid://8qfn1v423ubr"]
+
+[ext_resource type="Script" path="res://src/ui/livekit/livekit_ui.gd" id="1_w4x8r"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
+bg_color = Color(0.0941176, 0.0980392, 0.113725, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]
+bg_color = Color(0.133333, 0.141176, 0.168627, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_color = Color(0, 0, 0, 0.2)
+shadow_size = 10
+shadow_offset = Vector2(0, 4)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_input"]
+content_margin_left = 10.0
+content_margin_top = 8.0
+content_margin_right = 10.0
+content_margin_bottom = 8.0
+bg_color = Color(0.0941176, 0.0980392, 0.113725, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.239216, 0.258824, 0.301961, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_hover"]
+content_margin_left = 15.0
+content_margin_top = 8.0
+content_margin_right = 15.0
+content_margin_bottom = 8.0
+bg_color = Color(0.298039, 0.321569, 0.372549, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_normal"]
+content_margin_left = 15.0
+content_margin_top = 8.0
+content_margin_right = 15.0
+content_margin_bottom = 8.0
+bg_color = Color(0.239216, 0.258824, 0.301961, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_primary"]
+content_margin_left = 15.0
+content_margin_top = 8.0
+content_margin_right = 15.0
+content_margin_bottom = 8.0
+bg_color = Color(0.298039, 0.45098, 0.85098, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_danger"]
+content_margin_left = 15.0
+content_margin_top = 8.0
+content_margin_right = 15.0
+content_margin_bottom = 8.0
+bg_color = Color(0.85098, 0.298039, 0.298039, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[node name="LiveKitAudioUI" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_w4x8r")
+
+[node name="Background" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_bg")
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MainCard" type="PanelContainer" parent="CenterContainer"]
+custom_minimum_size = Vector2(900, 600)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+
+[node name="Margin" type="MarginContainer" parent="CenterContainer/MainCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="MainLayout" type="HBoxContainer" parent="CenterContainer/MainCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="LeftColumn" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 20
+
+[node name="Header" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/Header"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 28
+text = "LiveKit Voice Chat"
+horizontal_alignment = 1
+
+[node name="StatusLabel" type="Label" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/Header"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
+text = "Ready to connect"
+horizontal_alignment = 1
+
+[node name="UsernameSection" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/Header"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="UsernameLabel" type="Label" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/Header/UsernameSection"]
+layout_mode = 2
+text = "Username:"
+vertical_alignment = 1
+
+[node name="UsernameEntry" type="LineEdit" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/Header/UsernameSection"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/normal = SubResource("StyleBoxFlat_input")
+placeholder_text = "Your Name"
+
+[node name="UpdateNameButton" type="Button" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/Header/UsernameSection"]
+layout_mode = 2
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
+text = "Update Name"
+
+[node name="ConnectionSection" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Inputs" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ServerEntry" type="LineEdit" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection/Inputs"]
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_input")
+placeholder_text = "Server URL (wss://...)"
+
+[node name="TokenEntry" type="LineEdit" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection/Inputs"]
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_input")
+placeholder_text = "Access Token"
+secret = true
+
+[node name="Buttons" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="AutoConnectButton" type="Button" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
+text = "⚡ Auto (Sandbox)"
+
+[node name="ConnectButton" type="Button" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_primary")
+text = "Connect"
+
+[node name="DisconnectButton" type="Button" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_danger")
+disabled = true
+text = "Disconnect"
+
+[node name="HSeparator1" type="HSeparator" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn"]
+layout_mode = 2
+
+[node name="AudioSection" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SectionTitle" type="Label" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+theme_override_font_sizes/font_size = 14
+text = "AUDIO SETTINGS"
+
+[node name="Controls" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection"]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="MuteButton" type="Button" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/Controls"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
+toggle_mode = true
+text = "🎤 Active"
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/Controls"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MicLevelBar" type="ProgressBar" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/Controls/VBoxContainer"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+size_flags_vertical = 4
+show_percentage = false
+
+[node name="ThresholdContainer" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/Controls/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/Controls/VBoxContainer/ThresholdContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Threshold"
+
+[node name="ThresholdSlider" type="HSlider" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/Controls/VBoxContainer/ThresholdContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 1.0
+step = 0.01
+value = 0.1
+
+[node name="ThresholdLabel" type="Label" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/Controls/VBoxContainer/ThresholdContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "0.10"
+
+[node name="DeviceContainer" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection"]
+layout_mode = 2
+
+[node name="HSeparator2" type="HSeparator" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn"]
+layout_mode = 2
+
+[node name="ParticipantsSection" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Header" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ParticipantsSection"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ParticipantsSection/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+theme_override_font_sizes/font_size = 14
+text = "PARTICIPANTS (0)"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ParticipantsSection"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ParticipantList" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ParticipantsSection/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="VSeparator" type="VSeparator" parent="CenterContainer/MainCard/Margin/MainLayout"]
+layout_mode = 2
+
+[node name="ChatSection" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.8
+theme_override_constants/separation = 8
+
+[node name="SectionTitle" type="Label" parent="CenterContainer/MainCard/Margin/MainLayout/ChatSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+theme_override_font_sizes/font_size = 14
+text = "CHAT"
+
+[node name="ChatDisplay" type="ScrollContainer" parent="CenterContainer/MainCard/Margin/MainLayout/ChatSection"]
+custom_minimum_size = Vector2(0, 150)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ChatMessages" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/ChatSection/ChatDisplay"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="ChatInput" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/ChatSection"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="MessageEntry" type="LineEdit" parent="CenterContainer/MainCard/Margin/MainLayout/ChatSection/ChatInput"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/normal = SubResource("StyleBoxFlat_input")
+placeholder_text = "Type a message..."
+
+[node name="SendButton" type="Button" parent="CenterContainer/MainCard/Margin/MainLayout/ChatSection/ChatInput"]
+layout_mode = 2
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_primary")
+text = "Send"
+
+[node name="SandboxHTTPRequest" type="HTTPRequest" parent="."]
