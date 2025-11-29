@@ -24,3 +24,4 @@ user://
 # MCP Server dependencies
 godot-mcp-server/
 addons/godot-xr-tools/
+godot-livekit
