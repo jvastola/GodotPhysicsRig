@@ -20,6 +20,12 @@ extends Control
 @onready var message_entry = $CenterContainer/MainCard/Margin/MainLayout/ChatSection/ChatInput/MessageEntry
 @onready var send_button = $CenterContainer/MainCard/Margin/MainLayout/ChatSection/ChatInput/SendButton
 
+# Sections for reparenting
+@onready var main_layout = $CenterContainer/MainCard/Margin/MainLayout
+@onready var chat_section = $CenterContainer/MainCard/Margin/MainLayout/ChatSection
+@onready var participants_section = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ParticipantsSection
+@onready var left_column = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn
+
 @onready var sandbox_http_request = $SandboxHTTPRequest
 
 # Audio controls
@@ -57,6 +63,56 @@ var mic_player: AudioStreamPlayer
 
 func _ready():
 	print("=== LiveKit Audio Client UI ===")
+	
+	# --- UI RESTRUCTURING (3 Columns) ---
+	# Layout: [LeftColumn] | [VSep] | [Participants] | [VSep] | [Chat]
+	
+	# 1. Move Participants Section to MainLayout (Middle Column)
+	left_column.remove_child(participants_section)
+	
+	# Insert after LeftColumn (index 1, since LeftColumn is 0)
+	# But MainLayout has [LeftColumn, VSeparator, ChatSection]
+	# We want: [LeftColumn, VSeparator, ParticipantsSection, VSeparator2, ChatSection]
+	
+	# Create new separator
+	var sep2 = VSeparator.new()
+	main_layout.add_child(sep2)
+	# main_layout.move_child(sep2, 2) # After existing VSep (index 1)? No wait.
+	
+	# Current Children of MainLayout:
+	# 0: LeftColumn
+	# 1: VSeparator (VSeparator)
+	# 2: ChatSection
+	
+	# We want to insert ParticipantsSection at index 2
+	main_layout.add_child(participants_section)
+	main_layout.move_child(participants_section, 2)
+	
+	# Now: [Left, VSep, Participants, Chat]
+	# We need another separator between Participants and Chat
+	main_layout.add_child(sep2)
+	main_layout.move_child(sep2, 3)
+	
+	# Final: [Left, VSep, Participants, VSep2, Chat]
+	
+	# Show title again (if it was hidden)
+	var part_title = participants_section.get_node_or_null("Header/Title")
+	if part_title: part_title.visible = true
+	
+	var chat_title = chat_section.get_node_or_null("SectionTitle")
+	if chat_title: chat_title.visible = true
+	
+	# Adjust Size Flags
+	left_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_column.size_flags_stretch_ratio = 0.25
+	
+	participants_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	participants_section.size_flags_stretch_ratio = 0.45
+	
+	chat_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	chat_section.size_flags_stretch_ratio = 0.3
+	
+	# -------------------------------
 	
 	# Setup Audio
 	_setup_audio()
@@ -290,13 +346,26 @@ func _process(delta):
 				print("⚠️ Player stopped! Restarting...")
 				mic_player.play()
 
-	# Update participant levels
+	# Update participant levels and positions
 	for p_id in participants:
 		var p_data = participants[p_id]
+		
+		# Decay level
+		p_data["level"] = lerp(float(p_data["level"]), 0.0, 10.0 * delta)
+		
 		if p_data.has("level_bar") and p_data["level_bar"]:
 			p_data["level_bar"].value = p_data["level"] * 100
-			# Decay level
-			p_data["level"] = lerp(p_data["level"], 0.0, 10.0 * delta)
+			
+		# Update Position Label
+		if p_data.get("pos_label"):
+			var network_player = _find_network_player(p_id)
+			if network_player:
+				var pos = network_player.global_position
+				p_data["pos_label"].text = "Pos: (%.1f, %.1f, %.1f)" % [pos.x, pos.y, pos.z]
+				p_data["pos_label"].modulate = Color.GREEN
+			else:
+				p_data["pos_label"].text = "Pos: Not Found"
+				p_data["pos_label"].modulate = Color.RED
 
 func _process_mic_audio():
 	if capture_effect and capture_effect.can_get_buffer(BUFFER_SIZE):
@@ -555,11 +624,11 @@ func _update_participant_list():
 		# Create a styled panel for the row
 		var row_panel = PanelContainer.new()
 		var style = StyleBoxFlat.new()
-		style.bg_color = Color(0.18, 0.20, 0.25)
-		style.corner_radius_top_left = 6
-		style.corner_radius_top_right = 6
-		style.corner_radius_bottom_right = 6
-		style.corner_radius_bottom_left = 6
+		style.bg_color = Color(0.15, 0.17, 0.22) # Slightly darker
+		style.corner_radius_top_left = 8
+		style.corner_radius_top_right = 8
+		style.corner_radius_bottom_right = 8
+		style.corner_radius_bottom_left = 8
 		style.content_margin_left = 10
 		style.content_margin_right = 10
 		style.content_margin_top = 8
@@ -570,9 +639,9 @@ func _update_participant_list():
 		hbox.add_theme_constant_override("separation", 15)
 		row_panel.add_child(hbox)
 		
-		# Avatar (Placeholder)
+		# Avatar
 		var avatar = ColorRect.new()
-		avatar.custom_minimum_size = Vector2(32, 32)
+		avatar.custom_minimum_size = Vector2(40, 40)
 		avatar.color = Color(0.3, 0.5, 0.9) # Blue avatar
 		avatar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		
@@ -582,9 +651,15 @@ func _update_participant_list():
 		letter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		letter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		letter.anchors_preset = Control.PRESET_FULL_RECT
+		letter.add_theme_font_size_override("font_size", 20)
 		avatar.add_child(letter)
 		
 		hbox.add_child(avatar)
+		
+		# Info Column (VBox)
+		var info_vbox = VBoxContainer.new()
+		info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hbox.add_child(info_vbox)
 		
 		# Name label
 		var name_label = Label.new()
@@ -592,39 +667,76 @@ func _update_participant_list():
 		var display_name = participant_usernames.get(participant_id, participant_id)
 		name_label.text = display_name
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		hbox.add_child(name_label)
+		name_label.add_theme_font_size_override("font_size", 18)
+		info_vbox.add_child(name_label)
+		
+		# Details Row (HBox)
+		var details_hbox = HBoxContainer.new()
+		details_hbox.add_theme_constant_override("separation", 10)
+		info_vbox.add_child(details_hbox)
+		
+		# Position Label (Monospace)
+		var pos_label = Label.new()
+		pos_label.text = "Pos: --"
+		pos_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		pos_label.add_theme_font_size_override("font_size", 12)
+		details_hbox.add_child(pos_label)
+		p_data["pos_label"] = pos_label
 		
 		# Audio level bar
 		var level_bar = ProgressBar.new()
-		level_bar.custom_minimum_size = Vector2(80, 8)
+		level_bar.custom_minimum_size = Vector2(60, 8)
 		level_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		level_bar.value = p_data["level"] * 100
 		level_bar.show_percentage = false
-		hbox.add_child(level_bar)
+		details_hbox.add_child(level_bar)
+		p_data["level_bar"] = level_bar
+		
+		# Controls Container
+		var controls_box = HBoxContainer.new()
+		controls_box.add_theme_constant_override("separation", 5)
+		details_hbox.add_child(controls_box)
+		
+		# Volume Slider
+		var vol_slider = HSlider.new()
+		vol_slider.custom_minimum_size = Vector2(80, 0)
+		vol_slider.min_value = 0.0
+		vol_slider.max_value = 2.0
+		vol_slider.step = 0.1
+		vol_slider.value = p_data.get("volume", 1.0)
+		vol_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		vol_slider.value_changed.connect(_on_participant_volume_changed.bind(participant_id))
+		controls_box.add_child(vol_slider)
 		
 		# Mute Button
 		var mute_btn = Button.new()
 		mute_btn.text = "🔇" if p_data["muted"] else "🔊"
 		mute_btn.toggle_mode = true
 		mute_btn.button_pressed = p_data["muted"]
+		mute_btn.custom_minimum_size = Vector2(30, 30)
+		mute_btn.add_theme_font_size_override("font_size", 12)
 		mute_btn.pressed.connect(_on_participant_mute_toggled.bind(participant_id, mute_btn))
-		hbox.add_child(mute_btn)
-		
-		# Volume Slider
-		var vol_slider = HSlider.new()
-		vol_slider.custom_minimum_size = Vector2(80, 0)
-		vol_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		vol_slider.min_value = 0.0
-		vol_slider.max_value = 2.0
-		vol_slider.step = 0.1
-		vol_slider.value = p_data["volume"]
-		vol_slider.value_changed.connect(_on_participant_volume_changed.bind(participant_id))
-		hbox.add_child(vol_slider)
-		
-		# Store ref to bar
-		p_data["level_bar"] = level_bar
+		controls_box.add_child(mute_btn)
 		
 		participant_list.add_child(row_panel)
+
+func _find_network_player(peer_id: String) -> Node:
+	# Try to find the NetworkPlayer for this peer_id
+	# This assumes NetworkPlayers are named with their ID or have a property
+	
+	# 1. Search in "Players" group
+	var players = get_tree().get_nodes_in_group("network_players")
+	for player in players:
+		if str(player.name) == peer_id or (player.get("peer_id") and str(player.peer_id) == peer_id):
+			return player
+			
+	# 2. Fallback: Search by name in main scene
+	var root = get_tree().root
+	var main_scene = root.get_child(root.get_child_count() - 1)
+	var player_node = main_scene.find_child(peer_id, true, false)
+	if player_node:
+		return player_node
+		
+	return null
 
 func _on_participant_volume_changed(value: float, participant_id: String):
 	if participants.has(participant_id):

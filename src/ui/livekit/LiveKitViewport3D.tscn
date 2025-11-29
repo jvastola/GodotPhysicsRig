@@ -20,12 +20,12 @@ size = Vector3(3, 2, 0.01)
 
 [node name="LiveKitViewport3D" type="Node3D"]
 script = ExtResource("1_script")
-ui_size = Vector2(1200, 800)
+ui_size = Vector2(1800, 1200)
 quad_size = Vector2(3, 2)
 
 [node name="SubViewport" type="SubViewport" parent="."]
 transparent_bg = true
-size = Vector2i(1200, 800)
+size = Vector2i(1800, 1200)
 render_target_update_mode = 4
 
 [node name="LiveKitAudioUI" parent="SubViewport" instance=ExtResource("2_livekit_ui")]
