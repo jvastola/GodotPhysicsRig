@@ -83,6 +83,7 @@ func _ready():
 		print("❌ LiveKitManager class not found! Is the GDExtension loaded?")
 		status_label.text = "❌ Error: GDExtension not loaded"
 		connect_button.disabled = true
+		auto_connect_button.disabled = true
 
 	
 	# Connect UI signals
@@ -327,7 +328,11 @@ func _on_connect_pressed():
 	status_label.text = "⏳ Connecting..."
 	connect_button.disabled = true
 	
-	livekit_manager.connect_to_room(server_url, token)
+	if livekit_manager:
+		livekit_manager.connect_to_room(server_url, token)
+	else:
+		status_label.text = "❌ Error: LiveKitManager not initialized"
+		connect_button.disabled = false
 
 func _on_disconnect_pressed():
 	if livekit_manager:
