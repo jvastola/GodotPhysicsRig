@@ -38,6 +38,7 @@ var hear_own_audio: bool = false
 const BUFFER_SIZE = 4096
 var audio_bus_name = "LiveKit Mic"
 var audio_bus_idx = -1
+@export var audio_playback_enabled: bool = false # Default to false to avoid conflict with spatial audio
 
 # Chat and username
 var local_username: String = "User-" + str(randi() % 10000)
@@ -142,6 +143,13 @@ func _ready():
 	gain_slider.value = 0.0 # Default gain
 	gain_slider.value_changed.connect(_on_gain_changed)
 	gain_row.add_child(gain_slider)
+	
+	# Create Playback Checkbox (for debugging global audio)
+	var playback_check = CheckBox.new()
+	playback_check.text = "Play Global"
+	playback_check.button_pressed = audio_playback_enabled
+	playback_check.toggled.connect(func(toggled): audio_playback_enabled = toggled)
+	device_container.add_child(playback_check)
 	
 	var gain_value_label = Label.new()
 	gain_value_label.text = "0 dB"
@@ -413,7 +421,7 @@ func _on_audio_frame(peer_id: String, frame: PackedVector2Array):
 	p_data["level"] = max(p_data["level"], max_amp)
 
 	var player = p_data["player"]
-	if player and not p_data["muted"]:
+	if player and not p_data["muted"] and audio_playback_enabled:
 		var playback = player.get_stream_playback()
 		if playback:
 			# Apply volume scaling
