@@ -231,6 +231,12 @@ func _create_spatial_audio_player(peer_id: String, network_player: Node) -> void
 	
 	var player_data = remote_players[peer_id]
 	
+	# Find the Head visual node - this is where the actual player position is
+	var head_node = network_player.get_node_or_null("Head")
+	if not head_node:
+		push_error("PlayerVoiceComponent: No Head node found on NetworkPlayer ", network_player.name)
+		return
+	
 	# Create AudioStreamPlayer3D
 	var audio_player = AudioStreamPlayer3D.new()
 	audio_player.name = "VoicePlayer_" + peer_id
@@ -247,15 +253,16 @@ func _create_spatial_audio_player(peer_id: String, network_player: Node) -> void
 	audio_player.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
 	audio_player.bus = "Master"
 	
-	# Add to network player
-	network_player.add_child(audio_player)
+	# CRITICAL FIX: Add to Head node instead of NetworkPlayer root
+	# The NetworkPlayer root stays at (0,0,0), but Head has the actual position
+	head_node.add_child(audio_player)
 	audio_player.autoplay = true
 	audio_player.play()
 	
 	# Store reference
 	player_data["audio_player"] = audio_player
 	
-	print("PlayerVoiceComponent: Created spatial audio player for ", peer_id, " on ", network_player.name)
+	print("PlayerVoiceComponent: Created spatial audio player for ", peer_id, " on ", head_node.name, " (parent: ", network_player.name, ")")
 
 
 func set_mic_gain(gain_db: float) -> void:
