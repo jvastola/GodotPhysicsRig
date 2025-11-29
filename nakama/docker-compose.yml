@@ -1,3 +1,4 @@
+version: "3"
 services:
   postgres:
     container_name: postgres
@@ -7,12 +8,8 @@ services:
       - POSTGRES_PASSWORD=localdb
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
-    expose:
-      - "8080"
-      - "5432"
     ports:
       - "5432:5432"
-      - "8080:8080"
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres", "-d", "nakama"]
       interval: 3s
@@ -32,14 +29,9 @@ services:
     links:
       - "postgres:db"
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
     volumes:
       - ./data:/nakama/data
-    expose:
-      - "7349"
-      - "7350"
-      - "7351"
     ports:
       - "7349:7349"
       - "7350:7350"

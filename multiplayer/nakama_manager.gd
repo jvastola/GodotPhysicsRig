@@ -15,7 +15,7 @@ signal connection_restored()
 signal match_list_received(matches)
 
 # Nakama connection settings
-var nakama_host: String = "localhost"
+var nakama_host: String = "158.101.21.99"  # Oracle Cloud server
 var nakama_port: int = 7350
 var nakama_server_key: String = "defaultkey"
 var nakama_use_ssl: bool = false
