@@ -145,6 +145,10 @@ func _on_participant_left(identity: String) -> void:
 func _on_audio_frame(peer_id: String, frame: PackedVector2Array) -> void:
 	"""Handle incoming audio frame from LiveKit participant"""
 	
+	# Debug: Log first few frames for each participant
+	if not remote_players.has(peer_id):
+		print("🎵 PlayerVoiceComponent: First audio frame from: ", peer_id)
+	
 	# Ensure we have an entry for this participant
 	if not remote_players.has(peer_id):
 		remote_players[peer_id] = {
@@ -157,6 +161,10 @@ func _on_audio_frame(peer_id: String, frame: PackedVector2Array) -> void:
 	# Find the NetworkPlayer for this participant if we haven't yet
 	if not player_data["player_node"]:
 		player_data["player_node"] = _find_network_player(peer_id)
+		if player_data["player_node"]:
+			print("✅ PlayerVoiceComponent: Found NetworkPlayer for ", peer_id, ": ", player_data["player_node"].name)
+		else:
+			print("❌ PlayerVoiceComponent: NetworkPlayer NOT found for ", peer_id)
 	
 	# Create spatial audio player if needed
 	if not player_data["audio_player"] and player_data["player_node"]:
@@ -169,6 +177,10 @@ func _on_audio_frame(peer_id: String, frame: PackedVector2Array) -> void:
 		
 		if playback:
 			playback.push_buffer(frame)
+	else:
+		# Debug: Log when spatial player is missing
+		if frame.size() > 0:  # Only log when there's actually audio
+			print("⚠️ PlayerVoiceComponent: No spatial audio player for ", peer_id, " (audio dropped)")
 
 
 func _find_network_player(peer_id: String) -> Node:
