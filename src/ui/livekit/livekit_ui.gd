@@ -758,21 +758,36 @@ func _update_participant_list():
 
 func _find_network_player(peer_id: String) -> Node:
 	# Try to find the NetworkPlayer for this peer_id
-	# This assumes NetworkPlayers are named with their ID or have a property
+	# NetworkPlayers are named "RemotePlayer_<id>" and have peer_id property
 	
-	# 1. Search in "Players" group
-	var players = get_tree().get_nodes_in_group("network_players")
-	for player in players:
-		if str(player.name) == peer_id or (player.get("peer_id") and str(player.peer_id) == peer_id):
-			return player
-			
-	# 2. Fallback: Search by name in main scene
+	# Get all NetworkPlayer nodes (they should all be in root)
 	var root = get_tree().root
-	var main_scene = root.get_child(root.get_child_count() - 1)
-	var player_node = main_scene.find_child(peer_id, true, false)
-	if player_node:
-		return player_node
-		
+	
+	# Search all nodes recursively
+	var found = _search_for_network_player(root, peer_id)
+	if found:
+		return found
+	
+	return null
+
+
+func _search_for_network_player(node: Node, peer_id: String) -> Node:
+	# Check if this node is the NetworkPlayer we're looking for
+	if node.name.begins_with("RemotePlayer_"):
+		# Check peer_id property
+		if node.get("peer_id"):
+			if str(node.peer_id) == str(peer_id):
+				return node
+		# Also check if name contains the peer_id
+		if node.name == "RemotePlayer_" + str(peer_id):
+			return node
+	
+	# Recursively search children
+	for child in node.get_children():
+		var found = _search_for_network_player(child, peer_id)
+		if found:
+			return found
+	
 	return null
 
 func _on_participant_volume_changed(value: float, participant_id: String):
