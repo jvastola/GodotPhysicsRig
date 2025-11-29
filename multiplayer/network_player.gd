@@ -111,6 +111,9 @@ func _interpolate_transforms(delta: float) -> void:
 	var body_pos = target_head_position
 	body_pos.y = target_head_position.y - 0.3 # Chest height (slightly below head)
 	body_visual.global_position = body_visual.global_position.lerp(body_pos, lerp_factor)
+	
+	# Rotate body to match head's Y rotation (yaw) for more natural look
+	body_visual.rotation_degrees.y = lerp_angle(body_visual.rotation_degrees.y, target_head_rotation.y, lerp_factor)
 
 
 ## Create simple visual meshes for the player (rectangles like XRPlayer)
@@ -167,7 +170,7 @@ func _create_visuals() -> void:
 		add_child(body_visual)
 	
 	var body_mesh = BoxMesh.new()
-	body_mesh.size = Vector3(0.4, 0.6, 0.2)
+	body_mesh.size = Vector3(0.3, 0.4, 0.2) # Match local player body size
 	body_visual.mesh = body_mesh
 	
 	var body_material = StandardMaterial3D.new()
