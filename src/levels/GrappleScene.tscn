@@ -66,6 +66,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
 
 [node name="XRPlayer" parent="." instance=ExtResource("1_xrplayer")]
 transform = Transform3D(0.999598, 0, 0, 0, 0.999598, 0, 0, 0, 0.999598, 0, 2, 0)
+head_radius = null
+show_head_mesh = null
+desktop_extra_collider_enabled = null
+desktop_extra_collider_height = null
+desktop_extra_collider_radius = null
 
 [node name="Portal" parent="." instance=ExtResource("2_portal")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -5.60082)

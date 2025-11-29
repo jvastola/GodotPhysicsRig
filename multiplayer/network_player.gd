@@ -30,9 +30,8 @@ var buffer_index: int = 0
 # Label to show player name/ID
 var label_3d: Label3D = null
 
-# Voice chat
-var voice_player: AudioStreamPlayer3D = null
-var voice_playback: AudioStreamGeneratorPlayback = null
+# Voice chat - Now handled by PlayerVoiceComponent with LiveKit
+# AudioStreamPlayer3D nodes are created and managed by PlayerVoiceComponent
 
 # Avatar texture
 var has_custom_avatar: bool = false
@@ -41,13 +40,13 @@ var has_custom_avatar: bool = false
 func _ready() -> void:
 	_create_visuals()
 	_create_name_label()
-	_create_voice_player()
+	# Voice player creation removed - now handled by PlayerVoiceComponent
 
 
 func _process(delta: float) -> void:
 	_interpolate_transforms(delta)
 	_update_label_position()
-	_process_voice_playback(delta)
+	# Voice playback removed - now handled by PlayerVoiceComponent
 
 
 ## Update target transforms from network data
@@ -85,9 +84,8 @@ func update_from_network_data(player_data: Dictionary) -> void:
 	target_right_hand_rotation = player_data.get("right_hand_rotation", Vector3.ZERO)
 	target_scale = player_data.get("player_scale", Vector3.ONE)
 	
-	# Handle voice samples
-	if player_data.has("voice_samples"):
-		_play_voice_samples(player_data["voice_samples"])
+	# Voice samples removed - now handled by PlayerVoiceComponent via LiveKit
+	# Old Nakama voice_samples field is no longer used
 
 
 ## Smoothly interpolate to target transforms
@@ -273,158 +271,6 @@ func apply_avatar_texture(texture: ImageTexture) -> void:
 	print("NetworkPlayer: Applied avatar texture to player ", peer_id)
 
 
-## Create voice audio player
-# Voice Chat Settings
-const VOICE_SAMPLE_RATE = 22050 # Must match PlayerVoiceComponent
-const JITTER_BUFFER_MS = 0.1 # 100ms buffer target
-const MAX_JITTER_BUFFER_MS = 0.5 # 500ms max buffer
-
-var _jitter_buffer: Array[float] = [] # Buffer for individual samples (float)
-var _playback_ring_buffer: PackedVector2Array # Ring buffer for upsampling
-var _ring_buffer_pos: int = 0
-var _system_mix_rate: float = 44100.0
-
-## Create voice audio player
-func _create_voice_player() -> void:
-	voice_player = AudioStreamPlayer3D.new()
-	voice_player.name = "VoicePlayer"
-	
-	# Create audio stream generator for voice playback
-	var stream = AudioStreamGenerator.new()
-	_system_mix_rate = AudioServer.get_mix_rate()
-	stream.mix_rate = _system_mix_rate
-	stream.buffer_length = 0.5 # Large buffer for generator
-	voice_player.stream = stream
-	voice_player.bus = "VoiceOutput"
-	voice_player.autoplay = true
-	voice_player.max_distance = 20.0
-	voice_player.unit_size = 5.0
-	
-	add_child(voice_player)
-	
-	voice_player.play()
-	voice_playback = voice_player.get_stream_playback()
-	
-	print("NetworkPlayer [", peer_id, "]: Voice player created. System Rate: ", _system_mix_rate)
-
-
-## Process voice playback from jitter buffer
-func _process_voice_playback(_delta: float) -> void:
-	if not voice_playback:
-		return
-		
-	# 1. Check how many frames the generator needs
-	var frames_available = voice_playback.get_frames_available()
-	if frames_available <= 0:
-		return
-		
-	# 2. Pull from Jitter Buffer
-	# We need to fill 'frames_available' at SYSTEM mix rate
-	# But our buffer has samples at VOICE_SAMPLE_RATE (22050)
-	
-	var samples_needed = frames_available
-	var samples_to_push = PackedVector2Array()
-	samples_to_push.resize(samples_needed)
-	
-	# Calculate ratio for upsampling
-	var ratio = _system_mix_rate / float(VOICE_SAMPLE_RATE)
-	
-	# If buffer is empty or too low, we might need to wait (buffering)
-	# But for simplicity, if we have data, we play it. If not, silence.
-	# A more advanced jitter buffer would time-stretch.
-	
-	var buffer_size_samples = _jitter_buffer.size()
-	
-	# Simple Jitter Buffer Logic:
-	# If we have enough samples, play.
-	# If we run dry, we output silence.
-	
-	if buffer_size_samples > 0:
-		for i in range(samples_needed):
-			# Upsampling: Map output index to input index
-			# We consume 1 input sample for every 'ratio' output samples
-			# This is a bit tricky with a simple array buffer.
-			# Better approach: Step through output, calculate float index in input.
-			
-			# Current implementation: Linear Interpolation Upsampling
-			# We need to maintain a "read head" position in the jitter buffer
-			# Since we pop samples, index 0 is always the next sample.
-			# But we need fractional progress.
-			
-			# Simplified: Just repeat samples (Nearest Neighbor) or Linear Interp
-			# Let's do Linear Interpolation for quality.
-			
-			# We need 'ratio' output samples to consume 1 input sample.
-			# So we consume (1 / ratio) input samples per output sample.
-			
-			# Actually, let's just drain the buffer into the stream
-			# We need to generate 'samples_needed' output frames.
-			# That corresponds to 'samples_needed / ratio' input frames.
-			
-			var input_idx_float = float(i) / ratio
-			var input_idx_int = int(input_idx_float)
-			var input_frac = input_idx_float - input_idx_int
-			
-			# We need to peek into the buffer
-			var val_left = 0.0
-			var val_right = 0.0
-			
-			if input_idx_int < _jitter_buffer.size() / 2: # Buffer stores interleaved L, R
-				# Each frame is 2 floats (L, R)
-				var idx_base = input_idx_int * 2
-				
-				var l1 = _jitter_buffer[idx_base]
-				var r1 = _jitter_buffer[idx_base + 1]
-				
-				var l2 = l1
-				var r2 = r1
-				
-				if idx_base + 2 < _jitter_buffer.size():
-					l2 = _jitter_buffer[idx_base + 2]
-					r2 = _jitter_buffer[idx_base + 3]
-				
-				# Lerp
-				val_left = lerp(l1, l2, input_frac)
-				val_right = lerp(r1, r2, input_frac)
-				
-				samples_to_push[i] = Vector2(val_left, val_right)
-			else:
-				# Run out of data during this batch
-				samples_to_push[i] = Vector2.ZERO
-		
-		# Remove consumed samples from buffer
-		var input_samples_consumed = int(float(samples_needed) / ratio)
-		var floats_consumed = input_samples_consumed * 2
-		
-		if floats_consumed > 0:
-			if floats_consumed >= _jitter_buffer.size():
-				_jitter_buffer.clear()
-			else:
-				# This is slow for large arrays, but voice buffers are small
-				# Optimization: Use a ring buffer or index
-				for k in range(floats_consumed):
-					_jitter_buffer.pop_front()
-					
-		voice_playback.push_buffer(samples_to_push)
-	else:
-		# Silence
-		voice_playback.push_buffer(PackedVector2Array([Vector2.ZERO])) # Push a little silence
-
-
-## Receive voice samples (called from NetworkManager)
-func _play_voice_samples(samples: PackedVector2Array) -> void:
-	# Add to Jitter Buffer
-	# Samples are interleaved Vector2 (L, R)
-	# We convert to flat float array for easier processing
-	for sample in samples:
-		_jitter_buffer.append(sample.x)
-		_jitter_buffer.append(sample.y)
-	
-	# Limit buffer size (prevent infinite delay)
-	var max_samples = int(MAX_JITTER_BUFFER_MS * VOICE_SAMPLE_RATE * 2) # *2 for stereo
-	if _jitter_buffer.size() > max_samples:
-		# Drop oldest samples to catch up
-		var drop_count = _jitter_buffer.size() - max_samples
-		for i in range(drop_count):
-			_jitter_buffer.pop_front()
-		#print("NetworkPlayer: Jitter buffer overflow, dropped ", drop_count, " samples")
+# Old voice chat implementation removed
+# Voice is now handled by PlayerVoiceComponent with LiveKit spatial audio
+# AudioStreamPlayer3D nodes are created and managed by PlayerVoiceComponent based on LiveKit participant data

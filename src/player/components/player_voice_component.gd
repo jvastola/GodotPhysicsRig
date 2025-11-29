@@ -1,184 +1,272 @@
 class_name PlayerVoiceComponent
 extends Node
 
-var network_manager: Node = null
-var microphone: AudioStreamMicrophone = null
-var microphone_player: AudioStreamPlayer = null
-var voice_effect: AudioEffectCapture = null
+## PlayerVoiceComponent - LiveKit-based Spatial Audio
+## Handles microphone capture and manages spatial audio for remote players
+
+# LiveKit Integration
+var livekit_manager: Node = null
 var voice_enabled: bool = false
 
-# Audio Processing Settings
-# Audio Processing Settings
-const TARGET_SAMPLE_RATE = 22050 # Downsample to this rate
-var vad_threshold: float = 0.005 # RMS threshold for voice activity (adjustable)
-const VAD_HANGOVER_TIME = 0.2 # Keep sending for 0.2s after silence
-const BATCH_DURATION = 0.05 # Send packets every 50ms
+# Audio Capture
+var microphone_player: AudioStreamPlayer = null
+var capture_effect: AudioEffectCapture = null
+var audio_bus_name = "PlayerVoice"
+var audio_bus_idx = -1
 
-# State
-var _sample_buffer: PackedVector2Array = PackedVector2Array()
-var _batch_timer: float = 0.0
-var _vad_active: bool = false
-var _vad_hangover_timer: float = 0.0
-var _system_mix_rate: float = 44100.0 # Will be updated from AudioServer
-var _current_rms: float = 0.0 # For UI visualization
+# Audio Settings
+const BUFFER_SIZE = 4096
+var mic_gain_db: float = 0.0
 
-func setup(p_network_manager: Node) -> void:
-	network_manager = p_network_manager
-	_setup_voice_chat()
+# Spatial Audio Management
+var remote_players: Dictionary = {} # identity -> { "player_node": NetworkPlayer, "audio_player": AudioStreamPlayer3D }
+var player_scene_root: Node = null # Reference to find NetworkPlayers in scene
 
-func _process(delta: float) -> void:
-	_process_voice_chat(delta)
 
-func _setup_voice_chat() -> void:
-	"""Initialize microphone capture for voice chat"""
-	# Create microphone stream
-	microphone = AudioStreamMicrophone.new()
+func setup(p_livekit_manager: Node) -> void:
+	"""Initialize voice component with LiveKit manager"""
+	livekit_manager = p_livekit_manager
 	
-	# Create audio player for microphone (we just use it for capture)
+	if livekit_manager:
+		_setup_microphone()
+		_connect_livekit_signals()
+		print("PlayerVoiceComponent: Setup with LiveKit manager")
+	else:
+		push_warning("PlayerVoiceComponent: No LiveKit manager provided")
+
+
+func _setup_microphone() -> void:
+	"""Initialize microphone capture for LiveKit"""
+	# Create audio bus
+	audio_bus_idx = AudioServer.bus_count
+	AudioServer.add_bus(audio_bus_idx)
+	AudioServer.set_bus_name(audio_bus_idx, audio_bus_name)
+	
+	# Add Capture effect
+	capture_effect = AudioEffectCapture.new()
+	AudioServer.add_bus_effect(audio_bus_idx, capture_effect)
+	
+	# Route to Master (muted by default)
+	AudioServer.set_bus_send(audio_bus_idx, "Master")
+	AudioServer.set_bus_volume_db(audio_bus_idx, -80.0) # Muted locally
+	
+	# Create microphone stream
+	var mic_stream = AudioStreamMicrophone.new()
+	
+	# Create player
 	microphone_player = AudioStreamPlayer.new()
 	microphone_player.name = "MicrophonePlayer"
-	microphone_player.stream = microphone
-	microphone_player.bus = "VoiceInput" # Use Input bus (muted locally)
-	microphone_player.volume_db = 0.0  # Full volume for capture
+	microphone_player.stream = mic_stream
+	microphone_player.bus = audio_bus_name
 	add_child(microphone_player)
 	
-	# Add AudioEffectCapture to VoiceInput bus
-	var input_bus_index = AudioServer.get_bus_index("VoiceInput")
-	if input_bus_index != -1:
-		# Check if capture effect already exists
-		var has_capture = false
-		for i in range(AudioServer.get_bus_effect_count(input_bus_index)):
-			if AudioServer.get_bus_effect(input_bus_index, i) is AudioEffectCapture:
-				voice_effect = AudioServer.get_bus_effect(input_bus_index, i)
-				has_capture = true
-				break
-		
-		# Add Professional Audio Chain (HighPass -> Compressor -> Limiter -> Capture)
-		
-		# 1. High Pass Filter (Remove rumble/wind)
-		var high_pass = AudioEffectHighPassFilter.new()
-		high_pass.cutoff_hz = 80.0
-		AudioServer.add_bus_effect(input_bus_index, high_pass)
-		
-		# 2. Compressor (Level out volume)
-		var compressor = AudioEffectCompressor.new()
-		compressor.threshold = -20.0
-		compressor.ratio = 4.0
-		compressor.gain = 10.0
-		compressor.attack_us = 20.0
-		compressor.release_ms = 250.0
-		AudioServer.add_bus_effect(input_bus_index, compressor)
-		
-		# 3. Limiter (Prevent clipping)
-		var limiter = AudioEffectLimiter.new()
-		limiter.ceiling_db = -1.0
-		limiter.threshold_db = -1.0
-		AudioServer.add_bus_effect(input_bus_index, limiter)
-		
-		if not has_capture:
-			voice_effect = AudioEffectCapture.new()
-			AudioServer.add_bus_effect(input_bus_index, voice_effect)
-		
-		_system_mix_rate = AudioServer.get_mix_rate()
-		print("PlayerVoiceComponent: Voice chat initialized on VoiceInput bus. System Rate: ", _system_mix_rate)
+	print("PlayerVoiceComponent: Microphone initialized on bus '", audio_bus_name, "'")
+
+
+func _connect_livekit_signals() -> void:
+	"""Connect to LiveKit manager signals"""
+	if not livekit_manager:
+		return
+	
+	# Connect participant events
+	if livekit_manager.has_signal("participant_joined"):
+		livekit_manager.participant_joined.connect(_on_participant_joined)
+	if livekit_manager.has_signal("participant_left"):
+		livekit_manager.participant_left.connect(_on_participant_left)
+	
+	# Connect audio frame event
+	if livekit_manager.has_signal("on_audio_frame"):
+		livekit_manager.on_audio_frame.connect(_on_audio_frame)
+	
+	print("PlayerVoiceComponent: Connected to LiveKit signals")
+
 
 func toggle_voice_chat(enabled: bool) -> void:
 	"""Enable or disable voice chat"""
 	voice_enabled = enabled
 	
-	if network_manager:
-		network_manager.enable_voice_chat(enabled)
-	
-	# Ensure VoiceOutput bus is unmuted so we can hear remote players
-	var output_bus_index = AudioServer.get_bus_index("VoiceOutput")
-	if output_bus_index != -1:
-		AudioServer.set_bus_mute(output_bus_index, false)
-		#print("PlayerVoiceComponent: VoiceOutput bus unmuted")
-	
 	if enabled and microphone_player:
 		microphone_player.play()
+		print("PlayerVoiceComponent: Voice chat enabled")
 	elif microphone_player:
 		microphone_player.stop()
-	
-	print("PlayerVoiceComponent: Voice chat ", "enabled" if enabled else "disabled")
+		print("PlayerVoiceComponent: Voice chat disabled")
 
-func _process_voice_chat(delta: float) -> void:
-	"""Capture, process, and send voice data"""
-	if not voice_enabled or not voice_effect or not network_manager:
+
+func _process(_delta: float) -> void:
+	"""Capture and send audio to LiveKit"""
+	if not voice_enabled or not livekit_manager or not capture_effect:
 		return
 	
-	# Update batch timer
-	_batch_timer += delta
+	# Check if LiveKit is connected
+	if not livekit_manager.has_method("is_room_connected") or not livekit_manager.is_room_connected():
+		return
 	
-	# Get available audio frames from capture
-	var available = voice_effect.get_frames_available()
-	if available > 0:
-		var audio_data = voice_effect.get_buffer(available)
+	# Capture audio and push to LiveKit
+	if capture_effect.can_get_buffer(BUFFER_SIZE):
+		var buffer = capture_effect.get_buffer(BUFFER_SIZE)
 		
-		if audio_data.size() > 0:
-			# 1. Resample if needed (simple decimation for speed)
-			# Note: Proper resampling requires a filter, but for voice chat decimation is often "good enough"
-			# if we capture at 44.1/48 and want 22.05.
-			var resampled_data = _resample_audio(audio_data)
-			
-			# 2. Voice Activity Detection (VAD)
-			if _check_vad(resampled_data):
-				_vad_active = true
-				_vad_hangover_timer = VAD_HANGOVER_TIME
-			elif _vad_active:
-				_vad_hangover_timer -= delta * (float(audio_data.size()) / _system_mix_rate) # Approx time passed in audio
-				if _vad_hangover_timer <= 0:
-					_vad_active = false
-			
-			# 3. Buffer data if VAD is active
-			if _vad_active:
-				_sample_buffer.append_array(resampled_data)
+		if buffer.size() > 0 and livekit_manager.has_method("push_mic_audio"):
+			livekit_manager.push_mic_audio(buffer)
+
+
+func set_player_scene_root(root: Node) -> void:
+	"""Set the scene root to search for NetworkPlayer nodes"""
+	player_scene_root = root
+
+
+func _on_participant_joined(identity: String) -> void:
+	"""Handle new participant joining LiveKit room"""
+	print("PlayerVoiceComponent: Participant joined: ", identity)
 	
-	# 4. Send batch if timer expired and we have data
-	if _batch_timer >= BATCH_DURATION:
-		_batch_timer = 0.0
-		if _sample_buffer.size() > 0:
-			network_manager.send_voice_data(_sample_buffer)
-			#print("PlayerVoiceComponent: Sent batch of ", _sample_buffer.size(), " samples")
-			_sample_buffer.clear()
+	# We'll create the audio player when we receive the first audio frame
+	# This ensures the NetworkPlayer exists in the scene
+	if not remote_players.has(identity):
+		remote_players[identity] = {
+			"player_node": null,
+			"audio_player": null
+		}
 
 
-func _resample_audio(input_samples: PackedVector2Array) -> PackedVector2Array:
-	"""Downsample audio to TARGET_SAMPLE_RATE"""
-	if _system_mix_rate <= TARGET_SAMPLE_RATE:
-		return input_samples
-		
-	var ratio = _system_mix_rate / float(TARGET_SAMPLE_RATE)
-	var new_size = int(input_samples.size() / ratio)
-	var output = PackedVector2Array()
-	output.resize(new_size)
+func _on_participant_left(identity: String) -> void:
+	"""Handle participant leaving LiveKit room"""
+	print("PlayerVoiceComponent: Participant left: ", identity)
 	
-	# Simple nearest-neighbor/decimation for performance
-	# For better quality, we'd use linear interpolation or a filter
-	for i in range(new_size):
-		var src_idx = int(i * ratio)
-		if src_idx < input_samples.size():
-			output[i] = input_samples[src_idx]
-			
-	return output
-
-
-func _check_vad(samples: PackedVector2Array) -> bool:
-	"""Check if audio samples contain voice (RMS threshold)"""
-	var sum_squares = 0.0
-	for sample in samples:
-		# Average of left/right channels
-		var val = (sample.x + sample.y) * 0.5
-		sum_squares += val * val
+	if remote_players.has(identity):
+		var player_data = remote_players[identity]
 		
-	var rms = sqrt(sum_squares / samples.size())
-	_current_rms = rms # Store for UI
-	return rms > vad_threshold
+		# Clean up audio player
+		if player_data["audio_player"]:
+			player_data["audio_player"].queue_free()
+		
+		remote_players.erase(identity)
 
-# UI Helpers
-func get_current_rms() -> float:
-	return _current_rms
 
-func set_vad_threshold(value: float) -> void:
-	vad_threshold = value
+func _on_audio_frame(peer_id: String, frame: PackedVector2Array) -> void:
+	"""Handle incoming audio frame from LiveKit participant"""
+	
+	# Ensure we have an entry for this participant
+	if not remote_players.has(peer_id):
+		remote_players[peer_id] = {
+			"player_node": null,
+			"audio_player": null
+		}
+	
+	var player_data = remote_players[peer_id]
+	
+	# Find the NetworkPlayer for this participant if we haven't yet
+	if not player_data["player_node"]:
+		player_data["player_node"] = _find_network_player(peer_id)
+	
+	# Create spatial audio player if needed
+	if not player_data["audio_player"] and player_data["player_node"]:
+		_create_spatial_audio_player(peer_id, player_data["player_node"])
+	
+	# Push audio data to the spatial audio player
+	if player_data["audio_player"]:
+		var audio_player = player_data["audio_player"]
+		var playback = audio_player.get_stream_playback()
+		
+		if playback:
+			playback.push_buffer(frame)
 
+
+func _find_network_player(peer_id: String) -> Node:
+	"""Find the NetworkPlayer node for a given peer ID"""
+	# Try to find by searching the scene tree
+	var root = player_scene_root if player_scene_root else get_tree().root
+	
+	# Search for NetworkPlayer nodes
+	var network_players = _get_all_network_players(root)
+	
+	for player in network_players:
+		# Check if the peer_id matches
+		if player.has_method("get") and player.get("peer_id") == peer_id:
+			return player
+		# Also check as property
+		if "peer_id" in player and str(player.peer_id) == str(peer_id):
+			return player
+	
+	# Also try matching by identity string
+	for player in network_players:
+		var player_peer_id = str(player.peer_id) if "peer_id" in player else ""
+		if player_peer_id == peer_id:
+			return player
+	
+	print("PlayerVoiceComponent: Could not find NetworkPlayer for peer_id: ", peer_id)
+	return null
+
+
+func _get_all_network_players(node: Node) -> Array:
+	"""Recursively find all NetworkPlayer nodes in the scene"""
+	var players = []
+	
+	if node.get_script():
+		var script_path = node.get_script().resource_path
+		if "network_player" in script_path.to_lower():
+			players.append(node)
+	
+	for child in node.get_children():
+		players.append_array(_get_all_network_players(child))
+	
+	return players
+
+
+func _create_spatial_audio_player(peer_id: String, network_player: Node) -> void:
+	"""Create an AudioStreamPlayer3D for spatial audio"""
+	if not remote_players.has(peer_id):
+		return
+	
+	var player_data = remote_players[peer_id]
+	
+	# Create AudioStreamPlayer3D
+	var audio_player = AudioStreamPlayer3D.new()
+	audio_player.name = "VoicePlayer_" + peer_id
+	
+	# Create audio stream generator
+	var stream = AudioStreamGenerator.new()
+	stream.mix_rate = 48000 # Match LiveKit's sample rate
+	stream.buffer_length = 0.1 # 100ms buffer
+	audio_player.stream = stream
+	
+	# Configure 3D audio settings
+	audio_player.max_distance = 20.0
+	audio_player.unit_size = 5.0
+	audio_player.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+	audio_player.bus = "Master"
+	
+	# Add to network player
+	network_player.add_child(audio_player)
+	audio_player.autoplay = true
+	audio_player.play()
+	
+	# Store reference
+	player_data["audio_player"] = audio_player
+	
+	print("PlayerVoiceComponent: Created spatial audio player for ", peer_id, " on ", network_player.name)
+
+
+func set_mic_gain(gain_db: float) -> void:
+	"""Set microphone gain"""
+	mic_gain_db = gain_db
+	if audio_bus_idx != -1:
+		AudioServer.set_bus_volume_db(audio_bus_idx, gain_db)
+
+
+func get_remote_player_count() -> int:
+	"""Get the number of remote players with audio"""
+	return remote_players.size()
+
+
+func cleanup() -> void:
+	"""Clean up all audio players and resources"""
+	for peer_id in remote_players.keys():
+		var player_data = remote_players[peer_id]
+		if player_data["audio_player"]:
+			player_data["audio_player"].queue_free()
+	
+	remote_players.clear()
+	
+	if microphone_player:
+		microphone_player.queue_free()
+		microphone_player = null

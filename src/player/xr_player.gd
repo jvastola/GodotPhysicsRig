@@ -64,10 +64,17 @@ func _setup_components() -> void:
 	else:
 		push_warning("XRPlayer: PlayerNetworkComponent not found in scene")
 	
-	# Voice Component
+	# Voice Component - now uses LiveKit instead of Nakama
 	voice_component = get_node_or_null("PlayerVoiceComponent")
-	if voice_component and network_component:
-		voice_component.setup(network_component.network_manager)
+	if voice_component:
+		# Find LiveKit manager in the scene
+		var livekit_manager = _find_livekit_manager()
+		if livekit_manager:
+			voice_component.setup(livekit_manager)
+			# Set scene root so voice component can find NetworkPlayers
+			voice_component.set_player_scene_root(get_tree().root)
+		else:
+			push_warning("XRPlayer: LiveKit manager not found in scene")
 	elif not voice_component:
 		push_warning("XRPlayer: PlayerVoiceComponent not found in scene")
 	
@@ -75,6 +82,51 @@ func _setup_components() -> void:
 	movement_component = get_node_or_null("PlayerMovementComponent")
 	if movement_component:
 		movement_component.setup(player_body, right_controller)
+
+
+func _find_livekit_manager() -> Node:
+	"""Find the LiveKit manager in the scene"""
+	# Option 1: Look for LiveKitViewport3D and get its manager
+	var root = get_tree().root
+	var livekit_ui = _find_node_by_script(root, "livekit_ui.gd")
+	if livekit_ui and livekit_ui.has_method("get") and "livekit_manager" in livekit_ui:
+		return livekit_ui.livekit_manager
+	
+	# Option 2: Look for LiveKitManager directly
+	var livekit_manager = _find_node_by_class(root, "LiveKitManager")
+	if livekit_manager:
+		return livekit_manager
+	
+	return null
+
+
+func _find_node_by_script(node: Node, script_name: String) -> Node:
+	"""Recursively find a node by its script filename"""
+	if node.get_script():
+		var script_path = node.get_script().resource_path
+		if script_name in script_path:
+			return node
+	
+	for child in node.get_children():
+		var result = _find_node_by_script(child, script_name)
+		if result:
+			return result
+	
+	return null
+
+
+func _find_node_by_class(node: Node, class_name: String) -> Node:
+	"""Recursively find a node by its class name"""
+	if node.get_class() == class_name:
+		return node
+	
+	for child in node.get_children():
+		var result = _find_node_by_class(child, class_name)
+		if result:
+			return result
+	
+	return null
+
 
 
 func _setup_physics_hands() -> void:

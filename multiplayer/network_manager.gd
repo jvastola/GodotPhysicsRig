@@ -748,135 +748,45 @@ func get_object_owner(object_id: String) -> int:
 
 
 # ============================================================================
-# Voice Chat
+# Voice Chat - DEPRECATED
 # ============================================================================
+# Voice chat now handled entirely by PlayerVoiceComponent with LiveKit.
+# Old Nakama voice transport removed.
 
 func _setup_voice_chat() -> void:
-	"""Initialize voice chat audio buses"""
+	"""Voice buses setup - kept for backwards compatibility"""
+	# These buses may still be used by old code
 	var bus_count = AudioServer.get_bus_count()
 	
-	# 1. Setup VoiceInput bus (Microphone -> Capture)
-	# We mute this bus so we don't hear ourselves, but Capture effect still works
 	var input_bus = AudioServer.get_bus_index("VoiceInput")
 	if input_bus == -1:
 		AudioServer.add_bus(bus_count)
 		AudioServer.set_bus_name(bus_count, "VoiceInput")
 		input_bus = bus_count
-		print("NetworkManager: Created VoiceInput audio bus")
 		bus_count += 1
 	
-	AudioServer.set_bus_mute(input_bus, true) # Mute so we don't hear self
-	AudioServer.set_bus_volume_db(input_bus, 0.0)
+	AudioServer.set_bus_mute(input_bus, true)
 	AudioServer.set_bus_send(input_bus, "Master")
 	
-	# 2. Setup VoiceOutput bus (Remote Players -> Master)
-	# We want to hear this!
 	var output_bus = AudioServer.get_bus_index("VoiceOutput")
 	if output_bus == -1:
 		AudioServer.add_bus(bus_count)
 		AudioServer.set_bus_name(bus_count, "VoiceOutput")
 		output_bus = bus_count
-		print("NetworkManager: Created VoiceOutput audio bus")
 	
-	AudioServer.set_bus_mute(output_bus, false) # Unmute to hear others
-	AudioServer.set_bus_volume_db(output_bus, 0.0)
+	AudioServer.set_bus_mute(output_bus, false)
 	AudioServer.set_bus_send(output_bus, "Master")
-	
-	print("NetworkManager: Voice buses configured - Input (Muted), Output (Unmuted)")
 
 
 func enable_voice_chat(enable: bool) -> void:
-	"""Enable or disable voice chat"""
+	"""DEPRECATED: Voice chat now handled by LiveKit"""
 	voice_enabled = enable
-	print("NetworkManager: Voice chat ", "enabled" if enable else "disabled")
+	print("NetworkManager: Voice chat setting changed (deprecated - use LiveKit)")
 
 
-func send_voice_data(audio_data: PackedVector2Array) -> void:
-	"""Send voice audio data to all other players with compression"""
-	if not voice_enabled:
-		return
-	
-	# Check if we have a way to send (either Nakama or ENet)
-	if not use_nakama and not multiplayer.multiplayer_peer:
-		return
-	
-	# Compress to 16-bit PCM instead of 32-bit float (4x smaller)
-	var byte_array = PackedByteArray()
-	byte_array.resize(audio_data.size() * 4) # 2 int16 per Vector2, 2 bytes per int16
-	
-	for i in range(audio_data.size()):
-		var sample = audio_data[i]
-		# Convert float [-1.0, 1.0] to int16 [-32768, 32767]
-		var left_int = int(clamp(sample.x, -1.0, 1.0) * 32767.0)
-		var right_int = int(clamp(sample.y, -1.0, 1.0) * 32767.0)
-		
-		# Encode as 16-bit integers
-		byte_array.encode_s16(i * 4, left_int)
-		byte_array.encode_s16(i * 4 + 2, right_int)
-	
-	if use_nakama:
-		NakamaManager.send_match_state(NakamaManager.MatchOpCode.VOICE_DATA, byte_array)
-	else:
-		_receive_voice_data.rpc_id(0, byte_array)
-
-
-@rpc("unreliable", "call_remote", "any_peer")
-func _receive_voice_data(audio_data: PackedByteArray) -> void:
-	"""Receive compressed voice data from another player (ENet)"""
-	var sender_id = multiplayer.get_remote_sender_id()
-	_process_incoming_voice_data(audio_data, sender_id)
-
-
-func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Variant) -> void:
-	"""Handle incoming match state from Nakama"""
-	if op_code == NakamaManager.MatchOpCode.PLAYER_TRANSFORM:
-		if data is Dictionary:
-			_handle_nakama_player_transform(peer_id, data)
-	elif op_code == NakamaManager.MatchOpCode.VOICE_DATA:
-		if data is PackedByteArray:
-			_process_incoming_voice_data(data, peer_id)
-	elif op_code == NakamaManager.MatchOpCode.AVATAR_DATA:
-		if data is Dictionary:
-			_handle_nakama_avatar_data(peer_id, data)
-
-
-func _process_incoming_voice_data(audio_data: PackedByteArray, sender_id: Variant) -> void:
-	"""Process voice data from any source (ENet or Nakama)"""
-	# Don't play our own voice back to ourselves
-	# Note: For Nakama, sender_id is String. For ENet, it's int.
-	# We need to compare correctly.
-	# TEMPORARILY DISABLED FOR TESTING - UNCOMMENT TO PREVENT ECHO
-	#if str(sender_id) == str(get_multiplayer_id()) or str(sender_id) == NakamaManager.local_user_id:
-	#	return
-	
-	print("NetworkManager: Received ", audio_data.size(), " bytes of voice data from ", sender_id)
-	
-	# Decompress 16-bit PCM back to float samples
-	var sample_count = int(float(audio_data.size()) / 4.0)
-	var samples = PackedVector2Array()
-	samples.resize(sample_count)
-	
-	for i in range(sample_count):
-		# Decode 16-bit integers
-		var left_int = audio_data.decode_s16(i * 4)
-		var right_int = audio_data.decode_s16(i * 4 + 2)
-		
-		# Convert int16 back to float [-1.0, 1.0]
-		var left = float(left_int) / 32767.0
-		var right = float(right_int) / 32767.0
-		samples[i] = Vector2(left, right)
-	
-	# Emit signal for audio playback
-	# XRPlayer will handle playing this through the remote player's AudioStreamPlayer3D
-	
-	# Ensure player exists in dictionary (might be a new Nakama player)
-	if not players.has(sender_id):
-		# Create a basic entry if missing so we can hear them
-		players[sender_id] = local_player_info.duplicate(true)
-		
-	if players.has(sender_id):
-		players[sender_id]["voice_samples"] = samples
-		print("NetworkManager: Stored ", samples.size(), " voice samples for player ", sender_id)
+func send_voice_data(_audio_data: PackedVector2Array) -> void:
+	"""DEPRECATED: Voice is now transmitted via LiveKit, not Nakama"""
+	pass # No-op
 
 
 # ============================================================================
@@ -945,6 +855,7 @@ func _on_nakama_match_state(peer_id: String, op_code: int, data: Dictionary) -> 
 	if not use_nakama:
 		return
 		
+	# Note: Voice data (VOICE_DATA op code) removed - voice now handled by LiveKit
 	# Map Nakama op codes to local signals
 	# Note: NakamaManager is autoloaded, so we can access the enum directly if we wanted,
 	# but to avoid circular dependency issues during load, we'll use the integer values
