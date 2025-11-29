@@ -150,6 +150,14 @@ func _setup_physics_hands() -> void:
 func _process(delta: float) -> void:
 	if movement_component:
 		movement_component.process_turning(delta)
+	
+	# Retry setting up voice component if needed (handles race condition with UI loading)
+	if voice_component and not voice_component.livekit_manager:
+		var livekit_manager = _find_livekit_manager()
+		if livekit_manager:
+			print("XRPlayer: Found LiveKit manager (late init), setting up voice component")
+			voice_component.setup(livekit_manager)
+			voice_component.set_player_scene_root(get_tree().root)
 
 
 func _physics_process(delta: float) -> void:
