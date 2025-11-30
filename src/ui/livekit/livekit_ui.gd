@@ -48,6 +48,10 @@ var audio_bus_idx = -1
 
 # Chat and username
 var local_username: String = "User-" + str(randi() % 10000)
+
+# Room info
+var current_room_name: String = ""
+var room_name_label: Label = null
 var chat_messages = [] # Array of {sender: String, message: String, timestamp: int}
 var participant_usernames = {} # Dictionary of identity -> username
 
@@ -238,6 +242,9 @@ func _ready():
 	
 	# Add Nakama ID helper info
 	_update_nakama_id_hint()
+	
+	# Create room name label
+	_create_room_name_label()
 	
 	status_label.text = "Ready to connect"
 	print("✅ LiveKit Audio UI Ready!")
@@ -478,7 +485,20 @@ func _on_disconnect_pressed():
 
 func _on_room_connected():
 	print("✅ Connected to room!")
-	status_label.text = "✅ Connected"
+	
+	# Try to get room name from LiveKit manager
+	if livekit_manager and livekit_manager.has_method("get_current_room"):
+		current_room_name = livekit_manager.get_current_room()
+	
+	# Update status with room name
+	if current_room_name.is_empty():
+		status_label.text = "✅ Connected"
+	else:
+		status_label.text = "✅ Connected to: " + current_room_name
+	
+	# Update room name label
+	_update_room_name_label()
+	
 	connect_button.disabled = true
 	disconnect_button.disabled = false
 	
@@ -487,9 +507,13 @@ func _on_room_connected():
 
 func _on_room_disconnected():
 	print("📴 Disconnected")
+	current_room_name = ""
 	status_label.text = "Disconnected"
 	connect_button.disabled = false
 	disconnect_button.disabled = true
+	
+	# Update room name label
+	_update_room_name_label()
 	
 	# Clear participant list
 	for child in participant_list.get_children():
@@ -905,9 +929,9 @@ func _on_update_name_pressed():
 
 func _generate_livekit_token(participant_id: String, room_name: String = "test-room") -> String:
 	"""Generate a LiveKit JWT access token using HS256"""
-	# LiveKit credentials (must match server config)
-	const API_KEY = "devkey"
-	const API_SECRET = "secret"
+	# LiveKit Cloud credentials
+	const API_KEY = "APIbSEA2MXzP8Mf"
+	const API_SECRET = "Kqw1FLCX3rq2IWbuWjilBMlgbODqlzxTkgyzKrzuF6I"
 	const TOKEN_VALIDITY_HOURS = 24
 	
 	# Current time
@@ -1036,3 +1060,37 @@ func _update_nakama_id_hint():
 	
 	# Ensure hint is visible
 	existing_hint.visible = true
+
+
+func _create_room_name_label():
+	"""Create a label to display the current LiveKit room name"""
+	var header_section = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/Header
+	
+	# Create room name label
+	room_name_label = Label.new()
+	room_name_label.name = "RoomNameLabel"
+	room_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	room_name_label.add_theme_font_size_override("font_size", 16)
+	room_name_label.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))  # Green
+	room_name_label.text = ""
+	room_name_label.visible = false
+	
+	# Add to header section
+	header_section.add_child(room_name_label)
+	header_section.move_child(room_name_label, 1)  # Place after StatusLabel
+	
+	print("✅ [LiveKit UI] Created room name label")
+
+
+func _update_room_name_label():
+	"""Update the room name label with current room info"""
+	if not room_name_label:
+		return
+	
+	if current_room_name.is_empty():
+		room_name_label.visible = false
+		room_name_label.text = ""
+	else:
+		room_name_label.visible = true
+		room_name_label.text = "🎙️ Room: " + current_room_name
+		print("📋 [LiveKit UI] Updated room name: ", current_room_name)

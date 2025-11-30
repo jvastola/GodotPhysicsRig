@@ -422,8 +422,14 @@ func _on_http_request_completed(result: int, response_code: int, _headers: Packe
 	if data.has("token"):
 		session = data
 		is_authenticated = true
-		local_user_id = data.get("user_id", "")  # May be empty, will get from presence
+		
+		# Try to get user ID from response, otherwise parse token
+		local_user_id = data.get("user_id", "")
+		if local_user_id.is_empty():
+			local_user_id = _extract_user_id_from_token(session.token)
+			
 		print("NakamaManager: Authentication successful!")
+		print("NakamaManager: User ID: ", local_user_id)
 		print("NakamaManager: Token: ", session.token.substr(0, 20), "...")
 		authenticated.emit(session)
 		
@@ -432,6 +438,33 @@ func _on_http_request_completed(result: int, response_code: int, _headers: Packe
 	else:
 		push_error("NakamaManager: Unexpected response format")
 		authentication_failed.emit("Invalid response")
+
+
+func _extract_user_id_from_token(token: String) -> String:
+	var parts = token.split(".")
+	if parts.size() < 2:
+		return ""
+	
+	var payload_str = parts[1]
+	# Add padding if needed
+	match (payload_str.length() % 4):
+		2: payload_str += "=="
+		3: payload_str += "="
+	
+	# Replace URL-safe chars
+	payload_str = payload_str.replace("-", "+").replace("_", "/")
+	
+	var payload_bytes = Marshalls.base64_to_raw(payload_str)
+	var json = JSON.new()
+	if json.parse(payload_bytes.get_string_from_utf8()) == OK:
+		var payload = json.get_data()
+		# Nakama uses 'uid' or 'sub' for user ID
+		if payload.has("uid"):
+			return payload.uid
+		elif payload.has("sub"):
+			return payload.sub
+			
+	return ""
 
 
 func _on_match_list_http_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:

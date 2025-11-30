@@ -22,6 +22,10 @@ var current_room_name: String = ""
 var available_rooms: Array = []
 var is_connecting: bool = false
 
+# Connection info labels
+var nakama_info_label: Label = null
+var livekit_info_label: Label = null
+
 
 func _ready() -> void:
 	print("=== Unified Room UI ===")
@@ -55,6 +59,9 @@ func _ready() -> void:
 	current_room_panel.visible = false
 	status_label.text = "⏳ Connecting to Nakama..."
 	
+	# Create connection info labels
+	_create_connection_info_labels()
+	
 	# Auto-authenticate with Nakama
 	if not nakama_manager.is_authenticated:
 		nakama_manager.authenticate_device()
@@ -64,6 +71,9 @@ func _ready() -> void:
 	
 	# Auto-refresh room list
 	_refresh_room_list()
+	
+	# Update connection info
+	_update_connection_info()
 	
 	print("✅ Unified Room UI Ready!")
 
@@ -99,6 +109,10 @@ func _connect_signals() -> void:
 		nakama_manager.authenticated.disconnect(_on_nakama_authenticated)
 	nakama_manager.authenticated.connect(_on_nakama_authenticated)
 	
+	if nakama_manager.match_created.is_connected(_on_match_created):
+		nakama_manager.match_created.disconnect(_on_match_created)
+	nakama_manager.match_created.connect(_on_match_created)
+	
 	if nakama_manager.match_joined.is_connected(_on_match_joined):
 		nakama_manager.match_joined.disconnect(_on_match_joined)
 	nakama_manager.match_joined.connect(_on_match_joined)
@@ -114,12 +128,25 @@ func _connect_signals() -> void:
 	if nakama_manager.match_presence.is_connected(_on_match_presence):
 		nakama_manager.match_presence.disconnect(_on_match_presence)
 	nakama_manager.match_presence.connect(_on_match_presence)
+	
+	# Connect to LiveKit signals if manager exists
+	if livekit_manager:
+		if livekit_manager.has_signal("room_connected"):
+			if livekit_manager.room_connected.is_connected(_on_livekit_connected):
+				livekit_manager.room_connected.disconnect(_on_livekit_connected)
+			livekit_manager.room_connected.connect(_on_livekit_connected)
+			
+		if livekit_manager.has_signal("room_disconnected"):
+			if livekit_manager.room_disconnected.is_connected(_on_livekit_disconnected):
+				livekit_manager.room_disconnected.disconnect(_on_livekit_disconnected)
+			livekit_manager.room_disconnected.connect(_on_livekit_disconnected)
 
 
 func _on_nakama_authenticated(_session: Dictionary) -> void:
 	"""Handle Nakama authentication"""
 	print("UnifiedRoomUI: Nakama authenticated")
 	status_label.text = "✅ Connected to Nakama"
+	_update_connection_info()
 	_refresh_room_list()
 
 
@@ -241,9 +268,43 @@ func _on_join_room(match_id: String, room_name: String) -> void:
 	nakama_manager.join_match(match_id)
 
 
+func _on_match_created(match_id: String, match_label: String) -> void:
+	"""Handle successful match creation"""
+	print("UnifiedRoomUI: Created match: ", match_id, " (", match_label, ")")
+	is_connecting = false
+	current_match_id = match_id
+	current_room_name = match_label if match_label else match_id
+	
+	# Update UI
+	current_room_panel.visible = true
+	room_name_label.text = "Room: " + current_room_name
+	player_count_label.text = "👥 1"  # Will be updated by presence events
+	status_label.text = "✅ Created room"
+	
+	# Auto-connect to LiveKit
+	_auto_connect_livekit(current_room_name)
+	
+	# Update connection info
+	_update_connection_info()
+	
+	# Refresh room list to remove current room
+	_refresh_room_list()
+	# Update player count
+	var total_players = nakama_manager.match_peers.size() + 1  # +1 for self
+	player_count_label.text = "👥 %d" % total_players
+	
+
+
+
 func _on_match_joined(match_id: String) -> void:
 	"""Handle successful match join"""
 	print("UnifiedRoomUI: Joined match: ", match_id)
+	
+	# If we just created this match, we already handled connection in _on_match_created
+	if match_id == current_match_id and not is_connecting:
+		print("UnifiedRoomUI: Already connected to this match (via creation)")
+		return
+		
 	is_connecting = false
 	current_match_id = match_id
 	
@@ -255,6 +316,9 @@ func _on_match_joined(match_id: String) -> void:
 	
 	# Auto-connect to LiveKit
 	_auto_connect_livekit(current_room_name)
+	
+	# Update connection info
+	_update_connection_info()
 	
 	# Refresh room list to remove current room
 	_refresh_room_list()
@@ -280,31 +344,68 @@ func _on_match_presence(joins: Array, leaves: Array) -> void:
 
 func _auto_connect_livekit(room_name: String) -> void:
 	"""Automatically connect to LiveKit for this room"""
+	print("UnifiedRoomUI: _auto_connect_livekit called with room: ", room_name)
+	
 	# Get or create LiveKit manager
 	if not livekit_manager:
+		print("UnifiedRoomUI: LiveKit manager not found, searching...")
 		livekit_manager = _find_livekit_manager()
+		# If found now, connect signals
+		if livekit_manager:
+			_connect_signals()
 	
 	if not livekit_manager:
 		push_warning("UnifiedRoomUI: LiveKit manager not found - voice chat unavailable")
 		status_label.text += " (No voice)"
+		print("❌ UnifiedRoomUI: Could not find LiveKit manager!")
 		return
+	
+	print("UnifiedRoomUI: Found LiveKit manager: ", livekit_manager)
 	
 	# Get Nakama user ID for LiveKit participant identity
 	var nakama_id = nakama_manager.local_user_id
+	print("UnifiedRoomUI: Nakama user ID: ", nakama_id)
+	
 	if nakama_id.is_empty():
 		push_warning("UnifiedRoomUI: No Nakama user ID - cannot connect to LiveKit")
+		print("❌ UnifiedRoomUI: Nakama user ID is empty!")
 		return
 	
+	# Sanitize room name (remove trailing dot if present)
+	var clean_room_name = room_name
+	if clean_room_name.ends_with("."):
+		clean_room_name = clean_room_name.substr(0, clean_room_name.length() - 1)
+		print("UnifiedRoomUI: Sanitized room name from '", room_name, "' to '", clean_room_name, "'")
+	
 	# Generate LiveKit token
-	var token = _generate_livekit_token(nakama_id, room_name)
+	print("UnifiedRoomUI: Generating LiveKit token...")
+	var token = _generate_livekit_token(nakama_id, clean_room_name)
+	print("UnifiedRoomUI: Token generated (length: ", token.length(), ")")
 	
 	# Connect to LiveKit
-	var server_url = "ws://localhost:7880"  # Default local LiveKit server
+	var server_url = "wss://godotkit-mjbmdjse.livekit.cloud"
 	
 	print("UnifiedRoomUI: Auto-connecting to LiveKit room: ", room_name)
+	print("UnifiedRoomUI: Server URL: ", server_url)
 	livekit_manager.connect_to_room(server_url, token)
+	print("✅ UnifiedRoomUI: Called connect_to_room on LiveKit manager")
+	
+	# Update LiveKit UI with room name
+	_update_livekit_ui_room_name(clean_room_name)
 	
 	status_label.text = "✅ Joined room with voice chat"
+
+
+func _on_livekit_connected() -> void:
+	"""Handle LiveKit connection success"""
+	print("UnifiedRoomUI: ✅ Successfully connected to LiveKit!")
+	_update_connection_info()
+
+
+func _on_livekit_disconnected() -> void:
+	"""Handle LiveKit disconnection"""
+	print("UnifiedRoomUI: ❌ Disconnected from LiveKit")
+	_update_connection_info()
 
 
 func _on_leave_button_pressed() -> void:
@@ -331,6 +432,9 @@ func _leave_room() -> void:
 	current_room_panel.visible = false
 	status_label.text = "Left room"
 	
+	# Update connection info
+	_update_connection_info()
+	
 	# Refresh room list
 	_refresh_room_list()
 
@@ -351,9 +455,9 @@ func _disconnect_livekit() -> void:
 
 func _generate_livekit_token(participant_id: String, room_name: String) -> String:
 	"""Generate a LiveKit JWT access token using HS256"""
-	# LiveKit credentials (must match server config)
-	const API_KEY = "devkey"
-	const API_SECRET = "secret"
+	# LiveKit Cloud credentials
+	const API_KEY = "APIbSEA2MXzP8Mf"
+	const API_SECRET = "Kqw1FLCX3rq2IWbuWjilBMlgbODqlzxTkgyzKrzuF6I"
 	const TOKEN_VALIDITY_HOURS = 24
 	
 	# Current time
@@ -416,3 +520,101 @@ func _hmac_sha256(message: PackedByteArray, key: PackedByteArray) -> PackedByteA
 	ctx.start(HashingContext.HASH_SHA256, key)
 	ctx.update(message)
 	return ctx.finish()
+
+
+func _update_livekit_ui_room_name(room_name: String) -> void:
+	"""Update the LiveKit UI to show the current room name"""
+	# Find LiveKit UI in the scene tree
+	var livekit_ui = _find_livekit_ui()
+	if livekit_ui and livekit_ui.has_method("set"):
+		# Set the room name property
+		livekit_ui.current_room_name = room_name
+		# Trigger update if method exists
+		if livekit_ui.has_method("_update_room_name_label"):
+			livekit_ui._update_room_name_label()
+		print("UnifiedRoomUI: Updated LiveKit UI with room name: ", room_name)
+
+
+func _find_livekit_ui() -> Node:
+	"""Find the LiveKit UI node in the scene tree"""
+	var root = get_tree().root
+	return _search_for_livekit_ui(root)
+
+
+func _search_for_livekit_ui(node: Node) -> Node:
+	"""Recursively search for LiveKit UI instance"""
+	if node.get_script():
+		var script_path = node.get_script().resource_path
+		if "livekit_ui" in script_path.to_lower():
+			return node
+	
+	for child in node.get_children():
+		var found = _search_for_livekit_ui(child)
+		if found:
+			return found
+	
+	return null
+
+
+func _create_connection_info_labels() -> void:
+	"""Create labels to display connection information"""
+	var vbox = $VBox
+	
+	# Create a container for connection info (below status label, before separator)
+	var info_container = VBoxContainer.new()
+	info_container.name = "ConnectionInfoContainer"
+	info_container.add_theme_constant_override("separation", 5)
+	
+	# Nakama connection info
+	nakama_info_label = Label.new()
+	nakama_info_label.name = "NakamaInfoLabel"
+	nakama_info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	nakama_info_label.add_theme_font_size_override("font_size", 16)
+	nakama_info_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	nakama_info_label.text = "Nakama: Connecting..."
+	info_container.add_child(nakama_info_label)
+	
+	# LiveKit connection info
+	livekit_info_label = Label.new()
+	livekit_info_label.name = "LiveKitInfoLabel"
+	livekit_info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	livekit_info_label.add_theme_font_size_override("font_size", 16)
+	livekit_info_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	livekit_info_label.text = "LiveKit: Not connected"
+	info_container.add_child(livekit_info_label)
+	
+	# Add container to VBox (after StatusLabel, before first HSeparator)
+	vbox.add_child(info_container)
+	vbox.move_child(info_container, 2)  # After Title and StatusLabel
+	
+	print("✅ Created connection info labels")
+
+
+func _update_connection_info() -> void:
+	"""Update the connection info labels with current status"""
+	if not nakama_info_label or not livekit_info_label:
+		return
+	
+	# Update Nakama info
+	if nakama_manager:
+		if nakama_manager.is_authenticated:
+			var nakama_host = nakama_manager.nakama_host
+			var nakama_port = nakama_manager.nakama_port
+			nakama_info_label.text = "🟢 Nakama: %s:%d" % [nakama_host, nakama_port]
+			nakama_info_label.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))  # Green
+		else:
+			nakama_info_label.text = "🔴 Nakama: Not connected"
+			nakama_info_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.6))  # Red
+	
+	# Update LiveKit info
+	if livekit_manager:
+		if livekit_manager.has_method("is_room_connected") and livekit_manager.is_room_connected():
+			var room_display = current_room_name if not current_room_name.is_empty() else "Unknown"
+			livekit_info_label.text = "🟢 LiveKit: Cloud Connected (Room: %s)" % room_display
+			livekit_info_label.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))  # Green
+		else:
+			livekit_info_label.text = "🔴 LiveKit: Not connected"
+			livekit_info_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.6))  # Red
+	else:
+		livekit_info_label.text = "⚠️ LiveKit: Manager not found"
+		livekit_info_label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.6))  # Yellow
