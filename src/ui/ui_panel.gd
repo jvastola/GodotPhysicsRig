@@ -191,16 +191,45 @@ func _setup_ui() -> void:
 	scale_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	scale_container.add_child(scale_label)
 
-	var scale_slider = HSlider.new()
-	scale_slider.min_value = 0.25
-	scale_slider.max_value = 3.0
-	scale_slider.step = 0.05
-	scale_slider.value = initial_scale
-	scale_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scale_slider.value_changed.connect(func(val):
-		_on_player_scale_changed(val, scale_label)
-	)
-	scale_container.add_child(scale_slider)
+	# Scale Action Buttons [-] [+]
+	var action_hbox = HBoxContainer.new()
+	action_hbox.add_theme_constant_override("separation", 10)
+	
+	var decrease_btn = Button.new()
+	decrease_btn.text = " - "
+	decrease_btn.custom_minimum_size = Vector2(40, 0)
+	decrease_btn.pressed.connect(func(): _on_apply_scale_change(-1, scale_label))
+	action_hbox.add_child(decrease_btn)
+	
+	var increase_btn = Button.new()
+	increase_btn.text = " + "
+	increase_btn.custom_minimum_size = Vector2(40, 0)
+	increase_btn.pressed.connect(func(): _on_apply_scale_change(1, scale_label))
+	action_hbox.add_child(increase_btn)
+	
+	scale_container.add_child(action_hbox)
+	
+	# Step Control: Step: 5% [-] [+]
+	var step_hbox = HBoxContainer.new()
+	step_hbox.add_theme_constant_override("separation", 10)
+	
+	var step_label = Label.new()
+	step_label.text = "Step: %d%%" % scale_step_percent
+	step_hbox.add_child(step_label)
+	
+	var step_dec_btn = Button.new()
+	step_dec_btn.text = "-"
+	step_dec_btn.custom_minimum_size = Vector2(30, 0)
+	step_dec_btn.pressed.connect(func(): _on_scale_step_changed(-1, step_label))
+	step_hbox.add_child(step_dec_btn)
+	
+	var step_inc_btn = Button.new()
+	step_inc_btn.text = "+"
+	step_inc_btn.custom_minimum_size = Vector2(30, 0)
+	step_inc_btn.pressed.connect(func(): _on_scale_step_changed(1, step_label))
+	step_hbox.add_child(step_inc_btn)
+	
+	scale_container.add_child(step_hbox)
 	vbox_player.add_child(scale_container)
 
 	# Set tab titles if we have a TabContainer (Turn and Player)
@@ -245,3 +274,22 @@ func _on_player_scale_changed(value: float, label: Label) -> void:
 		label.text = "Player Scale: %.2fx" % value
 	else:
 		print("UIPanel: Cannot change player scale, PlayerBody not found")
+
+# === Player Scale Helpers ===
+
+var scale_step_percent: int = 5
+
+func _on_scale_step_changed(change: int, label: Label) -> void:
+	scale_step_percent = clampi(scale_step_percent + change, 1, 25)
+	label.text = "Step: %d%%" % scale_step_percent
+
+func _on_apply_scale_change(sign: int, label: Label) -> void:
+	if not player_body:
+		return
+		
+	var current_scale = player_body.scale.x
+	var change_amount = (scale_step_percent / 100.0) * sign
+	var new_scale = clampf(current_scale + change_amount, 0.25, 3.0)
+	
+	player_body.scale = Vector3(new_scale, new_scale, new_scale)
+	label.text = "Player Scale: %.2fx" % new_scale
