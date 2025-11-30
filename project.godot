@@ -21,12 +21,14 @@ driver/enable_input=true
 
 [autoload]
 
+XRToolsUserSettings="*res://addons/godot-xr-tools/user_settings/user_settings.gd"
 GameManager="*res://src/systems/game_manager.gd"
 SaveManager="*res://src/systems/save_manager.gd"
 InventoryManager="*res://src/systems/inventory_manager.gd"
 NetworkManager="*res://multiplayer/network_manager.gd"
 NakamaManager="*res://multiplayer/nakama_manager.gd"
 InteractionManager="*res://src/systems/interactions/interaction_manager.gd"
+XRToolsRumbleManager="*res://addons/godot-xr-tools/rumble/rumble_manager.gd"
 
 [dotnet]
 
@@ -39,7 +41,7 @@ version_control/autoload_on_startup=true
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot-livekit/plugin.cfg")
+enabled=PackedStringArray("res://addons/godot-livekit/plugin.cfg", "res://addons/godot-xr-tools/plugin.cfg")
 
 [input]
 
