@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=15 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -9,9 +9,8 @@
 [ext_resource type="PackedScene" uid="uid://c4jv0mg3xpn45" path="res://src/objects/grabbables/CameraFlipper.tscn" id="8_camera_flipper"]
 [ext_resource type="PackedScene" uid="uid://crqvm2hbh8k5p" path="res://src/objects/grabbables/DizzySphere.tscn" id="9_dizzy_sphere"]
 [ext_resource type="PackedScene" uid="uid://bq7h5xn8vwfkj" path="res://src/objects/grabbables/SpeedBooster.tscn" id="10_speed_booster"]
-[ext_resource type="PackedScene" uid="uid://b8k3v2oax4mjw" path="res://multiplayer/NetworkUIViewport3D.tscn" id="11_network_ui"]
 [ext_resource type="PackedScene" uid="uid://cnhqkr7y8k7qb" path="res://src/objects/GridLineDisplay.tscn" id="12_grid_display"]
-[ext_resource type="PackedScene" uid="uid://dak3v2oax4mjy" path="res://src/ui/livekit/LiveKitViewport3D.tscn" id="14_livekit_ui"]
+[ext_resource type="PackedScene" uid="uid://e58b0q1ewqr7" path="res://src/ui/multiplayer/UnifiedRoomViewport3D.tscn" id="13_unified_ui"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -94,11 +93,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
 text = "Grabbables Room"
 font_size = 48
 
-[node name="NetworkUIViewport3D" parent="." instance=ExtResource("11_network_ui")]
-transform = Transform3D(0.999479, 0, 0.0322832, 0, 1, 0, -0.0322832, 0, 0.999479, -1.44939, 1.10555, -2.04488)
-
-[node name="LiveKitViewport3D" parent="." instance=ExtResource("14_livekit_ui")]
-transform = Transform3D(0.696088, 0, 0.717956, 0, 1, 0, -0.717956, 0, 0.696088, -3.17293, 1.5, -0.199965)
+[node name="UnifiedRoomViewport3D" parent="." instance=ExtResource("13_unified_ui")]
+transform = Transform3D(0.505, 0, 0, 0, 0.505, 0, 0, 0, 0.505, 0, 1.04535, -2.5)
 
 [node name="GridSnapMesh" parent="." instance=ExtResource("6_hjxlr")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.57185, 0, 0)
