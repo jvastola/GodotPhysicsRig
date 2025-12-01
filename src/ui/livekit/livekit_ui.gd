@@ -80,8 +80,7 @@ func _ready():
 	
 	# Create new separator
 	var sep2 = VSeparator.new()
-	main_layout.add_child(sep2)
-	# main_layout.move_child(sep2, 2) # After existing VSep (index 1)? No wait.
+	# Will be added later after participants_section is in place
 	
 	# Current Children of MainLayout:
 	# 0: LeftColumn
