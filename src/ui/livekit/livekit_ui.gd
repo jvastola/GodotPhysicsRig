@@ -452,11 +452,23 @@ func _on_connect_pressed():
 		status_label.text = "❌ Error: Enter server URL and token"
 		return
 	
+	print("=" * 60)
+	print("🔗 ATTEMPTING LIVEKIT CONNECTION")
+	print("   Server URL: ", server_url)
+	print("   Token length: ", token.length())
+	print("   LiveKitManager exists: ", livekit_manager != null)
+	if livekit_manager:
+		print("   LiveKitManager type: ", livekit_manager.get_class())
+		print("   Has connect_to_room method: ", livekit_manager.has_method("connect_to_room"))
+	print("=" * 60)
+	
 	status_label.text = "⏳ Connecting..."
 	connect_button.disabled = true
 	
 	if livekit_manager:
+		print("📞 Calling livekit_manager.connect_to_room()...")
 		livekit_manager.connect_to_room(server_url, token)
+		print("✅ connect_to_room() call returned (does not mean connected yet)")
 	else:
 		status_label.text = "❌ Error: LiveKitManager not initialized"
 		connect_button.disabled = false
