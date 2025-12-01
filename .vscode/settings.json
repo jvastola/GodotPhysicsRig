@@ -1,5 +1,5 @@
 {
-    "godotTools.editorPath.godot4": "c:\\Users\\Admin\\Downloads\\godot.windows.editor.x86_64.exe\\godot.windows.editor.x86_64.exe",
+    "godotTools.editorPath.godot4": "/Applications/Godot.app/Contents/MacOS/Godot",
     "files.associations": {
         "*.gd": "gdscript",
         "*.tres": "gdscript"

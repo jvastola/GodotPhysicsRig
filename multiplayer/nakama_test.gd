@@ -142,7 +142,7 @@ func _on_match_state(peer_id, op_code, data):
 	match op_code:
 		NakamaManager.MatchOpCode.PLAYER_TRANSFORM:
 			op_name = "TRANSFORM"
-		NakamaManager.MatchOpCode.GRABBABLE_GRAB:
+		NakamaManager.MatchOpCode.GRAB_OBJECT:
 			op_name = "GRAB"
 		NakamaManager.MatchOpCode.VOICE_DATA:
 			op_name = "VOICE"

@@ -12,7 +12,7 @@ config_version=5
 
 config/name="PhysicsHand"
 run/main_scene="res://src/levels/MainScene.tscn"
-config/features=PackedStringArray("4.4", "GL Compatibility")
+config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="res://assets/textures/icon.svg"
 
 [audio]
@@ -41,7 +41,7 @@ version_control/autoload_on_startup=true
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot-livekit/plugin.cfg", "res://addons/godot-xr-tools/plugin.cfg")
+enabled=PackedStringArray("res://addons/godot-livekit/plugin.cfg")
 
 [input]
 
@@ -102,7 +102,6 @@ textures/vram_compression/import_etc2_astc=true
 
 [xr]
 
-openxr/enabled=true
 openxr/foveation_level=3
 shaders/enabled=true
 openxr/extensions/meta/color_space/starting_color_space=3
