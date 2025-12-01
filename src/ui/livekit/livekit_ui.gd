@@ -269,13 +269,13 @@ func _on_auto_connect_pressed():
 	
 	var url = "https://cloud-api.livekit.io/api/sandbox/connection-details"
 	var headers = [
-		"X-Sandbox-ID: godot-247cr9",
+		"X-Sandbox-ID: conference-pkdo9w",
 		"Content-Type: application/json"
 	]
 	
 	# Use Nakama ID as participant name for ID synchronization
 	var body = JSON.stringify({
-		"room_name": "godot-demo",
+		"room_name": "godot-demo2",
 		"participant_name": nakama_id  # CRITICAL: Use Nakama ID here!
 	})
 	

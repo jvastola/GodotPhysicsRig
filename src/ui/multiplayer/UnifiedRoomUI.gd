@@ -21,6 +21,7 @@ var current_match_id: String = ""
 var current_room_name: String = ""
 var available_rooms: Array = []
 var is_connecting: bool = false
+var _is_refreshing_list: bool = false  # Debounce flag for match list refresh
 
 # Connection info labels
 var nakama_info_label: Label = null
@@ -169,16 +170,25 @@ func _on_create_room_button_pressed() -> void:
 
 func _refresh_room_list() -> void:
 	"""Fetch available rooms from Nakama"""
+	# Debounce: Skip if already refreshing to prevent concurrent requests
+	# This prevents crashes on Android when leaving a match triggers multiple refreshes
+	if _is_refreshing_list:
+		print("UnifiedRoomUI: Skipping refresh - already in progress")
+		return
+	
 	if not nakama_manager or not nakama_manager.is_authenticated:
 		status_label.text = "⚠️ Not connected to Nakama"
 		return
 	
+	_is_refreshing_list = true
 	status_label.text = "⏳ Refreshing room list..."
 	nakama_manager.list_matches()
 
 
 func _on_match_list_received(matches: Array) -> void:
 	"""Handle received match list from Nakama"""
+	_is_refreshing_list = false  # Reset debounce flag
+	
 	available_rooms = matches
 	_update_room_list_ui()
 	

@@ -167,14 +167,21 @@ func create_match() -> void:
 	}
 	_send_socket_message(envelope)
 	
-	# Store for when we receive the response
-	current_match_id = match_label
+	# DON'T set current_match_id here - wait for server response
+	# This prevents the race condition where join_match guard clause fails
+	# The ID will be set in _handle_match_created when we get the actual match ID
 	print("NakamaManager: Creating match with label: ", match_label)
 
 
 ## Join a match by ID
 func join_match(match_id: String) -> void:
 	print("NakamaManager: join_match called with: '", match_id, "' (length: ", match_id.length(), ")")
+	
+	# Guard: If we're already in this match, don't join again
+	# This prevents redundant join calls on Android when creating a match
+	if current_match_id == match_id:
+		print("NakamaManager: Already in match ", match_id, " - skipping redundant join")
+		return
 	
 	if not is_socket_connected:
 		push_error("NakamaManager: Socket not connected")
@@ -187,6 +194,7 @@ func join_match(match_id: String) -> void:
 	}
 	_send_socket_message(envelope)
 	print("NakamaManager: Joining match: ", match_id)
+
 
 
 ## Leave current match
@@ -216,6 +224,12 @@ func list_matches(min_players: int = 0, max_players: int = 10, limit: int = 20) 
 		match_list_received.emit([])
 		return
 	
+	# Safety: Cancel any pending HTTP request to prevent concurrent requests
+	# This prevents crashes on Android when refresh is called multiple times quickly
+	if http_request.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
+		print("NakamaManager: Cancelling pending HTTP request")
+		http_request.cancel_request()
+	
 	# Build URL - don't filter by min/max size to see all matches including empty ones
 	var url = "http://" + nakama_host + ":" + str(nakama_port) + "/v2/match"
 	var query = "?limit=" + str(limit)
@@ -232,6 +246,7 @@ func list_matches(min_players: int = 0, max_players: int = 10, limit: int = 20) 
 	if error != OK:
 		push_error("NakamaManager: HTTP request failed: ", error)
 		match_list_received.emit([])
+
 
 
 ## Send match state to other players
