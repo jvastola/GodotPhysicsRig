@@ -217,7 +217,7 @@ func leave_match() -> void:
 
 
 ## List available matches
-func list_matches(min_players: int = 0, max_players: int = 10, limit: int = 20) -> void:
+func list_matches(_min_players: int = 0, _max_players: int = 10, limit: int = 20) -> void:
 	"""Request list of available matches from Nakama using HTTP REST API"""
 	if not is_authenticated or not session:
 		push_error("NakamaManager: Cannot list matches - not authenticated")
@@ -482,7 +482,7 @@ func _extract_user_id_from_token(token: String) -> String:
 	return ""
 
 
-func _on_match_list_http_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+func _on_match_list_http_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	"""Handle HTTP response from Nakama REST API (match list)"""
 	print("NakamaManager: HTTP response - result: ", result, ", code: ", response_code)
 	

@@ -283,12 +283,12 @@ func _on_scale_step_changed(change: int, label: Label) -> void:
 	scale_step_percent = clampi(scale_step_percent + change, 1, 25)
 	label.text = "Step: %d%%" % scale_step_percent
 
-func _on_apply_scale_change(sign: int, label: Label) -> void:
+func _on_apply_scale_change(delta_sign: int, label: Label) -> void:
 	if not player_body:
 		return
 		
 	var current_scale = player_body.scale.x
-	var change_amount = (scale_step_percent / 100.0) * sign
+	var change_amount = (scale_step_percent / 100.0) * delta_sign
 	var new_scale = clampf(current_scale + change_amount, 0.25, 3.0)
 	
 	player_body.scale = Vector3(new_scale, new_scale, new_scale)

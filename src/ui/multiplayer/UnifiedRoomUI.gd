@@ -208,13 +208,13 @@ func _update_room_list_ui() -> void:
 	for match_data in available_rooms:
 		var match_id = match_data.get("match_id", "")
 		var label = match_data.get("label", match_id)
-		var size = match_data.get("size", 0)
+		var player_count = match_data.get("size", 0)
 		
 		# Skip if this is our current room
 		if match_id == current_match_id:
 			continue
 		
-		_create_room_list_item(match_id, label, size)
+		_create_room_list_item(match_id, label, player_count)
 
 
 func _create_room_list_item(match_id: String, room_name: String, player_count: int) -> void:
@@ -472,7 +472,7 @@ func _generate_livekit_token(participant_id: String, room_name: String) -> Strin
 	
 	# Current time
 	var now = Time.get_unix_time_from_system()
-	var exp = now + (TOKEN_VALIDITY_HOURS * 3600)
+	var expire_time = now + (TOKEN_VALIDITY_HOURS * 3600)
 	
 	# JWT Header (HS256 algorithm)
 	var header = {
@@ -482,7 +482,7 @@ func _generate_livekit_token(participant_id: String, room_name: String) -> Strin
 	
 	# JWT Claims (Payload)
 	var claims = {
-		"exp": exp,
+		"exp": expire_time,
 		"iss": API_KEY,
 		"nbf": now,
 		"sub": participant_id,  # CRITICAL: This must match Nakama user_id

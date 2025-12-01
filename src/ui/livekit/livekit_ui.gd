@@ -287,7 +287,7 @@ func _on_auto_connect_pressed():
 		connect_button.disabled = false
 		auto_connect_button.disabled = false
 
-func _on_sandbox_request_completed(result, response_code, headers, body):
+func _on_sandbox_request_completed(result, response_code, _headers, body):
 	auto_connect_button.disabled = false
 	
 	if result != HTTPRequest.RESULT_SUCCESS:
@@ -381,7 +381,7 @@ func _process(delta):
 	if _debug_timer > 2.0:
 		_debug_timer = 0.0
 		if audio_bus_idx != -1:
-			var is_bus_muted = AudioServer.is_bus_mute(audio_bus_idx)
+			var _is_bus_muted = AudioServer.is_bus_mute(audio_bus_idx)
 			var is_player_playing = mic_player.playing
 			# print("🔊 [Debug] Bus Muted: %s | Player Playing: %s | Hear Own: %s" % [is_bus_muted, is_player_playing, hear_own_audio])
 			
@@ -674,17 +674,17 @@ func _on_input_device_selected(index: int):
 		print("   ✅ Microphone stream recreated and playing on: ", AudioServer.get_input_device())
 
 
-func _add_participant(name: String, _level: float):
-	if not participants.has(name):
+func _add_participant(participant_name: String, _level: float):
+	if not participants.has(participant_name):
 		# Add participant with null audio player initially
-		participants[name] = {
+		participants[participant_name] = {
 			"player": null,
 			"level": 0.0,
 			"level_bar": null,
 			"muted": false,
 			"volume": 1.0
 		}
-		print("   Added participant to list: ", name)
+		print("   Added participant to list: ", participant_name)
 
 
 func _update_participant_list():
@@ -948,7 +948,7 @@ func _generate_livekit_token(participant_id: String, room_name: String = "test-r
 	
 	# Current time
 	var now = Time.get_unix_time_from_system()
-	var exp = now + (TOKEN_VALIDITY_HOURS * 3600)
+	var expire_time = now + (TOKEN_VALIDITY_HOURS * 3600)
 	
 	# JWT Header (HS256 algorithm)
 	var header = {

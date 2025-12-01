@@ -60,7 +60,7 @@ func _can_interact_with(interactor: BaseInteractor) -> bool:
 
 
 ## Check if this interactable can be selected by the given interactor
-func _can_select(interactor: BaseInteractor) -> bool:
+func _can_select(_interactor: BaseInteractor) -> bool:
 	if select_mode == SelectMode.SINGLE and not selecting_interactors.is_empty():
 		# Already selected by another interactor
 		return false
