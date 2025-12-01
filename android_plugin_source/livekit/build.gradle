@@ -39,9 +39,9 @@ android {
         jvmTarget = '17'
     }
 
-    // Package the Godot editor classes
     sourceSets {
         main {
+            kotlin.srcDirs += ['src/main/kotlin']
             java.srcDirs = ['src/main/java']
         }
     }

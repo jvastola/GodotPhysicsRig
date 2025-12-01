@@ -30,6 +30,11 @@
             android:name="io.livekit.android.audio.AudioService"
             android:foregroundServiceType="mediaPlayback"
             android:exported="false" />
+
+        <!-- Godot v2 Android Plugin init class -->
+        <meta-data
+            android:name="org.godotengine.plugin.v2.GodotLiveKit"
+            android:value="com.jvastola.physicshand.livekit.GodotLiveKitPlugin" />
     </application>
 
 </manifest>
