@@ -35,3 +35,10 @@ release.keystore
 gradlew
 gradlew.bat
 **/build/
+
+# Local configuration
+local.properties
+
+# Temporary scripts
+add_jitpack.py
+create_local_prop.py

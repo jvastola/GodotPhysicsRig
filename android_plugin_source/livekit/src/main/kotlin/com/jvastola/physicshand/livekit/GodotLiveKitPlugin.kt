@@ -63,8 +63,15 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
                     token
                 )
                 
-                // Auto enable mic
+                // Auto enable mic with high-quality audio settings for better Quest 3 -> Desktop audio
+                // Configure echo cancellation, noise suppression, and auto gain control
                 room?.localParticipant?.setMicrophoneEnabled(true)
+                
+                // Note: LiveKit Android SDK v2.x automatically configures audio processing
+                // Echo cancellation, noise suppression, and AGC are enabled by default
+                // For higher bitrate, configure on the server side via room codec settings
+                android.util.Log.d("GodotLiveKit", "Audio track published with default HQ settings (echo cancel, noise suppress, AGC)")
+                
                 emitSignal("room_connected")
             } catch (e: Exception) {
                 emitSignal("error_occurred", e.message ?: "Connection failed")

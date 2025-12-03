@@ -70,54 +70,69 @@ func _ready():
 	
 	# --- UI RESTRUCTURING (3 Columns) ---
 	# Layout: [LeftColumn] | [VSep] | [Participants] | [VSep] | [Chat]
+	# NOTE: Only do this on Desktop - Android/VR works better with original 2-column layout
 	
-	# 1. Move Participants Section to MainLayout (Middle Column)
-	left_column.remove_child(participants_section)
-	
-	# Insert after LeftColumn (index 1, since LeftColumn is 0)
-	# But MainLayout has [LeftColumn, VSeparator, ChatSection]
-	# We want: [LeftColumn, VSeparator, ParticipantsSection, VSeparator2, ChatSection]
-	
-	# Create new separator
-	var sep2 = VSeparator.new()
-	# Will be added later after participants_section is in place
-	
-	# Current Children of MainLayout:
-	# 0: LeftColumn
-	# 1: VSeparator (VSeparator)
-	# 2: ChatSection
-	
-	# We want to insert ParticipantsSection at index 2
-	main_layout.add_child(participants_section)
-	main_layout.move_child(participants_section, 2)
-	
-	# Now: [Left, VSep, Participants, Chat]
-	# We need another separator between Participants and Chat
-	main_layout.add_child(sep2)
-	main_layout.move_child(sep2, 3)
-	
-	# Final: [Left, VSep, Participants, VSep2, Chat]
-	
-	# Show title again (if it was hidden)
-	var part_title = participants_section.get_node_or_null("Header/Title")
-	if part_title: part_title.visible = true
-	
-	var chat_title = chat_section.get_node_or_null("SectionTitle")
-	if chat_title: chat_title.visible = true
-	
-	# Adjust Size Flags
-	left_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left_column.size_flags_stretch_ratio = 0.25
-	
-	participants_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	participants_section.size_flags_stretch_ratio = 0.45
-	
-	chat_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	chat_section.size_flags_stretch_ratio = 0.3
+	if OS.get_name() != "Android":
+		print("🖥️ Desktop detected - restructuring UI to 3-column layout")
+		
+		# 1. Move Participants Section to MainLayout (Middle Column)
+		left_column.remove_child(participants_section)
+		
+		# Insert after LeftColumn (index 1, since LeftColumn is 0)
+		# But MainLayout has [LeftColumn, VSeparator, ChatSection]
+		# We want: [LeftColumn, VSeparator, ParticipantsSection, VSeparator2, ChatSection]
+		
+		# Create new separator
+		var sep2 = VSeparator.new()
+		# Will be added later after participants_section is in place
+		
+		# Current Children of MainLayout:
+		# 0: LeftColumn
+		# 1: VSeparator (VSeparator)
+		# 2: ChatSection
+		
+		# We want to insert ParticipantsSection at index 2
+		main_layout.add_child(participants_section)
+		main_layout.move_child(participants_section, 2)
+		
+		# Now: [Left, VSep, Participants, Chat]
+		# We need another separator between Participants and Chat
+		main_layout.add_child(sep2)
+		main_layout.move_child(sep2, 3)
+		
+		# Final: [Left, VSep, Participants, VSep2, Chat]
+		
+		# Show title again (if it was hidden)
+		var part_title = participants_section.get_node_or_null("Header/Title")
+		if part_title: part_title.visible = true
+		
+		var chat_title = chat_section.get_node_or_null("SectionTitle")
+		if chat_title: chat_title.visible = true
+		
+		# Adjust Size Flags
+		left_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		left_column.size_flags_stretch_ratio = 0.25
+		
+		participants_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		participants_section.size_flags_stretch_ratio = 0.45
+		
+		chat_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		chat_section.size_flags_stretch_ratio = 0.3
+	else:
+		print("📱 Android/VR detected - using original 2-column layout")
+		# On Android, keep the original structure from the scene file
+		# ParticipantsSection and ChatSection are both in LeftColumn originally
+		# Just ensure they're visible
+		var part_title = participants_section.get_node_or_null("Header/Title")
+		if part_title: part_title.visible = true
+		
+		var chat_title = chat_section.get_node_or_null("SectionTitle")
+		if chat_title: chat_title.visible = true
 	
 	# -------------------------------
 	
 	# Setup Audio
+
 	_setup_audio()
 
 	# Create LiveKitManager -> Use Wrapper
