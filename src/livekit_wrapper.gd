@@ -143,7 +143,9 @@ func disconnect_from_room() -> void:
 func send_data(data: String, reliable: bool = true) -> void:
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
-			_android_plugin.send_data(data, reliable)
+			# Android plugin expects (ByteArray, topic: String)
+			var bytes = data.to_utf8_buffer()
+			_android_plugin.sendData(bytes, "")
 	else:
 		if _rust_manager:
 			_rust_manager.send_chat_message(data)  # Rust uses chat message API
@@ -156,7 +158,9 @@ func send_data(data: String, reliable: bool = true) -> void:
 func send_data_to(data: String, identity: String, reliable: bool = true) -> void:
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
-			_android_plugin.send_data_to(data, reliable, identity)
+			# Android plugin expects (ByteArray, identity: String, topic: String)
+			var bytes = data.to_utf8_buffer()
+			_android_plugin.sendDataTo(bytes, identity, "")
 	else:
 		if _rust_manager:
 			# Rust backend might not support targeted sending directly
@@ -170,7 +174,8 @@ func publish_audio_track() -> void:
 	
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
-			_android_plugin.publish_audio_track()
+			# Android plugin auto-enables mic on connect
+			_android_plugin.setAudioEnabled(true)
 	else:
 		if _rust_manager:
 			_rust_manager.enable_microphone(true)
@@ -182,7 +187,7 @@ func unpublish_audio_track() -> void:
 	
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
-			_android_plugin.unpublish_audio_track()
+			_android_plugin.setAudioEnabled(false)
 	else:
 		if _rust_manager:
 			_rust_manager.enable_microphone(false)
@@ -193,7 +198,7 @@ func unpublish_audio_track() -> void:
 func set_metadata(metadata: String) -> void:
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
-			_android_plugin.set_metadata(metadata)
+			_android_plugin.setMetadata(metadata)
 	else:
 		if _rust_manager and _rust_manager.has_method("set_username"):
 			# Rust uses username as metadata
@@ -241,7 +246,7 @@ func get_participant_identities() -> PackedStringArray:
 func set_audio_enabled(enabled: bool) -> void:
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
-			_android_plugin.set_audio_enabled(enabled)
+			_android_plugin.setAudioEnabled(enabled)
 	else:
 		if _rust_manager:
 			_rust_manager.enable_microphone(enabled)

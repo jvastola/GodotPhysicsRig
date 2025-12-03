@@ -90,10 +90,10 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
     }
 
     @UsedByGodot
-    fun getParticipantIdentities(): Array<String> {
+    fun getParticipantIdentities(): String {
         val identities = mutableListOf<String>()
         room?.remoteParticipants?.keys?.forEach { identities.add(it.value) }
-        return identities.toTypedArray()
+        return identities.joinToString(",")
     }
 
     @UsedByGodot
@@ -119,6 +119,20 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
                     listOf(participant.identity!!)
                 )
             }
+        }
+    }
+
+    @UsedByGodot
+    fun setAudioEnabled(enabled: Boolean) {
+        scope.launch {
+            room?.localParticipant?.setMicrophoneEnabled(enabled)
+        }
+    }
+
+    @UsedByGodot
+    fun setMetadata(metadata: String) {
+        scope.launch {
+            room?.localParticipant?.updateMetadata(metadata)
         }
     }
 
