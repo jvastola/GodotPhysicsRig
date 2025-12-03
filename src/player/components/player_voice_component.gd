@@ -248,7 +248,7 @@ func _create_spatial_audio_player(peer_id: String, network_player: Node) -> void
 	audio_player.stream = stream
 	
 	# Configure 3D audio settings
-	audio_player.max_distance = 20.0
+	audio_player.max_distance = 100.0
 	audio_player.unit_size = 5.0
 	audio_player.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
 	audio_player.bus = "Master"

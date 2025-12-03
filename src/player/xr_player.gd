@@ -32,6 +32,10 @@ var _desktop_trigger_event: InputEventMouseButton = null
 @export var desktop_extra_collider_radius: float = 0.2
 @export var desktop_extra_collider_offset: Vector3 = Vector3(0, 1.15, 0)
 
+# Audio Listeners
+var vr_listener: AudioListener3D = null
+var desktop_listener: AudioListener3D = null
+
 
 func _ready() -> void:
 	# Initialize components
@@ -54,6 +58,9 @@ func _ready() -> void:
 	
 	# Add to group for easy finding
 	add_to_group("xr_player")
+	
+	# Setup audio listeners
+	_setup_audio_listeners()
 
 
 func _setup_components() -> void:
@@ -215,6 +222,12 @@ func _activate_vr_mode() -> void:
 	if desktop_controller and desktop_controller.has_method("deactivate"):
 		desktop_controller.deactivate()
 
+	# Switch audio listener
+	if vr_listener:
+		vr_listener.make_current()
+	elif desktop_listener:
+		desktop_listener.clear_current()
+
 	# Remove desktop-only extra collider when in VR
 	_remove_desktop_extra_collider()
 	
@@ -240,6 +253,12 @@ func _activate_desktop_mode() -> void:
 	# Enable desktop controller
 	if desktop_controller and desktop_controller.has_method("activate"):
 		desktop_controller.activate(desktop_camera)
+	
+	# Switch audio listener
+	if desktop_listener:
+		desktop_listener.make_current()
+	elif vr_listener:
+		vr_listener.clear_current()
 	
 	# Disable physics hands
 	if physics_hand_left:
@@ -371,3 +390,20 @@ func apply_texture_to_head(texture: ImageTexture) -> void:
 func toggle_voice_chat(enabled: bool) -> void:
 	if voice_component:
 		voice_component.toggle_voice_chat(enabled)
+
+
+func _setup_audio_listeners() -> void:
+	"""Create and attach audio listeners to cameras"""
+	# VR Listener
+	if xr_camera:
+		vr_listener = AudioListener3D.new()
+		vr_listener.name = "VRListener"
+		xr_camera.add_child(vr_listener)
+	
+	# Desktop Listener
+	if desktop_camera:
+		desktop_listener = AudioListener3D.new()
+		desktop_listener.name = "DesktopListener"
+		desktop_camera.add_child(desktop_listener)
+	
+	print("XRPlayer: Audio listeners setup")

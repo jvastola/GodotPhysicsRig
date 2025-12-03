@@ -492,7 +492,7 @@ func _generate_livekit_token(participant_id: String, room_name: String) -> Strin
 	var claims = {
 		"exp": expire_time,
 		"iss": API_KEY,
-		"nbf": now,
+		"nbf": now - 60,  # Allow for 1 minute clock skew
 		"sub": participant_id,  # CRITICAL: This must match Nakama user_id
 		"video": {
 			"room": room_name,

@@ -118,10 +118,14 @@ func connect_to_room(url: String, token: String) -> void:
 		if _android_plugin:
 			# Android plugin uses camelCase (Kotlin @UsedByGodot convention)
 			_android_plugin.connectToRoom(url, token)
+		else:
+			push_error("[LiveKitWrapper] Cannot connect: Android plugin not initialized")
 	else:
 		if _rust_manager:
 			# Rust GDExtension uses snake_case (Godot convention)
 			_rust_manager.connect_to_room(url, token)
+		else:
+			push_error("[LiveKitWrapper] Cannot connect: Rust manager not initialized")
 
 
 ## Disconnect from the current room
