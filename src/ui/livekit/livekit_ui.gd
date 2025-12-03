@@ -120,28 +120,34 @@ func _ready():
 	# Setup Audio
 	_setup_audio()
 
-	# Create LiveKitManager
-	if ClassDB.class_exists("LiveKitManager"):
-		livekit_manager = ClassDB.instantiate("LiveKitManager")
-		add_child(livekit_manager)
-		
+	# Create LiveKitManager -> Use Wrapper
+	livekit_manager = get_node_or_null("/root/LiveKitWrapper")
+	if livekit_manager:
 		# Connect signals
-		livekit_manager.room_connected.connect(_on_room_connected)
-		livekit_manager.room_disconnected.connect(_on_room_disconnected)
-		livekit_manager.participant_joined.connect(_on_participant_joined)
-		livekit_manager.participant_left.connect(_on_participant_left)
-		livekit_manager.on_audio_frame.connect(_on_audio_frame)
-		livekit_manager.chat_message_received.connect(_on_chat_message_received)
-		livekit_manager.participant_name_changed.connect(_on_participant_name_changed)
-		livekit_manager.error_occurred.connect(_on_error)
+		if not livekit_manager.room_connected.is_connected(_on_room_connected):
+			livekit_manager.room_connected.connect(_on_room_connected)
+		if not livekit_manager.room_disconnected.is_connected(_on_room_disconnected):
+			livekit_manager.room_disconnected.connect(_on_room_disconnected)
+		if not livekit_manager.participant_joined.is_connected(_on_participant_joined):
+			livekit_manager.participant_joined.connect(_on_participant_joined)
+		if not livekit_manager.participant_left.is_connected(_on_participant_left):
+			livekit_manager.participant_left.connect(_on_participant_left)
+		if not livekit_manager.audio_frame_received.is_connected(_on_audio_frame):
+			livekit_manager.audio_frame_received.connect(_on_audio_frame)
+		if not livekit_manager.chat_message_received.is_connected(_on_chat_message_received):
+			livekit_manager.chat_message_received.connect(_on_chat_message_received)
+		if not livekit_manager.participant_metadata_changed.is_connected(_on_participant_metadata_changed):
+			livekit_manager.participant_metadata_changed.connect(_on_participant_metadata_changed)
+		if not livekit_manager.connection_error.is_connected(_on_error):
+			livekit_manager.connection_error.connect(_on_error)
 		
 		# Set sample rate
 		var mix_rate = AudioServer.get_mix_rate()
 		livekit_manager.set_mic_sample_rate(int(mix_rate))
 		print("🎤 Set LiveKit mic sample rate to: ", mix_rate)
 	else:
-		print("❌ LiveKitManager class not found! Is the GDExtension loaded?")
-		status_label.text = "❌ Error: GDExtension not loaded"
+		print("❌ LiveKitWrapper autoload not found!")
+		status_label.text = "❌ Error: LiveKitWrapper not loaded"
 		connect_button.disabled = true
 		auto_connect_button.disabled = true
 
@@ -469,7 +475,7 @@ func _on_connect_pressed():
 		livekit_manager.connect_to_room(server_url, token)
 		print("✅ connect_to_room() call returned (does not mean connected yet)")
 	else:
-		status_label.text = "❌ Error: LiveKitManager not initialized"
+		status_label.text = "❌ Error: LiveKitWrapper not initialized"
 		connect_button.disabled = false
 
 func _on_disconnect_pressed():
@@ -861,6 +867,11 @@ func _on_chat_message_received(sender: String, message: String, timestamp: int):
 	# Update chat UI if it exists
 	_update_chat_ui()
 
+func _on_participant_metadata_changed(identity: String, metadata: String):
+	var data = JSON.parse_string(metadata)
+	if data and data.has("username"):
+		_on_participant_name_changed(identity, data.username)
+
 func _on_participant_name_changed(identity: String, username: String):
 	print("👤 Name changed for ", identity, ": ", username)
 	participant_usernames[identity] = username
@@ -870,7 +881,7 @@ func _on_participant_name_changed(identity: String, username: String):
 
 func _send_chat_message(message: String):
 	if livekit_manager and livekit_manager.is_room_connected():
-		livekit_manager.send_chat_message(message)
+		livekit_manager.send_data(message)
 		
 		# Add own message to chat (won't receive it back from server)
 		chat_messages.append({
@@ -888,7 +899,8 @@ func _update_local_username(new_name: String):
 		
 	local_username = new_name
 	if livekit_manager and livekit_manager.is_room_connected():
-		livekit_manager.update_username(new_name)
+		var metadata = JSON.stringify({"username": new_name})
+		livekit_manager.set_metadata(metadata)
 		print("✅ Username updated to: ", new_name)
 		
 		# Manually trigger local update since we might not get the event back for ourselves immediately

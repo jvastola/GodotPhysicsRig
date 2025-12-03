@@ -27,6 +27,7 @@ InventoryManager="*res://src/systems/inventory_manager.gd"
 NetworkManager="*res://multiplayer/network_manager.gd"
 NakamaManager="*res://multiplayer/nakama_manager.gd"
 InteractionManager="*res://src/systems/interactions/interaction_manager.gd"
+LiveKitWrapper="*res://src/livekit_wrapper.gd"
 
 [dotnet]
 

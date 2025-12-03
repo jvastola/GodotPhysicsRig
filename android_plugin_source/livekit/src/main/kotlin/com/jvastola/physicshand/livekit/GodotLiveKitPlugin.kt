@@ -1,63 +1,68 @@
 package com.jvastola.physicshand.livekit
 
-import android.content.Context
+import android.app.Activity
 import android.os.Handler
 import android.os.Looper
-import androidx.core.content.edit
 import io.livekit.android.*
 import io.livekit.android.events.*
 import io.livekit.android.room.*
 import io.livekit.android.room.track.*
 import io.livekit.android.room.participant.*
-import io.livekit.android.util.flow
 import kotlinx.coroutines.*
 import org.godotengine.godot.Godot
 import org.godotengine.godot.plugin.GodotPlugin
+import org.godotengine.godot.plugin.SignalInfo
 import org.godotengine.godot.plugin.UsedByGodot
-import org.godotengine.godot.Dictionary
-import org.godotengine.godot.type.GodotArray
-import org.godotengine.godot.type.GodotString
 import java.nio.ByteBuffer
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
-class GodotLiveKitPlugin : GodotPlugin() {
+class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
 
     companion object {
         const val PLUGIN_NAME = "GodotLiveKit"
     }
 
     private var room: Room? = null
-    private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private var audioFrameHandler = Handler(Looper.getMainLooper())
-    private var micTrack: LocalAudioTrack? = null
-    private var remoteAudioListeners = mutableMapOf<String, (FloatArray) -> Unit>()
-    private var prefs = mutableMapOf<String, Any?>()
+    private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     override fun getPluginName(): String = PLUGIN_NAME
 
-    override fun getPluginSignals(): MutableList<String> {
-        return mutableListOf(
-            "room_connected",
-            "room_disconnected",
-            "participant_joined",
-            "participant_left",
-            "data_received",
-            "audio_frame"
+    override fun getPluginSignals(): Set<SignalInfo> {
+        return setOf(
+            SignalInfo("room_connected"),
+            SignalInfo("room_disconnected"),
+            SignalInfo("participant_joined", String::class.java),
+            SignalInfo("participant_left", String::class.java),
+            SignalInfo("participant_metadata_changed", String::class.java, String::class.java),
+            SignalInfo("data_received", String::class.java, ByteArray::class.java, String::class.java),
+            SignalInfo("audio_frame", String::class.java, FloatArray::class.java),
+            SignalInfo("track_subscribed", String::class.java, String::class.java),
+            SignalInfo("track_unsubscribed", String::class.java, String::class.java),
+            SignalInfo("audio_track_published"),
+            SignalInfo("audio_track_unpublished"),
+            SignalInfo("error_occurred", String::class.java)
         )
     }
 
     @UsedByGodot
-    fun connectToRoom(url: GodotString, token: GodotString) {
+    fun connectToRoom(url: String, token: String) {
         scope.launch {
             try {
-                room = Room.connect(
-                    getActivity(),
-                    url.toPlatformString(),
-                    token.toPlatformString(),
-                    ConnectOptions()
-                )
+                val currentActivity = activity
+                if (currentActivity == null) {
+                    emitSignal("error_occurred", "Activity is null")
+                    return@launch
+                }
+
+                // LK 2.x: Create room then connect
+                room = LiveKit.create(currentActivity)
+                
                 setupRoomListeners()
+                
+                room?.connect(
+                    url,
+                    token
+                )
+                
                 // Auto enable mic
                 room?.localParticipant?.setMicrophoneEnabled(true)
                 emitSignal("room_connected")
@@ -69,81 +74,91 @@ class GodotLiveKitPlugin : GodotPlugin() {
 
     @UsedByGodot
     fun disconnectFromRoom() {
-        room?.disconnect()
-        room = null
-        micTrack?.release()
-        micTrack = null
-        emitSignal("room_disconnected")
+        scope.launch {
+            room?.disconnect()
+            room = null
+            emitSignal("room_disconnected")
+        }
     }
 
     @UsedByGodot
-    fun isRoomConnected(): Boolean = room?.connectionState == ConnectionState.CONNECTED
+    fun isRoomConnected(): Boolean = room?.state == Room.State.CONNECTED
 
     @UsedByGodot
-    fun getParticipantIdentities(): GodotArray<String> {
-        val identities = GodotArray<String>()
-        room?.remoteParticipants?.keys?.forEach { identities.add(it) }
-        return identities
+    fun get_local_identity(): String {
+        return room?.localParticipant?.identity?.value ?: ""
     }
 
     @UsedByGodot
-    fun sendData(data: ByteArray, topic: GodotString) {
+    fun getParticipantIdentities(): Array<String> {
+        val identities = mutableListOf<String>()
+        room?.remoteParticipants?.keys?.forEach { identities.add(it.value) }
+        return identities.toTypedArray()
+    }
+
+    @UsedByGodot
+    fun sendData(data: ByteArray, topic: String) {
         scope.launch {
             room?.localParticipant?.publishData(
-                ByteBuffer.wrap(data),
-                DataPublishOptions(topic = topic.toPlatformString(), reliable = true)
+                data,
+                DataPublishReliability.RELIABLE,
+                topic
             )
+        }
+    }
+
+    @UsedByGodot
+    fun sendDataTo(data: ByteArray, identity: String, topic: String) {
+         scope.launch {
+            val participant = room?.remoteParticipants?.values?.find { it.identity?.value == identity }
+            if (participant != null && participant.identity != null) {
+                 room?.localParticipant?.publishData(
+                    data,
+                    DataPublishReliability.RELIABLE,
+                    topic,
+                    listOf(participant.identity!!)
+                )
+            }
         }
     }
 
     private suspend fun setupRoomListeners() {
         room?.let { r ->
-            r.events.collect { event ->
-                when (event) {
-                    is ParticipantConnected -> emitSignal("participant_joined", event.participant.identity)
-                    is ParticipantDisconnected -> emitSignal("participant_left", event.participant.identity)
-                    is DataReceived -> emitSignal("data_received", event.participant.identity, event.data.array(), event.topic)
-                    is LocalParticipantCreated -> { /* mic already enabled */ }
+            scope.launch {
+                r.events.collect { event ->
+                    when (event) {
+                        is RoomEvent.ParticipantConnected -> emitSignal("participant_joined", event.participant.identity?.value ?: "")
+                        is RoomEvent.ParticipantDisconnected -> emitSignal("participant_left", event.participant.identity?.value ?: "")
+                        is RoomEvent.ParticipantMetadataChanged -> emitSignal("participant_metadata_changed", event.participant.identity?.value ?: "", event.participant.metadata ?: "")
+                        is RoomEvent.TrackSubscribed -> emitSignal("track_subscribed", event.participant.identity?.value ?: "", event.track.sid ?: "")
+                        is RoomEvent.TrackUnsubscribed -> emitSignal("track_unsubscribed", event.participant.identity?.value ?: "", event.track.sid ?: "")
+                        is RoomEvent.DataReceived -> {
+                            emitSignal("data_received", event.participant?.identity?.value ?: "", event.data, event.topic ?: "")
+                        }
+                        else -> {}
+                    }
                 }
             }
         }
     }
 
-    // Audio: Remote tracks
-    private fun onRemoteAudioSamples(participantId: String, samples: FloatArray) {
-        emitSignal("audio_frame", participantId, samples.toGodotArray())
-    }
-
-    // Setup per remote audio track listener (call when participant joined)
-    private fun setupRemoteAudio(participant: RemoteParticipant) {
-        participant.audioTracks.values.forEach { track ->
-            (track as? RemoteAudioTrack)?.setSamplesReadyListener { buffer ->
-                val samples = FloatArray(buffer.remaining())
-                buffer.get(samples)
-                audioFrameHandler.post { onRemoteAudioSamples(participant.identity, samples) }
-            }
+    override fun onMainPause() {
+        scope.launch {
+            room?.localParticipant?.setMicrophoneEnabled(false)
         }
+        super.onMainPause()
     }
 
-    private fun FloatArray.toGodotArray(): GodotArray<Float> {
-        val arr = GodotArray<Float>()
-        this.forEach { arr.add(it) }
-        return arr
+    override fun onMainResume() {
+        scope.launch {
+            room?.localParticipant?.setMicrophoneEnabled(true)
+        }
+        super.onMainResume()
     }
 
-    override fun onMainPauseActivity() {
-        room?.localParticipant?.setMicrophoneEnabled(false)
-        super.onMainPauseActivity()
-    }
-
-    override fun onMainResumeActivity() {
-        room?.localParticipant?.setMicrophoneEnabled(true)
-        super.onMainResumeActivity()
-    }
-
-    override fun onMainDestroyActivity() {
+    override fun onMainDestroy() {
         disconnectFromRoom()
         scope.cancel()
-        super.onMainDestroyActivity()
+        super.onMainDestroy()
     }
 }

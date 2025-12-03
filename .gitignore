@@ -28,3 +28,9 @@ godot-livekit
 addons/godotopenxrvendors/
 debug.keystore
 release.keystore
+
+# Gradle build artifacts (Android plugin)
+.gradle/
+**/gradle/wrapper/gradle-wrapper.jar
+gradlew
+gradlew.bat

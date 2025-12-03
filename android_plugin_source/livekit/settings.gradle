@@ -16,5 +16,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "GodotLiveKit"
-include ':livekit'
-project(':livekit').projectDir = file('.')
+
