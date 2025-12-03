@@ -81,12 +81,20 @@ func _ready() -> void:
 
 func _find_livekit_manager() -> Node:
 	"""Find LiveKit manager in the scene tree"""
-	# Check if it exists as an autoload
-	var lk = get_node_or_null("/root/LiveKitManager")
+	# Check for LiveKitWrapper first (Android/unified wrapper)
+	var lk = get_node_or_null("/root/LiveKitWrapper")
 	if lk:
+		print("UnifiedRoomUI: Found LiveKitWrapper autoload")
+		return lk
+	
+	# Check for LiveKitManager (Desktop Rust GDExtension)
+	lk = get_node_or_null("/root/LiveKitManager")
+	if lk:
+		print("UnifiedRoomUI: Found LiveKitManager autoload")
 		return lk
 	
 	# Search for LiveKitManager class instances
+	print("UnifiedRoomUI: No autoload found, searching scene tree...")
 	var root = get_tree().root
 	return _search_for_livekit(root)
 

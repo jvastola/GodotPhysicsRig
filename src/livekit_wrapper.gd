@@ -1,7 +1,7 @@
 ## LiveKit Platform Wrapper
 ## Automatically uses Rust GDExtension on Desktop, Android Plugin on Android
 ## Provides a unified API across all platforms
-class_name LiveKitWrapper
+# class_name LiveKitWrapper removed to avoid autoload conflict
 extends Node
 
 # Signals - unified across platforms
@@ -81,7 +81,7 @@ func _connect_android_signals() -> void:
 	
 	_android_plugin.connect("room_connected", _on_room_connected)
 	_android_plugin.connect("room_disconnected", _on_room_disconnected)
-	_android_plugin.connect("connection_error", _on_connection_error)
+	_android_plugin.connect("error_occurred", _on_connection_error)
 	_android_plugin.connect("participant_joined", _on_participant_joined)
 	_android_plugin.connect("participant_left", _on_participant_left)
 	_android_plugin.connect("participant_metadata_changed", _on_participant_metadata_changed)
@@ -116,9 +116,11 @@ func connect_to_room(url: String, token: String) -> void:
 	
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
-			_android_plugin.connect_to_room(url, token)
+			# Android plugin uses camelCase (Kotlin @UsedByGodot convention)
+			_android_plugin.connectToRoom(url, token)
 	else:
 		if _rust_manager:
+			# Rust GDExtension uses snake_case (Godot convention)
 			_rust_manager.connect_to_room(url, token)
 
 
@@ -128,10 +130,11 @@ func disconnect_from_room() -> void:
 	
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
-			_android_plugin.disconnect()
+			# Android plugin uses camelCase
+			_android_plugin.disconnectFromRoom()
 	else:
 		if _rust_manager:
-			_rust_manager.disconnect()
+			_rust_manager.disconnect_from_room()
 
 
 ## Send data to all participants
@@ -200,13 +203,13 @@ func set_metadata(metadata: String) -> void:
 
 
 ## Check if currently connected to a room
-func is_connected() -> bool:
+func is_room_connected() -> bool:
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
-			return _android_plugin.is_connected()
+			return _android_plugin.isRoomConnected()
 	else:
-		if _rust_manager and _rust_manager.has_method("is_connected"):
-			return _rust_manager.is_connected()
+		if _rust_manager and _rust_manager.has_method("is_room_connected"):
+			return _rust_manager.is_room_connected()
 	return _is_connected
 
 
@@ -215,6 +218,9 @@ func get_local_identity() -> String:
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
 			return _android_plugin.get_local_identity()
+	else:
+		if _rust_manager and _rust_manager.has_method("get_local_identity"):
+			return _rust_manager.get_local_identity()
 	return _local_identity
 
 
@@ -239,6 +245,24 @@ func set_audio_enabled(enabled: bool) -> void:
 	else:
 		if _rust_manager:
 			_rust_manager.enable_microphone(enabled)
+
+
+## Push microphone audio buffer (Desktop/Rust only)
+func push_mic_audio(buffer: PackedVector2Array) -> void:
+	if current_platform == Platform.DESKTOP and _rust_manager and _rust_manager.has_method("push_mic_audio"):
+		_rust_manager.push_mic_audio(buffer)
+
+
+## Set microphone sample rate (Desktop/Rust only)
+func set_mic_sample_rate(rate: int) -> void:
+	if current_platform == Platform.DESKTOP and _rust_manager and _rust_manager.has_method("set_mic_sample_rate"):
+		_rust_manager.set_mic_sample_rate(rate)
+
+
+## Get current room name
+func get_current_room() -> String:
+	# TODO: Implement for Android if needed
+	return ""
 
 
 # ============ SIGNAL HANDLERS ============
