@@ -20,6 +20,8 @@ size = Vector3(1.2, 1.5, 0.01)
 
 [node name="MovementSettingsViewport3D" type="Node3D"]
 script = ExtResource("1_ui_script")
+ui_size = Vector2(400, 500)
+quad_size = Vector2(1.2, 1.5)
 
 [node name="SubViewport" type="SubViewport" parent="."]
 transparent_bg = true

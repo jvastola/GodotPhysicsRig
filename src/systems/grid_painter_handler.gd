@@ -6,6 +6,10 @@ extends MeshInstance3D
 @export var flip_v: bool = true
 @export var debug_uv: bool = false
 
+func _ready() -> void:
+	# Add to pointer_interactable group so hand pointer raycast can find this handler
+	add_to_group("pointer_interactable")
+
 func _compute_uv_from_local_pos(mi: MeshInstance3D, lp: Vector3) -> Vector2:
 	var aabb: AABB = mi.mesh.get_aabb()
 	# find two axes that have non-zero size in the AABB (the surface plane)
