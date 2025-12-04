@@ -30,6 +30,7 @@ var _android_plugin: Object = null  # GodotLiveKit Android plugin
 # State
 var _is_connected: bool = false
 var _local_identity: String = ""
+var _is_muted: bool = false  # Track mute state for desktop (Rust doesn't have enable_microphone)
 
 
 func _ready() -> void:
@@ -82,7 +83,7 @@ func _connect_android_signals() -> void:
 	_android_plugin.connect("room_connected", _on_room_connected)
 	_android_plugin.connect("room_disconnected", _on_room_disconnected)
 	_android_plugin.connect("error_occurred", _on_connection_error)
-	_android_plugin.connect("participant_joined", _on_participant_joined)
+	_android_plugin.connect("participant_joined", _on_participant_joined_android)  # Android sends only 1 arg
 	_android_plugin.connect("participant_left", _on_participant_left)
 	_android_plugin.connect("participant_metadata_changed", _on_participant_metadata_changed)
 	_android_plugin.connect("data_received", _on_data_received)
@@ -181,8 +182,10 @@ func publish_audio_track() -> void:
 			# Android plugin auto-enables mic on connect
 			_android_plugin.setAudioEnabled(true)
 	else:
-		if _rust_manager:
-			_rust_manager.enable_microphone(true)
+		# Desktop: The Rust client auto-publishes track on connect
+		# We just need to ensure we're not muted
+		_is_muted = false
+		print("[LiveKitWrapper] Desktop: Audio track publishing (unmuted)")
 
 
 ## Unpublish the local audio track
@@ -193,8 +196,9 @@ func unpublish_audio_track() -> void:
 		if _android_plugin:
 			_android_plugin.setAudioEnabled(false)
 	else:
-		if _rust_manager:
-			_rust_manager.enable_microphone(false)
+		# Desktop: Set muted flag, push_mic_audio will respect this
+		_is_muted = true
+		print("[LiveKitWrapper] Desktop: Audio track unpublished (muted)")
 
 
 ## Set the local participant's metadata
@@ -248,16 +252,23 @@ func get_participant_identities() -> PackedStringArray:
 
 ## Enable or disable the local audio track
 func set_audio_enabled(enabled: bool) -> void:
+	print("[LiveKitWrapper] set_audio_enabled: ", enabled)
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
 			_android_plugin.setAudioEnabled(enabled)
+			print("[LiveKitWrapper] Called Android plugin setAudioEnabled(", enabled, ")")
 	else:
-		if _rust_manager:
-			_rust_manager.enable_microphone(enabled)
+		# Desktop: Track mute state, push_mic_audio will respect this
+		_is_muted = !enabled
+		print("[LiveKitWrapper] Desktop: _is_muted set to ", _is_muted)
 
 
 ## Push microphone audio buffer (Desktop/Rust only)
 func push_mic_audio(buffer: PackedVector2Array) -> void:
+	# Skip if muted on desktop
+	if _is_muted:
+		return
+	
 	if current_platform == Platform.DESKTOP and _rust_manager and _rust_manager.has_method("push_mic_audio"):
 		_rust_manager.push_mic_audio(buffer)
 
@@ -299,9 +310,15 @@ func _on_participant_joined(identity: String, name: String) -> void:
 	participant_joined.emit(identity, name)
 
 
+func _on_participant_joined_android(identity: String) -> void:
+	# Android plugin only sends identity, use it as name too
+	print("[LiveKitWrapper] Participant joined (Android): %s" % identity)
+	participant_joined.emit(identity, identity)
+
+
 func _on_participant_joined_rust(identity: String) -> void:
 	# Rust only sends identity, use it as name too
-	print("[LiveKitWrapper] Participant joined: %s" % identity)
+	print("[LiveKitWrapper] Participant joined (Rust): %s" % identity)
 	participant_joined.emit(identity, identity)
 
 
