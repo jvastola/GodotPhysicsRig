@@ -416,6 +416,7 @@ func _on_room_connected():
 	
 	# Add local participant
 	_add_participant("You (local)", 0.0)
+	_update_participant_list()  # CRITICAL: Render the UI!
 
 func _on_room_disconnected():
 	print("📴 Disconnected")
@@ -433,7 +434,7 @@ func _on_room_disconnected():
 		child.queue_free()
 	participants.clear()
 
-func _on_participant_joined(identity: String):
+func _on_participant_joined(identity: String, _name: String = ""):
 	print("👤 Participant joined: ", identity)
 	_add_participant(identity, 0.0)
 	_update_participant_list()

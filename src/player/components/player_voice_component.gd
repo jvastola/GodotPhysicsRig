@@ -117,7 +117,7 @@ func set_player_scene_root(root: Node) -> void:
 	player_scene_root = root
 
 
-func _on_participant_joined(identity: String) -> void:
+func _on_participant_joined(identity: String, _name: String = "") -> void:
 	"""Handle new participant joining LiveKit room"""
 	print("PlayerVoiceComponent: Participant joined: ", identity)
 	
