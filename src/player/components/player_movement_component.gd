@@ -159,8 +159,8 @@ func _get_movement_direction(input: Vector2) -> Vector3:
 	right = right.normalized()
 	
 	# Combine input with directions
-	# Thumbstick: Y is forward/back, X is left/right
-	return (forward * -input.y + right * input.x).normalized()
+	# Thumbstick: Y positive = forward, Y negative = back, X positive = right, X negative = left
+	return (forward * input.y + right * input.x).normalized()
 
 
 func _handle_turning(delta: float) -> void:
