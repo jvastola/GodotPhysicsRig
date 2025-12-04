@@ -639,6 +639,12 @@ func _on_mute_toggle():
 	is_muted = !is_muted
 	mute_button.text = "🔇 Muted" if is_muted else "🎤 Active"
 	
+	# Also mute the XR player's voice component (for spatial audio)
+	var xr_player = get_tree().get_first_node_in_group("xr_player")
+	if xr_player and xr_player.has_method("set_muted"):
+		xr_player.set_muted(is_muted)
+		print("LiveKit UI: Set XR player mute to: ", is_muted)
+	
 	# We don't stop the player so we can still see visualization if we wanted,
 	# but for now let's just stop pushing audio in _process_mic_audio.
 	# Also update visualizer color

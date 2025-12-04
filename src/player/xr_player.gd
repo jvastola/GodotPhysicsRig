@@ -392,6 +392,12 @@ func toggle_voice_chat(enabled: bool) -> void:
 		voice_component.toggle_voice_chat(enabled)
 
 
+func set_muted(muted: bool) -> void:
+	"""Set mute status for voice chat"""
+	if voice_component:
+		voice_component.set_muted(muted)
+
+
 func _setup_audio_listeners() -> void:
 	"""Create and attach audio listeners to cameras"""
 	# VR Listener

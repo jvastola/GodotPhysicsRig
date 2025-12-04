@@ -7,6 +7,7 @@ extends Node
 # LiveKit Integration
 var livekit_manager: Node = null
 var voice_enabled: bool = false
+var is_muted: bool = false
 
 # Audio Capture
 var microphone_player: AudioStreamPlayer = null
@@ -106,7 +107,8 @@ func _process(_delta: float) -> void:
 	if capture_effect.can_get_buffer(BUFFER_SIZE):
 		var buffer = capture_effect.get_buffer(BUFFER_SIZE)
 		
-		if buffer.size() > 0 and livekit_manager.has_method("push_mic_audio"):
+		# Only push if not muted
+		if not is_muted and buffer.size() > 0 and livekit_manager.has_method("push_mic_audio"):
 			livekit_manager.push_mic_audio(buffer)
 
 
@@ -263,6 +265,12 @@ func _create_spatial_audio_player(peer_id: String, network_player: Node) -> void
 	player_data["audio_player"] = audio_player
 	
 	print("PlayerVoiceComponent: Created spatial audio player for ", peer_id, " on ", head_node.name, " (parent: ", network_player.name, ")")
+
+
+func set_muted(muted: bool) -> void:
+	"""Set mute status"""
+	is_muted = muted
+	print("PlayerVoiceComponent: Mute set to: ", is_muted)
 
 
 func set_mic_gain(gain_db: float) -> void:
