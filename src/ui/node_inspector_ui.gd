@@ -4,7 +4,7 @@ extends PanelContainer
 # Works in conjunction with SceneHierarchyUI
 
 signal property_changed(node_path: NodePath, property_name: String, new_value: Variant)
-
+signal script_requested(script_path: String)
 @onready var title_label: Label = $MarginContainer/VBoxContainer/TitleLabel
 @onready var scroll_container: ScrollContainer = $MarginContainer/VBoxContainer/ScrollContainer
 @onready var properties_container: VBoxContainer = $MarginContainer/VBoxContainer/ScrollContainer/PropertiesContainer
@@ -113,7 +113,7 @@ func _build_inspector_ui() -> void:
 	var script = _current_node.get_script()
 	if script:
 		_add_section_header("Script")
-		_add_readonly_property("Script", script.resource_path.get_file())
+		_add_script_button(script)
 	
 	# Add exported properties
 	_add_exported_properties()
@@ -155,6 +155,43 @@ func _add_exported_properties() -> void:
 					_add_color_readonly(prop_name, prop_value)
 				_:
 					_add_readonly_property(prop_name, str(prop_value))
+
+
+func _add_script_button(script: Script) -> void:
+	if not properties_container or not script:
+		return
+	
+	var hbox = HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 8)
+	
+	var label = Label.new()
+	label.text = "Script:"
+	label.custom_minimum_size.x = 80
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75))
+	hbox.add_child(label)
+	
+	var script_button = Button.new()
+	script_button.text = "📜 " + script.resource_path.get_file()
+	script_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	script_button.add_theme_font_size_override("font_size", 11)
+	script_button.add_theme_color_override("font_color", Color(0.6, 0.85, 1.0))
+	
+	var script_path = script.resource_path
+	script_button.pressed.connect(func(): _on_script_button_pressed(script_path))
+	script_button.tooltip_text = "Click to view: " + script_path
+	hbox.add_child(script_button)
+	
+	properties_container.add_child(hbox)
+
+
+func _on_script_button_pressed(script_path: String) -> void:
+	print("NodeInspectorUI: Opening script: ", script_path)
+	script_requested.emit(script_path)
+	
+	# Also try to open directly in the ScriptViewerUI if available
+	if ScriptViewerUI and ScriptViewerUI.instance:
+		ScriptViewerUI.instance.open_script(script_path)
 
 
 func _add_section_header(title: String) -> void:

@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=22 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -17,6 +17,7 @@
 [ext_resource type="PackedScene" path="res://src/ui/SceneHierarchyViewport3D.tscn" id="17_scene_hierarchy"]
 [ext_resource type="PackedScene" path="res://src/ui/NodeInspectorViewport3D.tscn" id="18_node_inspector"]
 [ext_resource type="PackedScene" path="res://src/ui/DebugConsoleViewport3D.tscn" id="19_debug_console"]
+[ext_resource type="PackedScene" path="res://src/ui/ScriptViewerViewport3D.tscn" id="20_script_viewer"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -145,3 +146,6 @@ transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0.6, 1.2, -1.9860382)
 
 [node name="DebugConsoleViewport3D" parent="." unique_id=421789258 instance=ExtResource("19_debug_console")]
 transform = Transform3D(0.3999252, 0, -0.0077348175, 0, 0.4, 0, 0.0077348175, 0, 0.3999252, -0.4, 1.1644142, -1.9860382)
+
+[node name="ScriptViewerViewport3D" parent="." instance=ExtResource("20_script_viewer")]
+transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 1.5, 1.2, -1.9860382)
