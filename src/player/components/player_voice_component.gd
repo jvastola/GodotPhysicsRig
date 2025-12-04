@@ -75,8 +75,8 @@ func _connect_livekit_signals() -> void:
 		livekit_manager.participant_left.connect(_on_participant_left)
 	
 	# Connect audio frame event
-	if livekit_manager.has_signal("on_audio_frame"):
-		livekit_manager.on_audio_frame.connect(_on_audio_frame)
+	if livekit_manager.has_signal("audio_frame_received"):
+		livekit_manager.audio_frame_received.connect(_on_audio_frame)
 	
 	print("PlayerVoiceComponent: Connected to LiveKit signals")
 

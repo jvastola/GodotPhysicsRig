@@ -122,12 +122,18 @@ func _ready():
 		print("📱 Android/VR detected - using original 2-column layout")
 		# On Android, keep the original structure from the scene file
 		# ParticipantsSection and ChatSection are both in LeftColumn originally
-		# Just ensure they're visible
+		# Explicitly ensure they're visible and sized correctly
 		var part_title = participants_section.get_node_or_null("Header/Title")
 		if part_title: part_title.visible = true
 		
+		# Ensure ParticipantsSection is visible
+		participants_section.visible = true
+		
 		var chat_title = chat_section.get_node_or_null("SectionTitle")
 		if chat_title: chat_title.visible = true
+		
+		# Ensure ChatSection is visible
+		chat_section.visible = true
 	
 	# -------------------------------
 	
