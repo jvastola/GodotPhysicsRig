@@ -1,0 +1,41 @@
+[gd_scene load_steps=7 format=3 uid="uid://debug_console_viewport3d"]
+
+[ext_resource type="Script" uid="uid://debug_console_vp3d_script" path="res://src/ui/debug_console_viewport_3d.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://debug_console_ui" path="res://src/ui/DebugConsoleUI.tscn" id="2_ui"]
+
+[sub_resource type="ViewportTexture" id="ViewportTexture_console"]
+viewport_path = NodePath("SubViewport")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_console"]
+resource_local_to_scene = true
+transparency = 1
+shading_mode = 0
+albedo_texture = SubResource("ViewportTexture_console")
+
+[sub_resource type="QuadMesh" id="QuadMesh_console"]
+size = Vector2(2.4, 1.6)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_console"]
+size = Vector3(2.4, 1.6, 0.01)
+
+[node name="DebugConsoleViewport3D" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="SubViewport" type="SubViewport" parent="."]
+transparent_bg = true
+size = Vector2i(600, 400)
+render_target_update_mode = 4
+
+[node name="DebugConsoleUI" parent="SubViewport" instance=ExtResource("2_ui")]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("StandardMaterial3D_console")
+cast_shadow = 0
+mesh = SubResource("QuadMesh_console")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="MeshInstance3D"]
+collision_layer = 32
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D/StaticBody3D"]
+shape = SubResource("BoxShape3D_console")
