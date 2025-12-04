@@ -181,23 +181,6 @@ cast_shadow = 0
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_pointer_hit")
 
-[node name="GridSnapIndicator" type="Node3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer"]
-script = ExtResource("8_grid_snap")
-follow_mode = "always"
-maintain_visibility_without_hit = true
-pointer_node_path = NodePath("..")
-build_mode_enabled = false
-build_cube_scene = ExtResource("9_build_cube")
-voxel_chunk_manager_path = NodePath("../../../../../VoxelChunkManager")
-build_parent_path = NodePath("../../../../../BuildRoot")
-raycast_path = NodePath("../PointerRayCast")
-hide_without_hit = false
-
-[node name="IndicatorMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer/GridSnapIndicator"]
-material_override = SubResource("StandardMaterial3D_grid_indicator")
-cast_shadow = 0
-mesh = SubResource("BoxMesh_grid_indicator")
-
 [node name="RightController" type="XRController3D" parent="PlayerBody/XROrigin3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.549018, 0, 0)
 tracker = &"right_hand"

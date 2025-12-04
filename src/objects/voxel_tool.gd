@@ -62,6 +62,16 @@ func _ready() -> void:
 	print("VoxelTool: Ready with voxel size ", voxel_size)
 
 
+func _exit_tree() -> void:
+	# Clean up indicator and hit_marker if they're in another part of the tree
+	if indicator_mesh and is_instance_valid(indicator_mesh):
+		indicator_mesh.queue_free()
+		indicator_mesh = null
+	if hit_marker and is_instance_valid(hit_marker):
+		hit_marker.queue_free()
+		hit_marker = null
+
+
 func _find_voxel_manager() -> void:
 	_voxel_manager = get_tree().root.find_child("VoxelChunkManager", true, false) as VoxelChunkManager
 	if _voxel_manager:
@@ -97,7 +107,7 @@ func _create_ray_visual() -> void:
 
 func _create_indicator() -> void:
 	indicator_mesh = MeshInstance3D.new()
-	indicator_mesh.name = "GridIndicator"
+	indicator_mesh.name = "VoxelToolIndicator"
 	
 	var box = BoxMesh.new()
 	box.size = Vector3.ONE * voxel_size
@@ -109,16 +119,13 @@ func _create_indicator() -> void:
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	indicator_mesh.material_override = mat
 	
-	# Make it top-level so it doesn't rotate with the tool
-	indicator_mesh.top_level = true
+	# Add to scene root (will be done when in tree)
 	indicator_mesh.visible = false
-	
-	add_child(indicator_mesh)
 
 
 func _create_hit_marker() -> void:
 	hit_marker = MeshInstance3D.new()
-	hit_marker.name = "HitMarker"
+	hit_marker.name = "VoxelToolHitMarker"
 	
 	var sphere = SphereMesh.new()
 	sphere.radius = 0.02
@@ -131,14 +138,15 @@ func _create_hit_marker() -> void:
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	hit_marker.material_override = mat
 	
-	hit_marker.top_level = true
+	# Add to scene root (will be done when in tree)
 	hit_marker.visible = false
-	
-	add_child(hit_marker)
 
 
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
+	
+	# Ensure indicator and hit_marker are in the scene tree
+	_ensure_visuals_in_tree()
 	
 	if not is_grabbed or not is_instance_valid(grabbing_hand):
 		_set_visuals_visible(false)
@@ -147,6 +155,22 @@ func _physics_process(delta: float) -> void:
 	_process_input(delta)
 	_process_raycast()
 	_update_visuals()
+
+
+func _ensure_visuals_in_tree() -> void:
+	"""Add indicator and hit_marker to scene root if not already there"""
+	if not is_inside_tree():
+		return
+	
+	var scene_root = get_tree().current_scene
+	if not scene_root:
+		return
+	
+	if indicator_mesh and not indicator_mesh.is_inside_tree():
+		scene_root.add_child(indicator_mesh)
+	
+	if hit_marker and not hit_marker.is_inside_tree():
+		scene_root.add_child(hit_marker)
 
 
 func _process_input(delta: float) -> void:
