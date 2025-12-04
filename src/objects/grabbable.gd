@@ -85,6 +85,63 @@ func _ready() -> void:
 				print("  - first shape parent: ", grabbed_collision_shapes[0].get_parent())
 
 
+func _exit_tree() -> void:
+	# Force cleanup if still grabbed when being removed from tree
+	# This prevents orphaned collision shapes on the physics hand during scene transitions
+	if is_grabbed:
+		print("Grabbable: ", save_id, " exiting tree while grabbed - forcing cleanup")
+		_force_cleanup_grab_state()
+
+
+func _force_cleanup_grab_state() -> void:
+	"""Force cleanup of grab state and all collision shapes attached to hand.
+	Uses name-based matching to find shapes even if references are stale."""
+	print("Grabbable: _force_cleanup_grab_state for ", save_id)
+	
+	if is_instance_valid(grabbing_hand):
+		# Find and remove all shapes/meshes matching our naming pattern
+		# This is more robust than relying on array references which may be stale
+		var children_to_remove: Array = []
+		for child in grabbing_hand.get_children():
+			if child.name.begins_with(name + "_grabbed_"):
+				children_to_remove.append(child)
+		
+		for child in children_to_remove:
+			print("Grabbable: Removing orphaned shape: ", child.name)
+			grabbing_hand.remove_child(child)
+			child.queue_free()
+		
+		# Clear hand's held_object reference
+		if grabbing_hand.has_method("set"):
+			if grabbing_hand.get("held_object") == self:
+				grabbing_hand.set("held_object", null)
+	
+	# Also clean up any shapes in our arrays
+	for shape in grabbed_collision_shapes:
+		if is_instance_valid(shape):
+			var parent = shape.get_parent()
+			if parent:
+				parent.remove_child(shape)
+			shape.queue_free()
+	
+	for mesh in grabbed_mesh_instances:
+		if is_instance_valid(mesh):
+			var parent = mesh.get_parent()
+			if parent:
+				parent.remove_child(mesh)
+			mesh.queue_free()
+	
+	grabbed_collision_shapes.clear()
+	grabbed_mesh_instances.clear()
+	
+	# Reset grab state
+	is_grabbed = false
+	grabbing_hand = null
+	
+	# Update save state to reflect release
+	_save_grab_state(null)
+
+
 func _setup_components() -> void:
 	network_component = GrabbableNetworkComponent.new()
 	network_component.name = "GrabbableNetworkComponent"

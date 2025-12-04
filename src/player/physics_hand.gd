@@ -72,6 +72,9 @@ func _physics_process(delta: float) -> void:
 		_hookes_law()
 	
 	_handle_grab_input()
+	
+	# Periodically check for and remove orphaned collision shapes
+	_cleanup_orphaned_grabbed_shapes()
 
 
 func _pid_movement(delta: float) -> void:
@@ -341,3 +344,23 @@ func remove_grabbed_collision(collision_shapes: Array) -> void:
 	if collision_shapes.size() > 0:
 		print("PhysicsHand: Removed ", collision_shapes.size(), " collision shapes")
 
+
+func _cleanup_orphaned_grabbed_shapes() -> void:
+	"""Remove any orphaned grabbed collision shapes or meshes.
+	This catches shapes that were left behind during scene transitions
+	or when a grabbable was freed unexpectedly."""
+	# Only cleanup if we're NOT holding something
+	if held_object != null and is_instance_valid(held_object):
+		return
+	
+	# Find any children with "_grabbed_" in their name - these are orphaned
+	var orphans: Array = []
+	for child in get_children():
+		if "_grabbed_" in child.name:
+			orphans.append(child)
+	
+	if orphans.size() > 0:
+		print("PhysicsHand: Cleaning up ", orphans.size(), " orphaned grabbed shapes")
+		for orphan in orphans:
+			remove_child(orphan)
+			orphan.queue_free()
