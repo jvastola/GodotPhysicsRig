@@ -19,6 +19,7 @@
 [ext_resource type="PackedScene" path="res://src/ui/DebugConsoleViewport3D.tscn" id="19_debug_console"]
 [ext_resource type="PackedScene" path="res://src/ui/ScriptViewerViewport3D.tscn" id="20_script_viewer"]
 [ext_resource type="PackedScene" path="res://src/ui/KeyboardFullViewport3D.tscn" id="21_keyboard"]
+[ext_resource type="PackedScene" uid="uid://file_system_viewport3d" path="res://src/ui/FileSystemViewport3D.tscn" id="22_filesystem"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -153,3 +154,6 @@ transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 1.064451, 0.7851808, -1
 
 [node name="KeyboardFullViewport3D" parent="." unique_id=1262501057 instance=ExtResource("21_keyboard")]
 transform = Transform3D(0.35, 0, 0, 0, 0.35, 0, 0, 0, 0.35, 1.0585722, 0.2227844, -1.88066)
+
+[node name="FileSystemViewport3D" parent="." instance=ExtResource("22_filesystem")]
+transform = Transform3D(0.35, 0, 0, 0, 0.35, 0, 0, 0, 0.35, -2.5, 1.2, -2.0)
