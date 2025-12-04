@@ -42,6 +42,9 @@ const HIDDEN_FOLDERS = [".git", ".godot", "android/build", ".import"]
 # Static instance
 static var instance: FileSystemUI = null
 
+# Guard flag to prevent infinite recursion
+var _processing_selection: bool = false
+
 
 func _ready() -> void:
 	instance = self
