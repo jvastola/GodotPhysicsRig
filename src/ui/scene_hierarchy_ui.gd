@@ -3,6 +3,9 @@ extends PanelContainer
 # Scene Hierarchy UI - Displays the current scene tree in a Tree control
 # Designed for 3D worldspace rendering via SubViewport
 
+## Emitted when a node is selected in the hierarchy tree
+signal node_selected(node_path: NodePath)
+
 @export var auto_refresh_interval: float = 2.0  # Seconds between auto-refresh (0 to disable)
 @export var show_internal_nodes: bool = false   # Show nodes that start with underscore
 
@@ -16,6 +19,9 @@ var _refresh_timer: float = 0.0
 var _tree_items: Dictionary = {}  # node -> TreeItem mapping for updates
 
 func _ready() -> void:
+	# Add to group so inspector can find us
+	add_to_group("scene_hierarchy")
+	
 	# Set up button connections
 	if refresh_button:
 		refresh_button.pressed.connect(_on_refresh_pressed)
@@ -210,3 +216,5 @@ func _on_item_selected() -> void:
 		var node_path = selected.get_metadata(0)
 		if node_path:
 			print("SceneHierarchyUI: Selected node: ", node_path)
+			# Emit signal for connected inspector panels
+			node_selected.emit(node_path)

@@ -1,4 +1,4 @@
-[gd_scene load_steps=19 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=20 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -15,6 +15,7 @@
 [ext_resource type="PackedScene" path="res://src/objects/VoxelTool.tscn" id="15_voxel_tool"]
 [ext_resource type="PackedScene" path="res://src/ui/MovementSettingsViewport3D.tscn" id="16_movement_settings"]
 [ext_resource type="PackedScene" path="res://src/ui/SceneHierarchyViewport3D.tscn" id="17_scene_hierarchy"]
+[ext_resource type="PackedScene" path="res://src/ui/NodeInspectorViewport3D.tscn" id="18_node_inspector"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -137,3 +138,6 @@ transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, -4, 1.2, -2.5)
 [node name="SceneHierarchyViewport3D" parent="." unique_id=1482733498 instance=ExtResource("17_scene_hierarchy")]
 transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, -1.3916323, 1.2, -1.9860382)
 ui_size = Vector2(1200, 800)
+
+[node name="NodeInspectorViewport3D" parent="." instance=ExtResource("18_node_inspector")]
+transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0.6, 1.2, -1.9860382)
