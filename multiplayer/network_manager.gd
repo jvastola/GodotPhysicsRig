@@ -15,15 +15,10 @@ var use_nakama: bool = false  # Set to true to use Nakama instead of P2P
 const DEFAULT_PORT = 7777
 const MAX_CLIENTS = 8
 
-# Room code system
+# Room code system (legacy - now handled by Nakama match labels)
 var current_room_code: String = ""
 var room_code_to_ip: Dictionary = {} # room_code -> {ip, port, host_name, player_count, created_time}
 signal room_code_generated(code: String)
-
-# Matchmaking
-var matchmaking: Node = null
-var use_matchmaking_server: bool = true
-const MATCHMAKING_SERVER_URL = "http://158.101.21.99:8080"
 
 
 
@@ -57,11 +52,9 @@ signal avatar_texture_received(peer_id: int)
 signal voxel_placed_network(world_pos: Vector3, color: Color)
 signal voxel_removed_network(world_pos: Vector3)
 
-# Voice chat
+# Voice chat - HANDLED BY LIVEKIT (see PlayerVoiceComponent)
+# These variables kept for API compatibility but not used
 var voice_enabled: bool = false
-var microphone_bus_index: int = -1
-const VOICE_SAMPLE_RATE = 16000
-const VOICE_BUFFER_SIZE = 2048
 
 # Connection quality monitoring
 enum ConnectionQuality {
@@ -116,21 +109,8 @@ func _ready() -> void:
 	multiplayer.connection_failed.connect(_on_connection_failed)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 	
-	# Setup matchmaking
-	_setup_matchmaking()
-	
-	# Setup voice chat audio bus
-	_setup_voice_chat()
-	
-	# Enable voice with always-on mode by default
-	voice_enabled = true
-	voice_mode = VoiceMode.ALWAYS_ON
-	
 	# Initialize network stats monitoring
 	_last_server_response_time = Time.get_ticks_msec() / 1000.0
-	
-	# Connect to Nakama events if available
-	# (Handled by _setup_nakama_integration)
 	
 	# Setup Nakama signals (deferred to ensure NakamaManager autoload is ready)
 	call_deferred("_setup_nakama_integration")
@@ -138,22 +118,6 @@ func _ready() -> void:
 	# Connect Nakama signals
 	if NakamaManager:
 		NakamaManager.match_state_received.connect(_on_nakama_match_state_received)
-
-
-func _setup_matchmaking() -> void:
-	"""Initialize matchmaking server connection"""
-	var matchmaking_script = load("res://multiplayer/matchmaking_server.gd")
-	matchmaking = matchmaking_script.new()
-	add_child(matchmaking)
-	
-	# Use local server for development, or set to false to use remote server
-	matchmaking.matchmaking_url = MATCHMAKING_SERVER_URL
-	
-	# Connect signals
-	matchmaking.room_registered.connect(_on_matchmaking_room_registered)
-	matchmaking.room_found.connect(_on_matchmaking_room_found)
-	
-	print("NetworkManager: Matchmaking initialized")
 
 
 func _setup_nakama_integration() -> void:
@@ -169,23 +133,6 @@ func _setup_nakama_integration() -> void:
 			NakamaManager.match_state_received.connect(_on_nakama_match_state_received)
 		print("NetworkManager: Nakama integration initialized")
 
-
-func _on_matchmaking_room_found(success: bool, room_data: Dictionary) -> void:
-	"""Handle room lookup response from matchmaking server"""
-	if success and room_data.has("ip") and room_data.has("port"):
-		print("Matchmaking: Found room at ", room_data["ip"], ":", room_data["port"])
-		join_server(room_data["ip"], room_data["port"])
-	else:
-		push_error("Matchmaking: Failed to find room")
-		connection_failed.emit()
-
-
-func _on_matchmaking_room_registered(success: bool, room_code: String) -> void:
-	"""Handle room registration response from matchmaking server"""
-	if success:
-		print("Matchmaking: Room registered with code ", room_code)
-	else:
-		push_error("Matchmaking: Failed to register room")
 
 
 ## Generate a 6-character room code
@@ -222,10 +169,6 @@ func create_server(port: int = DEFAULT_PORT, use_room_code: bool = true) -> Erro
 			"created_time": Time.get_unix_time_from_system()
 		}
 		
-		# Register with matchmaking server
-		if use_matchmaking_server and matchmaking:
-			matchmaking.register_room(current_room_code, local_ip, port, local_player_info.get("name", "Host"))
-		
 		room_code_generated.emit(current_room_code)
 		print("Room code: ", current_room_code, " (IP: ", local_ip, ")")
 	
@@ -249,27 +192,21 @@ func get_local_ip() -> String:
 	return "127.0.0.1"
 
 
-## Get public IP address (for internet play via matchmaking)
+## Get public IP address (for internet play)
 func get_public_ip() -> String:
-	# For cloud matchmaking, use a placeholder that clients will replace with server IP
-	# The actual connection happens via the matchmaking server's returned IP
-	# This is just for registration purposes
-	return "0.0.0.0"  # Placeholder - clients connect via matchmaking lookup
+	# Returns placeholder - use Nakama for proper matchmaking
+	return "0.0.0.0"
 
 
-## Join by room code (uses matchmaking)
+## Join by room code (legacy - prefer Nakama match IDs)
 func join_by_room_code(room_code: String) -> void:
-	"""Lookup room via matchmaking server and join"""
-	if use_matchmaking_server and matchmaking:
-		matchmaking.lookup_room(room_code)
+	"""Lookup room via local dictionary and join (legacy ENet support)"""
+	if room_code_to_ip.has(room_code):
+		var room_data = room_code_to_ip[room_code]
+		join_server(room_data["ip"], room_data["port"])
 	else:
-		# Fallback to local dictionary
-		if room_code_to_ip.has(room_code):
-			var room_data = room_code_to_ip[room_code]
-			join_server(room_data["ip"], room_data["port"])
-		else:
-			push_error("Room code not found: ", room_code)
-			connection_failed.emit()
+		push_error("Room code not found: ", room_code)
+		connection_failed.emit()
 
 
 ## Join a server (client)
@@ -294,10 +231,7 @@ func join_server(address: String, port: int = DEFAULT_PORT) -> Error:
 
 ## Disconnect from network
 func disconnect_from_network() -> void:
-	# Unregister from matchmaking if we were the host
-	if is_server() and use_matchmaking_server and current_room_code != "":
-		matchmaking.unregister_room(current_room_code)
-		current_room_code = ""
+	current_room_code = ""
 	
 	if peer:
 		peer.close()
@@ -746,47 +680,6 @@ func get_object_owner(object_id: String) -> int:
 		return -1
 	return grabbed_objects[object_id].get("owner_peer_id", -1)
 
-
-# ============================================================================
-# Voice Chat - DEPRECATED
-# ============================================================================
-# Voice chat now handled entirely by PlayerVoiceComponent with LiveKit.
-# Old Nakama voice transport removed.
-
-func _setup_voice_chat() -> void:
-	"""Voice buses setup - kept for backwards compatibility"""
-	# These buses may still be used by old code
-	var bus_count = AudioServer.get_bus_count()
-	
-	var input_bus = AudioServer.get_bus_index("VoiceInput")
-	if input_bus == -1:
-		AudioServer.add_bus(bus_count)
-		AudioServer.set_bus_name(bus_count, "VoiceInput")
-		input_bus = bus_count
-		bus_count += 1
-	
-	AudioServer.set_bus_mute(input_bus, true)
-	AudioServer.set_bus_send(input_bus, "Master")
-	
-	var output_bus = AudioServer.get_bus_index("VoiceOutput")
-	if output_bus == -1:
-		AudioServer.add_bus(bus_count)
-		AudioServer.set_bus_name(bus_count, "VoiceOutput")
-		output_bus = bus_count
-	
-	AudioServer.set_bus_mute(output_bus, false)
-	AudioServer.set_bus_send(output_bus, "Master")
-
-
-func enable_voice_chat(enable: bool) -> void:
-	"""DEPRECATED: Voice chat now handled by LiveKit"""
-	voice_enabled = enable
-	print("NetworkManager: Voice chat setting changed (deprecated - use LiveKit)")
-
-
-func send_voice_data(_audio_data: PackedVector2Array) -> void:
-	"""DEPRECATED: Voice is now transmitted via LiveKit, not Nakama"""
-	pass # No-op
 
 
 # ============================================================================
