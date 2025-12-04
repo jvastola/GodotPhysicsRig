@@ -416,6 +416,17 @@ func _on_room_connected():
 	
 	# Add local participant
 	_add_participant("You (local)", 0.0)
+	
+	# Query existing participants (they don't trigger participant_joined event)
+	# This is especially important on Android where we need to poll for existing users
+	if livekit_manager and livekit_manager.has_method("get_participant_identities"):
+		var existing = livekit_manager.get_participant_identities()
+		print("📋 Existing participants from LiveKit: ", existing)
+		for identity in existing:
+			if not identity.is_empty():
+				_add_participant(identity, 0.0)
+				print("   + Added existing participant: ", identity)
+	
 	_update_participant_list()  # CRITICAL: Render the UI!
 
 func _on_room_disconnected():

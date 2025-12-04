@@ -243,7 +243,7 @@ func get_participant_identities() -> PackedStringArray:
 	
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
-			var csv = _android_plugin.get_participant_identities()
+			var csv = _android_plugin.getParticipantIdentities()  # camelCase for Android plugin
 			if csv != "":
 				result = PackedStringArray(csv.split(","))
 	
