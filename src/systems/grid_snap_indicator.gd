@@ -14,7 +14,7 @@ var _build_parent_path: NodePath = NodePath()
 @export_range(0.01, 10.0, 0.01) var pointer_scale_grid_multiplier: float = 1.0
 @export_range(0.005, 2.0, 0.005) var pointer_scale_min_grid_size: float = 0.01
 @export_range(0.0, 0.25, 0.001) var surface_normal_offset: float = 0.01
-@export var build_mode_enabled: bool = true
+@export var build_mode_enabled: bool = false  # Disabled - use VoxelTool grabbable instead
 @export var build_mode_toggle_action: String = ""
 @export var build_cube_scene: PackedScene
 @export var default_build_color: Color = Color(0.6, 0.6, 0.6, 1.0)
