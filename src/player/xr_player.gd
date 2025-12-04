@@ -394,8 +394,12 @@ func toggle_voice_chat(enabled: bool) -> void:
 
 func set_muted(muted: bool) -> void:
 	"""Set mute status for voice chat"""
+	print("XRPlayer.set_muted called with: ", muted)
 	if voice_component:
 		voice_component.set_muted(muted)
+		print("  ✓ Forwarded to voice_component")
+	else:
+		print("  ❌ voice_component is NULL! Cannot forward mute.")
 
 
 func _setup_audio_listeners() -> void:

@@ -102,7 +102,7 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="MainCard" type="PanelContainer" parent="CenterContainer"]
-custom_minimum_size = Vector2(900, 600)
+custom_minimum_size = Vector2(700, 500)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_card")
 
@@ -113,222 +113,259 @@ theme_override_constants/margin_top = 24
 theme_override_constants/margin_right = 24
 theme_override_constants/margin_bottom = 24
 
-[node name="MainLayout" type="HBoxContainer" parent="CenterContainer/MainCard/Margin"]
+[node name="VBox" type="VBoxContainer" parent="CenterContainer/MainCard/Margin"]
 layout_mode = 2
-theme_override_constants/separation = 20
+theme_override_constants/separation = 16
 
-[node name="LeftColumn" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout"]
+[node name="Header" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Header"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 20
-
-[node name="Header" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn"]
-layout_mode = 2
-
-[node name="Title" type="Label" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/Header"]
-layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 24
 text = "LiveKit Voice Chat"
-horizontal_alignment = 1
 
-[node name="StatusLabel" type="Label" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/Header"]
+[node name="StatusLabel" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Header"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
+theme_override_font_sizes/font_size = 14
 text = "Ready to connect"
-horizontal_alignment = 1
+horizontal_alignment = 2
 
-[node name="UsernameSection" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/Header"]
+[node name="HSeparator" type="HSeparator" parent="CenterContainer/MainCard/Margin/VBox"]
 layout_mode = 2
-theme_override_constants/separation = 10
 
-[node name="UsernameLabel" type="Label" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/Header/UsernameSection"]
+[node name="Content" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/VBox"]
 layout_mode = 2
-text = "Username:"
-vertical_alignment = 1
+size_flags_vertical = 3
+theme_override_constants/separation = 24
 
-[node name="UsernameEntry" type="LineEdit" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/Header/UsernameSection"]
+[node name="LeftColumn" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.45
+theme_override_constants/separation = 20
+
+[node name="ConnectionSection" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SectionTitle" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_font_sizes/font_size = 14
+text = "CONNECTION"
+
+[node name="UsernameRow" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="UsernameEntry" type="LineEdit" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/UsernameRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_styles/normal = SubResource("StyleBoxFlat_input")
 placeholder_text = "Your Name"
 
-[node name="UpdateNameButton" type="Button" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/Header/UsernameSection"]
+[node name="UpdateNameButton" type="Button" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/UsernameRow"]
 layout_mode = 2
 theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
-text = "Update Name"
+text = "Update"
 
-[node name="ConnectionSection" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn"]
+[node name="ServerEntry" type="LineEdit" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_styles/normal = SubResource("StyleBoxFlat_input")
+placeholder_text = "wss://your-server.livekit.cloud"
 
-[node name="Inputs" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection"]
+[node name="TokenEntry" type="LineEdit" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection"]
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_input")
+placeholder_text = "Paste token or use auto-generate"
+secret = true
+
+[node name="Buttons" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="ServerEntry" type="LineEdit" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection/Inputs"]
-layout_mode = 2
-theme_override_styles/normal = SubResource("StyleBoxFlat_input")
-placeholder_text = "Server URL (wss://...)"
-
-[node name="TokenEntry" type="LineEdit" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection/Inputs"]
-layout_mode = 2
-theme_override_styles/normal = SubResource("StyleBoxFlat_input")
-placeholder_text = "Access Token"
-secret = true
-
-[node name="Buttons" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection"]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="AutoConnectButton" type="Button" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection/Buttons"]
+[node name="ConnectButton" type="Button" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/Buttons"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
-text = "⚡ Auto (Sandbox)"
-
-[node name="ConnectButton" type="Button" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection/Buttons"]
-layout_mode = 2
-size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 14
 theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_primary")
 text = "Connect"
 
-[node name="DisconnectButton" type="Button" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection/Buttons"]
+[node name="DisconnectButton" type="Button" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/Buttons"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 14
 theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_danger")
 disabled = true
 text = "Disconnect"
 
-[node name="HSeparator1" type="HSeparator" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn"]
+[node name="HelperButtons" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AutoConnectButton" type="Button" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/HelperButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
+text = "⚡ Auto Connect"
+
+[node name="GenerateTokenButton" type="Button" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/HelperButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
+text = "🎫 Gen Token"
+
+[node name="RoomInfo" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
+theme_override_font_sizes/font_size = 12
+text = "Room: Not connected"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn"]
 layout_mode = 2
 
-[node name="AudioSection" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn"]
+[node name="AudioSection" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn"]
 layout_mode = 2
+size_flags_vertical = 3
 theme_override_constants/separation = 12
 
-[node name="SectionTitle" type="Label" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection"]
+[node name="SectionTitle" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
 theme_override_font_sizes/font_size = 14
 text = "AUDIO SETTINGS"
 
-[node name="Controls" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection"]
+[node name="MuteButton" type="Button" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection"]
+custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
-theme_override_constants/separation = 15
-
-[node name="MuteButton" type="Button" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/Controls"]
-custom_minimum_size = Vector2(100, 0)
-layout_mode = 2
+theme_override_font_sizes/font_size = 18
 theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
 toggle_mode = true
 text = "🎤 Active"
 
-[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/Controls"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="MicLevelBar" type="ProgressBar" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/Controls/VBoxContainer"]
+[node name="MicLevelBar" type="ProgressBar" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection"]
 custom_minimum_size = Vector2(0, 8)
 layout_mode = 2
-size_flags_vertical = 4
 show_percentage = false
 
-[node name="ThresholdContainer" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/Controls/VBoxContainer"]
+[node name="DeviceContainer" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="GainSection" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="HBox" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/GainSection"]
 layout_mode = 2
 
-[node name="Label" type="Label" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/Controls/VBoxContainer/ThresholdContainer"]
+[node name="Label" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/GainSection/HBox"]
 layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
 theme_override_font_sizes/font_size = 12
-text = "Threshold"
+text = "Mic Gain"
 
-[node name="ThresholdSlider" type="HSlider" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/Controls/VBoxContainer/ThresholdContainer"]
+[node name="Value" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/GainSection/HBox"]
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_vertical = 4
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+theme_override_font_sizes/font_size = 12
+text = "0 dB"
+horizontal_alignment = 2
+
+[node name="GainSlider" type="HSlider" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/GainSection"]
+layout_mode = 2
+max_value = 60.0
+
+[node name="ThresholdSection" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="HBox" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/ThresholdSection"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/ThresholdSection/HBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+theme_override_font_sizes/font_size = 12
+text = "Voice Threshold"
+
+[node name="Value" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/ThresholdSection/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.10"
+horizontal_alignment = 2
+
+[node name="ThresholdSlider" type="HSlider" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/ThresholdSection"]
+layout_mode = 2
 max_value = 1.0
 step = 0.01
 value = 0.1
 
-[node name="ThresholdLabel" type="Label" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/Controls/VBoxContainer/ThresholdContainer"]
+[node name="OptionsSection" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HearSelfCheck" type="CheckBox" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/OptionsSection"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
-text = "0.10"
+text = "Hear Self (Local Playback)"
 
-[node name="DeviceContainer" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection"]
+[node name="PlayGlobalCheck" type="CheckBox" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/OptionsSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Play Global (Debug)"
+
+[node name="VSeparator" type="VSeparator" parent="CenterContainer/MainCard/Margin/VBox/Content"]
 layout_mode = 2
 
-[node name="HSeparator2" type="HSeparator" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn"]
-layout_mode = 2
-
-[node name="ParticipantsSection" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="Header" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ParticipantsSection"]
-layout_mode = 2
-
-[node name="Title" type="Label" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ParticipantsSection/Header"]
+[node name="RightColumn" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content"]
+custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
-theme_override_font_sizes/font_size = 14
-text = "PARTICIPANTS (0)"
+size_flags_stretch_ratio = 0.55
+theme_override_constants/separation = 12
 
-[node name="ScrollContainer" type="ScrollContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ParticipantsSection"]
+[node name="Header" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/RightColumn"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Content/RightColumn/Header"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_font_sizes/font_size = 14
+text = "PARTICIPANTS"
+
+[node name="Count" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Content/RightColumn/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
+theme_override_font_sizes/font_size = 14
+text = "(0)"
+horizontal_alignment = 2
+
+[node name="ScrollContainer" type="ScrollContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/RightColumn"]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="ParticipantList" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ParticipantsSection/ScrollContainer"]
+[node name="ParticipantList" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/RightColumn/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 8
-
-[node name="VSeparator" type="VSeparator" parent="CenterContainer/MainCard/Margin/MainLayout"]
-layout_mode = 2
-
-[node name="ChatSection" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_stretch_ratio = 0.8
-theme_override_constants/separation = 8
-
-[node name="SectionTitle" type="Label" parent="CenterContainer/MainCard/Margin/MainLayout/ChatSection"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
-theme_override_font_sizes/font_size = 14
-text = "CHAT"
-
-[node name="ChatDisplay" type="ScrollContainer" parent="CenterContainer/MainCard/Margin/MainLayout/ChatSection"]
-custom_minimum_size = Vector2(0, 150)
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="ChatMessages" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/ChatSection/ChatDisplay"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-theme_override_constants/separation = 4
-
-[node name="ChatInput" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/MainLayout/ChatSection"]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="MessageEntry" type="LineEdit" parent="CenterContainer/MainCard/Margin/MainLayout/ChatSection/ChatInput"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_styles/normal = SubResource("StyleBoxFlat_input")
-placeholder_text = "Type a message..."
-
-[node name="SendButton" type="Button" parent="CenterContainer/MainCard/Margin/MainLayout/ChatSection/ChatInput"]
-layout_mode = 2
-theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-theme_override_styles/normal = SubResource("StyleBoxFlat_btn_primary")
-text = "Send"
 
 [node name="SandboxHTTPRequest" type="HTTPRequest" parent="."]

@@ -1,42 +1,40 @@
 extends Control
 
-# LiveKit Voice Chat UI with Audio Visualization
+# LiveKit Voice Chat UI - Dashboard Design
 
-# Main UI References
-@onready var server_entry = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection/Inputs/ServerEntry
-@onready var token_entry = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection/Inputs/TokenEntry
-@onready var connect_button = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection/Buttons/ConnectButton
-@onready var disconnect_button = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection/Buttons/DisconnectButton
-@onready var auto_connect_button = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection/Buttons/AutoConnectButton
-@onready var status_label = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/Header/StatusLabel
-@onready var participants_title = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ParticipantsSection/Header/Title
+# UI References - Dashboard Structure
+@onready var status_label = $CenterContainer/MainCard/Margin/VBox/Header/StatusLabel
 
-# Username UI
-@onready var username_entry = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/Header/UsernameSection/UsernameEntry
-@onready var update_name_button = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/Header/UsernameSection/UpdateNameButton
+# Left Column - Connection
+@onready var username_entry = $"CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/UsernameRow/UsernameEntry"
+@onready var update_name_button = $"CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/UsernameRow/UpdateNameButton"
+@onready var server_entry = $"CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/ServerEntry"
+@onready var token_entry = $"CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/TokenEntry"
+@onready var connect_button = $"CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/Buttons/ConnectButton"
+@onready var disconnect_button = $"CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/Buttons/DisconnectButton"
+@onready var auto_connect_button = $"CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/HelperButtons/AutoConnectButton"
+@onready var generate_token_button = $"CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/HelperButtons/GenerateTokenButton"
+@onready var room_info_label = $"CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/RoomInfo"
 
-# Chat UI
-@onready var chat_messages_container = $CenterContainer/MainCard/Margin/MainLayout/ChatSection/ChatDisplay/ChatMessages
-@onready var message_entry = $CenterContainer/MainCard/Margin/MainLayout/ChatSection/ChatInput/MessageEntry
-@onready var send_button = $CenterContainer/MainCard/Margin/MainLayout/ChatSection/ChatInput/SendButton
+# Left Column - Audio
+@onready var mute_button = $"CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/MuteButton"
+@onready var mic_level_bar = $"CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/MicLevelBar"
+@onready var device_container = $"CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/DeviceContainer"
+@onready var gain_slider = $"CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/GainSection/GainSlider"
+@onready var gain_value_label = $"CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/GainSection/HBox/Value"
+@onready var threshold_slider = $"CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/ThresholdSection/ThresholdSlider"
+@onready var threshold_label = $"CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/ThresholdSection/HBox/Value"
+@onready var hear_self_check = $"CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/OptionsSection/HearSelfCheck"
+@onready var play_global_check = $"CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/OptionsSection/PlayGlobalCheck"
 
-# Sections for reparenting
-@onready var main_layout = $CenterContainer/MainCard/Margin/MainLayout
-@onready var chat_section = $CenterContainer/MainCard/Margin/MainLayout/ChatSection
-@onready var participants_section = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ParticipantsSection
-@onready var left_column = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn
+# Right Column - People
+@onready var participant_count_label = $"CenterContainer/MainCard/Margin/VBox/Content/RightColumn/Header/Count"
+@onready var participant_list = $"CenterContainer/MainCard/Margin/VBox/Content/RightColumn/ScrollContainer/ParticipantList"
 
+# Other
 @onready var sandbox_http_request = $SandboxHTTPRequest
 
-# Audio controls
-@onready var audio_section = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection
-@onready var mic_level_bar = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/Controls/VBoxContainer/MicLevelBar
-@onready var threshold_slider = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/Controls/VBoxContainer/ThresholdContainer/ThresholdSlider
-@onready var threshold_label = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/Controls/VBoxContainer/ThresholdContainer/ThresholdLabel
-@onready var mute_button = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/Controls/MuteButton
-@onready var device_container = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/DeviceContainer
-
-var hear_audio_check: CheckBox
+# Variables
 var input_device_option: OptionButton # Will be added dynamically
 var mic_threshold: float = 0.1
 var is_muted: bool = false
@@ -51,12 +49,7 @@ var local_username: String = "User-" + str(randi() % 10000)
 
 # Room info
 var current_room_name: String = ""
-var room_name_label: Label = null
-var chat_messages = [] # Array of {sender: String, message: String, timestamp: int}
 var participant_usernames = {} # Dictionary of identity -> username
-
-# Participants
-@onready var participant_list = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ParticipantsSection/ScrollContainer/ParticipantList
 
 var livekit_manager: Node
 var participants = {} # Dictionary of participant_id -> { "player": AudioStreamPlayer, "level": float, "level_bar": ProgressBar, "muted": bool, "volume": float }
@@ -66,79 +59,9 @@ var mic_player: AudioStreamPlayer
 
 
 func _ready():
-	print("=== LiveKit Audio Client UI ===")
-	
-	# --- UI RESTRUCTURING (3 Columns) ---
-	# Layout: [LeftColumn] | [VSep] | [Participants] | [VSep] | [Chat]
-	# NOTE: Only do this on Desktop - Android/VR works better with original 2-column layout
-	
-	if OS.get_name() != "Android":
-		print("🖥️ Desktop detected - restructuring UI to 3-column layout")
-		
-		# 1. Move Participants Section to MainLayout (Middle Column)
-		left_column.remove_child(participants_section)
-		
-		# Insert after LeftColumn (index 1, since LeftColumn is 0)
-		# But MainLayout has [LeftColumn, VSeparator, ChatSection]
-		# We want: [LeftColumn, VSeparator, ParticipantsSection, VSeparator2, ChatSection]
-		
-		# Create new separator
-		var sep2 = VSeparator.new()
-		# Will be added later after participants_section is in place
-		
-		# Current Children of MainLayout:
-		# 0: LeftColumn
-		# 1: VSeparator (VSeparator)
-		# 2: ChatSection
-		
-		# We want to insert ParticipantsSection at index 2
-		main_layout.add_child(participants_section)
-		main_layout.move_child(participants_section, 2)
-		
-		# Now: [Left, VSep, Participants, Chat]
-		# We need another separator between Participants and Chat
-		main_layout.add_child(sep2)
-		main_layout.move_child(sep2, 3)
-		
-		# Final: [Left, VSep, Participants, VSep2, Chat]
-		
-		# Show title again (if it was hidden)
-		var part_title = participants_section.get_node_or_null("Header/Title")
-		if part_title: part_title.visible = true
-		
-		var chat_title = chat_section.get_node_or_null("SectionTitle")
-		if chat_title: chat_title.visible = true
-		
-		# Adjust Size Flags
-		left_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		left_column.size_flags_stretch_ratio = 0.25
-		
-		participants_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		participants_section.size_flags_stretch_ratio = 0.45
-		
-		chat_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		chat_section.size_flags_stretch_ratio = 0.3
-	else:
-		print("📱 Android/VR detected - using original 2-column layout")
-		# On Android, keep the original structure from the scene file
-		# ParticipantsSection and ChatSection are both in LeftColumn originally
-		# Explicitly ensure they're visible and sized correctly
-		var part_title = participants_section.get_node_or_null("Header/Title")
-		if part_title: part_title.visible = true
-		
-		# Ensure ParticipantsSection is visible
-		participants_section.visible = true
-		
-		var chat_title = chat_section.get_node_or_null("SectionTitle")
-		if chat_title: chat_title.visible = true
-		
-		# Ensure ChatSection is visible
-		chat_section.visible = true
-	
-	# -------------------------------
+	print("=== LiveKit Audio Client UI - Unified Design ===")
 	
 	# Setup Audio
-
 	_setup_audio()
 
 	# Create LiveKitManager -> Use Wrapper
@@ -155,8 +78,6 @@ func _ready():
 			livekit_manager.participant_left.connect(_on_participant_left)
 		if not livekit_manager.audio_frame_received.is_connected(_on_audio_frame):
 			livekit_manager.audio_frame_received.connect(_on_audio_frame)
-		if not livekit_manager.chat_message_received.is_connected(_on_chat_message_received):
-			livekit_manager.chat_message_received.connect(_on_chat_message_received)
 		if not livekit_manager.participant_metadata_changed.is_connected(_on_participant_metadata_changed):
 			livekit_manager.participant_metadata_changed.connect(_on_participant_metadata_changed)
 		if not livekit_manager.connection_error.is_connected(_on_error):
@@ -172,43 +93,49 @@ func _ready():
 		connect_button.disabled = true
 		auto_connect_button.disabled = true
 
-	
-	# Connect UI signals
+	# Connect UI signals - Connection Tab
 	connect_button.pressed.connect(_on_connect_pressed)
 	disconnect_button.pressed.connect(_on_disconnect_pressed)
-	mute_button.pressed.connect(_on_mute_toggle)
-	threshold_slider.value_changed.connect(_on_threshold_changed)
-	
-	# Username UI
+	auto_connect_button.pressed.connect(_on_auto_connect_pressed)
+	generate_token_button.pressed.connect(_on_generate_token_pressed)
 	update_name_button.pressed.connect(_on_update_name_pressed)
 	username_entry.text = local_username
 	
-	# Chat UI
-	send_button.pressed.connect(_on_send_button_pressed)
-	message_entry.text_submitted.connect(_on_message_submitted)
+	# Connect UI signals - Audio Tab
+	mute_button.toggled.connect(_on_mute_toggle)
+	gain_slider.value_changed.connect(_on_gain_changed)
+	threshold_slider.value_changed.connect(_on_threshold_changed)
+	hear_self_check.toggled.connect(_on_hear_audio_toggled)
+	play_global_check.button_pressed = audio_playback_enabled
+	play_global_check.toggled.connect(func(toggled): audio_playback_enabled = toggled)
+	
+	# Setup audio device selector
+	_setup_input_device_selector()
 	
 	# Auto Connect signals
-	auto_connect_button.pressed.connect(_on_auto_connect_pressed)
 	sandbox_http_request.request_completed.connect(_on_sandbox_request_completed)
 	
-	# Create "Generate Token" button for easy token generation
-	var gen_token_button = Button.new()
-	gen_token_button.text = "🎫 Generate Token"
-	gen_token_button.tooltip_text = "Generate a LiveKit token using your Nakama user ID"
-	gen_token_button.pressed.connect(_on_generate_token_pressed)
+	# Initial state
+	disconnect_button.disabled = true
+	threshold_slider.value = mic_threshold
+	_on_threshold_changed(mic_threshold)
 	
-	# Add it to the Buttons container (same as Connect/Disconnect buttons)
-	var buttons_container = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection/Buttons
-	buttons_container.add_child(gen_token_button)
-	buttons_container.move_child(gen_token_button, 2)  # Place after Connect/Disconnect, before AutoConnect
+	# Set default server values for easy testing
+	server_entry.text = "ws://localhost:7880"
+	token_entry.text = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjQxODc2NDcsImlzcyI6ImRldmtleSIsIm5iZiI6MTc2NDEwMTI0Nywic3ViIjoiY2xpZW50LTEiLCJ2aWRlbyI6eyJyb29tIjoidGVzdC1yb29tIiwicm9vbUpvaW4iOnRydWUsImNhblB1Ymxpc2giOnRydWUsImNhblN1YnNjcmliZSI6dHJ1ZX19.tR0faOukMG6GJFXrCRVtPmEJhnbig_pirRyjcqvqy3M"
 	
-	# Create Input Device Selector
+	status_label.text = "Ready to connect"
+	print("✅ LiveKit Audio UI Ready (Unified Tab Design)!")
+
+
+func _setup_input_device_selector():
+	"""Create input device selector dropdown"""
 	var device_row = HBoxContainer.new()
 	device_container.add_child(device_row)
 	
 	var device_label = Label.new()
-	device_label.text = "Input Device:"
-	device_label.custom_minimum_size = Vector2(100, 0)
+	device_label.text = "Device:"
+	device_label.custom_minimum_size = Vector2(70, 0)
 	device_row.add_child(device_label)
 	
 	input_device_option = OptionButton.new()
@@ -216,64 +143,6 @@ func _ready():
 	input_device_option.item_selected.connect(_on_input_device_selected)
 	device_row.add_child(input_device_option)
 	_update_input_device_list()
-
-	# Create Hear Own Audio checkbox
-	hear_audio_check = CheckBox.new()
-	hear_audio_check.text = "Hear Self"
-	hear_audio_check.button_pressed = hear_own_audio
-	hear_audio_check.toggled.connect(_on_hear_audio_toggled)
-	device_row.add_child(hear_audio_check)
-	
-	# Create Gain slider
-	var gain_row = HBoxContainer.new()
-	device_container.add_child(gain_row)
-	
-	var gain_title = Label.new()
-	gain_title.text = "Mic Gain:"
-	gain_title.custom_minimum_size = Vector2(100, 0)
-	gain_row.add_child(gain_title)
-	
-	var gain_slider = HSlider.new()
-	gain_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	gain_slider.min_value = 0.0
-	gain_slider.max_value = 60.0
-	gain_slider.value = 0.0 # Default gain
-	gain_slider.value_changed.connect(_on_gain_changed)
-	gain_row.add_child(gain_slider)
-	
-	# Create Playback Checkbox (for debugging global audio)
-	var playback_check = CheckBox.new()
-	playback_check.text = "Play Global"
-	playback_check.button_pressed = audio_playback_enabled
-	playback_check.toggled.connect(func(toggled): audio_playback_enabled = toggled)
-	device_container.add_child(playback_check)
-	
-	var gain_value_label = Label.new()
-	gain_value_label.text = "0 dB"
-	gain_value_label.custom_minimum_size = Vector2(50, 0)
-	gain_value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	gain_row.add_child(gain_value_label)
-	
-	# Store reference for updates
-	gain_slider.set_meta("value_label", gain_value_label)
-	
-	# Initial state
-	disconnect_button.disabled = true
-	threshold_slider.value = mic_threshold
-	_on_threshold_changed(mic_threshold)
-	
-	# Set local server values for easy testing
-	server_entry.text = "ws://localhost:7880"
-	token_entry.text = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjQxODc2NDcsImlzcyI6ImRldmtleSIsIm5iZiI6MTc2NDEwMTI0Nywic3ViIjoiY2xpZW50LTEiLCJ2aWRlbyI6eyJyb29tIjoidGVzdC1yb29tIiwicm9vbUpvaW4iOnRydWUsImNhblB1Ymxpc2giOnRydWUsImNhblN1YnNjcmliZSI6dHJ1ZX19.tR0faOukMG6GJFXrCRVtPmEJhnbig_pirRyjcqvqy3M"
-	
-	# Add Nakama ID helper info
-	_update_nakama_id_hint()
-	
-	# Create room name label
-	_create_room_name_label()
-	
-	status_label.text = "Ready to connect"
-	print("✅ LiveKit Audio UI Ready!")
 	
 
 func _on_auto_connect_pressed():
@@ -397,11 +266,6 @@ func _process(delta):
 	_process_mic_audio()
 	
 	# Update Nakama ID hint periodically (every 2 seconds)
-	_hint_update_timer += delta
-	if _hint_update_timer > 2.0:
-		_hint_update_timer = 0.0
-		_update_nakama_id_hint()
-	
 	# Debug audio state every 2 seconds
 	_debug_timer += delta
 	if _debug_timer > 2.0:
@@ -443,9 +307,15 @@ func _process(delta):
 				p_data["pos_label"].text = "Pos: Not Found"
 				p_data["pos_label"].modulate = Color.RED
 
+var _audio_debug_counter = 0
 func _process_mic_audio():
 	if capture_effect and capture_effect.can_get_buffer(BUFFER_SIZE):
 		var buffer = capture_effect.get_buffer(BUFFER_SIZE)
+		
+		# Debug: Print mute state periodically
+		_audio_debug_counter += 1
+		if _audio_debug_counter % 60 == 0:  # Every ~1 second at 60fps
+			print("🔊 Audio check: is_muted=", is_muted, ", connected=", livekit_manager != null and livekit_manager.is_room_connected())
 		
 		# Audio is already amplified by AudioEffectAmplify on the bus
 		# No need for additional software gain here
@@ -534,8 +404,12 @@ func _on_room_connected():
 	else:
 		status_label.text = "✅ Connected to: " + current_room_name
 	
-	# Update room name label
-	_update_room_name_label()
+	# Update room info label
+	if room_info_label:
+		if current_room_name.is_empty():
+			room_info_label.text = "Room: Not connected"
+		else:
+			room_info_label.text = "🎙️ Room: " + current_room_name
 	
 	connect_button.disabled = true
 	disconnect_button.disabled = false
@@ -550,8 +424,9 @@ func _on_room_disconnected():
 	connect_button.disabled = false
 	disconnect_button.disabled = true
 	
-	# Update room name label
-	_update_room_name_label()
+	# Update room info label
+	if room_info_label:
+		room_info_label.text = "Room: Not connected"
 	
 	# Clear participant list
 	for child in participant_list.get_children():
@@ -635,15 +510,30 @@ func _on_error(msg: String):
 	connect_button.disabled = false
 
 
-func _on_mute_toggle():
-	is_muted = !is_muted
+func _on_mute_toggle(button_pressed: bool):
+	# button_pressed = true means the button is pressed (muted)
+	is_muted = button_pressed
 	mute_button.text = "🔇 Muted" if is_muted else "🎤 Active"
+	print("🎤 LiveKit UI Mute toggled: ", is_muted, " (button_pressed: ", button_pressed, ")")
 	
 	# Also mute the XR player's voice component (for spatial audio)
 	var xr_player = get_tree().get_first_node_in_group("xr_player")
-	if xr_player and xr_player.has_method("set_muted"):
-		xr_player.set_muted(is_muted)
-		print("LiveKit UI: Set XR player mute to: ", is_muted)
+	print("   Looking for xr_player in group: found = ", xr_player != null)
+	
+	if not xr_player:
+		# Fallback: try to find by name
+		xr_player = get_tree().root.find_child("XRPlayer", true, false)
+		print("   Fallback find_child: found = ", xr_player != null)
+		
+	if xr_player:
+		print("   xr_player.has_method('set_muted'): ", xr_player.has_method("set_muted"))
+		if xr_player.has_method("set_muted"):
+			xr_player.set_muted(is_muted)
+			print("   ✓ Called xr_player.set_muted(", is_muted, ")")
+		else:
+			print("   ❌ xr_player doesn't have set_muted method!")
+	else:
+		print("❌ LiveKit UI: Could not find XR player to mute! (Group count: ", get_tree().get_nodes_in_group("xr_player").size(), ")")
 	
 	# We don't stop the player so we can still see visualization if we wanted,
 	# but for now let's just stop pushing audio in _process_mic_audio.
@@ -670,10 +560,7 @@ func _on_gain_changed(value: float):
 		print("🎚️ Mic gain changed to: ", value, " dB")
 		
 		# Update label
-		# Update label
-		var label = get_node("CenterContainer/MainCard/Margin/MainLayout/LeftColumn/AudioSection/DeviceContainer").get_child(1).get_child(2)
-		if label:
-			label.text = "%.1f dB" % value
+		gain_value_label.text = "%.1f dB" % value
 
 func _update_input_device_list():
 	input_device_option.clear()
@@ -720,13 +607,21 @@ func _add_participant(participant_name: String, _level: float):
 
 
 func _update_participant_list():
+	print("📋 _update_participant_list called. participants count: ", participants.size())
+	print("   participant_list node valid: ", participant_list != null)
+	
+	if not participant_list:
+		print("   ❌ participant_list is NULL!")
+		return
+		
 	# Clear existing
 	for child in participant_list.get_children():
 		child.queue_free()
 	
-	# Update participant count in title
-	if participants_title:
-		participants_title.text = "PARTICIPANTS (%d)" % participants.size()
+	# Update participant count label
+	if participant_count_label:
+		participant_count_label.text = "(%d)" % participants.size()
+		print("   Updated count label to: ", participant_count_label.text)
 	
 	# Add all participants
 	for participant_id in participants.keys():
@@ -877,48 +772,16 @@ func _on_participant_mute_toggled(participant_id: String, btn: Button):
 		print("Toggled mute for ", participant_id, ": ", p_data["muted"])
 
 
-# Chat and Username handlers
-func _on_chat_message_received(sender: String, message: String, timestamp: int):
-	print("💬 Chat from ", sender, ": ", message)
-	
-	# Get username or fallback to identity
-	var sender_name = participant_usernames.get(sender, sender)
-	
-	# Store message
-	chat_messages.append({
-		"sender": sender_name,
-		"message": message,
-		"timestamp": timestamp
-	})
-	
-	# Update chat UI if it exists
-	_update_chat_ui()
-
 func _on_participant_metadata_changed(identity: String, metadata: String):
+	"""Handle participant metadata changes (username updates)"""
 	var data = JSON.parse_string(metadata)
 	if data and data.has("username"):
-		_on_participant_name_changed(identity, data.username)
+		var username = data.username
+		print("👤 Name changed for ", identity, ": ", username)
+		participant_usernames[identity] = username
+		# Update participant list to show new name
+		_update_participant_list()
 
-func _on_participant_name_changed(identity: String, username: String):
-	print("👤 Name changed for ", identity, ": ", username)
-	participant_usernames[identity] = username
-	
-	# Update participant list to show new name
-	_update_participant_list()
-
-func _send_chat_message(message: String):
-	if livekit_manager and livekit_manager.is_room_connected():
-		livekit_manager.send_data(message)
-		
-		# Add own message to chat (won't receive it back from server)
-		chat_messages.append({
-			"sender": local_username,
-			"message": message,
-			"timestamp": Time.get_unix_time_from_system()
-		})
-		_update_chat_ui()
-	else:
-		print("⚠️ Cannot send chat: not connected")
 
 func _update_local_username(new_name: String):
 	if new_name.strip_edges().is_empty():
@@ -937,35 +800,12 @@ func _update_local_username(new_name: String):
 	else:
 		print("⚠️ Not connected. Username will be sent on connect.")
 
-func _update_chat_ui():
-	# Clear existing messages
-	for child in chat_messages_container.get_children():
-		child.queue_free()
+func _on_participant_name_changed(identity: String, username: String):
+	print("👤 Name changed for ", identity, ": ", username)
+	participant_usernames[identity] = username
 	
-	# Add all messages
-	for msg in chat_messages:
-		var label = Label.new()
-		label.text = "[%s]: %s" % [msg["sender"], msg["message"]]
-		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		chat_messages_container.add_child(label)
-		
-	# Scroll to bottom (deferred to wait for layout)
-	await get_tree().process_frame
-	if chat_messages_container.get_parent() is ScrollContainer:
-		var scroll = chat_messages_container.get_parent()
-		scroll.set_v_scroll(scroll.get_v_scroll_bar().max_value)
-
-func _on_send_button_pressed():
-	var msg = message_entry.text.strip_edges()
-	if not msg.is_empty():
-		_send_chat_message(msg)
-		message_entry.text = ""
-
-func _on_message_submitted(text: String):
-	var msg = text.strip_edges()
-	if not msg.is_empty():
-		_send_chat_message(msg)
-		message_entry.text = ""
+	# Update participant list to show new name
+	_update_participant_list()
 
 func _on_update_name_pressed():
 	var new_name = username_entry.text.strip_edges()
@@ -1066,81 +906,3 @@ func _on_generate_token_pressed():
 	
 	status_label.text = "✅ Token generated for: " + nakama_id
 	print("🎫 Generated LiveKit token for Nakama ID: ", nakama_id)
-
-
-func _update_nakama_id_hint():
-	"""Display Nakama user ID to help with LiveKit token generation"""
-	# Find or create the hint label
-	var hint_container = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/ConnectionSection
-	var existing_hint = hint_container.get_node_or_null("NakamaIDHint")
-	
-	# Get NetworkManager
-	var network_manager = get_node_or_null("/root/NetworkManager")
-	if not network_manager:
-		print("⚠️ [LiveKit UI] NetworkManager not found - hint cannot be updated")
-		if existing_hint:
-			existing_hint.queue_free()
-		return
-	
-	var nakama_id = network_manager.get_nakama_user_id()
-	print("📋 [LiveKit UI] Nakama ID check: '", nakama_id, "' (empty: ", nakama_id.is_empty(), ")")
-	
-	# Create hint label if it doesn't exist
-	if not existing_hint:
-		existing_hint = Label.new()
-		existing_hint.name = "NakamaIDHint"
-		existing_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		existing_hint.add_theme_font_size_override("font_size", 12)
-		existing_hint.add_theme_color_override("font_color", Color.WHITE)
-		# Add some padding for visibility
-		existing_hint.add_theme_constant_override("line_spacing", 4)
-		hint_container.add_child(existing_hint)
-		hint_container.move_child(existing_hint, hint_container.get_child_count() - 1)
-		print("✅ [LiveKit UI] Created Nakama ID hint label")
-	
-	# Update hint text based on Nakama connection status
-	if nakama_id.is_empty():
-		existing_hint.text = "💡 Tip: Connect to Nakama first, then click 'Generate Token' below"
-		existing_hint.modulate = Color(1.0, 1.0, 0.6)  # Yellow
-		print("   → Hint: Not connected to Nakama")
-	else:
-		existing_hint.text = "ℹ️ Nakama ID: %s\n✨ Click 'Generate Token' to auto-fill your token!" % nakama_id
-		existing_hint.modulate = Color(0.6, 1.0, 0.6)  # Green
-		print("   → Hint: Showing Nakama ID: ", nakama_id)
-	
-	# Ensure hint is visible
-	existing_hint.visible = true
-
-
-func _create_room_name_label():
-	"""Create a label to display the current LiveKit room name"""
-	var header_section = $CenterContainer/MainCard/Margin/MainLayout/LeftColumn/Header
-	
-	# Create room name label
-	room_name_label = Label.new()
-	room_name_label.name = "RoomNameLabel"
-	room_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	room_name_label.add_theme_font_size_override("font_size", 16)
-	room_name_label.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))  # Green
-	room_name_label.text = ""
-	room_name_label.visible = false
-	
-	# Add to header section
-	header_section.add_child(room_name_label)
-	header_section.move_child(room_name_label, 1)  # Place after StatusLabel
-	
-	print("✅ [LiveKit UI] Created room name label")
-
-
-func _update_room_name_label():
-	"""Update the room name label with current room info"""
-	if not room_name_label:
-		return
-	
-	if current_room_name.is_empty():
-		room_name_label.visible = false
-		room_name_label.text = ""
-	else:
-		room_name_label.visible = true
-		room_name_label.text = "🎙️ Room: " + current_room_name
-		print("📋 [LiveKit UI] Updated room name: ", current_room_name)
