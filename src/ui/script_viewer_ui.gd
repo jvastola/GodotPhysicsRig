@@ -53,6 +53,10 @@ static var instance: PanelContainer = null
 var _search_field: LineEdit = null
 var _parent_viewport: SubViewport = null
 
+# Editable script code
+var _code_edit: CodeEdit = null
+var _is_edit_mode: bool = true  # Default to edit mode for VR
+
 
 func _ready() -> void:
 	instance = self
@@ -88,6 +92,51 @@ func _setup_search_field() -> void:
 	# Insert after title
 	vbox.add_child(search_container)
 	vbox.move_child(search_container, 1)
+	
+	# Create the CodeEdit for editable script viewing
+	_setup_code_edit()
+
+
+func _setup_code_edit() -> void:
+	# Create CodeEdit for editable script content
+	_code_edit = CodeEdit.new()
+	_code_edit.name = "CodeEdit"
+	_code_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_code_edit.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_code_edit.custom_minimum_size = Vector2(0, 300)
+	
+	# Style the CodeEdit
+	_code_edit.add_theme_font_size_override("font_size", 11)
+	_code_edit.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95))
+	_code_edit.add_theme_color_override("background_color", Color(0.08, 0.085, 0.1, 0.95))
+	
+	# Enable line numbers
+	_code_edit.gutters_draw_line_numbers = true
+	_code_edit.gutters_draw_fold_gutter = true
+	
+	# GDScript syntax highlighter
+	var highlighter = CodeHighlighter.new()
+	highlighter.number_color = NUMBER_COLOR
+	highlighter.symbol_color = Color(0.8, 0.8, 0.85)
+	highlighter.function_color = FUNCTION_COLOR
+	highlighter.member_variable_color = Color(0.7, 0.8, 1.0)
+	
+	# Add keywords
+	for keyword in KEYWORDS:
+		highlighter.add_keyword_color(keyword, KEYWORD_COLOR)
+	
+	# Add types
+	for type_name in TYPES:
+		highlighter.add_keyword_color(type_name, CLASS_COLOR)
+	
+	_code_edit.syntax_highlighter = highlighter
+	
+	# Add to scroll container or main vbox - replace the RichTextLabel
+	if scroll_container:
+		# Hide the old code_label if exists
+		if code_label:
+			code_label.visible = false
+		scroll_container.add_child(_code_edit)
 
 
 func _register_with_keyboard_manager() -> void:
@@ -104,9 +153,12 @@ func _register_with_keyboard_manager() -> void:
 
 
 func _deferred_register() -> void:
-	if KeyboardManager and KeyboardManager.instance and _search_field:
-		KeyboardManager.instance.register_control(_search_field, _parent_viewport)
-		print("ScriptViewerUI: Registered search field with KeyboardManager")
+	if KeyboardManager and KeyboardManager.instance:
+		if _search_field:
+			KeyboardManager.instance.register_control(_search_field, _parent_viewport)
+		if _code_edit:
+			KeyboardManager.instance.register_control(_code_edit, _parent_viewport)
+		print("ScriptViewerUI: Registered search field and code editor with KeyboardManager")
 
 
 func _on_search_submitted(text: String) -> void:
@@ -212,23 +264,34 @@ func _display_script() -> void:
 	# Get script source code
 	var source_code = _current_script.source_code
 	if source_code.is_empty():
-		if code_label:
+		if _code_edit:
+			_code_edit.text = "(Script source not available)"
+		elif code_label:
 			code_label.text = "[color=#888888](Script source not available)[/color]"
 		return
 	
-	# Apply syntax highlighting
-	var highlighted = _highlight_gdscript(source_code)
-	
-	if code_label:
-		code_label.text = highlighted
-	
-	# Generate line numbers
-	if line_numbers:
-		var lines = source_code.split("\n")
-		var line_nums_text = ""
-		for i in range(lines.size()):
-			line_nums_text += "[color=#555555]%4d[/color]\n" % (i + 1)
-		line_numbers.text = line_nums_text
+	# Use CodeEdit for editable viewing (preferred for VR with keyboard)
+	if _code_edit:
+		_code_edit.text = source_code
+		_code_edit.visible = true
+		# Hide the old RichTextLabel
+		if code_label:
+			code_label.visible = false
+		# Hide line_numbers since CodeEdit has its own
+		if line_numbers:
+			line_numbers.visible = false
+	else:
+		# Fallback to RichTextLabel (read-only)
+		var highlighted = _highlight_gdscript(source_code)
+		if code_label:
+			code_label.text = highlighted
+		# Generate line numbers
+		if line_numbers:
+			var lines = source_code.split("\n")
+			var line_nums_text = ""
+			for i in range(lines.size()):
+				line_nums_text += "[color=#555555]%4d[/color]\n" % (i + 1)
+			line_numbers.text = line_nums_text
 
 
 func _highlight_gdscript(source: String) -> String:

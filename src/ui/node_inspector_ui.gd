@@ -279,6 +279,9 @@ func _add_float_property(label_text: String, value: float, prop_name: String) ->
 	spinbox.value_changed.connect(func(val): _on_property_changed(prop_name, val))
 	hbox.add_child(spinbox)
 	
+	# Register with KeyboardManager
+	_register_spinbox(spinbox)
+	
 	properties_container.add_child(hbox)
 	_property_controls[prop_name] = spinbox
 
@@ -305,6 +308,9 @@ func _add_int_property(label_text: String, value: int, prop_name: String) -> voi
 	spinbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	spinbox.value_changed.connect(func(val): _on_property_changed(prop_name, int(val)))
 	hbox.add_child(spinbox)
+	
+	# Register with KeyboardManager
+	_register_spinbox(spinbox)
 	
 	properties_container.add_child(hbox)
 	_property_controls[prop_name] = spinbox
@@ -449,10 +455,20 @@ func _create_component_spinbox(component_label: String, value: float, color: Col
 	spinbox.custom_minimum_size.x = 60
 	hbox.add_child(spinbox)
 	
+	# Register the SpinBox's internal LineEdit with KeyboardManager
+	_register_spinbox(spinbox)
+	
 	# Store reference for retrieval
 	hbox.set_meta("spinbox", spinbox)
 	
 	return hbox
+
+
+func _register_spinbox(spinbox: SpinBox) -> void:
+	# SpinBox has an internal LineEdit that we need to register
+	var line_edit = spinbox.get_line_edit()
+	if line_edit:
+		_register_line_edit(line_edit)
 
 
 func _on_property_changed(prop_name: String, new_value: Variant) -> void:
