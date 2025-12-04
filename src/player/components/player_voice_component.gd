@@ -271,6 +271,11 @@ func set_muted(muted: bool) -> void:
 	"""Set mute status"""
 	is_muted = muted
 	print("PlayerVoiceComponent: Mute set to: ", is_muted)
+	
+	# Also notify LiveKit manager (important for Android native audio)
+	if livekit_manager and livekit_manager.has_method("set_audio_enabled"):
+		livekit_manager.set_audio_enabled(!muted)
+		print("  ✓ Called livekit_manager.set_audio_enabled(", !muted, ")")
 
 
 func set_mic_gain(gain_db: float) -> void:

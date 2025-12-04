@@ -516,6 +516,12 @@ func _on_mute_toggle(button_pressed: bool):
 	mute_button.text = "🔇 Muted" if is_muted else "🎤 Active"
 	print("🎤 LiveKit UI Mute toggled: ", is_muted, " (button_pressed: ", button_pressed, ")")
 	
+	# CRITICAL: Tell LiveKit to enable/disable the audio track
+	# This is especially important on Android where the native plugin handles audio
+	if livekit_manager and livekit_manager.is_room_connected():
+		livekit_manager.set_audio_enabled(!is_muted)
+		print("   ✓ Called livekit_manager.set_audio_enabled(", !is_muted, ")")
+	
 	# Also mute the XR player's voice component (for spatial audio)
 	var xr_player = get_tree().get_first_node_in_group("xr_player")
 	print("   Looking for xr_player in group: found = ", xr_player != null)
