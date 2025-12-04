@@ -1,0 +1,147 @@
+[gd_scene load_steps=6 format=3 uid="uid://dtu5x2k7a8mcv"]
+
+[ext_resource type="Script" path="res://src/ui/livekit/components/audio_settings.gd" id="1_audio"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.12, 0.13, 0.16, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+content_margin_left = 12
+content_margin_top = 12
+content_margin_right = 12
+content_margin_bottom = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_normal"]
+content_margin_left = 15
+content_margin_top = 8
+content_margin_right = 15
+content_margin_bottom = 8
+bg_color = Color(0.24, 0.26, 0.30, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_hover"]
+content_margin_left = 15
+content_margin_top = 8
+content_margin_right = 15
+content_margin_bottom = 8
+bg_color = Color(0.30, 0.32, 0.37, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_muted"]
+content_margin_left = 15
+content_margin_top = 8
+content_margin_right = 15
+content_margin_bottom = 8
+bg_color = Color(0.85, 0.30, 0.30, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[node name="AudioSettingsPanel" type="PanelContainer"]
+custom_minimum_size = Vector2(0, 200)
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+script = ExtResource("1_audio")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SectionTitle" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_font_sizes/font_size = 14
+text = "AUDIO SETTINGS"
+
+[node name="MuteButton" type="Button" parent="VBox"]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_muted")
+toggle_mode = true
+text = "🎤 Active"
+
+[node name="MicLevelBar" type="ProgressBar" parent="VBox"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+show_percentage = false
+
+[node name="DeviceContainer" type="VBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="GainSection" type="VBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="HBox" type="HBoxContainer" parent="VBox/GainSection"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="VBox/GainSection/HBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+theme_override_font_sizes/font_size = 12
+text = "Mic Gain"
+
+[node name="Value" type="Label" parent="VBox/GainSection/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+theme_override_font_sizes/font_size = 12
+text = "0 dB"
+horizontal_alignment = 2
+
+[node name="GainSlider" type="HSlider" parent="VBox/GainSection"]
+layout_mode = 2
+max_value = 60.0
+
+[node name="ThresholdSection" type="VBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="HBox" type="HBoxContainer" parent="VBox/ThresholdSection"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="VBox/ThresholdSection/HBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+theme_override_font_sizes/font_size = 12
+text = "Voice Threshold"
+
+[node name="Value" type="Label" parent="VBox/ThresholdSection/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.10"
+horizontal_alignment = 2
+
+[node name="ThresholdSlider" type="HSlider" parent="VBox/ThresholdSection"]
+layout_mode = 2
+max_value = 1.0
+step = 0.01
+value = 0.1
+
+[node name="OptionsSection" type="VBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HearSelfCheck" type="CheckBox" parent="VBox/OptionsSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Hear Self (Local Playback)"
+
+[node name="PlayGlobalCheck" type="CheckBox" parent="VBox/OptionsSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Play Global (Debug)"

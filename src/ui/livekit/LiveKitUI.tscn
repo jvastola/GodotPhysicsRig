@@ -1,12 +1,12 @@
-[gd_scene load_steps=9 format=3 uid="uid://8qfn1v423ubr"]
+[gd_scene load_steps=4 format=3 uid="uid://8qfn1v423ubr"]
 
-[ext_resource type="Script" path="res://src/ui/livekit/livekit_ui.gd" id="1_w4x8r"]
+[ext_resource type="Script" path="res://src/ui/livekit/livekit_ui.gd" id="1_coord"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
-bg_color = Color(0.0941176, 0.0980392, 0.113725, 1)
+bg_color = Color(0.094, 0.098, 0.114, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]
-bg_color = Color(0.133333, 0.141176, 0.168627, 1)
+bg_color = Color(0.133, 0.141, 0.169, 1)
 corner_radius_top_left = 12
 corner_radius_top_right = 12
 corner_radius_bottom_right = 12
@@ -15,74 +15,14 @@ shadow_color = Color(0, 0, 0, 0.2)
 shadow_size = 10
 shadow_offset = Vector2(0, 4)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_input"]
-content_margin_left = 10.0
-content_margin_top = 8.0
-content_margin_right = 10.0
-content_margin_bottom = 8.0
-bg_color = Color(0.0941176, 0.0980392, 0.113725, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.239216, 0.258824, 0.301961, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_hover"]
-content_margin_left = 15.0
-content_margin_top = 8.0
-content_margin_right = 15.0
-content_margin_bottom = 8.0
-bg_color = Color(0.298039, 0.321569, 0.372549, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_normal"]
-content_margin_left = 15.0
-content_margin_top = 8.0
-content_margin_right = 15.0
-content_margin_bottom = 8.0
-bg_color = Color(0.239216, 0.258824, 0.301961, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_primary"]
-content_margin_left = 15.0
-content_margin_top = 8.0
-content_margin_right = 15.0
-content_margin_bottom = 8.0
-bg_color = Color(0.298039, 0.45098, 0.85098, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_danger"]
-content_margin_left = 15.0
-content_margin_top = 8.0
-content_margin_right = 15.0
-content_margin_bottom = 8.0
-bg_color = Color(0.85098, 0.298039, 0.298039, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[node name="LiveKitAudioUI" type="Control"]
+[node name="LiveKitUI" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_w4x8r")
+script = ExtResource("1_coord")
 
 [node name="Background" type="Panel" parent="."]
 layout_mode = 1
@@ -102,7 +42,7 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="MainCard" type="PanelContainer" parent="CenterContainer"]
-custom_minimum_size = Vector2(700, 500)
+custom_minimum_size = Vector2(750, 550)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_card")
 
@@ -126,13 +66,13 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
 theme_override_font_sizes/font_size = 24
-text = "LiveKit Voice Chat"
+text = "🎙️ LiveKit Voice Chat"
 
 [node name="StatusLabel" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Header"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
 theme_override_font_sizes/font_size = 14
-text = "Ready to connect"
+text = "Initializing..."
 horizontal_alignment = 2
 
 [node name="HSeparator" type="HSeparator" parent="CenterContainer/MainCard/Margin/VBox"]
@@ -147,225 +87,14 @@ theme_override_constants/separation = 24
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 0.45
-theme_override_constants/separation = 20
-
-[node name="ConnectionSection" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn"]
-layout_mode = 2
-theme_override_constants/separation = 12
-
-[node name="SectionTitle" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
-theme_override_font_sizes/font_size = 14
-text = "CONNECTION"
-
-[node name="UsernameRow" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="UsernameEntry" type="LineEdit" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/UsernameRow"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_styles/normal = SubResource("StyleBoxFlat_input")
-placeholder_text = "Your Name"
-
-[node name="UpdateNameButton" type="Button" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/UsernameRow"]
-layout_mode = 2
-theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
-text = "Update"
-
-[node name="ServerEntry" type="LineEdit" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection"]
-layout_mode = 2
-theme_override_styles/normal = SubResource("StyleBoxFlat_input")
-placeholder_text = "wss://your-server.livekit.cloud"
-
-[node name="TokenEntry" type="LineEdit" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection"]
-layout_mode = 2
-theme_override_styles/normal = SubResource("StyleBoxFlat_input")
-placeholder_text = "Paste token or use auto-generate"
-secret = true
-
-[node name="Buttons" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="ConnectButton" type="Button" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/Buttons"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 14
-theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-theme_override_styles/normal = SubResource("StyleBoxFlat_btn_primary")
-text = "Connect"
-
-[node name="DisconnectButton" type="Button" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/Buttons"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 14
-theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-theme_override_styles/normal = SubResource("StyleBoxFlat_btn_danger")
-disabled = true
-text = "Disconnect"
-
-[node name="HelperButtons" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="AutoConnectButton" type="Button" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/HelperButtons"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 12
-theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
-text = "⚡ Auto Connect"
-
-[node name="GenerateTokenButton" type="Button" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection/HelperButtons"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 12
-theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
-text = "🎫 Gen Token"
-
-[node name="RoomInfo" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/ConnectionSection"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
-theme_override_font_sizes/font_size = 12
-text = "Room: Not connected"
-horizontal_alignment = 1
-
-[node name="HSeparator" type="HSeparator" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn"]
-layout_mode = 2
-
-[node name="AudioSection" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn"]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 12
-
-[node name="SectionTitle" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
-theme_override_font_sizes/font_size = 14
-text = "AUDIO SETTINGS"
-
-[node name="MuteButton" type="Button" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection"]
-custom_minimum_size = Vector2(0, 50)
-layout_mode = 2
-theme_override_font_sizes/font_size = 18
-theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
-toggle_mode = true
-text = "🎤 Active"
-
-[node name="MicLevelBar" type="ProgressBar" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection"]
-custom_minimum_size = Vector2(0, 8)
-layout_mode = 2
-show_percentage = false
-
-[node name="DeviceContainer" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="GainSection" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection"]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="HBox" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/GainSection"]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/GainSection/HBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
-theme_override_font_sizes/font_size = 12
-text = "Mic Gain"
-
-[node name="Value" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/GainSection/HBox"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
-theme_override_font_sizes/font_size = 12
-text = "0 dB"
-horizontal_alignment = 2
-
-[node name="GainSlider" type="HSlider" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/GainSection"]
-layout_mode = 2
-max_value = 60.0
-
-[node name="ThresholdSection" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection"]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="HBox" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/ThresholdSection"]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/ThresholdSection/HBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
-theme_override_font_sizes/font_size = 12
-text = "Voice Threshold"
-
-[node name="Value" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/ThresholdSection/HBox"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
-theme_override_font_sizes/font_size = 12
-text = "0.10"
-horizontal_alignment = 2
-
-[node name="ThresholdSlider" type="HSlider" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/ThresholdSection"]
-layout_mode = 2
-max_value = 1.0
-step = 0.01
-value = 0.1
-
-[node name="OptionsSection" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="HearSelfCheck" type="CheckBox" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/OptionsSection"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 12
-text = "Hear Self (Local Playback)"
-
-[node name="PlayGlobalCheck" type="CheckBox" parent="CenterContainer/MainCard/Margin/VBox/Content/LeftColumn/AudioSection/OptionsSection"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 12
-text = "Play Global (Debug)"
+theme_override_constants/separation = 16
 
 [node name="VSeparator" type="VSeparator" parent="CenterContainer/MainCard/Margin/VBox/Content"]
 layout_mode = 2
 
 [node name="RightColumn" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content"]
-custom_minimum_size = Vector2(300, 0)
+custom_minimum_size = Vector2(320, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 0.55
 theme_override_constants/separation = 12
-
-[node name="Header" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/RightColumn"]
-layout_mode = 2
-
-[node name="Title" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Content/RightColumn/Header"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
-theme_override_font_sizes/font_size = 14
-text = "PARTICIPANTS"
-
-[node name="Count" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Content/RightColumn/Header"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
-theme_override_font_sizes/font_size = 14
-text = "(0)"
-horizontal_alignment = 2
-
-[node name="ScrollContainer" type="ScrollContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/RightColumn"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="ParticipantList" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content/RightColumn/ScrollContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 8
-
-[node name="SandboxHTTPRequest" type="HTTPRequest" parent="."]
