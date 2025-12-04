@@ -1,4 +1,4 @@
-[gd_scene load_steps=22 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=23 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -18,6 +18,7 @@
 [ext_resource type="PackedScene" path="res://src/ui/NodeInspectorViewport3D.tscn" id="18_node_inspector"]
 [ext_resource type="PackedScene" path="res://src/ui/DebugConsoleViewport3D.tscn" id="19_debug_console"]
 [ext_resource type="PackedScene" path="res://src/ui/ScriptViewerViewport3D.tscn" id="20_script_viewer"]
+[ext_resource type="PackedScene" path="res://src/ui/KeyboardFullViewport3D.tscn" id="21_keyboard"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -101,7 +102,7 @@ text = "Grabbables Room"
 font_size = 48
 
 [node name="UnifiedRoomViewport3D" parent="." unique_id=1842196751 instance=ExtResource("13_unified_ui")]
-transform = Transform3D(0.505, 0, 0, 0, 0.505, 0, 0, 0, 0.505, -2.770787, 1.04535, -2.5)
+transform = Transform3D(0.505, 0, 0, 0, 0.505, 0, 0, 0, 0.505, -2.219528, 0.5762043, -1.9722173)
 
 [node name="LiveKitViewport3D" parent="." unique_id=1947332191 instance=ExtResource("14_livekit_viewport")]
 transform = Transform3D(0.505, 0, 0, 0, 0.505, 0, 0, 0, 0.505, 4, 1.04535, -2.5)
@@ -138,14 +139,17 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1, -3)
 transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, -4, 1.2, -2.5)
 
 [node name="SceneHierarchyViewport3D" parent="." unique_id=1482733498 instance=ExtResource("17_scene_hierarchy")]
-transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, -1.3916323, 1.2, -1.9860382)
+transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, -0.92447275, 0.4442712, -1.9860382)
 ui_size = Vector2(1200, 800)
 
 [node name="NodeInspectorViewport3D" parent="." unique_id=1993663670 instance=ExtResource("18_node_inspector")]
-transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0.6, 1.2, -1.9860382)
+transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0.03408259, 0.6178481, -1.9860382)
 
 [node name="DebugConsoleViewport3D" parent="." unique_id=421789258 instance=ExtResource("19_debug_console")]
-transform = Transform3D(0.3999252, 0, -0.0077348175, 0, 0.4, 0, 0.0077348175, 0, 0.3999252, -0.4, 1.1644142, -1.9860382)
+transform = Transform3D(0.3999252, 0, -0.0077348175, 0, 0.4, 0, 0.0077348175, 0, 0.3999252, 2.1419406, 0.46634054, -1.9860382)
 
-[node name="ScriptViewerViewport3D" parent="." instance=ExtResource("20_script_viewer")]
-transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 1.5, 1.2, -1.9860382)
+[node name="ScriptViewerViewport3D" parent="." unique_id=1076425149 instance=ExtResource("20_script_viewer")]
+transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 1.064451, 0.7851808, -1.9860382)
+
+[node name="KeyboardFullViewport3D" parent="." unique_id=1262501057 instance=ExtResource("21_keyboard")]
+transform = Transform3D(0.35, 0, 0, 0, 0.35, 0, 0, 0, 0.35, 1.0585722, 0.2227844, -1.88066)

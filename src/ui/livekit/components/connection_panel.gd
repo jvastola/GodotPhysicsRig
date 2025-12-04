@@ -39,6 +39,27 @@ func _setup_ui():
 	
 	username_entry.text = local_username
 	disconnect_button.disabled = true
+	
+	# Register input fields with KeyboardManager for virtual keyboard
+	_register_keyboard_fields()
+
+
+func _register_keyboard_fields() -> void:
+	# Find parent viewport for context
+	var viewport: SubViewport = null
+	var parent = get_parent()
+	while parent:
+		if parent is SubViewport:
+			viewport = parent
+			break
+		parent = parent.get_parent()
+	
+	# Register all text entry fields
+	if KeyboardManager and KeyboardManager.instance:
+		KeyboardManager.instance.register_control(username_entry, viewport)
+		KeyboardManager.instance.register_control(server_entry, viewport)
+		KeyboardManager.instance.register_control(token_entry, viewport)
+		print("ConnectionPanel: Registered input fields with KeyboardManager")
 
 
 func _set_defaults():

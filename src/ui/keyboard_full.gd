@@ -59,6 +59,21 @@ const KEY_SPACING = 3
 func _ready() -> void:
 	instance = self
 	_build_keyboard()
+	
+	# Connect to KeyboardManager if available
+	if KeyboardManager and KeyboardManager.instance:
+		text_input.connect(_on_text_for_manager)
+		special_key.connect(_on_special_for_manager)
+
+
+func _on_text_for_manager(character: String) -> void:
+	if KeyboardManager and KeyboardManager.instance:
+		KeyboardManager.instance.send_text(character)
+
+
+func _on_special_for_manager(key_name: String) -> void:
+	if KeyboardManager and KeyboardManager.instance:
+		KeyboardManager.instance.send_special_key(key_name)
 
 
 func _notification(what: int) -> void:

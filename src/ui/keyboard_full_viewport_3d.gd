@@ -34,6 +34,37 @@ func _ready() -> void:
 	if mesh_instance and _static_body:
 		mesh_instance.visible = true
 		_static_body.collision_layer = _saved_static_body_layer
+	
+	# Connect to KeyboardManager for focus feedback
+	_connect_keyboard_manager()
+
+
+func _connect_keyboard_manager() -> void:
+	# Use call_deferred to ensure KeyboardManager is ready
+	call_deferred("_deferred_connect_keyboard_manager")
+
+
+func _deferred_connect_keyboard_manager() -> void:
+	if KeyboardManager and KeyboardManager.instance:
+		KeyboardManager.instance.focus_changed.connect(_on_focus_changed)
+		KeyboardManager.instance.focus_cleared.connect(_on_focus_cleared)
+		print("KeyboardFullViewport3D: Connected to KeyboardManager")
+
+
+func _on_focus_changed(_control: Control, _viewport: SubViewport) -> void:
+	# Show visual feedback that keyboard is active
+	if mesh_instance:
+		var mat = mesh_instance.get_active_material(0) as StandardMaterial3D
+		if mat:
+			mat.albedo_color = Color(1.0, 1.0, 1.0, 1.0)  # Full brightness when active
+
+
+func _on_focus_cleared() -> void:
+	# Dim the keyboard when no input is focused
+	if mesh_instance:
+		var mat = mesh_instance.get_active_material(0) as StandardMaterial3D
+		if mat:
+			mat.albedo_color = Color(0.7, 0.7, 0.7, 0.85)  # Dimmed when inactive
 
 
 func handle_pointer_event(event: Dictionary) -> void:

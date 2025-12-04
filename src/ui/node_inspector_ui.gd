@@ -330,8 +330,25 @@ func _add_string_property(label_text: String, value: String, prop_name: String) 
 	line_edit.text_submitted.connect(func(text): _on_property_changed(prop_name, text))
 	hbox.add_child(line_edit)
 	
+	# Register with KeyboardManager for virtual keyboard input
+	_register_line_edit(line_edit)
+	
 	properties_container.add_child(hbox)
 	_property_controls[prop_name] = line_edit
+
+
+func _register_line_edit(line_edit: LineEdit) -> void:
+	# Find parent viewport for context
+	var viewport: SubViewport = null
+	var parent = get_parent()
+	while parent:
+		if parent is SubViewport:
+			viewport = parent
+			break
+		parent = parent.get_parent()
+	
+	if KeyboardManager and KeyboardManager.instance:
+		KeyboardManager.instance.register_control(line_edit, viewport)
 
 
 func _add_vector3_property(label_text: String, value: Vector3, prop_name: String) -> void:

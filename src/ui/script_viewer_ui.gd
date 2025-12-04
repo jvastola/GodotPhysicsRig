@@ -49,10 +49,83 @@ const TYPES = [
 # Static instance for global access
 static var instance: PanelContainer = null
 
+# Search/goto line input
+var _search_field: LineEdit = null
+var _parent_viewport: SubViewport = null
+
 
 func _ready() -> void:
 	instance = self
 	_show_no_script()
+	_setup_search_field()
+	_register_with_keyboard_manager()
+
+
+func _setup_search_field() -> void:
+	# Create search/goto line field after the title
+	var vbox = $MarginContainer/VBoxContainer
+	if not vbox:
+		return
+	
+	var search_container = HBoxContainer.new()
+	search_container.name = "SearchContainer"
+	search_container.add_theme_constant_override("separation", 4)
+	
+	var search_label = Label.new()
+	search_label.text = "🔍"
+	search_label.add_theme_font_size_override("font_size", 12)
+	search_container.add_child(search_label)
+	
+	_search_field = LineEdit.new()
+	_search_field.name = "SearchField"
+	_search_field.placeholder_text = "Go to line..."
+	_search_field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_search_field.add_theme_font_size_override("font_size", 11)
+	_search_field.custom_minimum_size.y = 24
+	_search_field.text_submitted.connect(_on_search_submitted)
+	search_container.add_child(_search_field)
+	
+	# Insert after title
+	vbox.add_child(search_container)
+	vbox.move_child(search_container, 1)
+
+
+func _register_with_keyboard_manager() -> void:
+	# Find parent viewport for context
+	var parent = get_parent()
+	while parent:
+		if parent is SubViewport:
+			_parent_viewport = parent
+			break
+		parent = parent.get_parent()
+	
+	# Use deferred to ensure KeyboardManager is ready
+	call_deferred("_deferred_register")
+
+
+func _deferred_register() -> void:
+	if KeyboardManager and KeyboardManager.instance and _search_field:
+		KeyboardManager.instance.register_control(_search_field, _parent_viewport)
+		print("ScriptViewerUI: Registered search field with KeyboardManager")
+
+
+func _on_search_submitted(text: String) -> void:
+	# Parse line number and scroll to it
+	if text.is_valid_int():
+		var line_num = text.to_int()
+		_scroll_to_line(line_num)
+		_search_field.clear()
+
+
+func _scroll_to_line(line: int) -> void:
+	if not scroll_container or not code_label:
+		return
+	
+	# Estimate line height and scroll position
+	var font_size = 11
+	var line_height = font_size + 4
+	var target_scroll = max(0, (line - 5) * line_height)
+	scroll_container.scroll_vertical = target_scroll
 
 
 func _notification(what: int) -> void:
