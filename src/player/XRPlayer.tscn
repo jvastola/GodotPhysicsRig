@@ -186,6 +186,7 @@ script = ExtResource("8_grid_snap")
 follow_mode = "always"
 maintain_visibility_without_hit = true
 pointer_node_path = NodePath("..")
+build_mode_enabled = false
 build_cube_scene = ExtResource("9_build_cube")
 voxel_chunk_manager_path = NodePath("../../../../../VoxelChunkManager")
 build_parent_path = NodePath("../../../../../BuildRoot")

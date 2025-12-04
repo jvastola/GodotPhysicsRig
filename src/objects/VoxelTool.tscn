@@ -14,8 +14,6 @@ metallic = 0.4
 roughness = 0.3
 
 [node name="VoxelTool" type="RigidBody3D" groups=["grabbable"]]
-collision_layer = 8
-collision_mask = 3
 mass = 0.3
 script = ExtResource("1_voxel_tool")
 save_id = "VoxelTool"
