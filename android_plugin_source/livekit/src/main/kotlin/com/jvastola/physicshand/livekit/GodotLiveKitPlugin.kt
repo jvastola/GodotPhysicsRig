@@ -23,6 +23,7 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
 
     private var room: Room? = null
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var isMuted: Boolean = false  // Track user's mute preference
 
     override fun getPluginName(): String = PLUGIN_NAME
 
@@ -63,14 +64,13 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
                     token
                 )
                 
-                // Auto enable mic with high-quality audio settings for better Quest 3 -> Desktop audio
-                // Configure echo cancellation, noise suppression, and auto gain control
-                room?.localParticipant?.setMicrophoneEnabled(true)
-                
-                // Note: LiveKit Android SDK v2.x automatically configures audio processing
-                // Echo cancellation, noise suppression, and AGC are enabled by default
-                // For higher bitrate, configure on the server side via room codec settings
-                android.util.Log.d("GodotLiveKit", "Audio track published with default HQ settings (echo cancel, noise suppress, AGC)")
+                // Only enable mic if not muted
+                if (!isMuted) {
+                    room?.localParticipant?.setMicrophoneEnabled(true)
+                    android.util.Log.d("GodotLiveKit", "connectToRoom: Mic enabled (not muted) with HQ settings")
+                } else {
+                    android.util.Log.d("GodotLiveKit", "connectToRoom: Mic disabled (user muted)")
+                }
                 
                 emitSignal("room_connected")
             } catch (e: Exception) {
@@ -131,6 +131,8 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
 
     @UsedByGodot
     fun setAudioEnabled(enabled: Boolean) {
+        isMuted = !enabled  // Remember user preference
+        android.util.Log.d("GodotLiveKit", "setAudioEnabled: $enabled, isMuted: $isMuted")
         scope.launch {
             room?.localParticipant?.setMicrophoneEnabled(enabled)
         }
@@ -172,7 +174,13 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
 
     override fun onMainResume() {
         scope.launch {
-            room?.localParticipant?.setMicrophoneEnabled(true)
+            // Only re-enable mic if user hasn't muted
+            if (!isMuted) {
+                room?.localParticipant?.setMicrophoneEnabled(true)
+                android.util.Log.d("GodotLiveKit", "onMainResume: Re-enabling mic (not muted)")
+            } else {
+                android.util.Log.d("GodotLiveKit", "onMainResume: Keeping mic disabled (muted)")
+            }
         }
         super.onMainResume()
     }
