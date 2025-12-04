@@ -88,7 +88,7 @@ func _setup_components() -> void:
 	# Movement Component - check if it already exists in scene first
 	movement_component = get_node_or_null("PlayerMovementComponent")
 	if movement_component:
-		movement_component.setup(player_body, right_controller)
+		movement_component.setup(player_body, left_controller, right_controller, xr_camera)
 
 
 func _find_livekit_manager() -> Node:
@@ -157,6 +157,7 @@ func _setup_physics_hands() -> void:
 func _process(delta: float) -> void:
 	if movement_component:
 		movement_component.process_turning(delta)
+		movement_component.process_locomotion(delta)
 	
 	# Retry setting up voice component if needed (handles race condition with UI loading)
 	if voice_component and not voice_component.livekit_manager:
@@ -170,6 +171,7 @@ func _process(delta: float) -> void:
 func _physics_process(delta: float) -> void:
 	if movement_component:
 		movement_component.physics_process_turning(delta)
+		movement_component.physics_process_locomotion(delta)
 		
 	# Head collision is now an Area3D parented to the XRCamera3D; it follows the headset automatically
 
