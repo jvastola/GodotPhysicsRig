@@ -159,6 +159,10 @@ func _get_file_icon(file_name: String) -> String:
 
 
 func _on_item_selected() -> void:
+	# Guard against infinite recursion when set_collapsed triggers item_selected
+	if _processing_selection:
+		return
+	
 	var selected = tree.get_selected()
 	if not selected:
 		return
@@ -167,14 +171,18 @@ func _on_item_selected() -> void:
 	
 	if DirAccess.dir_exists_absolute(path):
 		folder_selected.emit(path)
-		# Toggle folder collapsed state
+		# Toggle folder collapsed state (with guard to prevent recursion)
+		_processing_selection = true
 		selected.set_collapsed(not selected.is_collapsed())
 		# Update icon
 		var folder_name = path.get_file()
+		if folder_name.is_empty():
+			folder_name = "res://"
 		if selected.is_collapsed():
 			selected.set_text(0, ICONS["folder"] + " " + folder_name)
 		else:
 			selected.set_text(0, ICONS["folder_open"] + " " + folder_name)
+		_processing_selection = false
 	else:
 		file_selected.emit(path)
 
