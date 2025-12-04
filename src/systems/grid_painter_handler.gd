@@ -188,36 +188,71 @@ func _find_triangle_uv(mi: MeshInstance3D, lp: Vector3) -> Vector2:
 	return best_uv
 
 func handle_pointer_event(event: Dictionary) -> void:
+	# Debug logging for Android troubleshooting
+	var is_android = OS.get_name() == "Android"
+	if debug_uv or is_android:
+		print("GridPainterHandler: Received pointer event on ", name)
+		print("  - Event keys: ", event.keys())
+	
 	# Only respond to pointer events with a local position
 	if not event.has("local_position"):
-		return
+		if debug_uv or is_android:
+			print("  - WARNING: No local_position in event!")
+			# Try to compute local_position from global_position as fallback
+			if event.has("global_position"):
+				var gp: Vector3 = event["global_position"]
+				event["local_position"] = to_local(gp)
+				print("  - Computed local_position from global: ", event["local_position"])
+			else:
+				print("  - No global_position either, aborting")
+				return
+		else:
+			return
 
 	# Support both press and hold depending on event fields
 	var just_pressed: bool = event.has("action_just_pressed") and event["action_just_pressed"]
 	var pressed: bool = event.has("action_pressed") and event["action_pressed"]
+	if debug_uv or is_android:
+		print("  - just_pressed: ", just_pressed, ", pressed: ", pressed)
 	if not just_pressed and not pressed:
 		return
 
 	var pnode := get_node_or_null(painter) as Node
 	if not pnode:
+		if debug_uv or is_android:
+			print("  - WARNING: Painter node not found at path: ", painter)
 		return
 
 	var lp: Vector3 = event["local_position"]
 	var mi := self as MeshInstance3D
 	if not mi or not mi.mesh:
+		if debug_uv or is_android:
+			print("  - WARNING: No valid mesh on handler")
 		return
 
-	# Try triangle-level UV sampling first for accurate results on cubes and arbitrary meshes
+	# Try triangle-level UV sampling first for accurate results
 	var uv: Vector2 = _find_triangle_uv(mi, lp)
+	if debug_uv or is_android:
+		print("  - Triangle UV result: ", uv)
 	if uv.x < 0.0:
-		# fallback to AABB-based mapping (works well for planar quads)
+		# Fallback to AABB-based mapping
 		uv = _compute_uv_from_local_pos(mi, lp)
+		if debug_uv or is_android:
+			print("  - AABB UV fallback result: ", uv)
 		if uv.x < 0.0:
+			if debug_uv or is_android:
+				print("  - WARNING: Could not compute valid UV, aborting")
 			return
 
 	var color_to_paint: Color = paint_color
 	if event.has("pointer_color") and event["pointer_color"] is Color:
 		color_to_paint = event["pointer_color"]
 
+	if debug_uv or is_android:
+		print("  - Painting at UV ", uv, " with color ", color_to_paint)
+
 	if pnode.has_method("paint_at_uv"):
 		pnode.call_deferred("paint_at_uv", uv, color_to_paint, self.get_path())
+	elif debug_uv or is_android:
+		print("  - WARNING: Painter node doesn't have paint_at_uv method")
+

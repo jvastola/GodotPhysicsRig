@@ -122,6 +122,9 @@ func _physics_process(_delta: float) -> void:
 	var handler: Node = null
 	var hit_player: bool = false
 	var has_hit: bool = _raycast.is_colliding()
+	
+	# Debug logging for Android troubleshooting
+	var is_android = OS.get_name() == "Android"
 
 	if has_hit:
 		end = _raycast.get_collision_point()
@@ -138,6 +141,11 @@ func _physics_process(_delta: float) -> void:
 			handler = _resolve_handler(collider_obj)
 			if handler and not is_instance_valid(handler):
 				handler = null
+		
+		# Debug: Log hit info on Android
+		if is_android and action_state["just_pressed"]:
+			print("HandPointer: Hit on Android - collider=", collider_obj, " handler=", handler)
+			print("  - collision_mask=", _raycast.collision_mask, " point=", end)
 
 	if handler:
 		var base_event: Dictionary = _build_event(handler, collider_obj, end, normal, axis_world, start, distance, action_state, controller)
