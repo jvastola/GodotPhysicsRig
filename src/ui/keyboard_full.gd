@@ -142,6 +142,9 @@ func _create_key_button(key: String) -> Button:
 	var btn = Button.new()
 	btn.name = key.replace(" ", "_")
 	
+	# IMPORTANT: Prevent keyboard buttons from stealing focus from input fields
+	btn.focus_mode = Control.FOCUS_NONE
+	
 	# Set display text
 	var display = key
 	match key:
