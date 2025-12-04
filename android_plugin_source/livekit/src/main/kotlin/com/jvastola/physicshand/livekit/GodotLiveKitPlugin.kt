@@ -139,6 +139,27 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
     }
 
     @UsedByGodot
+    fun setParticipantVolume(identity: String, volume: Double) {
+        // LiveKit volume range is 0.0 to 10.0 (1.0 = normal)
+        android.util.Log.d("GodotLiveKit", "setParticipantVolume: $identity -> $volume")
+        scope.launch {
+            val participant = room?.remoteParticipants?.values?.find { it.identity?.value == identity }
+            // audioTrackPublications returns List<Pair<TrackPublication, Track?>>
+            participant?.audioTrackPublications?.forEach { (_, track) ->
+                (track as? io.livekit.android.room.track.RemoteAudioTrack)?.setVolume(volume)
+            }
+        }
+    }
+
+    @UsedByGodot
+    fun setParticipantMuted(identity: String, muted: Boolean) {
+        // Mute by setting volume to 0, unmute by setting to 1
+        val volume = if (muted) 0.0 else 1.0
+        android.util.Log.d("GodotLiveKit", "setParticipantMuted: $identity -> $muted (volume: $volume)")
+        setParticipantVolume(identity, volume)
+    }
+
+    @UsedByGodot
     fun setMetadata(metadata: String) {
         scope.launch {
             room?.localParticipant?.updateMetadata(metadata)

@@ -781,6 +781,12 @@ func _on_participant_volume_changed(value: float, participant_id: String):
 	if participants.has(participant_id):
 		participants[participant_id]["volume"] = value
 		print("Volume for ", participant_id, " set to ", value)
+		
+		# For Android: Call native volume control
+		# LiveKit Android SDK uses 0.0-10.0 range (1.0 = normal)
+		# Our slider is 0.0-2.0, so scale accordingly
+		if livekit_manager and livekit_manager.has_method("set_participant_volume"):
+			livekit_manager.set_participant_volume(participant_id, value)
 
 func _on_participant_mute_toggled(participant_id: String, btn: Button):
 	if participants.has(participant_id):
@@ -788,6 +794,10 @@ func _on_participant_mute_toggled(participant_id: String, btn: Button):
 		p_data["muted"] = !p_data["muted"]
 		btn.text = "🔇" if p_data["muted"] else "🔊"
 		print("Toggled mute for ", participant_id, ": ", p_data["muted"])
+		
+		# For Android: Call native mute control
+		if livekit_manager and livekit_manager.has_method("set_participant_muted"):
+			livekit_manager.set_participant_muted(participant_id, p_data["muted"])
 
 
 func _on_participant_metadata_changed(identity: String, metadata: String):

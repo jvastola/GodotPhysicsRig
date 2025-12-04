@@ -285,6 +285,26 @@ func get_current_room() -> String:
 	return ""
 
 
+## Set volume for a specific remote participant (Android only)
+## @param identity: Participant identity
+## @param volume: Volume level (0.0 = muted, 1.0 = normal, up to 10.0 for boost)
+func set_participant_volume(identity: String, volume: float) -> void:
+	print("[LiveKitWrapper] set_participant_volume: %s -> %.2f" % [identity, volume])
+	if current_platform == Platform.ANDROID:
+		if _android_plugin:
+			_android_plugin.setParticipantVolume(identity, volume)
+
+
+## Mute/unmute a specific remote participant (Android only)
+## @param identity: Participant identity
+## @param muted: Whether to mute the participant
+func set_participant_muted(identity: String, muted: bool) -> void:
+	print("[LiveKitWrapper] set_participant_muted: %s -> %s" % [identity, muted])
+	if current_platform == Platform.ANDROID:
+		if _android_plugin:
+			_android_plugin.setParticipantMuted(identity, muted)
+
+
 # ============ SIGNAL HANDLERS ============
 
 func _on_room_connected() -> void:
