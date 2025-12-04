@@ -72,6 +72,12 @@ func _deferred_restore_saved_grabs() -> void:
 			if c_name == save_id or (c_save_id != "" and c_save_id == save_id):
 				target = c
 				break
+		
+		# If target exists and is already grabbed, skip restoration (already preserved)
+		if target and target.has_method("get") and target.get("is_grabbed"):
+			print("GameManager: Object ", save_id, " already grabbed, skipping restore")
+			continue
+		
 		if not target:
 			# Try to instantiate a saved prototype scene if provided in the save entry.
 			var saved_scene_path := str(entry.get("scene", ""))
@@ -298,6 +304,37 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 		print("GameManager: Removing duplicate player from new scene")
 		scene_player.queue_free()
 		await get_tree().process_frame
+	
+	# Remove any grabbable objects from the new scene that we already have preserved
+	# (prevents duplicates when returning to a scene that has the same grabbable)
+	for preserved_obj in grabbed_objects:
+		if not is_instance_valid(preserved_obj):
+			continue
+		var preserved_name = preserved_obj.name
+		var preserved_save_id = ""
+		if preserved_obj.has_method("get") and preserved_obj.get("save_id") != null:
+			preserved_save_id = str(preserved_obj.get("save_id"))
+		
+		# Find and remove duplicates in the new scene
+		for scene_grabbable in current_world.get_children():
+			if not is_instance_valid(scene_grabbable):
+				continue
+			if scene_grabbable == preserved_obj:
+				continue
+			if not scene_grabbable.is_in_group("grabbable"):
+				continue
+			
+			var scene_name = scene_grabbable.name
+			var scene_save_id = ""
+			if scene_grabbable.has_method("get") and scene_grabbable.get("save_id") != null:
+				scene_save_id = str(scene_grabbable.get("save_id"))
+			
+			# Check if this is a duplicate (same name or same save_id)
+			if scene_name == preserved_name or (preserved_save_id != "" and scene_save_id == preserved_save_id):
+				print("GameManager: Removing duplicate grabbable from new scene: ", scene_name)
+				scene_grabbable.queue_free()
+	
+	await get_tree().process_frame
 	
 	# Move grabbed objects back to the new world
 	for obj in grabbed_objects:

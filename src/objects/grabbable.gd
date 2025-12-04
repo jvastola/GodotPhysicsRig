@@ -269,7 +269,7 @@ func release() -> void:
 	if not is_grabbed:
 		return
 	
-	print("Grabbable: Object released")
+	print("Grabbable: Object released - ", name)
 	
 	# Notify network
 	if network_component:
@@ -288,21 +288,39 @@ func release() -> void:
 	# Store hand velocity
 	var hand_velocity = Vector3.ZERO
 	var hand_angular_velocity = Vector3.ZERO
+	var hand_ref = grabbing_hand  # Store reference before clearing
 	
-	if is_instance_valid(grabbing_hand):
-		hand_velocity = grabbing_hand.linear_velocity
-		hand_angular_velocity = grabbing_hand.angular_velocity * 0.5
+	if is_instance_valid(hand_ref):
+		hand_velocity = hand_ref.linear_velocity
+		hand_angular_velocity = hand_ref.angular_velocity * 0.5
 		
-		# Remove all grabbed collision shapes and meshes from hand
+		# ROBUST CLEANUP: Use name-based matching to find ALL shapes/meshes
+		# This works even if grabbed_collision_shapes array has stale references
+		var children_to_remove: Array = []
+		for child in hand_ref.get_children():
+			if child.name.begins_with(name + "_grabbed_"):
+				children_to_remove.append(child)
+		
+		for child in children_to_remove:
+			print("Grabbable: Releasing shape: ", child.name)
+			hand_ref.remove_child(child)
+			child.queue_free()
+		
+		# Also clean up any shapes still in the arrays (belt and suspenders)
 		for collision_shape in grabbed_collision_shapes:
-			if is_instance_valid(collision_shape) and collision_shape.get_parent() == grabbing_hand:
-				grabbing_hand.remove_child(collision_shape)
+			if is_instance_valid(collision_shape) and collision_shape.get_parent() == hand_ref:
+				hand_ref.remove_child(collision_shape)
 				collision_shape.queue_free()
 		
 		for mesh_instance in grabbed_mesh_instances:
-			if is_instance_valid(mesh_instance) and mesh_instance.get_parent() == grabbing_hand:
-				grabbing_hand.remove_child(mesh_instance)
+			if is_instance_valid(mesh_instance) and mesh_instance.get_parent() == hand_ref:
+				hand_ref.remove_child(mesh_instance)
 				mesh_instance.queue_free()
+		
+		# Clear hand's held_object reference
+		if hand_ref.has_method("get"):
+			if hand_ref.get("held_object") == self:
+				hand_ref.set("held_object", null)
 	else:
 		# Hand is invalid, just clean up what we can
 		print("Grabbable: Warning - hand invalid during release, cleaning up")
@@ -331,13 +349,7 @@ func release() -> void:
 	linear_velocity = hand_velocity
 	angular_velocity = hand_angular_velocity
 	
-	# Clear hand's held_object reference
-	if is_instance_valid(grabbing_hand) and grabbing_hand.has_method("get"):
-		if grabbing_hand.get("held_object") == self:
-			grabbing_hand.set("held_object", null)
-	
 	is_grabbed = false
-	var _prev_hand = grabbing_hand
 	grabbing_hand = null
 	
 	released.emit()

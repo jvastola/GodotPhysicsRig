@@ -63,21 +63,27 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
-	# Clean up indicator and hit_marker if they're in another part of the tree
-	if indicator_mesh and is_instance_valid(indicator_mesh):
-		indicator_mesh.queue_free()
-		indicator_mesh = null
-	if hit_marker and is_instance_valid(hit_marker):
-		hit_marker.queue_free()
-		hit_marker = null
+	# Don't clean up indicator/hit_marker here - they'll be recreated on demand
+	# in _ensure_visuals_in_tree() after scene transitions
+	pass
 
 
 func _find_voxel_manager() -> void:
-	_voxel_manager = get_tree().root.find_child("VoxelChunkManager", true, false) as VoxelChunkManager
-	if _voxel_manager:
-		print("VoxelTool: Found VoxelChunkManager")
+	# Search by group - more robust than find_child across scene transitions
+	var managers = get_tree().get_nodes_in_group("voxel_manager")
+	if managers.size() > 0:
+		_voxel_manager = managers[0] as VoxelChunkManager
+		if _voxel_manager:
+			print("VoxelTool: Found VoxelChunkManager via group")
+		else:
+			push_warning("VoxelTool: Found node in voxel_manager group but wrong type!")
 	else:
-		push_warning("VoxelTool: VoxelChunkManager not found!")
+		# Fallback to find_child
+		_voxel_manager = get_tree().root.find_child("VoxelChunkManager", true, false) as VoxelChunkManager
+		if _voxel_manager:
+			print("VoxelTool: Found VoxelChunkManager via find_child")
+		else:
+			push_warning("VoxelTool: VoxelChunkManager not found!")
 
 
 func _create_raycast() -> void:
@@ -148,6 +154,10 @@ func _physics_process(delta: float) -> void:
 	# Ensure indicator and hit_marker are in the scene tree
 	_ensure_visuals_in_tree()
 	
+	# Refind voxel manager if it became invalid (e.g., after scene transition)
+	if not is_instance_valid(_voxel_manager):
+		_find_voxel_manager()
+	
 	if not is_grabbed or not is_instance_valid(grabbing_hand):
 		_set_visuals_visible(false)
 		return
@@ -158,7 +168,8 @@ func _physics_process(delta: float) -> void:
 
 
 func _ensure_visuals_in_tree() -> void:
-	"""Add indicator and hit_marker to scene root if not already there"""
+	"""Add indicator and hit_marker to scene root if not already there.
+	Recreates them if they were freed during scene transitions."""
 	if not is_inside_tree():
 		return
 	
@@ -166,6 +177,15 @@ func _ensure_visuals_in_tree() -> void:
 	if not scene_root:
 		return
 	
+	# Recreate indicator if it was freed
+	if not is_instance_valid(indicator_mesh):
+		_create_indicator()
+	
+	# Recreate hit_marker if it was freed
+	if not is_instance_valid(hit_marker):
+		_create_hit_marker()
+	
+	# Add to scene tree if not already there
 	if indicator_mesh and not indicator_mesh.is_inside_tree():
 		scene_root.add_child(indicator_mesh)
 	
@@ -304,12 +324,17 @@ func _snap_to_grid(pos: Vector3) -> Vector3:
 
 
 func _place_voxel() -> void:
+	print("VoxelTool: _place_voxel called, _voxel_manager valid: ", is_instance_valid(_voxel_manager))
 	if not _voxel_manager:
+		print("VoxelTool: _voxel_manager null, attempting to find...")
 		_find_voxel_manager()
 		if not _voxel_manager:
+			print("VoxelTool: ERROR - Could not find VoxelChunkManager!")
 			return
 	
+	print("VoxelTool: indicator_mesh valid: ", is_instance_valid(indicator_mesh), " visible: ", indicator_mesh.visible if is_instance_valid(indicator_mesh) else "N/A")
 	if not indicator_mesh or not indicator_mesh.visible:
+		print("VoxelTool: indicator_mesh not valid or not visible, skipping placement")
 		return
 	
 	var pos = indicator_mesh.global_position
