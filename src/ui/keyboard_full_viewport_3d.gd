@@ -4,8 +4,8 @@ extends Node3D
 # Supports single-hand grab (move) and two-hand grab (scale)
 
 @export var pointer_group: StringName = &"pointer_interactable"
-@export var ui_size: Vector2 = Vector2(800, 280)
-@export var quad_size: Vector2 = Vector2(3.2, 1.12)  # Aspect ratio matches 800:280
+@export var ui_size: Vector2 = Vector2(800, 320)  # Increased height for preview bar
+@export var quad_size: Vector2 = Vector2(3.2, 1.28)  # Aspect ratio matches 800:320
 @export var debug_coordinates: bool = false
 @export var flip_v: bool = true
 

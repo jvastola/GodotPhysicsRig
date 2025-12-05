@@ -123,6 +123,8 @@ func send_special_key(key_name: String) -> void:
 	match key_name:
 		"backspace":
 			_handle_backspace()
+		"delete":
+			_handle_delete()
 		"enter":
 			_handle_enter()
 		"arrow_left":
@@ -137,6 +139,135 @@ func send_special_key(key_name: String) -> void:
 			_handle_tab()
 		"escape":
 			clear_focus()
+		"home":
+			_handle_home()
+		"end":
+			_handle_end()
+
+
+## Send a shortcut action to the focused control (e.g., copy, paste, undo)
+func send_shortcut(action: String) -> void:
+	if not has_focus():
+		return
+	
+	match action:
+		"copy":
+			_handle_copy()
+		"paste":
+			_handle_paste()
+		"cut":
+			_handle_cut()
+		"undo":
+			_handle_undo()
+		"redo":
+			_handle_redo()
+		"select_all":
+			_handle_select_all()
+		"find":
+			# Emit signal for UI to handle find dialog
+			pass
+		"replace":
+			# Emit signal for UI to handle replace dialog
+			pass
+		"save":
+			# Emit signal for save action
+			pass
+
+
+func _handle_delete() -> void:
+	if _focused_control is LineEdit:
+		var line_edit := _focused_control as LineEdit
+		var pos = line_edit.caret_column
+		if pos < line_edit.text.length():
+			line_edit.text = line_edit.text.substr(0, pos) + line_edit.text.substr(pos + 1)
+	elif _focused_control is TextEdit or _focused_control is CodeEdit:
+		var text_edit := _focused_control as TextEdit
+		# Use cut_to_clipboard with no selection effectively deletes at caret
+		if text_edit.has_selection():
+			text_edit.delete_selection()
+
+
+func _handle_home() -> void:
+	if _focused_control is LineEdit:
+		var line_edit := _focused_control as LineEdit
+		line_edit.caret_column = 0
+	elif _focused_control is TextEdit or _focused_control is CodeEdit:
+		var text_edit := _focused_control as TextEdit
+		text_edit.set_caret_column(0)
+
+
+func _handle_end() -> void:
+	if _focused_control is LineEdit:
+		var line_edit := _focused_control as LineEdit
+		line_edit.caret_column = line_edit.text.length()
+	elif _focused_control is TextEdit or _focused_control is CodeEdit:
+		var text_edit := _focused_control as TextEdit
+		var line = text_edit.get_caret_line()
+		text_edit.set_caret_column(text_edit.get_line(line).length())
+
+
+func _handle_copy() -> void:
+	if _focused_control is LineEdit:
+		var line_edit := _focused_control as LineEdit
+		if line_edit.has_selection():
+			var selected = line_edit.get_selected_text()
+			DisplayServer.clipboard_set(selected)
+	elif _focused_control is TextEdit or _focused_control is CodeEdit:
+		var text_edit := _focused_control as TextEdit
+		if text_edit.has_selection():
+			var selected = text_edit.get_selected_text()
+			DisplayServer.clipboard_set(selected)
+
+
+func _handle_paste() -> void:
+	var clipboard = DisplayServer.clipboard_get()
+	if clipboard.is_empty():
+		return
+	
+	if _focused_control is LineEdit:
+		var line_edit := _focused_control as LineEdit
+		var pos = line_edit.caret_column
+		if line_edit.has_selection():
+			line_edit.delete_text(line_edit.get_selection_from_column(), line_edit.get_selection_to_column())
+			pos = line_edit.caret_column
+		line_edit.text = line_edit.text.substr(0, pos) + clipboard + line_edit.text.substr(pos)
+		line_edit.caret_column = pos + clipboard.length()
+	elif _focused_control is TextEdit or _focused_control is CodeEdit:
+		var text_edit := _focused_control as TextEdit
+		text_edit.insert_text_at_caret(clipboard)
+
+
+func _handle_cut() -> void:
+	_handle_copy()
+	if _focused_control is LineEdit:
+		var line_edit := _focused_control as LineEdit
+		if line_edit.has_selection():
+			line_edit.delete_text(line_edit.get_selection_from_column(), line_edit.get_selection_to_column())
+	elif _focused_control is TextEdit or _focused_control is CodeEdit:
+		var text_edit := _focused_control as TextEdit
+		if text_edit.has_selection():
+			text_edit.delete_selection()
+
+
+func _handle_undo() -> void:
+	if _focused_control is TextEdit or _focused_control is CodeEdit:
+		var text_edit := _focused_control as TextEdit
+		text_edit.undo()
+
+
+func _handle_redo() -> void:
+	if _focused_control is TextEdit or _focused_control is CodeEdit:
+		var text_edit := _focused_control as TextEdit
+		text_edit.redo()
+
+
+func _handle_select_all() -> void:
+	if _focused_control is LineEdit:
+		var line_edit := _focused_control as LineEdit
+		line_edit.select_all()
+	elif _focused_control is TextEdit or _focused_control is CodeEdit:
+		var text_edit := _focused_control as TextEdit
+		text_edit.select_all()
 
 
 func _handle_backspace() -> void:

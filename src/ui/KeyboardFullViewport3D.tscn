@@ -13,17 +13,17 @@ shading_mode = 0
 albedo_texture = SubResource("ViewportTexture_keyboard")
 
 [sub_resource type="QuadMesh" id="QuadMesh_keyboard"]
-size = Vector2(3.2, 1.12)
+size = Vector2(3.2, 1.28)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_keyboard"]
-size = Vector3(3.2, 1.12, 0.01)
+size = Vector3(3.2, 1.28, 0.01)
 
 [node name="KeyboardFullViewport3D" type="Node3D"]
 script = ExtResource("1_script")
 
 [node name="SubViewport" type="SubViewport" parent="."]
 transparent_bg = true
-size = Vector2i(800, 280)
+size = Vector2i(800, 320)
 render_target_update_mode = 4
 
 [node name="KeyboardFullUI" parent="SubViewport" instance=ExtResource("2_ui")]
