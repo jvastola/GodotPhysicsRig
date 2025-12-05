@@ -198,9 +198,11 @@ func _on_item_activated() -> void:
 		file_double_clicked.emit(path)
 		print("FileSystemUI: Double-clicked file: ", path)
 		
-		# If it's a script, open in ScriptViewer
+		# If it's a script, open in ScriptEditor (fallback to viewer)
 		if path.ends_with(".gd"):
-			if ScriptViewerUI and ScriptViewerUI.instance:
+			if ScriptEditorUI and ScriptEditorUI.instance:
+				ScriptEditorUI.instance.open_script(path)
+			elif ScriptViewerUI and ScriptViewerUI.instance:
 				ScriptViewerUI.instance.open_script(path)
 
 

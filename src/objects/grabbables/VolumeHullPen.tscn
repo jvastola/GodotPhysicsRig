@@ -1,6 +1,6 @@
-[gd_scene load_steps=7 format=3 uid="uid://volume_hull_pen"]
+[gd_scene load_steps=7 format=3 uid="uid://6v1kg2wa5orb"]
 
-[ext_resource type="Script" path="res://src/objects/grabbables/VolumeHullPen.gd" id="1_pen_script"]
+[ext_resource type="Script" uid="uid://bk5c3qwtvgtkn" path="res://src/objects/grabbables/VolumeHullPen.gd" id="1_pen_script"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_pen"]
 radius = 0.02
@@ -29,29 +29,29 @@ height = 0.05
 radial_segments = 16
 rings = 8
 
-[node name="VolumeHullPen" type="RigidBody3D"]
+[node name="VolumeHullPen" type="RigidBody3D" unique_id=1601796178]
 mass = 0.2
 gravity_scale = 0.5
 contact_monitor = true
 max_contacts_reported = 4
 script = ExtResource("1_pen_script")
 grab_mode = 0
-tip_offset = Vector3(0, 0, -0.15)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1056137253]
 shape = SubResource("CapsuleShape3D_pen")
 
-[node name="PenMesh" type="MeshInstance3D" parent="."]
+[node name="PenMesh" type="MeshInstance3D" parent="." unique_id=1295681956]
 mesh = SubResource("CapsuleMesh_pen")
 
-[node name="TipMarker" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.15)
+[node name="TipMarker" type="Node3D" parent="." unique_id=548355038]
 
-[node name="TipMesh" type="MeshInstance3D" parent="TipMarker"]
+[node name="TipMesh" type="MeshInstance3D" parent="TipMarker" unique_id=1815148645]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.14079866, 0)
 mesh = SubResource("SphereMesh_tip")
 
-[node name="Label3D" type="Label3D" parent="."]
+[node name="Label3D" type="Label3D" parent="." unique_id=1180823471]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
+visible = false
 text = "Volume Pen
 Live Mesh Fill"
 font_size = 18

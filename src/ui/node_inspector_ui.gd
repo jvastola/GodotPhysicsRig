@@ -189,8 +189,10 @@ func _on_script_button_pressed(script_path: String) -> void:
 	print("NodeInspectorUI: Opening script: ", script_path)
 	script_requested.emit(script_path)
 	
-	# Also try to open directly in the ScriptViewerUI if available
-	if ScriptViewerUI and ScriptViewerUI.instance:
+	# Prefer the editable ScriptEditor if available, otherwise fall back to the viewer
+	if ScriptEditorUI and ScriptEditorUI.instance:
+		ScriptEditorUI.instance.open_script(script_path)
+	elif ScriptViewerUI and ScriptViewerUI.instance:
 		ScriptViewerUI.instance.open_script(script_path)
 
 

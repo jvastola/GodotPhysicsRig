@@ -17,7 +17,7 @@
 [ext_resource type="PackedScene" path="res://src/ui/SceneHierarchyViewport3D.tscn" id="17_scene_hierarchy"]
 [ext_resource type="PackedScene" path="res://src/ui/NodeInspectorViewport3D.tscn" id="18_node_inspector"]
 [ext_resource type="PackedScene" path="res://src/ui/DebugConsoleViewport3D.tscn" id="19_debug_console"]
-[ext_resource type="PackedScene" path="res://src/ui/ScriptViewerViewport3D.tscn" id="20_script_viewer"]
+[ext_resource type="PackedScene" path="res://src/ui/ScriptEditorViewport3D.tscn" id="20_script_editor"]
 [ext_resource type="PackedScene" path="res://src/ui/KeyboardFullViewport3D.tscn" id="21_keyboard"]
 [ext_resource type="PackedScene" path="res://src/ui/FileSystemViewport3D.tscn" id="22_filesystem"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/ConvexHullPen.tscn" id="23_convex_hull_pen"]
@@ -151,7 +151,7 @@ transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0.03408259, 0.6178481, 
 [node name="DebugConsoleViewport3D" parent="." unique_id=421789258 instance=ExtResource("19_debug_console")]
 transform = Transform3D(0.3999252, 0, -0.0077348175, 0, 0.4, 0, 0.0077348175, 0, 0.3999252, 2.1419406, 0.46634054, -1.9860382)
 
-[node name="ScriptViewerViewport3D" parent="." unique_id=1076425149 instance=ExtResource("20_script_viewer")]
+[node name="ScriptEditorViewport3D" parent="." unique_id=1076425149 instance=ExtResource("20_script_editor")]
 transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 1.064451, 0.7851808, -1.9860382)
 
 [node name="KeyboardFullViewport3D" parent="." unique_id=1262501057 instance=ExtResource("21_keyboard")]
