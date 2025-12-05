@@ -32,7 +32,7 @@ size = Vector3(50, 5, 50)
 material = ExtResource("2_or5nu")
 size = Vector3(50, 5, 50)
 
-[node name="MainScene5" type="Node3D" unique_id=1547683746]
+[node name="MainScene6" type="Node3D" unique_id=1547683746]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1403982438]
 environment = SubResource("Environment_main")
@@ -163,5 +163,11 @@ transform = Transform3D(0.35, 0, 0, 0, 0.35, 0, 0, 0, 0.35, -1.7811422, 0.526621
 [node name="ConvexHullPen" parent="." unique_id=438475259 instance=ExtResource("23_convex_hull_pen")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, 1.5, -3)
 
-[node name="VolumeHullPen" parent="." instance=ExtResource("24_volume_hull_pen")]
+[node name="VolumeHullPen" parent="." unique_id=510759392 instance=ExtResource("24_volume_hull_pen")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1.5, -3)
+
+[node name="VolumeHullPen2" parent="." unique_id=909618236 instance=ExtResource("24_volume_hull_pen")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5714846, 1.5, -3)
+hull_color = Color(0.92199814, 0.53932786, 0.675874, 0.8509804)
+invert_faces = true
+show_hull_points = false

@@ -173,3 +173,24 @@ func set_interactive(enabled: bool) -> void:
 			_static_body.collision_layer = _saved_static_body_layer
 		else:
 			_static_body.collision_layer = 0
+
+
+# ============================================================================
+# POINTER GRAB INTERFACE
+# ============================================================================
+
+func pointer_grab_set_distance(new_distance: float, pointer: Node3D) -> void:
+	if not pointer or not is_instance_valid(pointer):
+		return
+	var pointer_forward: Vector3 = -pointer.global_transform.basis.z.normalized()
+	var pointer_origin: Vector3 = pointer.global_transform.origin
+	var new_position: Vector3 = pointer_origin + pointer_forward * new_distance
+	global_position = new_position
+	var direction: Vector3 = (global_position - pointer_origin).normalized()
+	if direction.length_squared() > 0.001:
+		var look_away_point: Vector3 = global_position + direction
+		look_at(look_away_point, Vector3.UP)
+
+
+func pointer_grab_set_scale(new_scale: float) -> void:
+	scale = Vector3.ONE * new_scale

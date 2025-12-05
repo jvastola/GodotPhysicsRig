@@ -225,14 +225,15 @@ func pointer_grab_set_distance(new_distance: float, pointer: Node3D) -> void:
 	global_position = new_position
 	
 	# Rotate panel to face toward the pointer origin (user)
-	var look_target: Vector3 = pointer_origin
-	var direction: Vector3 = (look_target - global_position).normalized()
+	# look_at makes -Z face the target, so we look at a point BEHIND us 
+	# (opposite direction from pointer) to make the front face toward the pointer
+	var direction: Vector3 = (global_position - pointer_origin).normalized()
 	
 	# Only rotate if we have valid direction
 	if direction.length_squared() > 0.001:
-		# Use look_at but keep the panel upright (Y-up)
-		# We want the panel's -Z (front face) to point toward the user
-		look_at(look_target, Vector3.UP)
+		# Look at a point behind us to face our +Z toward user
+		var look_away_point: Vector3 = global_position + direction
+		look_at(look_away_point, Vector3.UP)
 
 
 func pointer_grab_set_scale(new_scale: float) -> void:

@@ -10,6 +10,12 @@ extends Grabbable
 @export var preview_point_radius: float = 0.008
 @export var preview_point_color: Color = Color(1.0, 0.8, 0.0, 1.0)
 
+# Toggles
+@export_group("Output Options")
+@export var invert_faces: bool = false  # Flip face normals
+@export var show_hull_points: bool = true  # Show preview spheres for hull vertices
+@export var make_grabbable: bool = true  # Make generated hulls grabbable
+
 # State
 var _hull_points: PackedVector3Array = PackedVector3Array()  # Current hull vertices (minimal set)
 var _is_recording: bool = false
@@ -179,15 +185,65 @@ func _record_point() -> void:
 		if tip_pos.distance_to(existing_point) < min_distance:
 			return
 	
+	# Check if point is inside the current hull (skip internal points)
+	if _hull_points.size() >= min_points:
+		if _is_point_inside_hull(tip_pos):
+			return  # Skip points inside existing hull
+	
 	# Add point and recompute hull
 	_hull_points.append(tip_pos)
 	
 	# Create visual preview point
-	_create_preview_point(tip_pos)
+	if show_hull_points:
+		_create_preview_point(tip_pos)
 	
 	# Update hull mesh if we have enough points
 	if _hull_points.size() >= min_points:
 		_update_live_hull_mesh()
+
+
+func _is_point_inside_hull(point: Vector3) -> bool:
+	"""Check if a point is inside the current convex hull."""
+	if _hull_points.size() < min_points:
+		return false
+	
+	# Calculate centroid
+	var centroid = Vector3.ZERO
+	for p in _hull_points:
+		centroid += p
+	centroid /= _hull_points.size()
+	
+	# Use the existing hull faces to check if point is inside
+	# A point is inside if it's on the negative side of all outward-facing faces
+	var temp_shape = ConvexPolygonShape3D.new()
+	temp_shape.points = _hull_points
+	var hull_vertices = temp_shape.points
+	
+	if hull_vertices.size() < 4:
+		return false
+	
+	var faces = _compute_convex_hull_faces(hull_vertices, centroid)
+	
+	for face in faces:
+		if face.size() < 3:
+			continue
+		var v0 = face[0]
+		var v1 = face[1]
+		var v2 = face[2]
+		
+		# Get outward normal
+		var normal = (v1 - v0).cross(v2 - v0).normalized()
+		var face_center = (v0 + v1 + v2) / 3.0
+		var to_centroid = centroid - face_center
+		if normal.dot(to_centroid) > 0:
+			normal = -normal  # Flip to point outward
+		
+		# If point is on positive side (outside) of any face, it's outside the hull
+		var to_point = point - face_center
+		if to_point.dot(normal) > 0.001:
+			return false
+	
+	return true  # Point is inside (on negative side of all faces)
 
 
 func _create_preview_point(pos: Vector3) -> void:
@@ -232,6 +288,10 @@ func _update_live_hull_mesh() -> void:
 
 func _sync_preview_points_with_hull() -> void:
 	"""Update preview spheres to match current hull points."""
+	if not show_hull_points:
+		_cleanup_point_previews()
+		return
+	
 	# Remove excess preview spheres
 	while _preview_spheres.size() > _hull_points.size():
 		var sphere = _preview_spheres.pop_back()
@@ -261,7 +321,6 @@ func _create_convex_hull_mesh(points: PackedVector3Array) -> ArrayMesh:
 	centroid /= points.size()
 	
 	# Build triangles using quickhull-style face generation
-	# For a convex hull, we triangulate each face from the centroid
 	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	
@@ -292,6 +351,13 @@ func _create_convex_hull_mesh(points: PackedVector3Array) -> ArrayMesh:
 				var temp = v1
 				v1 = v2
 				v2 = temp
+			
+			# Apply invert_faces toggle
+			if invert_faces:
+				normal = -normal
+				var temp2 = v1
+				v1 = v2
+				v2 = temp2
 			
 			st.set_normal(normal)
 			st.add_vertex(v0)
@@ -554,11 +620,22 @@ func _create_final_hull() -> void:
 		print("VolumeHullPen: Failed to create hull mesh")
 		return
 	
-	# Create RigidBody3D
-	var hull_body = RigidBody3D.new()
+	# Create the hull body - use Grabbable if enabled, otherwise basic RigidBody3D
+	var hull_body: RigidBody3D
+	
+	if make_grabbable:
+		# Load and instantiate Grabbable script
+		var grabbable_script = load("res://src/objects/grabbable.gd")
+		hull_body = RigidBody3D.new()
+		hull_body.set_script(grabbable_script)
+	else:
+		hull_body = RigidBody3D.new()
+	
 	hull_body.name = "VolumeHull_" + str(randi() % 10000)
 	hull_body.mass = 0.5
 	hull_body.gravity_scale = 1.0
+	hull_body.contact_monitor = true
+	hull_body.max_contacts_reported = 4
 	
 	var collision_shape = CollisionShape3D.new()
 	collision_shape.shape = hull_shape
@@ -575,7 +652,7 @@ func _create_final_hull() -> void:
 		current_scene.add_child(hull_body)
 		hull_body.global_position = centroid
 		hull_body.add_to_group("grabbable")
-		print("VolumeHullPen: Created hull at ", centroid)
+		print("VolumeHullPen: Created ", "grabbable " if make_grabbable else "", "hull at ", centroid)
 	else:
 		hull_body.queue_free()
 
