@@ -20,11 +20,25 @@ enum TurnMode { SNAP, SMOOTH }
 enum HandAssignment { DEFAULT, SWAPPED }
 @export var hand_assignment: HandAssignment = HandAssignment.DEFAULT
 
+# === World Grab / Utility Settings ===
+@export var enable_two_hand_world_scale: bool = false
+@export var enable_two_hand_world_rotation: bool = false
+@export_range(0.05, 5.0, 0.05) var world_scale_min: float = 0.25
+@export_range(0.1, 10.0, 0.05) var world_scale_max: float = 3.0
+@export var player_gravity_enabled: bool = true
+
 # Turning state
 var can_snap_turn := true
 var snap_turn_timer := 0.0
 var _pending_snap_angle := 0.0
 var _smooth_input := 0.0
+
+# Two-hand world grab state
+var _world_grab_active := false
+var _world_grab_initial_distance := 0.0
+var _world_grab_initial_scale := 1.0
+var _world_grab_initial_vector := Vector3.ZERO
+var _world_grab_initial_body_basis := Basis.IDENTITY
 
 # References
 var player_body: RigidBody3D
@@ -52,6 +66,7 @@ func setup(p_player_body: RigidBody3D, p_left_controller: XRController3D, p_righ
 	left_controller = p_left_controller
 	right_controller = p_right_controller
 	xr_camera = p_xr_camera
+	_apply_player_gravity()
 	print("PlayerMovementComponent: Setup with both controllers")
 
 
@@ -99,6 +114,10 @@ func physics_process_turning(delta: float) -> void:
 			var lv2 = player_body.linear_velocity
 			player_body.rotate_y(deg_to_rad(turn_amount))
 			player_body.linear_velocity = lv2
+
+	# Handle two-hand world manipulation (rotation/scale) in the physics step
+	if is_vr_mode:
+		physics_process_world_grab(delta)
 
 
 func physics_process_locomotion(_delta: float) -> void:
@@ -215,3 +234,89 @@ func _handle_snap_turn(input: float) -> void:
 func _handle_smooth_turn(input: float, _delta: float) -> void:
 	"""Handle smooth turning"""
 	_smooth_input = input
+
+
+# === World Grab Helpers ===
+
+func physics_process_world_grab(_delta: float) -> void:
+	"""Allow two-hand grab gestures to scale/rotate the world."""
+	if not (enable_two_hand_world_scale or enable_two_hand_world_rotation):
+		_end_world_grab()
+		return
+	if not left_controller or not right_controller or not player_body:
+		_end_world_grab()
+		return
+
+	var left_pressed := _is_grip_pressed(left_controller)
+	var right_pressed := _is_grip_pressed(right_controller)
+
+	if left_pressed and right_pressed:
+		if not _world_grab_active:
+			_start_world_grab()
+		_update_world_grab()
+	else:
+		_end_world_grab()
+
+
+func _is_grip_pressed(controller: XRController3D) -> bool:
+	if not controller:
+		return false
+	if controller.has_method("get_float"):
+		var grip_val := controller.get_float("grip")
+		# Some action maps expose grip_click instead of grip
+		grip_val = max(grip_val, controller.get_float("grip_click"))
+		return grip_val > 0.75
+	return false
+
+
+func _start_world_grab() -> void:
+	_world_grab_active = true
+	_world_grab_initial_distance = max(0.01, left_controller.global_position.distance_to(right_controller.global_position))
+	_world_grab_initial_scale = XRServer.world_scale
+	_world_grab_initial_vector = right_controller.global_position - left_controller.global_position
+	_world_grab_initial_body_basis = player_body.global_transform.basis
+
+
+func _update_world_grab() -> void:
+	if not _world_grab_active:
+		return
+
+	var current_vector: Vector3 = right_controller.global_position - left_controller.global_position
+	var current_distance := max(0.01, left_controller.global_position.distance_to(right_controller.global_position))
+
+	if enable_two_hand_world_scale and _world_grab_initial_distance > 0.01:
+		var target_scale := clampf(
+			_world_grab_initial_scale * (current_distance / _world_grab_initial_distance),
+			world_scale_min,
+			world_scale_max
+		)
+		if abs(target_scale - XRServer.world_scale) > 0.001:
+			XRServer.world_scale = target_scale
+
+	if enable_two_hand_world_rotation:
+		var initial_2d := Vector2(_world_grab_initial_vector.x, _world_grab_initial_vector.z)
+		var current_2d := Vector2(current_vector.x, current_vector.z)
+		if initial_2d.length_squared() > 0.0001 and current_2d.length_squared() > 0.0001:
+			var angle_delta := initial_2d.angle_to(current_2d)
+			var lv = player_body.linear_velocity
+			var av = player_body.angular_velocity
+			player_body.global_transform = Transform3D(
+				Basis(Vector3.UP, angle_delta) * _world_grab_initial_body_basis,
+				player_body.global_transform.origin
+			)
+			player_body.linear_velocity = lv
+			player_body.angular_velocity = av
+
+
+func _end_world_grab() -> void:
+	_world_grab_active = false
+
+
+func set_player_gravity_enabled(enabled: bool) -> void:
+	player_gravity_enabled = enabled
+	_apply_player_gravity()
+
+
+func _apply_player_gravity() -> void:
+	if player_body:
+		player_body.gravity_scale = 1.0 if player_gravity_enabled else 0.0

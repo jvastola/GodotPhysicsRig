@@ -16,6 +16,9 @@ var smooth_speed_label: Label
 var deadzone_slider: HSlider
 var deadzone_label: Label
 var hand_swap_check: CheckBox
+var world_scale_check: CheckBox
+var world_rotation_check: CheckBox
+var gravity_check: CheckBox
 
 # Reference to movement component
 var movement_component: PlayerMovementComponent
@@ -167,6 +170,36 @@ func _build_ui():
 	hand_swap_check.toggled.connect(_on_hand_swap_toggled)
 	main_vbox.add_child(hand_swap_check)
 
+	# === World Manipulation ===
+	_add_section_label(main_vbox, "World Manipulation")
+
+	world_scale_check = CheckBox.new()
+	world_scale_check.text = "Two-Hand Grab World Scale"
+	world_scale_check.add_theme_font_size_override("font_size", 12)
+	if movement_component:
+		world_scale_check.button_pressed = movement_component.enable_two_hand_world_scale
+	world_scale_check.toggled.connect(_on_world_scale_toggled)
+	main_vbox.add_child(world_scale_check)
+
+	world_rotation_check = CheckBox.new()
+	world_rotation_check.text = "Two-Hand Grab World Rotation"
+	world_rotation_check.add_theme_font_size_override("font_size", 12)
+	if movement_component:
+		world_rotation_check.button_pressed = movement_component.enable_two_hand_world_rotation
+	world_rotation_check.toggled.connect(_on_world_rotation_toggled)
+	main_vbox.add_child(world_rotation_check)
+
+	# === Player ===
+	_add_section_label(main_vbox, "Player")
+
+	gravity_check = CheckBox.new()
+	gravity_check.text = "Player Gravity Enabled"
+	gravity_check.add_theme_font_size_override("font_size", 12)
+	if movement_component:
+		gravity_check.button_pressed = movement_component.player_gravity_enabled
+	gravity_check.toggled.connect(_on_gravity_toggled)
+	main_vbox.add_child(gravity_check)
+
 
 func _add_section_label(parent: VBoxContainer, text: String):
 	var label = Label.new()
@@ -249,6 +282,24 @@ func _on_hand_swap_toggled(pressed: bool):
 	settings_changed.emit()
 
 
+func _on_world_scale_toggled(pressed: bool):
+	if movement_component:
+		movement_component.enable_two_hand_world_scale = pressed
+	settings_changed.emit()
+
+
+func _on_world_rotation_toggled(pressed: bool):
+	if movement_component:
+		movement_component.enable_two_hand_world_rotation = pressed
+	settings_changed.emit()
+
+
+func _on_gravity_toggled(pressed: bool):
+	if movement_component:
+		movement_component.set_player_gravity_enabled(pressed)
+	settings_changed.emit()
+
+
 # === Public API ===
 
 func refresh():
@@ -271,3 +322,9 @@ func refresh():
 			deadzone_slider.value = movement_component.turn_deadzone
 		if hand_swap_check:
 			hand_swap_check.button_pressed = movement_component.hand_assignment == PlayerMovementComponent.HandAssignment.SWAPPED
+		if world_scale_check:
+			world_scale_check.button_pressed = movement_component.enable_two_hand_world_scale
+		if world_rotation_check:
+			world_rotation_check.button_pressed = movement_component.enable_two_hand_world_rotation
+		if gravity_check:
+			gravity_check.button_pressed = movement_component.player_gravity_enabled
