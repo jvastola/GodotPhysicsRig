@@ -18,6 +18,7 @@ signal node_reparented(node_path: NodePath, new_parent_path: NodePath)
 @onready var refresh_button: Button = $MarginContainer/VBoxContainer/HBoxContainer/RefreshButton
 @onready var collapse_button: Button = $MarginContainer/VBoxContainer/HBoxContainer/CollapseButton
 @onready var expand_button: Button = $MarginContainer/VBoxContainer/HBoxContainer/ExpandButton
+@onready var actions_button: Button = $MarginContainer/VBoxContainer/HBoxContainer2/ActionsButton
 @onready var search_bar: LineEdit = $MarginContainer/VBoxContainer/SearchBar
 @onready var status_label: Label = $MarginContainer/VBoxContainer/StatusLabel
 
@@ -65,18 +66,18 @@ func _ready() -> void:
 		collapse_button.pressed.connect(_on_collapse_pressed)
 	if expand_button:
 		expand_button.pressed.connect(_on_expand_pressed)
+	if actions_button:
+		actions_button.pressed.connect(_on_actions_button_pressed)
 	
 	# Configure tree
 	if tree:
 		tree.hide_root = false
 		tree.allow_reselect = true
-		tree.select_mode = Tree.SELECT_SINGLE  # Can change to SELECT_MULTI for multi-select
+		tree.select_mode = Tree.SELECT_SINGLE
 		tree.item_selected.connect(_on_item_selected)
 		tree.item_edited.connect(_on_item_edited)
-		tree.gui_input.connect(_on_tree_gui_input)
-		
-		# Enable drag-drop
-		tree.set_drag_forwarding(_tree_get_drag_data, _tree_can_drop_data, _tree_drop_data)
+		# Note: Drag-drop disabled - conflicts with scroll in VR worldspace
+		# tree.set_drag_forwarding(_tree_get_drag_data, _tree_can_drop_data, _tree_drop_data)
 	
 	# Set up context menu
 	_setup_context_menu()
@@ -131,6 +132,25 @@ func _on_tree_gui_input(event: InputEvent) -> void:
 				_update_context_menu_state()
 				_context_menu.position = get_global_mouse_position()
 				_context_menu.popup()
+
+
+func _on_actions_button_pressed() -> void:
+	# VR-friendly: Show context menu for currently selected node
+	var selected = tree.get_selected()
+	if not selected:
+		print("SceneHierarchy: No node selected - select a node first")
+		return
+	
+	_context_target_item = selected
+	_update_context_menu_state()
+	
+	# Position near the button
+	if actions_button:
+		_context_menu.position = actions_button.global_position + Vector2(0, actions_button.size.y)
+	else:
+		_context_menu.position = get_global_mouse_position()
+	
+	_context_menu.popup()
 
 
 func _update_context_menu_state() -> void:

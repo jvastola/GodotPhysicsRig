@@ -75,10 +75,27 @@ scroll_vertical_enabled = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.5, 0.55, 0.65, 1.0)
 theme_override_font_sizes/font_size = 12
-text = "0 nodes"
+text = "Select a node, then click Actions"
 horizontal_alignment = 1
 
 [node name="HSeparator2" type="HSeparator" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="HBoxContainer2" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="ActionsButton" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer2"]
+custom_minimum_size = Vector2(120, 32)
+layout_mode = 2
+theme_override_colors/font_color = Color(1.0, 0.95, 0.8, 1.0)
+theme_override_font_sizes/font_size = 14
+text = "⚡ Actions"
+tooltip_text = "Show actions for selected node"
+
+[node name="HSeparator3" type="HSeparator" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
 
 [node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
