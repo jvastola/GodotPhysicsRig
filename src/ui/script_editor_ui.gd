@@ -3,9 +3,11 @@ class_name ScriptEditorUI
 
 # Script Editor UI - Editable code viewer with syntax highlighting
 # Works with KeyboardFullUI for text input
+# Supports: Save, Undo, Redo, Copy, Paste, Drag-Select
 
 signal script_opened(script_path: String)
 signal script_modified(script_path: String)
+signal script_saved(script_path: String)
 
 @onready var title_label: Label = $MarginContainer/VBoxContainer/TitleLabel
 @onready var path_label: Label = $MarginContainer/VBoxContainer/PathLabel
@@ -15,6 +17,7 @@ signal script_modified(script_path: String)
 var _current_script_path: String = ""
 var _current_script: Script = null
 var _is_modified: bool = false
+var _original_content: String = ""  # Track original for comparison
 
 # Static instance for global access
 static var instance: ScriptEditorUI = null
@@ -27,6 +30,7 @@ func _ready() -> void:
 	
 	# Connect to keyboard if available
 	call_deferred("_connect_to_keyboard")
+	call_deferred("_connect_to_keyboard_shortcuts")
 
 
 func _notification(what: int) -> void:
@@ -158,6 +162,72 @@ func _on_keyboard_special(key_name: String) -> void:
 			code_edit.set_caret_line(line + 1)
 
 
+func _connect_to_keyboard_shortcuts() -> void:
+	if KeyboardFullUI.instance:
+		if not KeyboardFullUI.instance.shortcut_action.is_connected(_on_shortcut_action):
+			KeyboardFullUI.instance.shortcut_action.connect(_on_shortcut_action)
+			print("ScriptEditorUI: Connected to keyboard shortcuts")
+
+
+func _on_shortcut_action(action: String) -> void:
+	if not code_edit or not code_edit.has_focus():
+		return
+	
+	match action:
+		"undo":
+			code_edit.undo()
+		"redo":
+			code_edit.redo()
+		"copy":
+			code_edit.copy()
+		"paste":
+			code_edit.paste()
+		"cut":
+			code_edit.cut()
+		"select_all":
+			code_edit.select_all()
+		"save":
+			save_script()
+
+
+func save_script() -> void:
+	if not _current_script or _current_script_path.is_empty():
+		return
+	
+	var content = code_edit.text
+	
+	# 1. Update the script resource in memory
+	_current_script.source_code = content
+	var err = _current_script.reload()
+	if err != OK:
+		push_error("ScriptEditorUI: Failed to reload script: %s" % err)
+	
+	# 2. Save to disk
+	var file = FileAccess.open(_current_script_path, FileAccess.WRITE)
+	if file:
+		file.store_string(content)
+		file.close()
+		
+		# Update state
+		_original_content = content
+		_is_modified = false
+		if title_label and title_label.text.ends_with(" *"):
+			title_label.text = title_label.text.substr(0, title_label.text.length() - 2)
+		
+		print("ScriptEditorUI: Saved script to ", _current_script_path)
+		script_saved.emit(_current_script_path)
+		
+		# Show visual feedback (optional)
+		if title_label:
+			var original_color = title_label.get_theme_color("font_color")
+			title_label.add_theme_color_override("font_color", Color.GREEN)
+			var tween = create_tween()
+			tween.tween_interval(0.5)
+			tween.tween_callback(func(): title_label.add_theme_color_override("font_color", original_color))
+	else:
+		push_error("ScriptEditorUI: Failed to open file for writing: ", _current_script_path)
+
+
 func _on_text_changed() -> void:
 	if _current_script:
 		_is_modified = true
@@ -254,6 +324,7 @@ func _display_script() -> void:
 		code_edit.text = source_code
 		code_edit.set_caret_line(0)
 		code_edit.set_caret_column(0)
+		_original_content = source_code
 
 
 ## Get the current script content
@@ -268,18 +339,9 @@ func is_modified() -> bool:
 	return _is_modified
 
 
-## Save changes back to the script (runtime only)
+## Save changes back to the script (runtime and disk)
 func apply_changes() -> bool:
-	if not _current_script or not code_edit:
-		return false
-	
-	_current_script.source_code = code_edit.text
-	_is_modified = false
-	
-	if title_label and title_label.text.ends_with(" *"):
-		title_label.text = title_label.text.substr(0, title_label.text.length() - 2)
-	
-	print("ScriptEditorUI: Applied changes to ", _current_script_path)
+	save_script()
 	return true
 
 
