@@ -359,7 +359,8 @@ func _process_two_hand_grab(delta: float) -> void:
 
 func pointer_grab_set_distance(new_distance: float, pointer: Node3D) -> void:
 	"""Set the distance of this keyboard from the pointer origin.
-	Called by hand_pointer during grip grab mode."""
+	Called by hand_pointer during grip grab mode.
+	Also rotates the keyboard to face toward the pointer."""
 	if not pointer or not is_instance_valid(pointer):
 		return
 	
@@ -368,7 +369,17 @@ func pointer_grab_set_distance(new_distance: float, pointer: Node3D) -> void:
 	var pointer_origin: Vector3 = pointer.global_transform.origin
 	
 	# Position keyboard at the specified distance along pointer ray
-	global_position = pointer_origin + pointer_forward * new_distance
+	var new_position: Vector3 = pointer_origin + pointer_forward * new_distance
+	global_position = new_position
+	
+	# Rotate keyboard to face toward the pointer origin (user)
+	var look_target: Vector3 = pointer_origin
+	var direction: Vector3 = (look_target - global_position).normalized()
+	
+	# Only rotate if we have valid direction
+	if direction.length_squared() > 0.001:
+		# Use look_at but keep the keyboard upright (Y-up)
+		look_at(look_target, Vector3.UP)
 
 
 func pointer_grab_set_scale(new_scale: float) -> void:

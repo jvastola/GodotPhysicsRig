@@ -211,7 +211,8 @@ func set_interactive(enabled: bool) -> void:
 
 func pointer_grab_set_distance(new_distance: float, pointer: Node3D) -> void:
 	"""Set the distance of this UI panel from the pointer origin.
-	Called by hand_pointer during grip grab mode."""
+	Called by hand_pointer during grip grab mode.
+	Also rotates the panel to face toward the pointer."""
 	if not pointer or not is_instance_valid(pointer):
 		return
 	
@@ -220,7 +221,18 @@ func pointer_grab_set_distance(new_distance: float, pointer: Node3D) -> void:
 	var pointer_origin: Vector3 = pointer.global_transform.origin
 	
 	# Position panel at the specified distance along pointer ray
-	global_position = pointer_origin + pointer_forward * new_distance
+	var new_position: Vector3 = pointer_origin + pointer_forward * new_distance
+	global_position = new_position
+	
+	# Rotate panel to face toward the pointer origin (user)
+	var look_target: Vector3 = pointer_origin
+	var direction: Vector3 = (look_target - global_position).normalized()
+	
+	# Only rotate if we have valid direction
+	if direction.length_squared() > 0.001:
+		# Use look_at but keep the panel upright (Y-up)
+		# We want the panel's -Z (front face) to point toward the user
+		look_at(look_target, Vector3.UP)
 
 
 func pointer_grab_set_scale(new_scale: float) -> void:

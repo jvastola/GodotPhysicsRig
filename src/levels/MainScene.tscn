@@ -1,4 +1,4 @@
-[gd_scene load_steps=25 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=26 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -21,6 +21,7 @@
 [ext_resource type="PackedScene" path="res://src/ui/KeyboardFullViewport3D.tscn" id="21_keyboard"]
 [ext_resource type="PackedScene" path="res://src/ui/FileSystemViewport3D.tscn" id="22_filesystem"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/ConvexHullPen.tscn" id="23_convex_hull_pen"]
+[ext_resource type="PackedScene" path="res://src/objects/grabbables/VolumeHullPen.tscn" id="24_volume_hull_pen"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -161,3 +162,6 @@ transform = Transform3D(0.35, 0, 0, 0, 0.35, 0, 0, 0, 0.35, -1.7811422, 0.526621
 
 [node name="ConvexHullPen" parent="." unique_id=438475259 instance=ExtResource("23_convex_hull_pen")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, 1.5, -3)
+
+[node name="VolumeHullPen" parent="." instance=ExtResource("24_volume_hull_pen")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1.5, -3)
