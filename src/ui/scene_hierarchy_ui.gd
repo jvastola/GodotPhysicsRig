@@ -76,6 +76,8 @@ func _ready() -> void:
 		tree.select_mode = Tree.SELECT_SINGLE
 		tree.item_selected.connect(_on_item_selected)
 		tree.item_edited.connect(_on_item_edited)
+		if not tree.gui_input.is_connected(_on_tree_gui_input):
+			tree.gui_input.connect(_on_tree_gui_input)
 		# Note: Drag-drop disabled - conflicts with scroll in VR worldspace
 		# tree.set_drag_forwarding(_tree_get_drag_data, _tree_can_drop_data, _tree_drop_data)
 	
@@ -130,8 +132,8 @@ func _on_tree_gui_input(event: InputEvent) -> void:
 				tree.set_selected(item, 0)
 				_context_target_item = item
 				_update_context_menu_state()
-				_context_menu.position = get_global_mouse_position()
-				_context_menu.popup()
+				_show_context_menu(mouse_event.global_position)
+				mouse_event.accept()
 
 
 func _on_actions_button_pressed() -> void:
@@ -146,10 +148,16 @@ func _on_actions_button_pressed() -> void:
 	
 	# Position near the button
 	if actions_button:
-		_context_menu.position = actions_button.global_position + Vector2(0, actions_button.size.y)
+		_show_context_menu(actions_button.global_position + Vector2(0, actions_button.size.y))
 	else:
-		_context_menu.position = get_global_mouse_position()
-	
+		_show_context_menu(get_global_mouse_position())
+
+
+func _show_context_menu(global_position: Vector2) -> void:
+	if not _context_menu:
+		return
+	_context_menu.hide()
+	_context_menu.position = global_position
 	_context_menu.popup()
 
 

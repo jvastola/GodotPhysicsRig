@@ -77,10 +77,20 @@ func handle_pointer_event(event: Dictionary) -> void:
 		"secondary_press":
 			# Right-click for context menu (triggered by grip or secondary button in VR)
 			_send_mouse_motion(viewport_pos)
-			_send_mouse_button(viewport_pos, true, true, MOUSE_BUTTON_RIGHT)
+			_send_mouse_button(
+				viewport_pos,
+				true,
+				event.get("secondary_just_pressed", event.get("action_just_pressed", true)),
+				MOUSE_BUTTON_RIGHT
+			)
 		"secondary_release":
 			_send_mouse_motion(viewport_pos)
-			_send_mouse_button(viewport_pos, false, true, MOUSE_BUTTON_RIGHT)
+			_send_mouse_button(
+				viewport_pos,
+				false,
+				event.get("secondary_just_released", event.get("action_just_released", true)),
+				MOUSE_BUTTON_RIGHT
+			)
 		"exit":
 			_send_mouse_exit()
 			_is_hovering = false

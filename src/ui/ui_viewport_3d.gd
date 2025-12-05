@@ -127,6 +127,22 @@ func handle_pointer_event(event: Dictionary) -> void:
 			_send_mouse_motion(viewport_pos)
 			_send_mouse_button(viewport_pos, false, event.get("action_just_released", false))
 			_is_pressed = false
+		"secondary_press":
+			_send_mouse_motion(viewport_pos)
+			_send_mouse_button(
+				viewport_pos,
+				true,
+				event.get("secondary_just_pressed", event.get("action_just_pressed", true)),
+				MOUSE_BUTTON_RIGHT
+			)
+		"secondary_release":
+			_send_mouse_motion(viewport_pos)
+			_send_mouse_button(
+				viewport_pos,
+				false,
+				event.get("secondary_just_released", event.get("action_just_released", true)),
+				MOUSE_BUTTON_RIGHT
+			)
 		"exit":
 			_send_mouse_exit()
 			_is_hovering = false
@@ -167,14 +183,14 @@ func _send_mouse_motion(pos: Vector2) -> void:
 	_last_mouse_pos = pos
 	viewport.push_input(motion_event)
 
-func _send_mouse_button(pos: Vector2, pressed: bool, just_changed: bool) -> void:
+func _send_mouse_button(pos: Vector2, pressed: bool, just_changed: bool, button_index: int = MOUSE_BUTTON_LEFT) -> void:
 	if not viewport or not just_changed:
 		return
 	
 	var button_event := InputEventMouseButton.new()
 	button_event.position = pos
 	button_event.global_position = pos
-	button_event.button_index = MOUSE_BUTTON_LEFT
+	button_event.button_index = button_index
 	button_event.pressed = pressed
 	
 	viewport.push_input(button_event)

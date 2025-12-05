@@ -34,6 +34,9 @@ signal hit_scale_changed(scale: float)
 @export var send_hold_events: bool = true
 @export var include_pointer_color: bool = false
 @export var pointer_color: Color = Color(1.0, 1.0, 1.0, 1.0)
+@export var secondary_action: String = "by_button" # Quest/Oculus B or Y button
+@export var enable_secondary_long_press: bool = true
+@export_range(0.1, 2.0, 0.05) var secondary_long_press_time: float = 0.65
 @export var collide_with_areas: bool = true
 @export var collide_with_bodies: bool = true
 @export_enum("always", "on_hit", "on_trigger", "on_hit_or_trigger", "on_hit_and_trigger") var ray_visibility_mode: String = "always"
@@ -75,6 +78,10 @@ var _hover_collider: Object = null
 var _last_event: Dictionary = {}
 var _controller_cache: XRController3D = null
 var _prev_action_pressed: bool = false
+var _prev_secondary_pressed: bool = false
+var _secondary_active: bool = false
+var _secondary_source: String = "" # "button" or "long_press"
+var _secondary_hold_time: float = 0.0
 var _hit_scale_user_multiplier: float = 1.0
 var _last_emitted_hit_scale: float = -1.0
 
@@ -191,6 +198,7 @@ func _physics_process(_delta: float) -> void:
 			_emit_event(handler, "hold", base_event)
 		if action_state["just_released"]:
 			_emit_event(handler, "release", base_event)
+		_process_secondary_actions(handler, base_event, action_state, controller, _delta)
 	else:
 		_clear_hover_state()
 
@@ -270,6 +278,31 @@ func _gather_action_state(controller: XRController3D) -> Dictionary:
 
 	_prev_action_pressed = state["pressed"]
 	return state
+
+
+func _is_action_pressed(controller: XRController3D, action_name: String) -> bool:
+	if action_name == "":
+		return false
+	if InputMap.has_action(action_name) and Input.is_action_pressed(action_name):
+		return true
+	if controller:
+		if controller.has_method("get_pressed") and controller.get_pressed(action_name):
+			return true
+		if controller.has_method("get_bool") and controller.get_bool(action_name):
+			return true
+		if controller.has_method("get_button") and controller.get_button(action_name):
+			return true
+		if controller.has_method("is_button_pressed") and controller.is_button_pressed(action_name):
+			return true
+		if controller.has_method("get_float") and abs(controller.get_float(action_name)) > 0.5:
+			return true
+		if controller.has_method("get_axis") and abs(controller.get_axis(action_name)) > 0.5:
+			return true
+		if controller.has_method("get_vector2"):
+			var v2 := controller.get_vector2(action_name)
+			if v2.length() > 0.5:
+				return true
+	return false
 
 func _apply_ray_length_adjustment(delta: float, controller: XRController3D, action_state: Dictionary) -> void:
 	if ray_length_axis_action == "":
@@ -406,6 +439,59 @@ func _emit_event(target: Node, event_type: StringName, base_event: Dictionary) -
 		if target.has_method(method_name):
 			target.call_deferred(method_name, handler_payload)
 
+
+func _process_secondary_actions(handler: Node, base_event: Dictionary, action_state: Dictionary, controller: XRController3D, delta: float) -> void:
+	if not handler or not is_instance_valid(handler):
+		_reset_secondary_state()
+		return
+
+	var button_pressed: bool = _is_action_pressed(controller, secondary_action)
+	var should_press: bool = false
+	var should_release: bool = false
+	var reason: String = ""
+
+	if button_pressed and not _prev_secondary_pressed and not _secondary_active:
+		should_press = true
+		reason = "button"
+	elif _prev_secondary_pressed and not button_pressed and _secondary_active and _secondary_source == "button":
+		should_release = true
+		reason = "button"
+
+	_prev_secondary_pressed = button_pressed
+
+	if enable_secondary_long_press:
+		if action_state.get("pressed", false):
+			_secondary_hold_time += delta
+			if not _secondary_active and _secondary_hold_time >= secondary_long_press_time:
+				should_press = true
+				reason = "long_press"
+		else:
+			if _secondary_active and _secondary_source == "long_press":
+				should_release = true
+				reason = "long_press"
+			_secondary_hold_time = 0.0
+
+	if should_press:
+		_secondary_active = true
+		_secondary_source = reason if reason != "" else "button"
+		var secondary_event := base_event.duplicate(true)
+		secondary_event["secondary_action"] = secondary_action
+		secondary_event["secondary_reason"] = _secondary_source
+		secondary_event["secondary_just_pressed"] = true
+		secondary_event["secondary_pressed"] = true
+		_emit_event(handler, "secondary_press", secondary_event)
+
+	if should_release:
+		var secondary_event := base_event.duplicate(true)
+		secondary_event["secondary_action"] = secondary_action
+		secondary_event["secondary_reason"] = _secondary_source
+		secondary_event["secondary_just_released"] = true
+		secondary_event["secondary_pressed"] = false
+		_emit_event(handler, "secondary_release", secondary_event)
+		_secondary_active = false
+		_secondary_source = ""
+		_secondary_hold_time = 0.0
+
 func _resolve_handler(target: Object) -> Node:
 	var node: Node = target as Node
 	while node:
@@ -420,10 +506,25 @@ func _resolve_handler(target: Object) -> Node:
 
 func _clear_hover_state() -> void:
 	if _hover_target and is_instance_valid(_hover_target) and not _last_event.is_empty():
+		if _secondary_active:
+			var secondary_event := _last_event.duplicate(true)
+			secondary_event["secondary_action"] = secondary_action
+			secondary_event["secondary_reason"] = _secondary_source
+			secondary_event["secondary_just_released"] = true
+			secondary_event["secondary_pressed"] = false
+			_emit_event(_hover_target, "secondary_release", secondary_event)
 		_emit_event(_hover_target, "exit", _last_event)
 	_hover_target = null
 	_hover_collider = null
 	_last_event = {}
+	_reset_secondary_state()
+
+
+func _reset_secondary_state() -> void:
+	_prev_secondary_pressed = false
+	_secondary_active = false
+	_secondary_source = ""
+	_secondary_hold_time = 0.0
 
 
 # ============================================================================
