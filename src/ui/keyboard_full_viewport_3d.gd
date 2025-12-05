@@ -1,12 +1,20 @@
 extends Node3D
 
 # Keyboard Full Viewport 3D - 3D worldspace wrapper for full keyboard
+# Supports single-hand grab (move) and two-hand grab (scale)
 
 @export var pointer_group: StringName = &"pointer_interactable"
 @export var ui_size: Vector2 = Vector2(800, 280)
 @export var quad_size: Vector2 = Vector2(3.2, 1.12)  # Aspect ratio matches 800:280
 @export var debug_coordinates: bool = false
 @export var flip_v: bool = true
+
+# Grab settings
+@export_group("Grabbing")
+@export var grabbable: bool = true
+@export var min_scale: float = 0.3
+@export var max_scale: float = 3.0
+@export var grab_smooth_factor: float = 15.0  # Higher = snappier follow
 
 @onready var viewport: SubViewport = get_node_or_null("SubViewport") as SubViewport
 @onready var mesh_instance: MeshInstance3D = get_node_or_null("MeshInstance3D") as MeshInstance3D
@@ -17,10 +25,23 @@ var _last_mouse_pos: Vector2 = Vector2(-1, -1)
 var _is_hovering: bool = false
 var _is_pressed: bool = false
 
+# Grab state
+var _primary_hand: RigidBody3D = null  # First hand that grabbed
+var _secondary_hand: RigidBody3D = null  # Second hand for two-hand scaling
+var _grab_offset: Transform3D = Transform3D.IDENTITY  # Offset from primary hand at grab time
+var _initial_hand_distance: float = 0.0  # Distance between hands when two-hand grab started
+var _initial_scale: Vector3 = Vector3.ONE  # Scale when two-hand grab started
+var _is_grabbed: bool = false
+var _is_two_hand_grab: bool = false
+
 
 func _ready() -> void:
 	if pointer_group != StringName(""):
 		add_to_group(pointer_group)
+	
+	# Add to grabbable group for detection by physics hands
+	add_to_group("grabbable")
+	add_to_group("keyboard_grabbable")
 	
 	if viewport:
 		viewport.size = Vector2i(int(ui_size.x), int(ui_size.y))
@@ -176,3 +197,157 @@ func set_interactive(enabled: bool) -> void:
 			_static_body.collision_layer = _saved_static_body_layer
 		else:
 			_static_body.collision_layer = 0
+
+
+# ============================================================================
+# GRABBABLE INTERFACE
+# ============================================================================
+
+func try_grab(hand: RigidBody3D) -> bool:
+	"""Attempt to grab this keyboard with a hand. Returns true if successful."""
+	if not grabbable:
+		return false
+	
+	if not _is_grabbed:
+		# First hand grab - start single-hand mode
+		_primary_hand = hand
+		_is_grabbed = true
+		_is_two_hand_grab = false
+		
+		# Calculate offset from hand to keyboard in hand's local space
+		_grab_offset = hand.global_transform.affine_inverse() * global_transform
+		
+		print("KeyboardFullViewport3D: Grabbed by ", hand.name)
+		return true
+	
+	elif _is_grabbed and _primary_hand != hand and _secondary_hand == null:
+		# Second hand grab - start two-hand scaling mode
+		_secondary_hand = hand
+		_is_two_hand_grab = true
+		
+		# Record initial distance and scale for proportional scaling
+		_initial_hand_distance = _primary_hand.global_position.distance_to(_secondary_hand.global_position)
+		_initial_scale = scale
+		
+		print("KeyboardFullViewport3D: Two-hand grab started, initial distance: ", _initial_hand_distance)
+		return true
+	
+	return false
+
+
+func release(hand: RigidBody3D = null) -> void:
+	"""Release the keyboard from a specific hand, or all hands if null."""
+	if hand == null:
+		# Release from all hands
+		_primary_hand = null
+		_secondary_hand = null
+		_is_grabbed = false
+		_is_two_hand_grab = false
+		print("KeyboardFullViewport3D: Released from all hands")
+		return
+	
+	if hand == _secondary_hand:
+		# Secondary hand released - exit two-hand mode but stay grabbed by primary
+		_secondary_hand = null
+		_is_two_hand_grab = false
+		print("KeyboardFullViewport3D: Secondary hand released, back to single-hand mode")
+	
+	elif hand == _primary_hand:
+		if _secondary_hand:
+			# Primary released but secondary still holding - swap roles
+			_primary_hand = _secondary_hand
+			_secondary_hand = null
+			_is_two_hand_grab = false
+			# Recalculate offset for new primary hand
+			_grab_offset = _primary_hand.global_transform.affine_inverse() * global_transform
+			print("KeyboardFullViewport3D: Primary released, secondary becomes primary")
+		else:
+			# Only hand released - fully release
+			_primary_hand = null
+			_is_grabbed = false
+			_is_two_hand_grab = false
+			print("KeyboardFullViewport3D: Released completely")
+
+
+func is_grabbed() -> bool:
+	"""Returns true if currently grabbed by at least one hand."""
+	return _is_grabbed
+
+
+func get_grabbing_hand() -> RigidBody3D:
+	"""Returns the primary grabbing hand, or null if not grabbed."""
+	return _primary_hand
+
+
+func _physics_process(delta: float) -> void:
+	if not _is_grabbed or not is_instance_valid(_primary_hand):
+		# If hand became invalid, release
+		if _is_grabbed:
+			print("KeyboardFullViewport3D: Hand became invalid, releasing")
+			release()
+		return
+	
+	if _is_two_hand_grab:
+		_process_two_hand_grab(delta)
+	else:
+		_process_single_hand_grab(delta)
+
+
+func _process_single_hand_grab(delta: float) -> void:
+	"""Smoothly follow the primary hand."""
+	# Target transform is hand's transform * our stored offset
+	var target_transform: Transform3D = _primary_hand.global_transform * _grab_offset
+	
+	# Smoothly interpolate position and rotation
+	var t: float = clamp(grab_smooth_factor * delta, 0.0, 1.0)
+	global_position = global_position.lerp(target_transform.origin, t)
+	
+	var current_quat: Quaternion = global_transform.basis.get_rotation_quaternion()
+	var target_quat: Quaternion = target_transform.basis.get_rotation_quaternion()
+	global_transform.basis = Basis(current_quat.slerp(target_quat, t))
+
+
+func _process_two_hand_grab(delta: float) -> void:
+	"""Handle two-hand grab: position at midpoint and scale based on hand distance."""
+	if not is_instance_valid(_secondary_hand):
+		# Secondary hand became invalid, fall back to single hand
+		_secondary_hand = null
+		_is_two_hand_grab = false
+		return
+	
+	var primary_pos: Vector3 = _primary_hand.global_position
+	var secondary_pos: Vector3 = _secondary_hand.global_position
+	
+	# Position at midpoint between hands
+	var midpoint: Vector3 = (primary_pos + secondary_pos) * 0.5
+	
+	# Calculate current hand distance
+	var current_distance: float = primary_pos.distance_to(secondary_pos)
+	
+	# Avoid division by zero
+	if _initial_hand_distance < 0.01:
+		_initial_hand_distance = 0.01
+	
+	# Calculate scale factor based on ratio of current to initial distance
+	var scale_ratio: float = current_distance / _initial_hand_distance
+	var new_scale: Vector3 = _initial_scale * scale_ratio
+	
+	# Clamp scale within bounds
+	new_scale = new_scale.clamp(Vector3.ONE * min_scale, Vector3.ONE * max_scale)
+	
+	# Smooth interpolation
+	var t: float = clamp(grab_smooth_factor * delta, 0.0, 1.0)
+	global_position = global_position.lerp(midpoint, t)
+	scale = scale.lerp(new_scale, t)
+	
+	# Orient to face the average of both hands' forward directions
+	# with the keyboard horizontal (Y up)
+	var forward_dir: Vector3 = (secondary_pos - primary_pos).normalized()
+	var up_dir: Vector3 = Vector3.UP
+	# Make the keyboard face perpendicular to the line between hands
+	var look_dir: Vector3 = forward_dir.cross(up_dir).normalized()
+	if look_dir.length_squared() > 0.001:
+		var target_basis: Basis = Basis.looking_at(look_dir, up_dir)
+		var current_quat: Quaternion = global_transform.basis.get_rotation_quaternion()
+		var target_quat: Quaternion = target_basis.get_rotation_quaternion()
+		global_transform.basis = Basis(current_quat.slerp(target_quat, t * 0.5))  # Slower rotation

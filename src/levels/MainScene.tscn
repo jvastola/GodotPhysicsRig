@@ -1,4 +1,4 @@
-[gd_scene load_steps=23 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=24 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -19,7 +19,7 @@
 [ext_resource type="PackedScene" path="res://src/ui/DebugConsoleViewport3D.tscn" id="19_debug_console"]
 [ext_resource type="PackedScene" path="res://src/ui/ScriptViewerViewport3D.tscn" id="20_script_viewer"]
 [ext_resource type="PackedScene" path="res://src/ui/KeyboardFullViewport3D.tscn" id="21_keyboard"]
-[ext_resource type="PackedScene" uid="uid://file_system_viewport3d" path="res://src/ui/FileSystemViewport3D.tscn" id="22_filesystem"]
+[ext_resource type="PackedScene" path="res://src/ui/FileSystemViewport3D.tscn" id="22_filesystem"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -30,7 +30,7 @@ size = Vector3(50, 5, 50)
 material = ExtResource("2_or5nu")
 size = Vector3(50, 5, 50)
 
-[node name="MainScene3" type="Node3D" unique_id=1547683746]
+[node name="MainScene4" type="Node3D" unique_id=1547683746]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1403982438]
 environment = SubResource("Environment_main")
@@ -103,7 +103,7 @@ text = "Grabbables Room"
 font_size = 48
 
 [node name="UnifiedRoomViewport3D" parent="." unique_id=1842196751 instance=ExtResource("13_unified_ui")]
-transform = Transform3D(0.505, 0, 0, 0, 0.505, 0, 0, 0, 0.505, -2.219528, 0.5762043, -1.9722173)
+transform = Transform3D(0.505, 0, 0, 0, 0.505, 0, 0, 0, 0.505, -3.54267, 0.5762043, -1.9722173)
 
 [node name="LiveKitViewport3D" parent="." unique_id=1947332191 instance=ExtResource("14_livekit_viewport")]
 transform = Transform3D(0.505, 0, 0, 0, 0.505, 0, 0, 0, 0.505, 4, 1.04535, -2.5)
@@ -155,5 +155,5 @@ transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 1.064451, 0.7851808, -1
 [node name="KeyboardFullViewport3D" parent="." unique_id=1262501057 instance=ExtResource("21_keyboard")]
 transform = Transform3D(0.35, 0, 0, 0, 0.35, 0, 0, 0, 0.35, 1.0585722, 0.2227844, -1.88066)
 
-[node name="FileSystemViewport3D" parent="." instance=ExtResource("22_filesystem")]
-transform = Transform3D(0.35, 0, 0, 0, 0.35, 0, 0, 0, 0.35, -2.5, 1.2, -2.0)
+[node name="FileSystemViewport3D" parent="." unique_id=1729430813 instance=ExtResource("22_filesystem")]
+transform = Transform3D(0.35, 0, 0, 0, 0.35, 0, 0, 0, 0.35, -1.7811422, 0.526621, -2)
