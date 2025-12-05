@@ -246,6 +246,31 @@ func pointer_grab_set_scale(new_scale: float) -> void:
 	# This is handled by the mesh/collision being children that inherit scale
 
 
+func pointer_grab_set_rotation(pointer: Node3D, grab_point: Vector3 = Vector3.INF) -> void:
+	"""Rotate this panel to face the pointer origin.
+	Called by hand_pointer during grip grab mode - position is handled separately."""
+	if not pointer or not is_instance_valid(pointer):
+		return
+	
+	var pointer_origin: Vector3 = pointer.global_transform.origin
+	var direction: Vector3 = Vector3.ZERO
+	
+	# If we have a specific grab point (e.g. corner of panel), calculate direction
+	# such that the surface normal at that point points to user
+	# This means the vector from pointer to grab_point is our reference
+	if grab_point.is_finite():
+		direction = (grab_point - pointer_origin).normalized()
+	else:
+		# Fallback to center-based rotation
+		direction = (global_position - pointer_origin).normalized()
+	
+	# Only rotate if we have valid direction
+	if direction.length_squared() > 0.001:
+		# Look at a point behind us to face our +Z toward user
+		var look_away_point: Vector3 = global_position + direction
+		look_at(look_away_point, Vector3.UP)
+
+
 func pointer_grab_get_distance(pointer: Node3D) -> float:
 	"""Get current distance from the pointer origin."""
 	if not pointer or not is_instance_valid(pointer):

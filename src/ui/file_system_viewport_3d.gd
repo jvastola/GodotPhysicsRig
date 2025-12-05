@@ -202,3 +202,20 @@ func pointer_grab_set_distance(new_distance: float, pointer: Node3D) -> void:
 
 func pointer_grab_set_scale(new_scale: float) -> void:
 	scale = Vector3.ONE * new_scale
+
+
+func pointer_grab_set_rotation(pointer: Node3D, grab_point: Vector3 = Vector3.INF) -> void:
+	if not pointer or not is_instance_valid(pointer):
+		return
+	
+	var pointer_origin: Vector3 = pointer.global_transform.origin
+	var direction: Vector3 = Vector3.ZERO
+	
+	if grab_point.is_finite():
+		direction = (grab_point - pointer_origin).normalized()
+	else:
+		direction = (global_position - pointer_origin).normalized()
+	
+	if direction.length_squared() > 0.001:
+		var look_away_point: Vector3 = global_position + direction
+		look_at(look_away_point, Vector3.UP)

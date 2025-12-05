@@ -52,6 +52,8 @@ signal hit_scale_changed(scale: float)
 @export_range(0.5, 10.0, 0.1) var grab_max_scale: float = 5.0
 @export_range(0.1, 20.0, 0.1) var grab_min_distance: float = 0.3
 @export_range(0.5, 50.0, 0.1) var grab_max_distance: float = 20.0
+# Layer mask for objects that should rotate to face user when grabbed (default: Layer 6 for UI)
+@export_flags_3d_physics var grab_rotation_mask: int = 1 << 5
 
 @onready var _pointer_face: MeshInstance3D = get_node_or_null(pointer_face_path) as MeshInstance3D
 @onready var _raycast: RayCast3D = get_node_or_null(raycast_node_path) as RayCast3D
@@ -80,7 +82,9 @@ var _last_emitted_hit_scale: float = -1.0
 var _grab_target: Node = null  # Currently grabbed object
 var _grab_distance: float = 0.0  # Current distance from pointer origin
 var _grab_initial_scale: Vector3 = Vector3.ONE  # Scale when grab started
+var _grab_offset: Vector3 = Vector3.ZERO  # Offset from grab point to object center
 var _prev_grip_pressed: bool = false  # For edge detection
+var _grab_should_rotate: bool = false # Whether current grab target allows rotation
 
 func _ready() -> void:
 	_clamp_ray_length()
@@ -468,6 +472,18 @@ func _try_start_grab() -> void:
 			return
 	
 	_grab_target = _hover_target
+	_grab_should_rotate = false
+	
+	# Check if we should allow rotation based on collision layer
+	if _hover_target is CollisionObject3D:
+		var col_obj = _hover_target as CollisionObject3D
+		if (col_obj.collision_layer & grab_rotation_mask) != 0:
+			_grab_should_rotate = true
+	# Also allow rotation if target is NOT a collision object (fallback) or if we hit a UI static body
+	elif _hover_collider is CollisionObject3D:
+		var col_obj = _hover_collider as CollisionObject3D
+		if (col_obj.collision_layer & grab_rotation_mask) != 0:
+			_grab_should_rotate = true
 	
 	# Get initial distance from pointer
 	var axis_local: Vector3 = pointer_axis_local.normalized()
@@ -476,16 +492,26 @@ func _try_start_grab() -> void:
 	
 	if _hover_target is Node3D:
 		var target_3d: Node3D = _hover_target as Node3D
-		# Calculate distance along ray to target
-		var to_target: Vector3 = target_3d.global_position - start
-		_grab_distance = to_target.dot(axis_world)
+		
+		# Get the actual hit point from raycast for offset calculation
+		var hit_point: Vector3 = target_3d.global_position  # default to center
+		if _raycast and _raycast.is_colliding():
+			hit_point = _raycast.get_collision_point()
+		
+		# Calculate offset from hit point to object center (in object's local space)
+		_grab_offset = target_3d.global_position - hit_point
+		
+		# Calculate distance along ray to HIT POINT (not object center)
+		var to_hit: Vector3 = hit_point - start
+		_grab_distance = to_hit.dot(axis_world)
 		_grab_distance = clamp(_grab_distance, grab_min_distance, grab_max_distance)
 		_grab_initial_scale = target_3d.scale
 	else:
 		_grab_distance = ray_length
 		_grab_initial_scale = Vector3.ONE
+		_grab_offset = Vector3.ZERO
 	
-	print("HandPointer: Started grab on ", _grab_target.name, " at distance ", _grab_distance)
+	print("HandPointer: Started grab on ", _grab_target.name, " at distance ", _grab_distance, " offset ", _grab_offset)
 
 
 func _end_grab() -> void:
@@ -494,7 +520,10 @@ func _end_grab() -> void:
 		print("HandPointer: Ended grab on ", _grab_target.name if is_instance_valid(_grab_target) else "invalid")
 	_grab_target = null
 	_grab_distance = 0.0
+	_grab_distance = 0.0
 	_grab_initial_scale = Vector3.ONE
+	_grab_offset = Vector3.ZERO
+	_grab_should_rotate = false
 
 
 func _update_grabbed_object(delta: float, controller: XRController3D) -> void:
@@ -521,22 +550,28 @@ func _update_grabbed_object(delta: float, controller: XRController3D) -> void:
 	if joystick.x != 0.0:
 		scale_delta = joystick.x * grab_scale_adjust_speed * delta
 	
-	# Calculate new position along ray
+	# Calculate grab point on ray, then add offset to get object center
 	var axis_local: Vector3 = pointer_axis_local.normalized()
 	var axis_world: Vector3 = (global_transform.basis * axis_local).normalized()
 	var start: Vector3 = global_transform.origin
-	var new_position: Vector3 = start + axis_world * _grab_distance
+	var grab_point: Vector3 = start + axis_world * _grab_distance
 	
 	# Apply changes to grabbed object
 	if _grab_target is Node3D:
 		var target_3d: Node3D = _grab_target as Node3D
 		
-		# Use interface methods if available, otherwise direct manipulation
-		if _grab_target.has_method("pointer_grab_set_distance"):
-			_grab_target.pointer_grab_set_distance(_grab_distance, self)
-		else:
-			# Direct position update for objects without interface
-			target_3d.global_position = new_position
+		# Position the object so the grab point is on the ray
+		# grab_point is where we grabbed, _grab_offset is vector from grab point to center
+		target_3d.global_position = grab_point + _grab_offset
+		
+		# Apply rotation to face the pointer (if method exists and allowed by layer mask)
+		if _grab_should_rotate:
+			if _grab_target.has_method("pointer_grab_set_rotation"):
+				_grab_target.pointer_grab_set_rotation(self, grab_point)
+			elif _grab_target.has_method("pointer_grab_set_distance"):
+				# Just call for rotation side side effect - but DON'T let it reposition
+				# Actually skip this since it repositions
+				pass
 		
 		if scale_delta != 0.0:
 			if _grab_target.has_method("pointer_grab_set_scale"):

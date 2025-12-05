@@ -32,6 +32,12 @@ var _preview_sphere_mesh: SphereMesh = null
 var _preview_spheres: Array[MeshInstance3D] = []
 var _preview_container: Node3D = null
 
+# Performance optimization
+var _last_mesh_update_points: int = 0  # Track points when mesh was last updated
+var _mesh_update_interval: int = 3  # Only rebuild mesh every N new points
+var _cached_centroid: Vector3 = Vector3.ZERO  # Cache centroid calculation
+var _cached_hull_shape: ConvexPolygonShape3D = null  # Reuse for internal point checks
+
 
 func _ready() -> void:
 	super._ready()
@@ -628,6 +634,8 @@ func _create_final_hull() -> void:
 		var grabbable_script = load("res://src/objects/grabbable.gd")
 		hull_body = RigidBody3D.new()
 		hull_body.set_script(grabbable_script)
+		# Set to free grab mode (1) so it can be grabbed from any point
+		hull_body.set("grab_mode", 1)
 	else:
 		hull_body = RigidBody3D.new()
 	

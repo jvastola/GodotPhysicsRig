@@ -168,6 +168,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1.5, -3)
 
 [node name="VolumeHullPen2" parent="." unique_id=909618236 instance=ExtResource("24_volume_hull_pen")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5714846, 1.5, -3)
-hull_color = Color(0.92199814, 0.53932786, 0.675874, 0.8509804)
+hull_color = Color(0.34145394, 0.09690256, 0.22746554, 1)
 invert_faces = true
 show_hull_points = false
