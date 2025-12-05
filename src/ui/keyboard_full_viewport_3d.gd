@@ -351,3 +351,41 @@ func _process_two_hand_grab(delta: float) -> void:
 		var current_quat: Quaternion = global_transform.basis.get_rotation_quaternion()
 		var target_quat: Quaternion = target_basis.get_rotation_quaternion()
 		global_transform.basis = Basis(current_quat.slerp(target_quat, t * 0.5))  # Slower rotation
+
+
+# ============================================================================
+# POINTER GRAB INTERFACE (for hand_pointer grip grab mode)
+# ============================================================================
+
+func pointer_grab_set_distance(new_distance: float, pointer: Node3D) -> void:
+	"""Set the distance of this keyboard from the pointer origin.
+	Called by hand_pointer during grip grab mode."""
+	if not pointer or not is_instance_valid(pointer):
+		return
+	
+	# Get pointer direction
+	var pointer_forward: Vector3 = -pointer.global_transform.basis.z.normalized()
+	var pointer_origin: Vector3 = pointer.global_transform.origin
+	
+	# Position keyboard at the specified distance along pointer ray
+	global_position = pointer_origin + pointer_forward * new_distance
+
+
+func pointer_grab_set_scale(new_scale: float) -> void:
+	"""Set the uniform scale of this keyboard.
+	Called by hand_pointer during grip grab mode."""
+	# Clamp to our configured min/max
+	new_scale = clamp(new_scale, min_scale, max_scale)
+	scale = Vector3.ONE * new_scale
+
+
+func pointer_grab_get_distance(pointer: Node3D) -> float:
+	"""Get current distance from the pointer origin."""
+	if not pointer or not is_instance_valid(pointer):
+		return 0.0
+	return global_position.distance_to(pointer.global_transform.origin)
+
+
+func pointer_grab_get_scale() -> float:
+	"""Get current uniform scale."""
+	return scale.x

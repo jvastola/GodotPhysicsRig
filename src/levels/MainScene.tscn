@@ -1,4 +1,4 @@
-[gd_scene load_steps=24 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=25 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -31,7 +31,7 @@ size = Vector3(50, 5, 50)
 material = ExtResource("2_or5nu")
 size = Vector3(50, 5, 50)
 
-[node name="MainScene4" type="Node3D" unique_id=1547683746]
+[node name="MainScene5" type="Node3D" unique_id=1547683746]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1403982438]
 environment = SubResource("Environment_main")
@@ -159,6 +159,5 @@ transform = Transform3D(0.35, 0, 0, 0, 0.35, 0, 0, 0, 0.35, 1.0585722, 0.2227844
 [node name="FileSystemViewport3D" parent="." unique_id=1729430813 instance=ExtResource("22_filesystem")]
 transform = Transform3D(0.35, 0, 0, 0, 0.35, 0, 0, 0, 0.35, -1.7811422, 0.526621, -2)
 
-[node name="ConvexHullPen" parent="." instance=ExtResource("23_convex_hull_pen")]
+[node name="ConvexHullPen" parent="." unique_id=438475259 instance=ExtResource("23_convex_hull_pen")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, 1.5, -3)
-

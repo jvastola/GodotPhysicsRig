@@ -203,3 +203,43 @@ func set_interactive(enabled: bool) -> void:
 			_static_body.collision_layer = _saved_static_body_layer
 		else:
 			_static_body.collision_layer = 0
+
+
+# ============================================================================
+# POINTER GRAB INTERFACE
+# ============================================================================
+
+func pointer_grab_set_distance(new_distance: float, pointer: Node3D) -> void:
+	"""Set the distance of this UI panel from the pointer origin.
+	Called by hand_pointer during grip grab mode."""
+	if not pointer or not is_instance_valid(pointer):
+		return
+	
+	# Get pointer direction
+	var pointer_forward: Vector3 = -pointer.global_transform.basis.z.normalized()
+	var pointer_origin: Vector3 = pointer.global_transform.origin
+	
+	# Position panel at the specified distance along pointer ray
+	global_position = pointer_origin + pointer_forward * new_distance
+
+
+func pointer_grab_set_scale(new_scale: float) -> void:
+	"""Set the uniform scale of this UI panel.
+	Called by hand_pointer during grip grab mode."""
+	# Apply uniform scale
+	scale = Vector3.ONE * new_scale
+	
+	# Optionally update quad_size to maintain proper collision/interaction bounds
+	# This is handled by the mesh/collision being children that inherit scale
+
+
+func pointer_grab_get_distance(pointer: Node3D) -> float:
+	"""Get current distance from the pointer origin."""
+	if not pointer or not is_instance_valid(pointer):
+		return 0.0
+	return global_position.distance_to(pointer.global_transform.origin)
+
+
+func pointer_grab_get_scale() -> float:
+	"""Get current uniform scale."""
+	return scale.x

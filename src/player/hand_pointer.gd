@@ -41,6 +41,18 @@ signal hit_scale_changed(scale: float)
 @export var enable_hit_scaling: bool = true
 @export_enum("on_hit", "always", "on_trigger", "on_hit_or_trigger", "on_hit_and_trigger") var hit_visibility_mode: String = "on_hit"
 
+# Grip-based grab mode: hold grip while pointing at an object to grab and manipulate it
+@export_group("Grip Grab Mode")
+@export var enable_grip_grab: bool = true
+@export var grip_action: String = "grip"  # Grip button to activate grab mode
+@export_range(0.0, 1.0, 0.01) var grip_threshold: float = 0.5
+@export_range(0.1, 10.0, 0.1) var grab_distance_adjust_speed: float = 2.0
+@export_range(0.1, 5.0, 0.1) var grab_scale_adjust_speed: float = 1.0
+@export_range(0.1, 5.0, 0.1) var grab_min_scale: float = 0.2
+@export_range(0.5, 10.0, 0.1) var grab_max_scale: float = 5.0
+@export_range(0.1, 20.0, 0.1) var grab_min_distance: float = 0.3
+@export_range(0.5, 50.0, 0.1) var grab_max_distance: float = 20.0
+
 @onready var _pointer_face: MeshInstance3D = get_node_or_null(pointer_face_path) as MeshInstance3D
 @onready var _raycast: RayCast3D = get_node_or_null(raycast_node_path) as RayCast3D
 @onready var _ray_visual: MeshInstance3D = get_node_or_null(ray_visual_node_path) as MeshInstance3D
@@ -63,6 +75,12 @@ var _controller_cache: XRController3D = null
 var _prev_action_pressed: bool = false
 var _hit_scale_user_multiplier: float = 1.0
 var _last_emitted_hit_scale: float = -1.0
+
+# Grip grab mode state
+var _grab_target: Node = null  # Currently grabbed object
+var _grab_distance: float = 0.0  # Current distance from pointer origin
+var _grab_initial_scale: Vector3 = Vector3.ONE  # Scale when grab started
+var _prev_grip_pressed: bool = false  # For edge detection
 
 func _ready() -> void:
 	_clamp_ray_length()
@@ -109,6 +127,9 @@ func _physics_process(_delta: float) -> void:
 	_apply_ray_length_adjustment(_delta, controller, action_state)
 	_apply_hit_scale_adjustment(_delta, controller, action_state)
 	_clamp_ray_length()
+	
+	# Process grip grab mode (must be done before normal pointer events)
+	_process_grip_grab_mode(_delta, controller)
 
 	_raycast.target_position = axis_local * ray_length
 	_raycast.force_raycast_update()
@@ -399,3 +420,142 @@ func _clear_hover_state() -> void:
 	_hover_target = null
 	_hover_collider = null
 	_last_event = {}
+
+
+# ============================================================================
+# GRIP GRAB MODE
+# ============================================================================
+
+func _process_grip_grab_mode(delta: float, controller: XRController3D) -> void:
+	"""Process grip-based grab mode for manipulating objects at a distance."""
+	if not enable_grip_grab or not controller:
+		return
+	
+	# Get grip state
+	var grip_value: float = 0.0
+	if controller.has_method("get_float"):
+		grip_value = controller.get_float(grip_action)
+	var grip_pressed: bool = grip_value >= grip_threshold
+	var grip_just_pressed: bool = grip_pressed and not _prev_grip_pressed
+	var grip_just_released: bool = not grip_pressed and _prev_grip_pressed
+	_prev_grip_pressed = grip_pressed
+	
+	# Handle grab initiation
+	if grip_just_pressed:
+		_try_start_grab()
+	
+	# Handle grab release
+	if grip_just_released:
+		_end_grab()
+	
+	# Process grab manipulation if actively grabbing
+	if _grab_target and is_instance_valid(_grab_target) and grip_pressed:
+		_update_grabbed_object(delta, controller)
+	elif _grab_target and not is_instance_valid(_grab_target):
+		# Target became invalid, clean up
+		_grab_target = null
+
+
+func _try_start_grab() -> void:
+	"""Attempt to start grabbing the currently hovered target."""
+	if not _hover_target or not is_instance_valid(_hover_target):
+		return
+	
+	# Check if target supports pointer grab
+	if not _hover_target.has_method("pointer_grab_set_distance"):
+		# Fall back to checking if it's a Node3D we can manipulate
+		if not _hover_target is Node3D:
+			return
+	
+	_grab_target = _hover_target
+	
+	# Get initial distance from pointer
+	var axis_local: Vector3 = pointer_axis_local.normalized()
+	var axis_world: Vector3 = (global_transform.basis * axis_local).normalized()
+	var start: Vector3 = global_transform.origin
+	
+	if _hover_target is Node3D:
+		var target_3d: Node3D = _hover_target as Node3D
+		# Calculate distance along ray to target
+		var to_target: Vector3 = target_3d.global_position - start
+		_grab_distance = to_target.dot(axis_world)
+		_grab_distance = clamp(_grab_distance, grab_min_distance, grab_max_distance)
+		_grab_initial_scale = target_3d.scale
+	else:
+		_grab_distance = ray_length
+		_grab_initial_scale = Vector3.ONE
+	
+	print("HandPointer: Started grab on ", _grab_target.name, " at distance ", _grab_distance)
+
+
+func _end_grab() -> void:
+	"""End the current grab."""
+	if _grab_target:
+		print("HandPointer: Ended grab on ", _grab_target.name if is_instance_valid(_grab_target) else "invalid")
+	_grab_target = null
+	_grab_distance = 0.0
+	_grab_initial_scale = Vector3.ONE
+
+
+func _update_grabbed_object(delta: float, controller: XRController3D) -> void:
+	"""Update the grabbed object's position and scale based on joystick input."""
+	if not _grab_target or not is_instance_valid(_grab_target):
+		return
+	
+	# Get joystick input
+	var joystick: Vector2 = _get_pointer_axis_vector(controller)
+	
+	# Apply deadzone
+	if abs(joystick.y) < ray_length_adjust_deadzone:
+		joystick.y = 0.0
+	if abs(joystick.x) < ray_length_adjust_deadzone:
+		joystick.x = 0.0
+	
+	# Adjust distance (joystick Y = forward/back)
+	if joystick.y != 0.0:
+		_grab_distance += joystick.y * grab_distance_adjust_speed * delta
+		_grab_distance = clamp(_grab_distance, grab_min_distance, grab_max_distance)
+	
+	# Adjust scale (joystick X = left/right)
+	var scale_delta: float = 0.0
+	if joystick.x != 0.0:
+		scale_delta = joystick.x * grab_scale_adjust_speed * delta
+	
+	# Calculate new position along ray
+	var axis_local: Vector3 = pointer_axis_local.normalized()
+	var axis_world: Vector3 = (global_transform.basis * axis_local).normalized()
+	var start: Vector3 = global_transform.origin
+	var new_position: Vector3 = start + axis_world * _grab_distance
+	
+	# Apply changes to grabbed object
+	if _grab_target is Node3D:
+		var target_3d: Node3D = _grab_target as Node3D
+		
+		# Use interface methods if available, otherwise direct manipulation
+		if _grab_target.has_method("pointer_grab_set_distance"):
+			_grab_target.pointer_grab_set_distance(_grab_distance, self)
+		else:
+			# Direct position update for objects without interface
+			target_3d.global_position = new_position
+		
+		if scale_delta != 0.0:
+			if _grab_target.has_method("pointer_grab_set_scale"):
+				var current_uniform_scale: float = target_3d.scale.x
+				var new_uniform_scale: float = clamp(current_uniform_scale + scale_delta, grab_min_scale, grab_max_scale)
+				_grab_target.pointer_grab_set_scale(new_uniform_scale)
+			else:
+				# Direct scale update for objects without interface
+				var new_scale: float = clamp(target_3d.scale.x + scale_delta, grab_min_scale, grab_max_scale)
+				target_3d.scale = Vector3.ONE * new_scale
+
+
+func is_grabbing() -> bool:
+	"""Returns true if currently grabbing an object."""
+	return _grab_target != null and is_instance_valid(_grab_target)
+
+
+func get_grabbed_object() -> Node:
+	"""Returns the currently grabbed object, or null."""
+	if _grab_target and is_instance_valid(_grab_target):
+		return _grab_target
+	return null

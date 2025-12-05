@@ -561,3 +561,42 @@ func _set_remote_grabbed_visual(is_grabbed_visual: bool) -> void:
 			else:
 				# Restore normal appearance
 				child.material_override = null
+
+
+# ============================================================================
+# POINTER GRAB INTERFACE (for hand_pointer grip grab mode)
+# ============================================================================
+
+func pointer_grab_set_distance(new_distance: float, pointer: Node3D) -> void:
+	"""Set the distance of this object from the pointer origin.
+	Called by hand_pointer during grip grab mode.
+	Works independently of physics hand grab."""
+	if not pointer or not is_instance_valid(pointer):
+		return
+	
+	# Get pointer direction
+	var pointer_forward: Vector3 = -pointer.global_transform.basis.z.normalized()
+	var pointer_origin: Vector3 = pointer.global_transform.origin
+	
+	# Position object at the specified distance along pointer ray
+	global_position = pointer_origin + pointer_forward * new_distance
+
+
+func pointer_grab_set_scale(new_scale: float) -> void:
+	"""Set the uniform scale of this object.
+	Called by hand_pointer during grip grab mode."""
+	# Apply uniform scale (clamped for safety)
+	new_scale = clamp(new_scale, 0.1, 10.0)
+	scale = Vector3.ONE * new_scale
+
+
+func pointer_grab_get_distance(pointer: Node3D) -> float:
+	"""Get current distance from the pointer origin."""
+	if not pointer or not is_instance_valid(pointer):
+		return 0.0
+	return global_position.distance_to(pointer.global_transform.origin)
+
+
+func pointer_grab_get_scale() -> float:
+	"""Get current uniform scale."""
+	return scale.x

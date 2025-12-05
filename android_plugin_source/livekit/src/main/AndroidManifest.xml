@@ -1,40 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Network permissions for WebRTC -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
-    
-    <!-- Audio permissions for voice chat -->
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    
-    <!-- Camera permission (optional, for video) -->
-    <uses-permission android:name="android.permission.CAMERA" />
-    
-    <!-- Bluetooth permissions for headset support -->
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    
-    <!-- Wake lock to keep audio running -->
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    
-    <!-- Foreground service for background audio -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+	<!-- Network permissions for WebRTC -->
+	<uses-permission android:name="android.permission.INTERNET" />
+	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+	<uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+	
+	<!-- Audio permissions for voice chat -->
+	<uses-permission android:name="android.permission.RECORD_AUDIO" />
+	<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+	
+	<!-- Camera permission (optional, for video) -->
+	<uses-permission android:name="android.permission.CAMERA" />
+	
+	<!-- Bluetooth permissions for headset support -->
+	<uses-permission android:name="android.permission.BLUETOOTH" />
+	<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+	
+	<!-- Wake lock to keep audio running -->
+	<uses-permission android:name="android.permission.WAKE_LOCK" />
+	
+	<!-- Foreground service for background audio -->
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
-    <application>
-        <!-- LiveKit audio service for background playback -->
-        <service
-            android:name="io.livekit.android.audio.AudioService"
-            android:foregroundServiceType="mediaPlayback"
-            android:exported="false" />
+	<application>
+		<!-- LiveKit audio service for background playback -->
+		<service
+			android:name="io.livekit.android.audio.AudioService"
+			android:foregroundServiceType="mediaPlayback"
+			android:exported="false" />
 
-        <!-- Godot v2 Android Plugin init class -->
-        <meta-data
-            android:name="org.godotengine.plugin.v2.GodotLiveKit"
-            android:value="com.jvastola.physicshand.livekit.GodotLiveKitPlugin" />
-    </application>
+		<!-- Godot v2 Android Plugin init class -->
+		<meta-data
+			android:name="org.godotengine.plugin.v2.GodotLiveKit"
+			android:value="com.jvastola.physicshand.livekit.GodotLiveKitPlugin" />
+	</application>
 
 </manifest>
