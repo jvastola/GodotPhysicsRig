@@ -127,6 +127,10 @@ func _send_mouse_motion(pos: Vector2) -> void:
 	else:
 		motion_event.relative = Vector2.ZERO
 	
+	# IMPROVEMENT: Add button mask if pressed so drag-select works
+	if _is_pressed:
+		motion_event.button_mask = MOUSE_BUTTON_MASK_LEFT
+	
 	_last_mouse_pos = pos
 	viewport.push_input(motion_event)
 
@@ -140,6 +144,12 @@ func _send_mouse_button(pos: Vector2, pressed: bool, just_changed: bool) -> void
 	button_event.global_position = pos
 	button_event.button_index = MOUSE_BUTTON_LEFT
 	button_event.pressed = pressed
+	
+	# IMPROVEMENT: Add button mask so dragging works
+	if pressed:
+		button_event.button_mask = MOUSE_BUTTON_MASK_LEFT
+	else:
+		button_event.button_mask = 0
 	
 	viewport.push_input(button_event)
 

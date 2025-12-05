@@ -36,17 +36,29 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 4
 
-[node name="TitleLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="HeaderHBox" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.7, 0.75, 0.9, 1.0)
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/VBoxContainer/HeaderHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.7, 0.75, 0.9, 1)
 theme_override_font_sizes/font_size = 14
 text = "📝 Script Editor"
 horizontal_alignment = 1
 
+[node name="SaveButton" type="Button" parent="MarginContainer/VBoxContainer/HeaderHBox"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.2, 0.8, 0.4, 1)
+theme_override_font_sizes/font_size = 12
+text = "SAVE"
+
 [node name="PathLabel" type="Label" parent="MarginContainer/VBoxContainer"]
 visible = false
 layout_mode = 2
-theme_override_colors/font_color = Color(0.5, 0.5, 0.55, 1.0)
+theme_override_colors/font_color = Color(0.5, 0.5, 0.55, 1)
 theme_override_font_sizes/font_size = 10
 horizontal_alignment = 1
 text_overrun_behavior = 3

@@ -9,7 +9,8 @@ signal script_opened(script_path: String)
 signal script_modified(script_path: String)
 signal script_saved(script_path: String)
 
-@onready var title_label: Label = $MarginContainer/VBoxContainer/TitleLabel
+@onready var title_label: Label = $MarginContainer/VBoxContainer/HeaderHBox/TitleLabel
+@onready var save_button: Button = $MarginContainer/VBoxContainer/HeaderHBox/SaveButton
 @onready var path_label: Label = $MarginContainer/VBoxContainer/PathLabel
 @onready var code_edit: CodeEdit = $MarginContainer/VBoxContainer/CodeEdit
 @onready var no_script_label: Label = $MarginContainer/VBoxContainer/NoScriptLabel
@@ -27,6 +28,9 @@ func _ready() -> void:
 	instance = self
 	_setup_code_edit()
 	_show_no_script()
+	
+	if save_button:
+		save_button.pressed.connect(save_script)
 	
 	# Connect to keyboard if available
 	call_deferred("_connect_to_keyboard")
@@ -170,8 +174,13 @@ func _connect_to_keyboard_shortcuts() -> void:
 
 
 func _on_shortcut_action(action: String) -> void:
-	if not code_edit or not code_edit.has_focus():
+	# Relaxed focus check: allow shortcuts if editor is visible
+	if not code_edit or not code_edit.visible:
 		return
+	
+	# Optional: Check if we are really the active window/control if needed
+	# but for VR keyboard interaction, strictly requiring focus can be flaky
+	# if the user clicked the keyboard buttons.
 	
 	match action:
 		"undo":
