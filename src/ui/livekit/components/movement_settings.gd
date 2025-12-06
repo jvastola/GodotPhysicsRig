@@ -4,6 +4,8 @@ class_name MovementSettingsPanel
 
 signal settings_changed()
 
+const InputBindingManager = preload("res://src/systems/input_binding_manager.gd")
+
 # Visual palette
 const COLOR_TITLE := Color(0.88, 0.93, 1.0)
 const COLOR_SUBTITLE := Color(0.7, 0.78, 0.9)
@@ -16,11 +18,14 @@ const DEFAULTS := {
 	"locomotion_mode": PlayerMovementComponent.LocomotionMode.DISABLED,
 	"locomotion_speed": 3.0,
 	"locomotion_deadzone": 0.2,
+	"invert_locomotion_x": false,
+	"invert_locomotion_y": false,
 	"turn_mode": PlayerMovementComponent.TurnMode.SNAP,
 	"snap_turn_angle": 45.0,
 	"smooth_turn_speed": 90.0,
 	"turn_deadzone": 0.5,
 	"snap_turn_cooldown": 0.3,
+	"invert_turn_x": false,
 	"hand_assignment": PlayerMovementComponent.HandAssignment.DEFAULT,
 	"enable_two_hand_world_scale": false,
 	"enable_two_hand_world_rotation": false,
@@ -28,6 +33,7 @@ const DEFAULTS := {
 	"world_scale_max": 15.0,
 	"world_scale_sensitivity": 0.35,
 	"world_rotation_sensitivity": 0.6,
+	"world_grab_move_factor": 1.0,
 	"enable_one_hand_world_grab": false,
 	"one_hand_world_move_sensitivity": 0.35,
 	"jump_enabled": false,
@@ -36,12 +42,22 @@ const DEFAULTS := {
 	"player_gravity_enabled": true,
 }
 
+const INPUT_ACTIONS := [
+	{
+		"action": "jump",
+		"label": "Jump",
+		"description": "Bind how the jump action is triggered.",
+	},
+]
+
 # UI References - set up dynamically
 var locomotion_mode_btn: OptionButton
 var locomotion_speed_slider: HSlider
 var locomotion_speed_label: Label
 var locomotion_deadzone_slider: HSlider
 var locomotion_deadzone_label: Label
+var locomotion_invert_x_check: CheckBox
+var locomotion_invert_y_check: CheckBox
 var turn_mode_btn: OptionButton
 var snap_angle_slider: HSlider
 var snap_angle_label: Label
@@ -51,6 +67,7 @@ var deadzone_slider: HSlider
 var deadzone_label: Label
 var snap_cooldown_slider: HSlider
 var snap_cooldown_label: Label
+var turn_invert_check: CheckBox
 var hand_swap_check: CheckBox
 var world_scale_check: CheckBox
 var world_rotation_check: CheckBox
@@ -64,6 +81,8 @@ var world_scale_sensitivity_slider: HSlider
 var world_scale_sensitivity_label: Label
 var world_rotation_sensitivity_slider: HSlider
 var world_rotation_sensitivity_label: Label
+var world_grab_move_factor_slider: HSlider
+var world_grab_move_factor_label: Label
 var one_hand_world_grab_check: CheckBox
 var one_hand_world_move_sense_slider: HSlider
 var one_hand_world_move_sense_label: Label
@@ -72,9 +91,15 @@ var jump_impulse_slider: HSlider
 var jump_impulse_label: Label
 var jump_cooldown_slider: HSlider
 var jump_cooldown_label: Label
+var input_mapper_status: Label
 
 var snap_container: VBoxContainer
 var smooth_container: VBoxContainer
+
+# Input mapping UI state
+var input_rows := {}
+var input_listen_action := ""
+var input_listen_events: Array[InputEvent] = []
 
 # Reference to movement component
 var movement_component: PlayerMovementComponent
@@ -82,8 +107,25 @@ var defaults_snapshot := DEFAULTS.duplicate(true)
 
 
 func _ready():
+	# Stretch to viewport to avoid clipping; rely on scroll for overflow
+	_apply_fullrect_layout()
 	_find_movement_component()
 	_build_ui()
+
+
+func _apply_fullrect_layout():
+	anchor_left = 0.0
+	anchor_top = 0.0
+	anchor_right = 1.0
+	anchor_bottom = 1.0
+	offset_left = 0.0
+	offset_top = 0.0
+	offset_right = 0.0
+	offset_bottom = 0.0
+	grow_horizontal = Control.GROW_DIRECTION_BOTH
+	grow_vertical = Control.GROW_DIRECTION_BOTH
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_flags_vertical = Control.SIZE_EXPAND_FILL
 
 
 func _find_movement_component():
@@ -111,6 +153,8 @@ func _build_ui():
 	margin.add_theme_constant_override("margin_right", 12)
 	margin.add_theme_constant_override("margin_top", 12)
 	margin.add_theme_constant_override("margin_bottom", 12)
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(margin)
 
 	var scroll = ScrollContainer.new()
@@ -122,6 +166,8 @@ func _build_ui():
 	# Main container
 	var main_vbox = VBoxContainer.new()
 	main_vbox.add_theme_constant_override("separation", 12)
+	main_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	main_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.add_child(main_vbox)
 	
 	# Title + status
@@ -194,6 +240,30 @@ func _build_ui():
 	locomotion_deadzone_label = loco_deadzone_block.label
 	locomotion_deadzone_slider = loco_deadzone_block.slider
 	locomotion_deadzone_slider.value_changed.connect(func(value: float): _on_locomotion_deadzone_changed(value))
+	
+	# Locomotion Axis Inversion
+	var loco_invert_row = _create_row(locomotion_card, "Invert Axes")
+	locomotion_invert_x_check = CheckBox.new()
+	locomotion_invert_x_check.text = "Horizontal"
+	locomotion_invert_x_check.tooltip_text = "Flip left/right on the movement stick."
+	locomotion_invert_x_check.focus_mode = Control.FOCUS_NONE
+	if movement_component:
+		locomotion_invert_x_check.button_pressed = movement_component.invert_locomotion_x
+	else:
+		locomotion_invert_x_check.button_pressed = defaults_snapshot["invert_locomotion_x"]
+	locomotion_invert_x_check.toggled.connect(func(pressed: bool): _on_locomotion_invert_x_toggled(pressed))
+	loco_invert_row.add_child(locomotion_invert_x_check)
+	
+	locomotion_invert_y_check = CheckBox.new()
+	locomotion_invert_y_check.text = "Vertical"
+	locomotion_invert_y_check.tooltip_text = "Flip forward/back on the movement stick."
+	locomotion_invert_y_check.focus_mode = Control.FOCUS_NONE
+	if movement_component:
+		locomotion_invert_y_check.button_pressed = movement_component.invert_locomotion_y
+	else:
+		locomotion_invert_y_check.button_pressed = defaults_snapshot["invert_locomotion_y"]
+	locomotion_invert_y_check.toggled.connect(func(pressed: bool): _on_locomotion_invert_y_toggled(pressed))
+	loco_invert_row.add_child(locomotion_invert_y_check)
 	
 	# === Turning Section ===
 	var turning_card = _create_card(main_vbox, "Turning", "Snap or smooth turning with sensitivity controls", "🌀")
@@ -282,6 +352,19 @@ func _build_ui():
 	deadzone_slider = deadzone_block.slider
 	deadzone_slider.value_changed.connect(func(value: float): _on_deadzone_changed(value))
 	
+	# Turn Axis Inversion
+	var turn_invert_row = _create_row(turning_card, "Invert Turn")
+	turn_invert_check = CheckBox.new()
+	turn_invert_check.text = "Horizontal"
+	turn_invert_check.tooltip_text = "Flip left/right turn input."
+	turn_invert_check.focus_mode = Control.FOCUS_NONE
+	if movement_component:
+		turn_invert_check.button_pressed = movement_component.invert_turn_x
+	else:
+		turn_invert_check.button_pressed = defaults_snapshot["invert_turn_x"]
+	turn_invert_check.toggled.connect(func(pressed: bool): _on_turn_invert_toggled(pressed))
+	turn_invert_row.add_child(turn_invert_check)
+	
 	# === Hand Assignment Section ===
 	var controls_card = _create_card(main_vbox, "Controls", "Choose which hand drives movement and turning", "👐")
 	
@@ -321,6 +404,21 @@ func _build_ui():
 	world_rotation_check.toggled.connect(func(pressed: bool): _on_world_rotation_toggled(pressed))
 	world_rotation_check.tooltip_text = "Twist both grips to rotate the environment."
 	world_card.add_child(world_rotation_check)
+
+	var initial_grab_move = movement_component.world_grab_move_factor if movement_component else defaults_snapshot["world_grab_move_factor"]
+	var grab_move_block = _add_slider_block(
+		world_card,
+		"Two-Hand Move Factor",
+		"Translate opposite to midpoint hand motion. 1.0 = match distance.",
+		0.05,
+		3.0,
+		0.05,
+		initial_grab_move,
+		func(value): return " x%.2f" % value
+	)
+	world_grab_move_factor_label = grab_move_block.label
+	world_grab_move_factor_slider = grab_move_block.slider
+	world_grab_move_factor_slider.value_changed.connect(func(value: float): _on_world_grab_move_factor_changed(value))
 	
 	one_hand_world_grab_check = CheckBox.new()
 	one_hand_world_grab_check.text = "One-Hand World Grab"
@@ -461,6 +559,9 @@ func _build_ui():
 	jump_cooldown_slider = jump_cd_block.slider
 	jump_cooldown_slider.value_changed.connect(func(value: float): _on_jump_cooldown_changed(value))
 	
+	# === Input Mapper ===
+	_build_input_mapper(main_vbox)
+	
 	_update_turn_mode_ui()
 	_update_locomotion_controls_enabled()
 	_update_status_label()
@@ -518,6 +619,18 @@ func _on_locomotion_deadzone_changed(value: float):
 	settings_changed.emit()
 
 
+func _on_locomotion_invert_x_toggled(pressed: bool):
+	if movement_component:
+		movement_component.invert_locomotion_x = pressed
+	settings_changed.emit()
+
+
+func _on_locomotion_invert_y_toggled(pressed: bool):
+	if movement_component:
+		movement_component.invert_locomotion_y = pressed
+	settings_changed.emit()
+
+
 func _on_turn_mode_changed(index: int):
 	if movement_component:
 		movement_component.turn_mode = index as PlayerMovementComponent.TurnMode
@@ -552,6 +665,12 @@ func _on_deadzone_changed(value: float):
 	settings_changed.emit()
 
 
+func _on_turn_invert_toggled(pressed: bool):
+	if movement_component:
+		movement_component.invert_turn_x = pressed
+	settings_changed.emit()
+
+
 func _on_hand_swap_toggled(pressed: bool):
 	if movement_component:
 		if pressed:
@@ -571,6 +690,13 @@ func _on_world_scale_toggled(pressed: bool):
 func _on_world_rotation_toggled(pressed: bool):
 	if movement_component:
 		movement_component.enable_two_hand_world_rotation = pressed
+	settings_changed.emit()
+
+
+func _on_world_grab_move_factor_changed(value: float):
+	if movement_component:
+		movement_component.world_grab_move_factor = value
+	world_grab_move_factor_label.text = "Two-Hand Move Factor: x%.2f" % value
 	settings_changed.emit()
 
 
@@ -645,12 +771,86 @@ func _on_gravity_toggled(pressed: bool):
 	settings_changed.emit()
 
 
+func _on_mode_changed(action: String):
+	var row: InputRow = input_rows.get(action, null)
+	if not row:
+		return
+	var manager := InputBindingManager.get_singleton()
+	if not manager:
+		return
+	var binding := manager.get_binding(action)
+	var events: Array = binding.get("events", [])
+	if events.is_empty():
+		return
+	var mode := _mode_from_selector(row.mode_btn)
+	manager.set_binding(action, events, mode)
+	_refresh_input_row(action)
+
+
 func _on_reset_pressed():
 	# Prefer live snapshot when available, otherwise defaults
 	var source = defaults_snapshot if defaults_snapshot.size() > 0 else DEFAULTS
 	_apply_defaults(source)
 	refresh()
 	settings_changed.emit()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if input_listen_action == "":
+		return
+	if event.is_echo():
+		return
+	if event is InputEventKey and event.pressed:
+		if event.keycode == KEY_ESCAPE:
+			_stop_listening(false)
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+			_stop_listening(true)
+			get_viewport().set_input_as_handled()
+			return
+	if not _is_bindable_event(event):
+		return
+	_capture_listen_event(event)
+	get_viewport().set_input_as_handled()
+
+
+func _is_bindable_event(event: InputEvent) -> bool:
+	if event is InputEventMouseMotion:
+		return false
+	if event is InputEventMagnifyGesture or event is InputEventPanGesture:
+		return false
+	if event is InputEventScreenDrag:
+		return false
+	return event is InputEventKey or event is InputEventMouseButton or event is InputEventJoypadButton or event is InputEventJoypadMotion
+
+
+func _capture_listen_event(event: InputEvent):
+	if input_listen_action == "":
+		return
+	if not _is_pressed_event(event):
+		return
+	var copy: InputEvent = event.duplicate()
+	var text: String = copy.as_text()
+	for ev in input_listen_events:
+		if ev.as_text() == text:
+			return
+	input_listen_events.append(copy)
+	var row: InputRow = input_rows.get(input_listen_action, null)
+	if row and row.summary:
+		row.summary.text = "Captured: %s" % _format_events(input_listen_events)
+
+
+func _is_pressed_event(event: InputEvent) -> bool:
+	if event is InputEventKey:
+		return event.pressed
+	if event is InputEventMouseButton:
+		return event.pressed
+	if event is InputEventJoypadButton:
+		return event.pressed
+	if event is InputEventJoypadMotion:
+		return abs(event.axis_value) > 0.5
+	return false
 
 
 # === Public API ===
@@ -668,6 +868,10 @@ func refresh():
 			locomotion_speed_slider.value = movement_component.locomotion_speed
 		if locomotion_deadzone_slider:
 			locomotion_deadzone_slider.value = movement_component.locomotion_deadzone
+		if locomotion_invert_x_check:
+			locomotion_invert_x_check.button_pressed = movement_component.invert_locomotion_x
+		if locomotion_invert_y_check:
+			locomotion_invert_y_check.button_pressed = movement_component.invert_locomotion_y
 		if turn_mode_btn:
 			turn_mode_btn.selected = movement_component.turn_mode
 		if snap_angle_slider:
@@ -678,12 +882,16 @@ func refresh():
 			smooth_speed_slider.value = movement_component.smooth_turn_speed
 		if deadzone_slider:
 			deadzone_slider.value = movement_component.turn_deadzone
+		if turn_invert_check:
+			turn_invert_check.button_pressed = movement_component.invert_turn_x
 		if hand_swap_check:
 			hand_swap_check.button_pressed = movement_component.hand_assignment == PlayerMovementComponent.HandAssignment.SWAPPED
 		if world_scale_check:
 			world_scale_check.button_pressed = movement_component.enable_two_hand_world_scale
 		if world_rotation_check:
 			world_rotation_check.button_pressed = movement_component.enable_two_hand_world_rotation
+	if world_grab_move_factor_slider:
+		world_grab_move_factor_slider.value = movement_component.world_grab_move_factor
 		if gravity_check:
 			gravity_check.button_pressed = movement_component.player_gravity_enabled
 		if world_scale_min_slider:
@@ -719,17 +927,21 @@ func _snapshot_defaults():
 		"locomotion_mode": movement_component.locomotion_mode,
 		"locomotion_speed": movement_component.locomotion_speed,
 		"locomotion_deadzone": movement_component.locomotion_deadzone,
+		"invert_locomotion_x": movement_component.invert_locomotion_x,
+		"invert_locomotion_y": movement_component.invert_locomotion_y,
 		"turn_mode": movement_component.turn_mode,
 		"snap_turn_angle": movement_component.snap_turn_angle,
 		"smooth_turn_speed": movement_component.smooth_turn_speed,
 		"turn_deadzone": movement_component.turn_deadzone,
 		"snap_turn_cooldown": movement_component.snap_turn_cooldown,
+		"invert_turn_x": movement_component.invert_turn_x,
 		"hand_assignment": movement_component.hand_assignment,
 		"enable_two_hand_world_scale": movement_component.enable_two_hand_world_scale,
 		"enable_two_hand_world_rotation": movement_component.enable_two_hand_world_rotation,
 		"world_scale_min": movement_component.world_scale_min,
 		"world_scale_max": movement_component.world_scale_max,
 		"player_gravity_enabled": movement_component.player_gravity_enabled,
+		"world_grab_move_factor": movement_component.world_grab_move_factor,
 	}
 
 
@@ -740,6 +952,10 @@ func _apply_defaults(source: Dictionary):
 		locomotion_speed_slider.value = source.get("locomotion_speed", DEFAULTS["locomotion_speed"])
 	if locomotion_deadzone_slider:
 		locomotion_deadzone_slider.value = source.get("locomotion_deadzone", DEFAULTS["locomotion_deadzone"])
+	if locomotion_invert_x_check:
+		locomotion_invert_x_check.button_pressed = source.get("invert_locomotion_x", DEFAULTS["invert_locomotion_x"])
+	if locomotion_invert_y_check:
+		locomotion_invert_y_check.button_pressed = source.get("invert_locomotion_y", DEFAULTS["invert_locomotion_y"])
 	if turn_mode_btn:
 		turn_mode_btn.selected = source.get("turn_mode", DEFAULTS["turn_mode"])
 	if snap_angle_slider:
@@ -750,12 +966,16 @@ func _apply_defaults(source: Dictionary):
 		smooth_speed_slider.value = source.get("smooth_turn_speed", DEFAULTS["smooth_turn_speed"])
 	if deadzone_slider:
 		deadzone_slider.value = source.get("turn_deadzone", DEFAULTS["turn_deadzone"])
+	if turn_invert_check:
+		turn_invert_check.button_pressed = source.get("invert_turn_x", DEFAULTS["invert_turn_x"])
 	if hand_swap_check:
 		hand_swap_check.button_pressed = source.get("hand_assignment", DEFAULTS["hand_assignment"]) == PlayerMovementComponent.HandAssignment.SWAPPED
 	if world_scale_check:
 		world_scale_check.button_pressed = source.get("enable_two_hand_world_scale", DEFAULTS["enable_two_hand_world_scale"])
 	if world_rotation_check:
 		world_rotation_check.button_pressed = source.get("enable_two_hand_world_rotation", DEFAULTS["enable_two_hand_world_rotation"])
+	if world_grab_move_factor_slider:
+		world_grab_move_factor_slider.value = source.get("world_grab_move_factor", DEFAULTS["world_grab_move_factor"])
 	if world_scale_min_slider:
 		world_scale_min_slider.value = source.get("world_scale_min", DEFAULTS["world_scale_min"])
 	if world_scale_max_slider:
@@ -796,6 +1016,10 @@ func _update_locomotion_controls_enabled():
 		locomotion_speed_slider.editable = enabled
 	if locomotion_deadzone_slider:
 		locomotion_deadzone_slider.editable = enabled
+	if locomotion_invert_x_check:
+		locomotion_invert_x_check.disabled = not enabled
+	if locomotion_invert_y_check:
+		locomotion_invert_y_check.disabled = not enabled
 	if locomotion_speed_label:
 		locomotion_speed_label.modulate = Color.WHITE if enabled else Color(0.6, 0.6, 0.6)
 	if locomotion_deadzone_label:
@@ -811,6 +1035,155 @@ func _update_status_label():
 	else:
 		status_label.text = "Waiting for player..."
 		status_label.add_theme_color_override("font_color", Color(0.8, 0.6, 0.4))
+
+
+func _build_input_mapper(parent: VBoxContainer):
+	var card = _create_card(parent, "Input Mapper", "Map buttons/keys to actions. Press the inputs after clicking map.", "🎮")
+	input_mapper_status = _make_hint("Click \"Map Input\" to start listening. Enter = save, Esc = cancel.")
+	card.add_child(input_mapper_status)
+	
+	for action_data in INPUT_ACTIONS:
+		var row := _create_input_row(card, action_data)
+		input_rows[action_data.action] = row
+		_refresh_input_row(action_data.action)
+
+
+func _create_input_row(parent: VBoxContainer, action_data: Dictionary) -> InputRow:
+	var row := InputRow.new()
+	row.action = action_data.action
+	
+	var container = VBoxContainer.new()
+	container.add_theme_constant_override("separation", 4)
+	parent.add_child(container)
+	
+	var header = HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
+	container.add_child(header)
+	
+	var label = Label.new()
+	label.text = action_data.label
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", COLOR_SUBTITLE)
+	label.custom_minimum_size = Vector2(110, 0)
+	header.add_child(label)
+	
+	row.summary = _make_hint("Not mapped yet")
+	row.summary.custom_minimum_size = Vector2(220, 0)
+	header.add_child(row.summary)
+	
+	row.mode_btn = OptionButton.new()
+	row.mode_btn.add_item("Any (OR)") # 0
+	row.mode_btn.add_item("Chord (all together)") # 1
+	row.mode_btn.add_item("Sequence (in order)") # 2
+	row.mode_btn.tooltip_text = "Choose how multiple inputs should behave."
+	row.mode_btn.custom_minimum_size = Vector2(180, 0)
+	row.mode_btn.item_selected.connect(func(_i): _on_mode_changed(row.action))
+	header.add_child(row.mode_btn)
+	
+	row.listen_btn = Button.new()
+	row.listen_btn.text = "Map Input"
+	row.listen_btn.focus_mode = Control.FOCUS_NONE
+	row.listen_btn.tooltip_text = "Click, then press one or more inputs to bind."
+	row.listen_btn.pressed.connect(func(): _toggle_listen_for(row.action))
+	header.add_child(row.listen_btn)
+	
+	if action_data.has("description"):
+		var hint = _make_hint(action_data.description)
+		container.add_child(hint)
+	
+	return row
+
+
+func _toggle_listen_for(action: String):
+	if input_listen_action == action:
+		_stop_listening(true)
+		return
+	_start_listening(action)
+
+
+func _start_listening(action: String):
+	input_listen_action = action
+	input_listen_events = []
+	for key in input_rows.keys():
+		var r: InputRow = input_rows[key]
+		r.listen_btn.disabled = key != action
+		if key == action:
+			r.listen_btn.text = "Listening..."
+			if r.summary:
+				r.summary.text = "Listening..."
+	if input_mapper_status:
+		input_mapper_status.text = "Listening for %s. Press inputs, Enter = save, Esc = cancel." % action
+
+
+func _stop_listening(commit: bool):
+	if input_listen_action == "":
+		return
+	var action := input_listen_action
+	var events := input_listen_events.duplicate()
+	input_listen_action = ""
+	input_listen_events.clear()
+	
+	for key in input_rows.keys():
+		var r: InputRow = input_rows[key]
+		r.listen_btn.disabled = false
+		r.listen_btn.text = "Map Input"
+	
+	if commit and not events.is_empty():
+		var row: InputRow = input_rows.get(action, null)
+		var mode := _mode_from_selector(row.mode_btn) if row else InputBindingManager.MODE_ANY
+		InputBindingManager.get_singleton().set_binding(action, events, mode)
+		_refresh_input_row(action)
+	else:
+		_refresh_input_row(action)
+	if input_mapper_status:
+		input_mapper_status.text = "Click \"Map Input\" to start listening. Enter = save, Esc = cancel."
+
+
+func _mode_from_selector(selector: OptionButton) -> String:
+	match selector.selected:
+		1:
+			return InputBindingManager.MODE_CHORD
+		2:
+			return InputBindingManager.MODE_SEQUENCE
+		_:
+			return InputBindingManager.MODE_ANY
+
+
+func _refresh_input_row(action: String):
+	var row: InputRow = input_rows.get(action, null)
+	if not row:
+		return
+	var manager := InputBindingManager.get_singleton()
+	var binding := manager.get_binding(action) if manager else {}
+	if binding.is_empty():
+		var existing := InputMap.action_get_events(action) if InputMap.has_action(action) else []
+		if manager:
+			manager.ensure_binding(action, existing, InputBindingManager.MODE_ANY)
+		binding = manager.get_binding(action) if manager else {"events": existing, "mode": InputBindingManager.MODE_ANY}
+	
+	var events: Array = binding.get("events", [])
+	var mode: String = binding.get("mode", InputBindingManager.MODE_ANY)
+	row.mode_btn.selected = 0 if mode == InputBindingManager.MODE_ANY else 1 if mode == InputBindingManager.MODE_CHORD else 2
+	if events.is_empty():
+		row.summary.text = "No bindings set"
+	else:
+		row.summary.text = "%s (%s)" % [_format_events(events), _format_mode(mode)]
+
+
+func _format_mode(mode: String) -> String:
+	if mode == InputBindingManager.MODE_CHORD:
+		return "all together"
+	if mode == InputBindingManager.MODE_SEQUENCE:
+		return "in order"
+	return "any"
+
+
+func _format_events(events: Array) -> String:
+	var parts: Array[String] = []
+	for ev in events:
+		if ev is InputEvent:
+			parts.append(ev.as_text())
+	return ", ".join(parts)
 
 
 func _create_card(parent: VBoxContainer, title: String, subtitle: String = "", icon: String = "") -> VBoxContainer:
@@ -854,6 +1227,13 @@ func _create_card(parent: VBoxContainer, title: String, subtitle: String = "", i
 class SliderBlock:
 	var label: Label
 	var slider: HSlider
+
+
+class InputRow:
+	var action: String
+	var summary: Label
+	var listen_btn: Button
+	var mode_btn: OptionButton
 
 
 func _add_slider_block(parent: VBoxContainer, title: String, tooltip: String, min_value: float, max_value: float, step: float, initial_value: float, formatter: Callable) -> SliderBlock:

@@ -2,12 +2,16 @@ class_name PlayerMovementComponent
 extends Node
 ## Handles VR turning and joystick locomotion
 
+const InputBindingManager = preload("res://src/systems/input_binding_manager.gd")
+
 # === Locomotion Settings ===
 # Order is important to avoid breaking saved values; new modes are appended.
 enum LocomotionMode { DISABLED, HEAD_DIRECTION, HAND_DIRECTION, HEAD_DIRECTION_3D, HAND_DIRECTION_3D }
 @export var locomotion_mode: LocomotionMode = LocomotionMode.DISABLED
 @export var locomotion_speed: float = 3.0  # m/s
 @export var locomotion_deadzone: float = 0.2
+@export var invert_locomotion_x: bool = false
+@export var invert_locomotion_y: bool = false
 
 # === Turning Settings ===
 enum TurnMode { SNAP, SMOOTH }
@@ -16,6 +20,7 @@ enum TurnMode { SNAP, SMOOTH }
 @export var smooth_turn_speed: float = 90.0  # Degrees per second
 @export var turn_deadzone: float = 0.5  # Thumbstick deadzone for turning
 @export var snap_turn_cooldown: float = 0.3  # Seconds between snap turns
+@export var invert_turn_x: bool = false  # Optional invert for turn thumbstick
 
 # === Hand Assignment ===
 enum HandAssignment { DEFAULT, SWAPPED }
@@ -29,6 +34,7 @@ enum HandAssignment { DEFAULT, SWAPPED }
 @export_range(0.05, 1.5, 0.05) var world_scale_sensitivity: float = 0.35
 @export_range(0.05, 2.0, 0.05) var world_rotation_sensitivity: float = 0.6
 @export_range(1.0, 90.0, 1.0) var world_rotation_max_delta_deg: float = 25.0
+@export_range(0.05, 3.0, 0.05) var world_grab_move_factor: float = 1.0
 @export var enable_one_hand_world_grab: bool = false
 @export_range(0.05, 5.0, 0.05) var one_hand_world_move_sensitivity: float = 0.35
 
@@ -50,6 +56,8 @@ var _world_grab_initial_distance := 0.0
 var _world_grab_initial_scale := 1.0
 var _world_grab_initial_vector := Vector3.ZERO
 var _world_grab_prev_vector := Vector3.ZERO
+var _world_grab_initial_midpoint := Vector3.ZERO
+var _world_grab_prev_midpoint := Vector3.ZERO
 
 # One-hand world grab state
 var _one_hand_grab_active := false
@@ -59,6 +67,9 @@ var _one_hand_initial_body_pos := Vector3.ZERO
 
 # Jump state
 var _jump_cooldown_timer := 0.0
+
+# Input mapping helper
+var _input_binding_manager: InputBindingManager
 
 # References
 var player_body: RigidBody3D
@@ -88,6 +99,15 @@ func setup(p_player_body: RigidBody3D, p_left_controller: XRController3D, p_righ
 	xr_camera = p_xr_camera
 	_apply_player_gravity()
 	print("PlayerMovementComponent: Setup with both controllers")
+
+
+func _ready() -> void:
+	_input_binding_manager = InputBindingManager.get_singleton()
+	if _input_binding_manager:
+		var default_events := []
+		if InputMap.has_action("jump"):
+			default_events = InputMap.action_get_events("jump")
+		_input_binding_manager.ensure_binding("jump", default_events, InputBindingManager.MODE_ANY)
 
 
 func set_vr_mode(enabled: bool) -> void:
@@ -124,7 +144,7 @@ func physics_process_turning(delta: float) -> void:
 		if abs(_pending_snap_angle) > 0.001:
 			var lv = player_body.linear_velocity
 			var av = player_body.angular_velocity
-			player_body.rotate_y(deg_to_rad(_pending_snap_angle))
+			_rotate_player_body_y(deg_to_rad(_pending_snap_angle))
 			player_body.linear_velocity = lv
 			player_body.angular_velocity = av
 			_pending_snap_angle = 0.0
@@ -133,7 +153,7 @@ func physics_process_turning(delta: float) -> void:
 		if abs(_smooth_input) > 0.001:
 			var turn_amount = -_smooth_input * smooth_turn_speed * delta
 			var lv2 = player_body.linear_velocity
-			player_body.rotate_y(deg_to_rad(turn_amount))
+			_rotate_player_body_y(deg_to_rad(turn_amount))
 			player_body.linear_velocity = lv2
 
 	# Handle two-hand world manipulation (rotation/scale) in the physics step
@@ -150,20 +170,25 @@ func physics_process_locomotion(_delta: float) -> void:
 	
 	# Get thumbstick input
 	var input = locomotion_controller.get_vector2("primary")
+	if invert_locomotion_x:
+		input.x *= -1.0
+	if invert_locomotion_y:
+		input.y *= -1.0
 	
 	if input.length() < locomotion_deadzone:
 		return
 	
 	# Get movement direction based on mode
 	var move_direction = _get_movement_direction(input)
+	var allow_vertical := locomotion_mode == LocomotionMode.HEAD_DIRECTION_3D or locomotion_mode == LocomotionMode.HAND_DIRECTION_3D
 	
 	if move_direction.length() < 0.01:
 		return
 	
 	# Apply movement force (similar to desktop controller)
 	var target_velocity = move_direction * locomotion_speed
-	var current_horizontal = Vector3(player_body.linear_velocity.x, 0, player_body.linear_velocity.z)
-	var velocity_change = target_velocity - current_horizontal
+	var current_velocity = player_body.linear_velocity if allow_vertical else Vector3(player_body.linear_velocity.x, 0, player_body.linear_velocity.z)
+	var velocity_change = target_velocity - current_velocity
 	
 	# Apply force to reach target velocity
 	player_body.apply_central_force(velocity_change * player_body.mass * 10.0)
@@ -218,6 +243,8 @@ func _handle_turning(delta: float) -> void:
 	
 	# Get thumbstick input for turning (horizontal axis)
 	var turn_input = turn_controller.get_vector2("primary")
+	if invert_turn_x:
+		turn_input.x *= -1.0
 	
 	if abs(turn_input.x) > turn_deadzone:
 		if turn_mode == TurnMode.SNAP:
@@ -257,6 +284,18 @@ func _handle_snap_turn(input: float) -> void:
 func _handle_smooth_turn(input: float, _delta: float) -> void:
 	"""Handle smooth turning"""
 	_smooth_input = input
+
+
+func _rotate_player_body_y(angle_rad: float) -> void:
+	"""Rotate the player body around the headset pivot instead of world origin."""
+	if not player_body:
+		return
+	var pivot: Vector3 = xr_camera.global_transform.origin if xr_camera else player_body.global_transform.origin
+	var xf := player_body.global_transform
+	var rot_basis := Basis(Vector3.UP, angle_rad)
+	xf.origin = pivot + rot_basis * (xf.origin - pivot)
+	xf.basis = rot_basis * xf.basis
+	player_body.global_transform = xf
 
 
 # === World Grab Helpers ===
@@ -312,6 +351,8 @@ func _start_world_grab() -> void:
 	_world_grab_initial_scale = XRServer.world_scale
 	_world_grab_initial_vector = right_controller.global_position - left_controller.global_position
 	_world_grab_prev_vector = _world_grab_initial_vector
+	_world_grab_initial_midpoint = (left_controller.global_position + right_controller.global_position) * 0.5
+	_world_grab_prev_midpoint = _world_grab_initial_midpoint
 
 
 func _update_world_grab() -> void:
@@ -320,6 +361,7 @@ func _update_world_grab() -> void:
 
 	var current_vector: Vector3 = right_controller.global_position - left_controller.global_position
 	var current_distance: float = max(0.01, left_controller.global_position.distance_to(right_controller.global_position))
+	var current_midpoint: Vector3 = (left_controller.global_position + right_controller.global_position) * 0.5
 
 	if enable_two_hand_world_scale and _world_grab_initial_distance > 0.01:
 		var ratio := current_distance / _world_grab_initial_distance
@@ -331,6 +373,17 @@ func _update_world_grab() -> void:
 		)
 		if abs(target_scale - XRServer.world_scale) > 0.001:
 			XRServer.world_scale = target_scale
+
+	# Translate player opposite to midpoint movement (grabbed-panel style)
+	var move_delta: Vector3 = (_world_grab_prev_midpoint - current_midpoint) * world_grab_move_factor
+	if move_delta.length_squared() > 0.000001:
+		var xf := player_body.global_transform
+		var lv = player_body.linear_velocity
+		var av = player_body.angular_velocity
+		xf.origin += move_delta
+		player_body.global_transform = xf
+		player_body.linear_velocity = lv
+		player_body.angular_velocity = av
 
 	if enable_two_hand_world_rotation:
 		var prev_2d: Vector2 = Vector2(_world_grab_prev_vector.x, _world_grab_prev_vector.z)
@@ -350,6 +403,7 @@ func _update_world_grab() -> void:
 				player_body.linear_velocity = lv
 				player_body.angular_velocity = av
 		_world_grab_prev_vector = current_vector
+	_world_grab_prev_midpoint = current_midpoint
 
 
 func _start_one_hand_grab(controller: XRController3D) -> void:
@@ -390,7 +444,10 @@ func _handle_jump(delta: float) -> void:
 	if _jump_cooldown_timer > 0.0:
 		_jump_cooldown_timer = max(0.0, _jump_cooldown_timer - delta)
 		return
-	if Input.is_action_just_pressed("jump"):
+	var triggered := Input.is_action_just_pressed("jump")
+	if _input_binding_manager:
+		triggered = triggered or _input_binding_manager.is_action_just_triggered("jump")
+	if triggered:
 		player_body.apply_central_impulse(Vector3.UP * jump_impulse * player_body.mass)
 		_jump_cooldown_timer = jump_cooldown
 
