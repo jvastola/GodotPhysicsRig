@@ -84,6 +84,8 @@ var _secondary_source: String = "" # "button" or "long_press"
 var _secondary_hold_time: float = 0.0
 var _hit_scale_user_multiplier: float = 1.0
 var _last_emitted_hit_scale: float = -1.0
+var _movement_component: PlayerMovementComponent = null
+var _ui_scroll_active: bool = false
 
 # Grip grab mode state
 var _grab_target: Node = null  # Currently grabbed object
@@ -120,9 +122,10 @@ func _ready() -> void:
 	if _ray_hit:
 		_ray_hit.visible = false
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if not _raycast:
 		return
+	_get_movement_component()
 
 	if _hover_target and not is_instance_valid(_hover_target):
 		_hover_target = null
@@ -135,12 +138,12 @@ func _physics_process(_delta: float) -> void:
 
 	var controller: XRController3D = _get_pointer_controller()
 	var action_state: Dictionary = _gather_action_state(controller)
-	_apply_ray_length_adjustment(_delta, controller, action_state)
-	_apply_hit_scale_adjustment(_delta, controller, action_state)
+	_apply_ray_length_adjustment(delta, controller, action_state)
+	_apply_hit_scale_adjustment(delta, controller, action_state)
 	_clamp_ray_length()
 	
 	# Process grip grab mode (must be done before normal pointer events)
-	_process_grip_grab_mode(_delta, controller)
+	_process_grip_grab_mode(delta, controller)
 
 	_raycast.target_position = axis_local * ray_length
 	_raycast.force_raycast_update()
@@ -198,9 +201,11 @@ func _physics_process(_delta: float) -> void:
 			_emit_event(handler, "hold", base_event)
 		if action_state["just_released"]:
 			_emit_event(handler, "release", base_event)
-		_process_secondary_actions(handler, base_event, action_state, controller, _delta)
+		_process_secondary_actions(handler, base_event, action_state, controller, delta)
+		_process_ui_scroll(handler, base_event, controller, delta)
 	else:
 		_clear_hover_state()
+		_clear_ui_scroll_capture(controller)
 
 	var hit_scale: float = _compute_hit_scale(distance)
 	_maybe_emit_hit_scale(hit_scale)
@@ -492,6 +497,48 @@ func _process_secondary_actions(handler: Node, base_event: Dictionary, action_st
 		_secondary_source = ""
 		_secondary_hold_time = 0.0
 
+func _process_ui_scroll(handler: Node, base_event: Dictionary, controller: XRController3D, _delta: float) -> void:
+	var movement := _get_movement_component()
+	if not movement or not movement.ui_scroll_steals_stick:
+		_clear_ui_scroll_capture(controller, movement)
+		return
+	if not handler or not is_instance_valid(handler):
+		_clear_ui_scroll_capture(controller, movement)
+		return
+	if not controller:
+		_clear_ui_scroll_capture(controller, movement)
+		return
+
+	var axis: Vector2 = _get_pointer_axis_vector(controller)
+	var scroll_value: float = axis.y
+	if abs(scroll_value) <= movement.ui_scroll_deadzone:
+		_clear_ui_scroll_capture(controller, movement)
+		return
+
+	var scroll_event := base_event.duplicate(true)
+	scroll_event["type"] = "scroll"
+	scroll_event["scroll_value"] = scroll_value
+	scroll_event["scroll_vector"] = axis
+	scroll_event["scroll_wheel_factor"] = movement.ui_scroll_wheel_factor * _delta
+	_emit_event(handler, "scroll", scroll_event)
+
+	movement.set_ui_scroll_capture(true, controller)
+	_ui_scroll_active = true
+
+func _clear_ui_scroll_capture(controller: XRController3D, movement: PlayerMovementComponent = null) -> void:
+	var move_ref := movement if movement else _movement_component
+	if _ui_scroll_active and move_ref:
+		move_ref.set_ui_scroll_capture(false, controller)
+	_ui_scroll_active = false
+
+func _get_movement_component() -> PlayerMovementComponent:
+	if _movement_component and is_instance_valid(_movement_component):
+		return _movement_component
+	var player := get_tree().get_first_node_in_group("xr_player")
+	if player:
+		_movement_component = player.get_node_or_null("PlayerMovementComponent")
+	return _movement_component
+
 func _resolve_handler(target: Object) -> Node:
 	var node: Node = target as Node
 	while node:
@@ -514,6 +561,7 @@ func _clear_hover_state() -> void:
 			secondary_event["secondary_pressed"] = false
 			_emit_event(_hover_target, "secondary_release", secondary_event)
 		_emit_event(_hover_target, "exit", _last_event)
+	_clear_ui_scroll_capture(_get_pointer_controller())
 	_hover_target = null
 	_hover_collider = null
 	_last_event = {}

@@ -7,6 +7,14 @@ extends Control
 var movement_component: PlayerMovementComponent
 var player_body: RigidBody3D
 var xr_player: Node = null
+var passthrough_check: CheckBox
+var passthrough_status: Label
+
+var _xr_interface: XRInterface
+var _world_environment: WorldEnvironment
+var _world_env_snapshot: Dictionary = {}
+var _root_viewport: Viewport
+var _viewport_transparent_default: bool = false
 
 func _ready() -> void:
 	print("UIPanel: _ready() called")
@@ -25,6 +33,12 @@ func _find_player_and_setup() -> void:
 		xr_player = player
 		player_body = player.get_node_or_null("PlayerBody") as RigidBody3D
 		print("UIPanel: Found player_body: ", player_body)
+	
+	_xr_interface = XRServer.find_interface("OpenXR")
+	_root_viewport = get_tree().root
+	if _root_viewport:
+		_viewport_transparent_default = _root_viewport.transparent_bg
+	_find_world_environment()
 	
 	if movement_component:
 		print("UIPanel: Calling _setup_ui()")
@@ -232,6 +246,69 @@ func _setup_ui() -> void:
 	scale_container.add_child(step_hbox)
 	vbox_player.add_child(scale_container)
 
+	var respawn_btn = Button.new()
+	respawn_btn.text = "Respawn (hard setting)"
+	respawn_btn.custom_minimum_size = Vector2(0, 40)
+	respawn_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	respawn_btn.pressed.connect(_on_respawn_pressed)
+	vbox_player.add_child(respawn_btn)
+	
+	# Environment / Passthrough (Quest 3)
+	_add_separator(vbox_player)
+	var env_label = Label.new()
+	env_label.text = "Environment"
+	env_label.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
+	vbox_player.add_child(env_label)
+	
+	passthrough_check = CheckBox.new()
+	passthrough_check.text = "Skybox Passthrough (Meta Quest 3)"
+	passthrough_check.tooltip_text = "Uses OpenXR alpha-blend to reveal passthrough video. Only supported on devices like Quest 3."
+	passthrough_check.toggled.connect(func(pressed): _on_passthrough_toggled(pressed))
+	vbox_player.add_child(passthrough_check)
+	
+	passthrough_status = Label.new()
+	passthrough_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	passthrough_status.text = "Skybox status pending..."
+	vbox_player.add_child(passthrough_status)
+	_update_passthrough_ui_state()
+
+	# Quick panel buttons to bring UI in front of player
+	_add_separator(vbox_player)
+	var quick_label = Label.new()
+	quick_label.text = "Quick Panels"
+	quick_label.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
+	vbox_player.add_child(quick_label)
+
+	var btn_move_movement = Button.new()
+	btn_move_movement.text = "Move Movement Settings in Front"
+	btn_move_movement.pressed.connect(func(): _move_ui_node_in_front("MovementSettingsViewport3D2"))
+	vbox_player.add_child(btn_move_movement)
+
+	var btn_move_keyboard = Button.new()
+	btn_move_keyboard.text = "Move Keyboard in Front"
+	btn_move_keyboard.pressed.connect(func(): _move_ui_node_in_front("KeyboardFullViewport3D"))
+	vbox_player.add_child(btn_move_keyboard)
+
+	var btn_move_filesystem = Button.new()
+	btn_move_filesystem.text = "Move File System in Front"
+	btn_move_filesystem.pressed.connect(func(): _move_ui_node_in_front("FileSystemViewport3D"))
+	vbox_player.add_child(btn_move_filesystem)
+
+	var btn_move_hierarchy = Button.new()
+	btn_move_hierarchy.text = "Move Scene Hierarchy in Front"
+	btn_move_hierarchy.pressed.connect(func(): _move_ui_node_in_front("SceneHierarchyViewport3D"))
+	vbox_player.add_child(btn_move_hierarchy)
+
+	var btn_move_debug = Button.new()
+	btn_move_debug.text = "Move Debug Window in Front"
+	btn_move_debug.pressed.connect(func(): _move_ui_node_in_front("DebugConsoleViewport3D"))
+	vbox_player.add_child(btn_move_debug)
+
+	var btn_move_git = Button.new()
+	btn_move_git.text = "Move Git Tracker in Front"
+	btn_move_git.pressed.connect(func(): _move_ui_node_in_front("GitViewport3D"))
+	vbox_player.add_child(btn_move_git)
+
 	# Set tab titles if we have a TabContainer (Turn and Player)
 	if tab and tab.get_child_count() >= 2:
 		tab.set_tab_title(0, "Turn")
@@ -293,3 +370,148 @@ func _on_apply_scale_change(delta_sign: int, label: Label) -> void:
 	
 	player_body.scale = Vector3(new_scale, new_scale, new_scale)
 	label.text = "Player Scale: %.2fx" % new_scale
+
+
+func _on_respawn_pressed() -> void:
+	if movement_component:
+		movement_component.respawn(movement_component.hard_respawn_resets_settings)
+
+
+func _on_passthrough_toggled(enabled: bool) -> void:
+	_apply_passthrough_enabled(enabled)
+	_update_passthrough_ui_state()
+
+
+func _find_world_environment() -> void:
+	if _world_environment:
+		return
+	var root := get_tree().root
+	if not root:
+		return
+	var env_node := root.find_child("WorldEnvironment", true, false)
+	if env_node and env_node is WorldEnvironment:
+		_world_environment = env_node
+		if _world_environment.environment and _world_env_snapshot.is_empty():
+			var env := _world_environment.environment
+			_world_env_snapshot = {
+				"background_mode": env.background_mode,
+				"background_color": env.background_color,
+				"sky": env.sky,
+			}
+
+
+func _supports_alpha_passthrough() -> bool:
+	if not _xr_interface:
+		return false
+	if _xr_interface.has_method("get_supported_environment_blend_modes"):
+		var supported: PackedInt32Array = _xr_interface.get_supported_environment_blend_modes()
+		return XRInterface.XR_ENV_BLEND_MODE_ALPHA_BLEND in supported
+	# Assume supported when the runtime does not expose the query
+	return true
+
+
+func _current_blend_mode() -> int:
+	if not _xr_interface:
+		return -1
+	if _xr_interface.has_method("get_environment_blend_mode"):
+		return _xr_interface.get_environment_blend_mode()
+	return _xr_interface.environment_blend_mode
+
+
+func _set_environment_blend_mode(mode: int) -> void:
+	if not _xr_interface:
+		return
+	if _xr_interface.has_method("set_environment_blend_mode"):
+		_xr_interface.set_environment_blend_mode(mode)
+	else:
+		_xr_interface.environment_blend_mode = mode
+
+
+func _apply_passthrough_enabled(enabled: bool) -> void:
+	if not _xr_interface:
+		_update_passthrough_status("OpenXR not available")
+		if passthrough_check:
+			passthrough_check.button_pressed = false
+		return
+	if enabled and not _supports_alpha_passthrough():
+		_update_passthrough_status("Alpha blend not supported by runtime")
+		if passthrough_check:
+			passthrough_check.button_pressed = false
+		return
+	
+	var target_mode = XRInterface.XR_ENV_BLEND_MODE_ALPHA_BLEND if enabled else XRInterface.XR_ENV_BLEND_MODE_OPAQUE
+	_set_environment_blend_mode(target_mode)
+	
+	if _root_viewport:
+		_root_viewport.transparent_bg = true if enabled else _viewport_transparent_default
+	
+	if _world_environment and _world_environment.environment:
+		var env := _world_environment.environment
+		if _world_env_snapshot.is_empty():
+			_world_env_snapshot = {
+				"background_mode": env.background_mode,
+				"background_color": env.background_color,
+				"sky": env.sky,
+			}
+		if enabled:
+			env.background_mode = Environment.BG_CLEAR_COLOR
+			env.background_color = Color(0, 0, 0, 0)
+		else:
+			env.background_mode = _world_env_snapshot.get("background_mode", env.background_mode)
+			env.background_color = _world_env_snapshot.get("background_color", env.background_color)
+			env.sky = _world_env_snapshot.get("sky", env.sky)
+
+
+func _update_passthrough_status(text: String) -> void:
+	if passthrough_status:
+		passthrough_status.text = text
+
+
+func _update_passthrough_ui_state() -> void:
+	var xr_ready := _xr_interface and _xr_interface.is_initialized()
+	var supported := _supports_alpha_passthrough()
+	if passthrough_check:
+		passthrough_check.disabled = not xr_ready or not supported
+		if not xr_ready:
+			passthrough_check.tooltip_text = "Passthrough requires OpenXR to be running."
+		elif not supported:
+			passthrough_check.tooltip_text = "Runtime does not support alpha blend passthrough."
+		else:
+			passthrough_check.tooltip_text = "Uses OpenXR alpha-blend to reveal passthrough video. Only supported on devices like Quest 3."
+		passthrough_check.button_pressed = xr_ready and supported and _current_blend_mode() == XRInterface.XR_ENV_BLEND_MODE_ALPHA_BLEND
+	
+	if not xr_ready:
+		_update_passthrough_status("VR session not active")
+	elif not supported:
+		_update_passthrough_status("Passthrough not supported by runtime")
+	elif _current_blend_mode() == XRInterface.XR_ENV_BLEND_MODE_ALPHA_BLEND:
+		_update_passthrough_status("Passthrough ON (skybox hidden)")
+	else:
+		_update_passthrough_status("Passthrough OFF (skybox visible)")
+
+
+func _move_ui_node_in_front(node_name: String, distance: float = 1.6, height_offset: float = 0.0) -> void:
+	if not xr_player:
+		print("UIPanel: xr_player not found, cannot move UI")
+		return
+	var camera: XRCamera3D = xr_player.get_node_or_null("PlayerBody/XROrigin3D/XRCamera3D") as XRCamera3D
+	if not camera:
+		print("UIPanel: camera not found, cannot move UI")
+		return
+	var ui_node := get_tree().get_current_scene().get_node_or_null(node_name)
+	if not ui_node or not (ui_node is Node3D):
+		print("UIPanel: node %s not found or not Node3D" % node_name)
+		return
+	var cam_tf := camera.global_transform
+	var forward := -cam_tf.basis.z.normalized()
+	var target_origin := cam_tf.origin + forward * distance + Vector3(0, height_offset, 0)
+	var xf: Transform3D = ui_node.global_transform
+	xf.origin = target_origin
+	# Face the camera (only yaw)
+	var look_at_target := cam_tf.origin
+	var dir := (look_at_target - target_origin)
+	dir.y = 0
+	if dir.length_squared() > 0.0001:
+		dir = dir.normalized()
+		xf.basis = Basis().looking_at(dir, Vector3.UP)
+	ui_node.global_transform = xf

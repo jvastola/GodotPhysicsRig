@@ -1,128 +1,278 @@
 extends RefCounted
 class_name GitService
 
-## Lightweight helper to run git commands inside the project repo.
-## Uses `git -C <repo>` to avoid changing the working directory.
+## Lightweight local version tracker (no git CLI required).
+## Stores commit snapshots and staging info in user://gitpanel_state.json.
 
 var repo_root: String
+const STATE_FILE := "user://gitpanel_state.json"
+const TRACK_EXTS := [
+	"gd", "tscn", "tres", "gdshader", "shader", "cfg", "json", "txt", "md", "cs"
+]
+const IGNORE_DIRS := [".git", ".godot", ".import", "android/build", "bin", "dist", "tmp"]
+const IGNORE_SUFFIX := [".import"]
 
 func _init(repo_path: String = "") -> void:
 	repo_root = repo_path
 	if repo_root.is_empty():
 		repo_root = ProjectSettings.globalize_path("res://")
 	repo_root = repo_root.rstrip("/")  # Normalize trailing slash
-
-
-func _run_git(args: Array) -> Dictionary:
-	var output: Array = []
-	var cmd: Array = ["-C", repo_root]
-	cmd.append_array(args)
-	var exit_code := OS.execute("git", cmd, output, true)
-	var stdout := "\n".join(output)
-	return {
-		"code": exit_code,
-		"output": stdout
-	}
+	_ensure_state()
 
 
 func get_status() -> Dictionary:
-	# Returns a dictionary with staged, unstaged, and untracked arrays.
-	var res := _run_git(["status", "--porcelain=v1"])
-	if res.code != 0:
-		return {"error": res.output.strip_edges()}
-	return _parse_status(res.output)
+	# Returns staged/unstaged/untracked arrays comparing current files to last commit snapshot.
+	var state := _load_state()
+	var commits: Array = state.get("commits", [])
+	var last_snapshot: Dictionary = {}
+	if commits.size() > 0:
+		last_snapshot = commits[-1].get("hashes", {})
+	var staged_paths: Array = state.get("staged", [])
+	var current := _current_snapshot()
+	var staged: Array = []
+	var unstaged: Array = []
+	var untracked: Array = []
+
+	# Detect added/modified files present now
+	for path in current.keys():
+		var cur_hash: String = current[path]
+		var prev_hash: String = last_snapshot.get(path, "")
+		var is_staged := staged_paths.has(path)
+		if prev_hash == "":
+			# New file
+			if is_staged:
+				staged.append({"code": "A ", "path": path})
+			else:
+				untracked.append({"code": "??", "path": path})
+		elif prev_hash != cur_hash:
+			if is_staged:
+				staged.append({"code": "M ", "path": path})
+			else:
+				unstaged.append({"code": " M", "path": path})
+		else:
+			if is_staged:
+				# Staged but unchanged vs snapshot; leave unstaged to avoid clutter.
+				staged.append({"code": "S ", "path": path})
+
+	# Detect deletions (present in snapshot but missing now)
+	for path in last_snapshot.keys():
+		if current.has(path):
+			continue
+		var is_staged := staged_paths.has(path)
+		if is_staged:
+			staged.append({"code": "D ", "path": path})
+		else:
+			unstaged.append({"code": " D", "path": path})
+
+	return {
+		"staged": staged,
+		"unstaged": unstaged,
+		"untracked": untracked
+	}
 
 
 func stage_paths(paths: Array) -> Dictionary:
 	if paths.is_empty():
 		return {"code": 0, "output": "Nothing to stage"}
-	var res := _run_git(["add", "--"] + paths)
-	return {"code": res.code, "output": res.output.strip_edges()}
+	var state := _load_state()
+	var staged: Array = state.get("staged", [])
+	for p in paths:
+		if not staged.has(p):
+			staged.append(p)
+	state["staged"] = staged
+	_save_state(state)
+	return {"code": 0, "output": "Staged %d file(s)" % paths.size()}
 
 
 func unstage_paths(paths: Array) -> Dictionary:
 	if paths.is_empty():
 		return {"code": 0, "output": "Nothing to unstage"}
-	# Prefer restore --staged; falls back gracefully if git is old enough to fail.
-	var res := _run_git(["restore", "--staged", "--"] + paths)
-	if res.code != 0:
-		res = _run_git(["reset", "HEAD", "--"] + paths)
-	return {"code": res.code, "output": res.output.strip_edges()}
+	var state := _load_state()
+	var staged: Array = state.get("staged", [])
+	for p in paths:
+		staged.erase(p)
+	state["staged"] = staged
+	_save_state(state)
+	return {"code": 0, "output": "Unstaged %d file(s)" % paths.size()}
 
 
 func stage_all() -> Dictionary:
-	return _run_git(["add", "-A"])
+	var status := get_status()
+	var to_stage: Array = []
+	for e in status.get("unstaged", []):
+		to_stage.append(e.get("path", ""))
+	for e in status.get("untracked", []):
+		to_stage.append(e.get("path", ""))
+	return stage_paths(to_stage)
 
 
 func unstage_all() -> Dictionary:
-	return _run_git(["restore", "--staged", "."])
+	var state := _load_state()
+	state["staged"] = []
+	_save_state(state)
+	return {"code": 0, "output": "Unstaged all"}
 
 
 func commit(message: String) -> Dictionary:
 	var msg := message.strip_edges()
 	if msg.is_empty():
 		return {"code": 1, "output": "Commit message is empty"}
-	return _run_git(["commit", "-m", msg])
+	var state := _load_state()
+	var staged: Array = state.get("staged", [])
+	if staged.is_empty():
+		return {"code": 1, "output": "Nothing staged"}
+
+	var current := _current_snapshot()
+	var last_snapshot: Dictionary = {}
+	var commits: Array = state.get("commits", [])
+	if commits.size() > 0:
+		last_snapshot = commits[-1].get("hashes", {})
+
+	# Start from previous snapshot and update with staged file states
+	var new_snapshot := last_snapshot.duplicate(true)
+	for p in staged:
+		if current.has(p):
+			new_snapshot[p] = current[p]
+		else:
+			# File deleted
+			new_snapshot.erase(p)
+
+	var commit_id := str(Time.get_unix_time_from_system()) + "-" + str(randi())
+	var ts := Time.get_datetime_string_from_system()
+	var entry := {
+		"id": commit_id,
+		"message": msg,
+		"timestamp": ts,
+		"hashes": new_snapshot
+	}
+	commits.append(entry)
+	state["commits"] = commits
+	state["staged"] = []
+	_save_state(state)
+	return {"code": 0, "output": "Committed: %s" % msg}
 
 
 func get_history(limit: int = 20) -> Dictionary:
-	var res := _run_git([
-		"log",
-		"--pretty=format:%h%x09%ad%x09%an%x09%s",
-		"--date=short",
-		"-n",
-		str(limit)
-	])
-	if res.code != 0:
-		return {"error": res.output.strip_edges()}
 	var history: Array[Dictionary] = []
-	for line in res.output.split("\n"):
-		if line.strip_edges().is_empty():
-			continue
-		var parts: PackedStringArray = line.split("\t")
-		if parts.size() >= 4:
-			var message_parts: Array[String] = []
-			for i in range(3, parts.size()):
-				message_parts.append(parts[i])
-			var message: String = " ".join(message_parts)
-			history.append({
-				"hash": parts[0],
-				"date": parts[1],
-				"author": parts[2],
-				"message": message
-			})
+	var state := _load_state()
+	var commits: Array = state.get("commits", [])
+	var start: int = int(max(0, commits.size() - limit))
+	for i in range(commits.size() - 1, start - 1, -1):
+		var c: Dictionary = commits[i]
+		history.append({
+			"hash": c.get("id", ""),
+			"date": c.get("timestamp", ""),
+			"author": "local",
+			"message": c.get("message", "")
+		})
 	return {"history": history}
 
 
 func get_branch() -> String:
-	var res := _run_git(["rev-parse", "--abbrev-ref", "HEAD"])
-	if res.code != 0:
-		return ""
-	return res.output.strip_edges()
+	# Single local branch
+	return "local"
 
 
-func _parse_status(raw: String) -> Dictionary:
-	var staged: Array = []
-	var unstaged: Array = []
-	var untracked: Array = []
-	for line in raw.split("\n"):
-		if line.strip_edges().is_empty():
+func _current_snapshot() -> Dictionary:
+	var results: Dictionary = {}
+	_scan_dir(repo_root, results)
+	return results
+
+
+func _scan_dir(dir_path: String, results: Dictionary) -> void:
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var name := dir.get_next()
+	while name != "":
+		if name == "." or name == "..":
+			name = dir.get_next()
 			continue
-		var x := line.substr(0, 1)
-		var y := line.substr(1, 1)
-		var path := line.substr(3, line.length())
-		var entry := {
-			"code": line.substr(0, 2),
-			"path": path
+		var full := dir_path.path_join(name)
+		if dir.current_is_dir():
+			if _is_ignored_dir(name):
+				name = dir.get_next()
+				continue
+			_scan_dir(full, results)
+		else:
+			if _is_ignored_file(name):
+				name = dir.get_next()
+				continue
+			if not _is_tracked_extension(name):
+				name = dir.get_next()
+				continue
+			var md5 := FileAccess.get_md5(full)
+			if md5 != "":
+				var res_path := ProjectSettings.localize_path(full)
+				results[res_path] = md5
+		name = dir.get_next()
+	dir.list_dir_end()
+
+
+func _is_ignored_dir(name: String) -> bool:
+	for d in IGNORE_DIRS:
+		if name == d:
+			return true
+	return false
+
+
+func _is_ignored_file(name: String) -> bool:
+	for sfx in IGNORE_SUFFIX:
+		if name.ends_with(sfx):
+			return true
+	return false
+
+
+func _is_tracked_extension(name: String) -> bool:
+	var ext := name.get_extension().to_lower()
+	return TRACK_EXTS.has(ext)
+
+
+func _ensure_state() -> void:
+	var state := _load_state()
+	if not state.has("commits"):
+		state["commits"] = []
+	if not state.has("staged"):
+		state["staged"] = []
+	if not state.has("root"):
+		state["root"] = ProjectSettings.localize_path(repo_root)
+	_save_state(state)
+
+
+func _load_state() -> Dictionary:
+	if not FileAccess.file_exists(STATE_FILE):
+		return {
+			"commits": [],
+			"staged": [],
+			"root": ProjectSettings.localize_path(repo_root)
 		}
-		if x == "?" or y == "?":
-			untracked.append(entry)
-		elif x != " ":
-			staged.append(entry)
-		elif y != " ":
-			unstaged.append(entry)
-	return {
-		"staged": staged,
-		"unstaged": unstaged,
-		"untracked": untracked
-	}
+	var f := FileAccess.open(STATE_FILE, FileAccess.READ)
+	if f == null:
+		return {
+			"commits": [],
+			"staged": [],
+			"root": ProjectSettings.localize_path(repo_root)
+		}
+	var txt := f.get_as_text()
+	var data: Variant = JSON.parse_string(txt)
+	if typeof(data) != TYPE_DICTIONARY:
+		return {
+			"commits": [],
+			"staged": [],
+			"root": ProjectSettings.localize_path(repo_root)
+		}
+	if not data.has("commits"):
+		data["commits"] = []
+	if not data.has("staged"):
+		data["staged"] = []
+	if not data.has("root"):
+		data["root"] = ProjectSettings.localize_path(repo_root)
+	return data
+
+
+func _save_state(state: Dictionary) -> void:
+	var f := FileAccess.open(STATE_FILE, FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_string(JSON.stringify(state, "  "))

@@ -90,6 +90,9 @@ func handle_pointer_event(event: Dictionary) -> void:
 				event.get("secondary_just_released", event.get("action_just_released", true)),
 				MOUSE_BUTTON_RIGHT
 			)
+		"scroll":
+			_send_mouse_motion(viewport_pos)
+			_send_scroll(viewport_pos, event.get("scroll_value", 0.0) * event.get("scroll_wheel_factor", 1.0))
 		"exit":
 			_send_mouse_exit()
 			_is_hovering = false
@@ -143,6 +146,19 @@ func _send_mouse_button(pos: Vector2, pressed: bool, just_changed: bool, button_
 	# Handle double-click for file opening
 	if pressed and button_index == MOUSE_BUTTON_LEFT:
 		_handle_potential_double_click(pos)
+
+func _send_scroll(pos: Vector2, amount: float) -> void:
+	if not viewport:
+		return
+	if abs(amount) <= 0.001:
+		return
+	var scroll_event := InputEventMouseButton.new()
+	scroll_event.position = pos
+	scroll_event.global_position = pos
+	scroll_event.button_index = MOUSE_BUTTON_WHEEL_UP if amount > 0.0 else MOUSE_BUTTON_WHEEL_DOWN
+	scroll_event.pressed = true
+	scroll_event.factor = abs(amount)
+	viewport.push_input(scroll_event)
 
 
 var _last_click_time: float = 0.0

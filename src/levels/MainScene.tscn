@@ -13,7 +13,6 @@
 [ext_resource type="PackedScene" uid="uid://e58b0q1ewqr7" path="res://src/ui/multiplayer/UnifiedRoomViewport3D.tscn" id="13_unified_ui"]
 [ext_resource type="PackedScene" uid="uid://dak3v2oax4mjy" path="res://src/ui/livekit/LiveKitViewport3D.tscn" id="14_livekit_viewport"]
 [ext_resource type="PackedScene" path="res://src/objects/VoxelTool.tscn" id="15_voxel_tool"]
-[ext_resource type="PackedScene" path="res://src/ui/MovementSettingsViewport3D.tscn" id="16_movement_settings"]
 [ext_resource type="PackedScene" path="res://src/ui/SceneHierarchyViewport3D.tscn" id="17_scene_hierarchy"]
 [ext_resource type="PackedScene" path="res://src/ui/NodeInspectorViewport3D.tscn" id="18_node_inspector"]
 [ext_resource type="PackedScene" path="res://src/ui/DebugConsoleViewport3D.tscn" id="19_debug_console"]
@@ -23,6 +22,7 @@
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/ConvexHullPen.tscn" id="23_convex_hull_pen"]
 [ext_resource type="PackedScene" uid="uid://6v1kg2wa5orb" path="res://src/objects/grabbables/VolumeHullPen.tscn" id="24_volume_hull_pen"]
 [ext_resource type="PackedScene" path="res://src/ui/git/GitViewport3D.tscn" id="25_git_viewport"]
+[ext_resource type="PackedScene" path="res://src/ui/MovementSettingsViewport2.tscn" id="26_movement_settings_v2"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -139,8 +139,8 @@ height_noise_scale = 0.0
 [node name="VoxelTool" parent="." unique_id=884242549 instance=ExtResource("15_voxel_tool")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1, -3)
 
-[node name="MovementSettingsViewport3D" parent="." unique_id=1559194731 instance=ExtResource("16_movement_settings")]
-transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, -0.9134774, 1.2, -2.5)
+[node name="MovementSettingsViewport3D2" parent="." unique_id=866338396 instance=ExtResource("26_movement_settings_v2")]
+transform = Transform3D(0.42, 0, 0, 0, 0.42, 0, 0, 0, 0.42, -0.1, 1.6099689, -1.85)
 
 [node name="SceneHierarchyViewport3D" parent="." unique_id=1482733498 instance=ExtResource("17_scene_hierarchy")]
 transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, -0.92447275, 0.4442712, -1.9860382)
