@@ -37,7 +37,7 @@ enum HandAssignment { DEFAULT, SWAPPED }
 @export var enable_two_hand_world_scale: bool = false
 @export var enable_two_hand_world_rotation: bool = false
 @export_range(0.01, 20.0, 0.05) var world_scale_min: float = 0.1
-@export_range(0.1, 50.0, 0.1) var world_scale_max: float = 15.0
+@export_range(0.1, 1000.0, 0.1) var world_scale_max: float = 15.0
 @export_range(0.05, 1.5, 0.05) var world_scale_sensitivity: float = 0.35
 @export_range(0.05, 2.0, 0.05) var world_rotation_sensitivity: float = 0.6
 @export_range(1.0, 90.0, 1.0) var world_rotation_max_delta_deg: float = 25.0
@@ -52,6 +52,7 @@ enum TwoHandPivot { MIDPOINT, PLAYER_ORIGIN }
 @export var enable_one_hand_world_grab: bool = false
 @export var enable_one_hand_world_rotate: bool = true
 @export_range(0.0, 2.0, 0.05) var one_hand_world_move_sensitivity: float = 1.0
+@export var apply_one_hand_release_velocity: bool = true
 enum OneHandGrabMode { RELATIVE, ANCHORED }
 @export var one_hand_grab_mode: OneHandGrabMode = OneHandGrabMode.ANCHORED
 @export var enable_one_hand_rotation: bool = true
@@ -92,6 +93,8 @@ var _one_hand_anchor_local := Vector3.ZERO
 var _one_hand_initial_dir2d := Vector2.ZERO
 var _one_hand_initial_yaw := 0.0
 var _one_hand_rotation_pivot := Vector3.ZERO
+var _one_hand_prev_body_pos := Vector3.ZERO
+var _one_hand_last_move_velocity := Vector3.ZERO
 
 # Visual helpers
 var _visual_root: Node3D
@@ -183,12 +186,17 @@ func set_ui_scroll_capture(active: bool, controller: XRController3D) -> void:
 	if not ui_scroll_steals_stick:
 		_clear_ui_scroll_capture()
 		return
-	if controller and controller == locomotion_controller:
-		_ui_block_locomotion = active
-	if controller and controller == turn_controller:
-		_ui_block_turn = active
-	if not controller:
-		_clear_ui_scroll_capture()
+	if active:
+		# While scrolling, pause both locomotion and turning to prevent drift.
+		_ui_block_locomotion = true
+		_ui_block_turn = true
+	else:
+		if controller and controller == locomotion_controller:
+			_ui_block_locomotion = false
+		if controller and controller == turn_controller:
+			_ui_block_turn = false
+		if not controller:
+			_clear_ui_scroll_capture()
 
 
 func _clear_ui_scroll_capture() -> void:
@@ -406,7 +414,7 @@ func _signed_angle_2d(a: Vector2, b: Vector2) -> float:
 
 # === World Grab Helpers ===
 
-func physics_process_world_grab(_delta: float) -> void:
+func physics_process_world_grab(delta: float) -> void:
 	"""Allow two-hand grab gestures to scale/rotate the world."""
 	var two_hand_enabled := enable_two_hand_world_scale or enable_two_hand_world_rotation
 	var one_hand_enabled := enable_one_hand_world_grab or enable_one_hand_world_rotate
@@ -434,7 +442,7 @@ func physics_process_world_grab(_delta: float) -> void:
 		if controller:
 			if not _one_hand_grab_active:
 				_start_one_hand_grab(controller)
-			_update_one_hand_grab(controller)
+			_update_one_hand_grab(controller, delta)
 	else:
 		_end_world_grab()
 		_end_one_hand_grab()
@@ -527,35 +535,42 @@ func _start_one_hand_grab(controller: XRController3D) -> void:
 	_one_hand_controller = controller
 	_one_hand_initial_controller_pos = controller.global_position
 	_one_hand_initial_body_pos = player_body.global_transform.origin
+	_one_hand_prev_body_pos = player_body.global_transform.origin
 	_one_hand_anchor_local = player_body.to_local(controller.global_position) if player_body else controller.global_position
 	# Store initial grab anchor in world space (used for relative mode visuals)
 	_one_hand_grab_anchor = controller.global_position
-	_one_hand_rotation_pivot = player_body.global_transform.origin if player_body else controller.global_position
+	_one_hand_rotation_pivot = _one_hand_grab_anchor
 	_one_hand_initial_dir2d = Vector2(controller.global_position.x - _one_hand_rotation_pivot.x, controller.global_position.z - _one_hand_rotation_pivot.z)
 	_one_hand_initial_yaw = _get_yaw(player_body.global_transform)
 	_update_one_hand_visual()
 
 
-func _update_one_hand_grab(controller: XRController3D) -> void:
+func _update_one_hand_grab(controller: XRController3D, delta: float) -> void:
 	if not _one_hand_grab_active or not controller or not player_body:
 		return
-	var anchor_world := player_body.to_global(_one_hand_anchor_local) if one_hand_grab_mode == OneHandGrabMode.ANCHORED else _one_hand_grab_anchor
-	_one_hand_grab_anchor = anchor_world
+	# Anchor always follows player space; relative mode uses the hand delta for movement, but visuals/pivot stay player-relative
+	var anchor_move_world := player_body.to_global(_one_hand_anchor_local)
+	_one_hand_grab_anchor = anchor_move_world
+	_one_hand_rotation_pivot = anchor_move_world
 	var offset: Vector3
 	if enable_one_hand_world_grab:
 		if one_hand_grab_mode == OneHandGrabMode.ANCHORED:
-			offset = (anchor_world - controller.global_position) * one_hand_world_move_sensitivity
+			offset = (anchor_move_world - controller.global_position) * one_hand_world_move_sensitivity
 		else:
 			offset = (controller.global_position - _one_hand_initial_controller_pos) * one_hand_world_move_sensitivity
 		if invert_one_hand_grab_direction:
 			offset *= -1.0
-		var lv = player_body.linear_velocity
-		var av = player_body.angular_velocity
-		var xf := player_body.global_transform
+		var prev_pos: Vector3 = player_body.global_transform.origin
+		var xf: Transform3D = player_body.global_transform
 		xf.origin += offset
 		player_body.global_transform = xf
-		player_body.linear_velocity = lv
-		player_body.angular_velocity = av
+		var dt: float = max(delta, 0.0001)
+		var new_vel: Vector3 = (xf.origin - prev_pos) / dt
+		player_body.linear_velocity = new_vel
+		_one_hand_prev_body_pos = xf.origin
+		_one_hand_last_move_velocity = new_vel
+	else:
+		_one_hand_last_move_velocity = Vector3.ZERO
 
 	# One-hand rotation around anchor (player space)
 	if enable_one_hand_rotation and enable_one_hand_world_rotate:
@@ -581,6 +596,9 @@ func _update_one_hand_grab(controller: XRController3D) -> void:
 func _end_one_hand_grab() -> void:
 	_one_hand_grab_active = false
 	_one_hand_controller = null
+	if not apply_one_hand_release_velocity and player_body:
+		player_body.linear_velocity = Vector3.ZERO
+	_one_hand_last_move_velocity = Vector3.ZERO
 	_update_one_hand_visual()
 
 
@@ -710,6 +728,7 @@ func _snapshot_settings() -> Dictionary:
 		"two_hand_right_action": two_hand_right_action,
 		"enable_one_hand_world_grab": enable_one_hand_world_grab,
 		"enable_one_hand_world_rotate": enable_one_hand_world_rotate,
+		"apply_one_hand_release_velocity": apply_one_hand_release_velocity,
 		"one_hand_world_move_sensitivity": one_hand_world_move_sensitivity,
 		"invert_one_hand_grab_direction": invert_one_hand_grab_direction,
 		"show_one_hand_grab_visual": show_one_hand_grab_visual,
@@ -755,6 +774,7 @@ func _apply_settings_snapshot(data: Dictionary) -> void:
 	two_hand_right_action = data.get("two_hand_right_action", two_hand_right_action)
 	enable_one_hand_world_grab = data.get("enable_one_hand_world_grab", enable_one_hand_world_grab)
 	enable_one_hand_world_rotate = data.get("enable_one_hand_world_rotate", enable_one_hand_world_rotate)
+	apply_one_hand_release_velocity = data.get("apply_one_hand_release_velocity", apply_one_hand_release_velocity)
 	one_hand_world_move_sensitivity = data.get("one_hand_world_move_sensitivity", one_hand_world_move_sensitivity)
 	invert_one_hand_grab_direction = data.get("invert_one_hand_grab_direction", invert_one_hand_grab_direction)
 	show_one_hand_grab_visual = data.get("show_one_hand_grab_visual", show_one_hand_grab_visual)
@@ -782,10 +802,12 @@ func _update_one_hand_visual() -> void:
 		var im := _one_hand_line_mesh.mesh as ImmediateMesh
 		if show_one_hand_grab_visual and _one_hand_grab_active and _one_hand_controller:
 			var hand_pos := _one_hand_controller.global_position
+			var anchor_local := _visual_root.to_local(anchor_world) if _visual_root else anchor_world
+			var hand_local := _visual_root.to_local(hand_pos) if _visual_root else hand_pos
 			im.clear_surfaces()
 			im.surface_begin(Mesh.PRIMITIVE_LINES)
-			im.surface_add_vertex(anchor_world)
-			im.surface_add_vertex(hand_pos)
+			im.surface_add_vertex(anchor_local)
+			im.surface_add_vertex(hand_local)
 			im.surface_end()
 			_one_hand_line_mesh.visible = true
 		else:

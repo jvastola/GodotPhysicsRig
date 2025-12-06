@@ -45,6 +45,7 @@ const DEFAULTS := {
 	"enable_one_hand_rotation": true,
 	"enable_one_hand_world_rotate": true,
 	"invert_one_hand_rotation": false,
+	"apply_one_hand_release_velocity": true,
 	"one_hand_rotation_smooth_factor": 0.2,
 	"auto_respawn_enabled": true,
 	"auto_respawn_distance": 120.0,
@@ -124,6 +125,7 @@ var one_hand_rotation_smooth_slider: HSlider
 var one_hand_rotation_smooth_label: Label
 var one_hand_rotate_check: CheckBox
 var invert_one_hand_rotation_check: CheckBox
+var apply_one_hand_release_vel_check: CheckBox
 var invert_one_hand_grab_check: CheckBox
 var show_one_hand_grab_visual_check: CheckBox
 var jump_enabled_check: CheckBox
@@ -648,8 +650,8 @@ func _build_ui():
 		"World Scale Max",
 		"Upper bound for two-hand world scaling.",
 		0.5,
-		50.0,
-		0.25,
+		1000.0,
+		0.5,
 		initial_world_max,
 		func(value): return " %.2fx" % value
 	)
@@ -729,6 +731,16 @@ func _build_ui():
 		one_hand_rotation_check.button_pressed = defaults_snapshot["enable_one_hand_rotation"]
 	one_hand_rotation_check.toggled.connect(func(pressed: bool): _on_one_hand_rotation_toggled(pressed))
 	world_card.add_child(one_hand_rotation_check)
+
+	apply_one_hand_release_vel_check = CheckBox.new()
+	apply_one_hand_release_vel_check.text = "Keep Velocity On Release"
+	apply_one_hand_release_vel_check.add_theme_font_size_override("font_size", 12)
+	if movement_component:
+		apply_one_hand_release_vel_check.button_pressed = movement_component.apply_one_hand_release_velocity
+	else:
+		apply_one_hand_release_vel_check.button_pressed = defaults_snapshot["apply_one_hand_release_velocity"]
+	apply_one_hand_release_vel_check.toggled.connect(func(pressed: bool): _on_apply_one_hand_release_vel_toggled(pressed))
+	world_card.add_child(apply_one_hand_release_vel_check)
 
 	invert_one_hand_rotation_check = CheckBox.new()
 	invert_one_hand_rotation_check.text = "Invert One-Hand Rotation"
@@ -1142,6 +1154,12 @@ func _on_invert_one_hand_rotation_toggled(pressed: bool):
 	settings_changed.emit()
 
 
+func _on_apply_one_hand_release_vel_toggled(pressed: bool):
+	if movement_component:
+		movement_component.apply_one_hand_release_velocity = pressed
+	settings_changed.emit()
+
+
 func _on_jump_enabled_toggled(pressed: bool):
 	if movement_component:
 		movement_component.jump_enabled = pressed
@@ -1348,6 +1366,8 @@ func refresh():
 		one_hand_rotation_check.button_pressed = movement_component.enable_one_hand_rotation
 	if invert_one_hand_rotation_check:
 		invert_one_hand_rotation_check.button_pressed = movement_component.invert_one_hand_rotation
+	if apply_one_hand_release_vel_check:
+		apply_one_hand_release_vel_check.button_pressed = movement_component.apply_one_hand_release_velocity
 	if one_hand_rotation_smooth_slider:
 		one_hand_rotation_smooth_slider.value = movement_component.one_hand_rotation_smooth_factor
 	if world_grab_move_factor_slider:
@@ -1507,6 +1527,8 @@ func _apply_defaults(source: Dictionary):
 		one_hand_rotation_check.button_pressed = source.get("enable_one_hand_rotation", DEFAULTS["enable_one_hand_rotation"])
 	if invert_one_hand_rotation_check:
 		invert_one_hand_rotation_check.button_pressed = source.get("invert_one_hand_rotation", DEFAULTS["invert_one_hand_rotation"])
+	if apply_one_hand_release_vel_check:
+		apply_one_hand_release_vel_check.button_pressed = source.get("apply_one_hand_release_velocity", DEFAULTS["apply_one_hand_release_velocity"])
 	if one_hand_rotation_smooth_slider:
 		one_hand_rotation_smooth_slider.value = source.get("one_hand_rotation_smooth_factor", DEFAULTS["one_hand_rotation_smooth_factor"])
 	if show_one_hand_grab_visual_check:

@@ -29,3 +29,4 @@ grow_vertical = 2
 custom_minimum_size = Vector2(520, 760)
 theme_override_styles/panel = SubResource("1_style")
 script = ExtResource("1_script")
+
