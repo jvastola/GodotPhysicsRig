@@ -391,11 +391,17 @@ func _try_attach_context_listener(control: Control) -> void:
 	# Only attach to controls that can accept text input
 	if not _is_input_candidate(control):
 		return
+	
+	# Reuse the same callable so is_connected works with bind() comparisons
+	var callable := Callable(self, "_on_control_gui_input").bind(control)
+	if control.gui_input.is_connected(callable):
+		_context_hooked[control] = true
+		return
 	if _context_hooked.get(control, false):
 		return
 	_context_hooked[control] = true
 	# Listen for right-click to offer keyboard summon
-	control.gui_input.connect(_on_control_gui_input.bind(control))
+	control.gui_input.connect(callable)
 
 
 func _is_input_candidate(control: Control) -> bool:

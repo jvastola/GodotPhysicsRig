@@ -232,6 +232,29 @@ func _deferred_restore_saved_grabs() -> void:
 		print("GameManager: Restored grabbed object ", save_id, " to hand ", hand_name)
 
 
+func _wrap_world_if_needed(world_root: Node) -> Node:
+	"""Ensure the world root has a transform. If the instantiated root is not a Node3D,
+	wrap it in a Node3D so systems that expect a transformable world root don't crash."""
+	if world_root is Node3D:
+		return world_root
+	var wrapper := Node3D.new()
+	wrapper.name = str(world_root.name)
+	return wrapper
+
+
+func _get_world_grabbables(world_root: Node) -> Array:
+	"""Return all grabbable descendants of the world root."""
+	var result: Array = []
+	var queue: Array = [world_root]
+	while not queue.is_empty():
+		var node: Node = queue.pop_front()
+		for child in node.get_children():
+			queue.append(child)
+			if child.is_in_group("grabbable"):
+				result.append(child)
+	return result
+
+
 func change_scene_with_player(scene_path: String, player_state: Dictionary = {}) -> void:
 	"""Change the world scene while keeping the player intact"""
 	# Prevent re-entrant scene changes
@@ -289,8 +312,12 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 		current_world = null
 	
 	# Instance new world
-	current_world = new_world_scene.instantiate()
+	var raw_world: Node = new_world_scene.instantiate()
+	current_world = _wrap_world_if_needed(raw_world)
 	get_tree().root.add_child(current_world)
+	if current_world != raw_world:
+		current_world.add_child(raw_world)
+		print("GameManager: Wrapped world ", raw_world.name, " in a Node3D container for transforms")
 	# Keep SceneTree's current_scene in sync so helpers relying on it keep working
 	if get_tree().current_scene != current_world:
 		get_tree().set_current_scene(current_world)
@@ -319,7 +346,7 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 			preserved_save_id = str(preserved_obj.get("save_id"))
 		
 		# Find and remove duplicates in the new scene
-		for scene_grabbable in current_world.get_children():
+		for scene_grabbable in _get_world_grabbables(current_world):
 			if not is_instance_valid(scene_grabbable):
 				continue
 			if scene_grabbable == preserved_obj:
