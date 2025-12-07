@@ -65,6 +65,9 @@ func _setup_ui() -> void:
 		c.queue_free()
 	for c in vbox_player.get_children():
 		c.queue_free()
+	# Ensure both tabs are actually visible once populated
+	if vbox_player:
+		vbox_player.visible = true
 	# Make a bit denser
 	if vbox_turn:
 		vbox_turn.add_theme_constant_override("separation", 8)
@@ -516,12 +519,16 @@ func _move_ui_node_in_front(node_name: String, distance: float = 1.6, height_off
 	var forward := -cam_tf.basis.z.normalized()
 	var target_origin := cam_tf.origin + forward * distance + Vector3(0, height_offset, 0)
 	var xf: Transform3D = ui_node.global_transform
+	var current_scale := xf.basis.get_scale()
 	xf.origin = target_origin
-	# Face the camera (only yaw)
-	var look_at_target := cam_tf.origin
-	var dir := (look_at_target - target_origin)
-	dir.y = 0
-	if dir.length_squared() > 0.0001:
-		dir = dir.normalized()
-		xf.basis = Basis().looking_at(dir, Vector3.UP)
+	# Face the camera with the front (+Z) of the panel while preserving scale.
+	var dir_to_camera := cam_tf.origin - target_origin
+	dir_to_camera.y = 0
+	if dir_to_camera.length_squared() > 0.0001:
+		dir_to_camera = dir_to_camera.normalized()
+		var facing_basis := Basis().looking_at(-dir_to_camera, Vector3.UP)
+		xf.basis = facing_basis.scaled(current_scale)
+	else:
+		# Keep upright even if camera is on top of the target origin
+		xf.basis = Basis.IDENTITY.scaled(current_scale)
 	ui_node.global_transform = xf

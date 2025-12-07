@@ -15,6 +15,7 @@ signal node_reparented(node_path: NodePath, new_parent_path: NodePath)
 @export var show_internal_nodes: bool = false   # Show nodes that start with underscore
 
 @onready var tree: Tree = $MarginContainer/VBoxContainer/ScrollContainer/Tree
+@onready var save_button: Button = $MarginContainer/VBoxContainer/HBoxContainer/SaveButton
 @onready var refresh_button: Button = $MarginContainer/VBoxContainer/HBoxContainer/RefreshButton
 @onready var collapse_button: Button = $MarginContainer/VBoxContainer/HBoxContainer/CollapseButton
 @onready var expand_button: Button = $MarginContainer/VBoxContainer/HBoxContainer/ExpandButton
@@ -61,6 +62,8 @@ func _ready() -> void:
 	_undo_redo = UndoRedo.new()
 	
 	# Set up button connections
+	if save_button:
+		save_button.pressed.connect(_on_save_scene_pressed)
 	if refresh_button:
 		refresh_button.pressed.connect(_on_refresh_pressed)
 	if collapse_button:
@@ -741,6 +744,88 @@ func _style_tree_item(item: TreeItem, node: Node) -> void:
 
 func _on_refresh_pressed() -> void:
 	_populate_tree()
+
+
+func _on_save_scene_pressed() -> void:
+	var msg := _save_current_scene()
+	if not msg.is_empty() and status_label:
+		status_label.text = msg
+
+
+func _save_current_scene() -> String:
+	var scene_tree := get_tree()
+	if not scene_tree:
+		return "No scene tree"
+	var current_scene := scene_tree.current_scene
+	if current_scene == null:
+		return "No active scene"
+	var path := current_scene.scene_file_path
+	if path.is_empty():
+		return "Save failed: scene path is empty"
+	var packed := PackedScene.new()
+	var pack_err := packed.pack(current_scene)
+	if pack_err != OK:
+		push_error("SceneHierarchyUI: Pack failed %s" % pack_err)
+		var user_target := _to_user_repo_path(path)
+		_notify_version_tracker([user_target])  # still stage so change is visible
+		return "Save failed (pack %s) at %s" % [pack_err, path]
+	var target_path := _to_user_repo_path(path)
+	_make_dir_recursive(target_path.get_base_dir())
+	var save_err := ResourceSaver.save(packed, target_path)
+	if save_err != OK:
+		push_error("SceneHierarchyUI: Save failed %s" % save_err)
+		_notify_version_tracker([target_path])  # still stage so change is visible
+		return "Save failed (code %s) for %s" % [save_err, target_path]
+	print("SceneHierarchyUI: Saved scene to ", target_path)
+	_notify_version_tracker([target_path])
+	return "💾 Saved scene"
+
+
+func _notify_version_tracker(paths: Array) -> void:
+	if paths.is_empty():
+		return
+	var localized: Array = []
+	for p in paths:
+		localized.append(ProjectSettings.localize_path(p))
+	var panel := _get_git_panel()
+	if panel:
+		panel.stage_paths_and_refresh(localized)
+		_refresh_git_panel(panel)
+	else:
+		var git := GitService.new()
+		git.stage_paths(localized)
+		_refresh_git_panel(_get_git_panel())  # try again in case it appeared
+
+
+func _get_git_panel() -> GitPanelUI:
+	if GitPanelUI.instance:
+		return GitPanelUI.instance
+	if get_tree():
+		var node = get_tree().get_first_node_in_group("git_panel")
+		if node and node is GitPanelUI:
+			return node
+	return null
+
+
+func _refresh_git_panel(panel: GitPanelUI) -> void:
+	if panel:
+		panel.refresh_status()
+		panel.refresh_history()
+
+
+func _to_user_repo_path(path: String) -> String:
+	if path.begins_with("user://workspace_repo/"):
+		return path
+	if path.begins_with("res://"):
+		var relative := path.substr("res://".length())
+		return "user://workspace_repo/" + relative
+	return path
+
+
+func _make_dir_recursive(path: String) -> void:
+	var d := DirAccess.open("user://")
+	if d:
+		d.make_dir_recursive(path)
 
 
 func _on_collapse_pressed() -> void:

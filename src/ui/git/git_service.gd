@@ -5,6 +5,7 @@ class_name GitService
 ## Stores commit snapshots and staging info in user://gitpanel_state.json.
 
 var repo_root: String
+const USER_REPO_ROOT := "user://workspace_repo"
 const STATE_FILE := "user://gitpanel_state.json"
 const TRACK_EXTS := [
 	"gd", "tscn", "tres", "gdshader", "shader", "cfg", "json", "txt", "md", "cs"
@@ -15,7 +16,7 @@ const IGNORE_SUFFIX := [".import"]
 func _init(repo_path: String = "") -> void:
 	repo_root = repo_path
 	if repo_root.is_empty():
-		repo_root = ProjectSettings.globalize_path("res://")
+		repo_root = _prepare_user_repo_root()
 	repo_root = repo_root.rstrip("/")  # Normalize trailing slash
 	_ensure_state()
 
@@ -171,6 +172,70 @@ func get_history(limit: int = 20) -> Dictionary:
 func get_branch() -> String:
 	# Single local branch
 	return "local"
+
+
+func _prepare_user_repo_root() -> String:
+	var user_root_local := USER_REPO_ROOT
+	var user_root_abs := ProjectSettings.globalize_path(user_root_local)
+	_make_dir_recursive(user_root_local)
+	_sync_from_res(user_root_abs)
+	return user_root_abs
+
+
+func _sync_from_res(target_abs_root: String) -> void:
+	var src_abs := ProjectSettings.globalize_path("res://")
+	_copy_dir_filtered(src_abs, target_abs_root)
+
+
+func _copy_dir_filtered(src_abs: String, dst_abs: String) -> void:
+	var dir := DirAccess.open(src_abs)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var name := dir.get_next()
+	while name != "":
+		if name == "." or name == "..":
+			name = dir.get_next()
+			continue
+		var src_path := src_abs.path_join(name)
+		var dst_path := dst_abs.path_join(name)
+		if dir.current_is_dir():
+			if _is_ignored_dir(name):
+				name = dir.get_next()
+				continue
+			_make_dir_recursive(dst_path)
+			_copy_dir_filtered(src_path, dst_path)
+		else:
+			if _is_ignored_file(name):
+				name = dir.get_next()
+				continue
+			if not _is_tracked_extension(name):
+				name = dir.get_next()
+				continue
+			_copy_file_if_changed(src_path, dst_path)
+		name = dir.get_next()
+	dir.list_dir_end()
+
+
+func _copy_file_if_changed(src_path: String, dst_path: String) -> void:
+	var src_md5 := FileAccess.get_md5(src_path)
+	var dst_md5 := FileAccess.get_md5(dst_path)
+	if src_md5 != "" and src_md5 == dst_md5:
+		return
+	var bytes := FileAccess.get_file_as_bytes(src_path)
+	if bytes.is_empty():
+		return
+	_make_dir_recursive(dst_path.get_base_dir())
+	var f := FileAccess.open(dst_path, FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_buffer(bytes)
+
+
+func _make_dir_recursive(path: String) -> void:
+	var d := DirAccess.open("user://")
+	if d:
+		d.make_dir_recursive(path)
 
 
 func _current_snapshot() -> Dictionary:

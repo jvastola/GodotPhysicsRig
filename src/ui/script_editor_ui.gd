@@ -16,6 +16,7 @@ signal script_saved(script_path: String)
 @onready var no_script_label: Label = $MarginContainer/VBoxContainer/NoScriptLabel
 
 var _current_script_path: String = ""
+var _current_user_script_path: String = ""
 var _current_script: Script = null
 var _is_modified: bool = false
 var _original_content: String = ""  # Track original for comparison
@@ -211,8 +212,9 @@ func save_script() -> void:
 	if err != OK:
 		push_error("ScriptEditorUI: Failed to reload script: %s" % err)
 	
-	# 2. Save to disk
-	var file = FileAccess.open(_current_script_path, FileAccess.WRITE)
+	# 2. Save to disk (user repo copy)
+	var target_path := _ensure_user_script_path(_current_script_path)
+	var file = FileAccess.open(target_path, FileAccess.WRITE)
 	if file:
 		file.store_string(content)
 		file.close()
@@ -223,8 +225,10 @@ func save_script() -> void:
 		if title_label and title_label.text.ends_with(" *"):
 			title_label.text = title_label.text.substr(0, title_label.text.length() - 2)
 		
-		print("ScriptEditorUI: Saved script to ", _current_script_path)
-		script_saved.emit(_current_script_path)
+		print("ScriptEditorUI: Saved script to ", target_path)
+		_current_user_script_path = target_path
+		script_saved.emit(target_path)
+		_notify_version_tracker(target_path)
 		
 		# Show visual feedback (optional)
 		if title_label:
@@ -234,7 +238,9 @@ func save_script() -> void:
 			tween.tween_interval(0.5)
 			tween.tween_callback(func(): title_label.add_theme_color_override("font_color", original_color))
 	else:
-		push_error("ScriptEditorUI: Failed to open file for writing: ", _current_script_path)
+		push_error("ScriptEditorUI: Failed to open file for writing: %s" % target_path)
+		# Still surface change to tracker so user sees pending work
+		_notify_version_tracker(target_path)
 
 
 func _on_text_changed() -> void:
@@ -251,21 +257,23 @@ func open_script(path: String) -> void:
 		_show_no_script()
 		return
 	
-	if not ResourceLoader.exists(path):
+	var user_path := _ensure_user_script_path(path)
+	if not ResourceLoader.exists(user_path):
 		_show_no_script()
-		push_warning("ScriptEditorUI: Script not found: ", path)
+		push_warning("ScriptEditorUI: Script not found: ", user_path)
 		return
 	
-	var script = load(path)
+	var script = load(user_path)
 	if not script is Script:
 		_show_no_script()
 		return
 	
 	_current_script_path = path
+	_current_user_script_path = user_path
 	_current_script = script
 	_is_modified = false
 	_display_script()
-	script_opened.emit(path)
+	script_opened.emit(user_path)
 
 
 ## Open and display a script resource directly
@@ -276,9 +284,10 @@ func open_script_resource(script: Script) -> void:
 	
 	_current_script = script
 	_current_script_path = script.resource_path
+	_current_user_script_path = _ensure_user_script_path(_current_script_path)
 	_is_modified = false
 	_display_script()
-	script_opened.emit(_current_script_path)
+	script_opened.emit(_current_user_script_path)
 
 
 ## Static helper to open a script from anywhere
@@ -309,11 +318,11 @@ func _display_script() -> void:
 	
 	# Update title
 	if title_label:
-		var filename = _current_script_path.get_file()
+		var filename = _current_user_script_path.get_file() if not _current_user_script_path.is_empty() else _current_script_path.get_file()
 		title_label.text = "📝 " + filename
 	
 	if path_label:
-		path_label.text = _current_script_path
+		path_label.text = _current_user_script_path if not _current_user_script_path.is_empty() else _current_script_path
 		path_label.visible = true
 	
 	# Show code edit, hide no-script label
@@ -334,6 +343,66 @@ func _display_script() -> void:
 		code_edit.set_caret_line(0)
 		code_edit.set_caret_column(0)
 		_original_content = source_code
+
+
+func _notify_version_tracker(script_path: String) -> void:
+	if script_path.is_empty():
+		return
+	var localized := ProjectSettings.localize_path(script_path)
+	var panel := _get_git_panel()
+	if panel:
+		panel.stage_paths_and_refresh([localized])
+		_refresh_git_panel(panel)
+	else:
+		# Fallback: stage silently so it appears when panel opens
+		var git := GitService.new()
+		git.stage_paths([localized])
+		_refresh_git_panel(_get_git_panel())  # try again if panel loaded after staging
+
+
+func _get_git_panel() -> GitPanelUI:
+	if GitPanelUI.instance:
+		return GitPanelUI.instance
+	if get_tree():
+		var node = get_tree().get_first_node_in_group("git_panel")
+		if node and node is GitPanelUI:
+			return node
+	return null
+
+
+func _refresh_git_panel(panel: GitPanelUI) -> void:
+	if panel:
+		panel.refresh_status()
+		panel.refresh_history()
+
+
+func _ensure_user_script_path(path: String) -> String:
+	if path.is_empty():
+		return path
+	var user_path := _to_user_repo_path(path)
+	if not FileAccess.file_exists(user_path) and FileAccess.file_exists(path):
+		_make_dir_recursive(user_path.get_base_dir())
+		var bytes := FileAccess.get_file_as_bytes(path)
+		var f := FileAccess.open(user_path, FileAccess.WRITE)
+		if f:
+			f.store_buffer(bytes)
+	return user_path
+
+
+func _to_user_repo_path(path: String) -> String:
+	if path.begins_with("user://workspace_repo/"):
+		return path
+	if path.begins_with("res://"):
+		var relative := path.substr("res://".length())
+		return "user://workspace_repo/" + relative
+	# Already user:// but not in workspace; keep as-is
+	return path
+
+
+func _make_dir_recursive(path: String) -> void:
+	var d := DirAccess.open("user://")
+	if d:
+		d.make_dir_recursive(path)
 
 
 ## Get the current script content

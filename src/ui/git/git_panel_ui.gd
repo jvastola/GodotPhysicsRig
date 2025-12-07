@@ -19,14 +19,22 @@ class_name GitPanelUI
 
 var git := GitService.new()
 var _busy: bool = false
+static var instance: GitPanelUI = null
 
 
 func _ready() -> void:
+	instance = self
+	add_to_group("git_panel")
 	_setup_lists()
 	_connect_signals()
 	_update_path_label()
 	refresh_status()
 	refresh_history()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and instance == self:
+		instance = null
 
 
 func _setup_lists() -> void:
@@ -50,10 +58,11 @@ func _connect_signals() -> void:
 
 func _update_path_label() -> void:
 	var branch := git.get_branch()
+	var root := ProjectSettings.localize_path(git.repo_root)
 	if branch.is_empty():
-		path_label.text = "Repo: %s".format([git.repo_root])
+		path_label.text = "Repo: %s" % root
 	else:
-		path_label.text = "Repo: %s (branch: %s)".format([git.repo_root, branch])
+		path_label.text = "Repo: %s (branch: %s)" % [root, branch]
 
 
 func refresh_status() -> void:
@@ -210,6 +219,18 @@ func _unstage_paths(paths: Array) -> void:
 		_set_status("Unstage failed: %s" % res.output)
 	refresh_status()
 	_set_busy(false)
+
+
+func stage_paths_and_refresh(paths: Array) -> void:
+	if paths.is_empty():
+		return
+	var res := git.stage_paths(paths)
+	if res.code == 0:
+		_set_status("Staged %d item(s)" % paths.size())
+	else:
+		_set_status("Stage failed: %s" % res.output)
+	refresh_status()
+	refresh_history()
 
 
 func _get_selected_paths(list: ItemList) -> Array:
