@@ -13,6 +13,8 @@ signal file_double_clicked(path: String)
 
 var _root_path: String = "res://"
 var _tree_root: TreeItem = null
+var _context_menu: PopupMenu = null
+var _context_target_path: String = ""
 
 # File type icons (emoji-based for simplicity)
 const ICONS = {
@@ -49,6 +51,7 @@ var _processing_selection: bool = false
 func _ready() -> void:
 	instance = self
 	_setup_tree()
+	_setup_context_menu()
 	# Delay the scan to ensure the tree is ready
 	call_deferred("_scan_filesystem")
 
@@ -74,6 +77,18 @@ func _setup_tree() -> void:
 	tree.allow_reselect = true
 	tree.item_selected.connect(_on_item_selected)
 	tree.item_activated.connect(_on_item_activated)
+	if not tree.gui_input.is_connected(_on_tree_gui_input):
+		tree.gui_input.connect(_on_tree_gui_input)
+
+
+func _setup_context_menu() -> void:
+	if _context_menu:
+		return
+	_context_menu = PopupMenu.new()
+	_context_menu.name = "ContextMenu"
+	add_child(_context_menu)
+	_context_menu.add_item("Load Scene", 0)
+	_context_menu.id_pressed.connect(_on_context_menu_item_selected)
 
 
 func _scan_filesystem() -> void:
@@ -204,6 +219,71 @@ func _on_item_activated() -> void:
 				ScriptEditorUI.instance.open_script(path)
 			elif ScriptViewerUI and ScriptViewerUI.instance:
 				ScriptViewerUI.instance.open_script(path)
+		
+		# Load scenes on double-click (including .tscn.remap)
+		_try_load_scene_from_path(path)
+
+
+func _on_tree_gui_input(event: InputEvent) -> void:
+	if not tree:
+		return
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		if mouse_event.button_index == MOUSE_BUTTON_RIGHT and mouse_event.pressed:
+			var item := tree.get_item_at_position(mouse_event.position)
+			if item:
+				tree.set_selected(item, 0)
+				_context_target_path = item.get_metadata(0)
+				_update_context_menu_state()
+				if _context_menu:
+					_context_menu.position = mouse_event.global_position
+					_context_menu.popup()
+				accept_event()
+
+
+func _try_load_scene_from_path(path: String) -> void:
+	if path.is_empty():
+		return
+	if DirAccess.dir_exists_absolute(path):
+		return
+	# Handle imported scene remap files by resolving to the actual .tscn
+	var scene_path := path
+	if path.ends_with(".tscn.remap"):
+		var candidate := path.substr(0, path.length() - ".remap".length())
+		scene_path = candidate
+	if not (scene_path.ends_with(".tscn") or scene_path.ends_with(".tscn.remap")):
+		return
+	# If resource exists, great; if not, still attempt so Godot can resolve remap
+	if ResourceLoader.exists(scene_path):
+		print("FileSystemUI: Loading scene from resource: ", scene_path)
+	else:
+		print("FileSystemUI: Attempting to load (may rely on remap): ", scene_path)
+	print("FileSystemUI: Loading scene from file: ", scene_path)
+	if GameManager and GameManager.has_method("change_scene_with_player"):
+		GameManager.call_deferred("change_scene_with_player", scene_path, {})
+	else:
+		get_tree().call_deferred("change_scene_to_file", scene_path)
+
+
+func _can_load_scene(path: String) -> bool:
+	if path.is_empty():
+		return false
+	if DirAccess.dir_exists_absolute(path):
+		return false
+	return path.ends_with(".tscn") or path.ends_with(".tscn.remap")
+
+
+func _update_context_menu_state() -> void:
+	if not _context_menu:
+		return
+	var can_load := _can_load_scene(_context_target_path)
+	_context_menu.set_item_disabled(0, not can_load)
+
+
+func _on_context_menu_item_selected(id: int) -> void:
+	match id:
+		0:
+			_try_load_scene_from_path(_context_target_path)
 
 
 ## Refresh the filesystem tree

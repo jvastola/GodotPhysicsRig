@@ -8,6 +8,7 @@ class_name GitPanelUI
 @onready var changes_list: ItemList = $MarginContainer/VBoxContainer/ChangesList
 @onready var staged_list: ItemList = $MarginContainer/VBoxContainer/StagedList
 @onready var history_list: ItemList = $MarginContainer/VBoxContainer/HistoryList
+@onready var restore_button: Button = $MarginContainer/VBoxContainer/HistoryButtons/RestoreButton
 @onready var commit_message: TextEdit = $MarginContainer/VBoxContainer/CommitMessage
 @onready var commit_button: Button = $MarginContainer/VBoxContainer/CommitButton
 @onready var stage_selected_button: Button = $MarginContainer/VBoxContainer/ChangesButtons/StageSelectedButton
@@ -54,6 +55,8 @@ func _connect_signals() -> void:
 	changes_list.item_activated.connect(_on_changes_item_activated)
 	staged_list.item_activated.connect(_on_staged_item_activated)
 	history_list.item_activated.connect(_on_history_item_activated)
+	history_list.item_selected.connect(_on_history_item_selected)
+	restore_button.pressed.connect(_on_restore_pressed)
 
 
 func _update_path_label() -> void:
@@ -113,6 +116,7 @@ func _populate_history(history: Array) -> void:
 		history_list.add_item(label)
 		history_list.set_item_metadata(idx, entry)
 		idx += 1
+	_update_restore_button_state(false)
 
 
 func _add_item(list: ItemList, entry: Dictionary) -> void:
@@ -136,9 +140,9 @@ func _on_commit_pressed() -> void:
 		_set_status("Commit created")
 	else:
 		_set_status("Commit failed: %s" % res.output)
+	_set_busy(false)
 	refresh_status()
 	refresh_history()
-	_set_busy(false)
 
 
 func _on_stage_selected_pressed() -> void:
@@ -154,8 +158,8 @@ func _on_stage_all_pressed() -> void:
 		_set_status("Staged all changes")
 	else:
 		_set_status("Stage all failed: %s" % res.output)
-	refresh_status()
 	_set_busy(false)
+	refresh_status()
 
 
 func _on_unstage_selected_pressed() -> void:
@@ -171,8 +175,8 @@ func _on_unstage_all_pressed() -> void:
 		_set_status("Unstaged all changes")
 	else:
 		_set_status("Unstage all failed: %s" % res.output)
-	refresh_status()
 	_set_busy(false)
+	refresh_status()
 
 
 func _on_changes_item_activated(index: int) -> void:
@@ -189,6 +193,33 @@ func _on_history_item_activated(index: int) -> void:
 	var entry: Dictionary = history_list.get_item_metadata(index)
 	if entry:
 		_set_status("[%s] %s - %s" % [entry.hash, entry.date, entry.message])
+		_update_restore_button_state(true)
+
+
+func _on_history_item_selected(index: int) -> void:
+	_update_restore_button_state(index >= 0)
+
+
+func _on_restore_pressed() -> void:
+	if _busy:
+		return
+	var idx := history_list.get_selected_items()
+	if idx.is_empty():
+		_set_status("Select a commit to restore")
+		return
+	var entry: Dictionary = history_list.get_item_metadata(idx[0])
+	if not entry:
+		_set_status("No commit data")
+		return
+	_set_busy(true)
+	var res := git.restore_commit(entry.hash)
+	if res.code == 0:
+		_set_status("Restored commit")
+	else:
+		_set_status("Restore failed: %s" % res.output)
+	_set_busy(false)
+	refresh_status()
+	refresh_history()
 
 
 func _stage_paths(paths: Array) -> void:
@@ -202,8 +233,8 @@ func _stage_paths(paths: Array) -> void:
 		_set_status("Staged %d item(s)" % paths.size())
 	else:
 		_set_status("Stage failed: %s" % res.output)
-	refresh_status()
 	_set_busy(false)
+	refresh_status()
 
 
 func _unstage_paths(paths: Array) -> void:
@@ -217,8 +248,8 @@ func _unstage_paths(paths: Array) -> void:
 		_set_status("Unstaged %d item(s)" % paths.size())
 	else:
 		_set_status("Unstage failed: %s" % res.output)
-	refresh_status()
 	_set_busy(false)
+	refresh_status()
 
 
 func stage_paths_and_refresh(paths: Array) -> void:
@@ -252,7 +283,8 @@ func _set_busy(value: bool) -> void:
 		unstage_selected_button,
 		unstage_all_button,
 		refresh_status_button,
-		refresh_history_button
+		refresh_history_button,
+		restore_button
 	]:
 		if btn:
 			btn.disabled = disabled
@@ -261,3 +293,8 @@ func _set_busy(value: bool) -> void:
 
 func _set_status(text: String) -> void:
 	status_label.text = text
+
+
+func _update_restore_button_state(enabled: bool) -> void:
+	if restore_button:
+		restore_button.disabled = not enabled or _busy

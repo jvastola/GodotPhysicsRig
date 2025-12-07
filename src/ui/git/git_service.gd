@@ -131,9 +131,14 @@ func commit(message: String) -> Dictionary:
 
 	# Start from previous snapshot and update with staged file states
 	var new_snapshot := last_snapshot.duplicate(true)
+	var contents: Dictionary = {}
 	for p in staged:
 		if current.has(p):
 			new_snapshot[p] = current[p]
+			var global_path := ProjectSettings.globalize_path(p)
+			var file := FileAccess.open(global_path, FileAccess.READ)
+			if file:
+				contents[p] = file.get_as_text()
 		else:
 			# File deleted
 			new_snapshot.erase(p)
@@ -144,7 +149,8 @@ func commit(message: String) -> Dictionary:
 		"id": commit_id,
 		"message": msg,
 		"timestamp": ts,
-		"hashes": new_snapshot
+		"hashes": new_snapshot,
+		"contents": contents
 	}
 	commits.append(entry)
 	state["commits"] = commits
@@ -172,6 +178,38 @@ func get_history(limit: int = 20) -> Dictionary:
 func get_branch() -> String:
 	# Single local branch
 	return "local"
+
+
+func restore_commit(commit_id: String) -> Dictionary:
+	var state := _load_state()
+	var commits: Array = state.get("commits", [])
+	var target: Dictionary = {}
+	for c in commits:
+		if c.get("id", "") == commit_id:
+			target = c
+			break
+	if target.is_empty():
+		return {"code": 1, "output": "Commit not found"}
+
+	var hashes: Dictionary = target.get("hashes", {})
+	var contents: Dictionary = target.get("contents", {})
+
+	# Delete files not in target snapshot
+	var current := _current_snapshot()
+	for path in current.keys():
+		if not hashes.has(path):
+			_remove_file(path)
+
+	# Restore files from contents
+	for path in hashes.keys():
+		if contents.has(path):
+			_write_file_text(path, contents[path])
+
+	# Clear staged after restore
+	state["staged"] = []
+	_save_state(state)
+
+	return {"code": 0, "output": "Restored commit %s" % commit_id}
 
 
 func _prepare_user_repo_root() -> String:
@@ -236,6 +274,21 @@ func _make_dir_recursive(path: String) -> void:
 	var d := DirAccess.open("user://")
 	if d:
 		d.make_dir_recursive(path)
+
+
+func _write_file_text(repo_path: String, content: String) -> void:
+	var global := ProjectSettings.globalize_path(repo_path)
+	_make_dir_recursive(global.get_base_dir())
+	var f := FileAccess.open(global, FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_string(content)
+
+
+func _remove_file(repo_path: String) -> void:
+	var global := ProjectSettings.globalize_path(repo_path)
+	if FileAccess.file_exists(global):
+		DirAccess.remove_absolute(global)
 
 
 func _current_snapshot() -> Dictionary:
