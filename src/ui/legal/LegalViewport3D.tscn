@@ -1,0 +1,42 @@
+[gd_scene load_steps=7 format=3 uid="uid://legal_viewport3d"]
+
+[ext_resource type="Script" path="res://src/ui/legal/legal_viewport_3d.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://src/ui/legal/LegalPanelUI.tscn" id="2_ui"]
+
+[sub_resource type="ViewportTexture" id="ViewportTexture_legal"]
+viewport_path = NodePath("SubViewport")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_legal"]
+resource_local_to_scene = true
+transparency = 1
+shading_mode = 0
+albedo_texture = SubResource("ViewportTexture_legal")
+
+[sub_resource type="QuadMesh" id="QuadMesh_legal"]
+size = Vector2(1.6, 1.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_legal"]
+size = Vector3(1.6, 1.8, 0.01)
+
+[node name="LegalViewport3D" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="SubViewport" type="SubViewport" parent="."]
+transparent_bg = true
+size = Vector2i(640, 720)
+render_target_update_mode = 4
+gui_embed_subwindows = true
+
+[node name="LegalPanelUI" parent="SubViewport" instance=ExtResource("2_ui")]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("StandardMaterial3D_legal")
+cast_shadow = 0
+mesh = SubResource("QuadMesh_legal")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="MeshInstance3D"]
+collision_layer = 32
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D/StaticBody3D"]
+shape = SubResource("BoxShape3D_legal")

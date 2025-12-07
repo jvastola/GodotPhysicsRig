@@ -1,4 +1,4 @@
-[gd_scene load_steps=27 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=28 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -23,6 +23,7 @@
 [ext_resource type="PackedScene" uid="uid://6v1kg2wa5orb" path="res://src/objects/grabbables/VolumeHullPen.tscn" id="24_volume_hull_pen"]
 [ext_resource type="PackedScene" path="res://src/ui/git/GitViewport3D.tscn" id="25_git_viewport"]
 [ext_resource type="PackedScene" path="res://src/ui/MovementSettingsViewport2.tscn" id="26_movement_settings_v2"]
+[ext_resource type="PackedScene" path="res://src/ui/legal/LegalViewport3D.tscn" id="27_legal_viewport"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -163,6 +164,9 @@ transform = Transform3D(0.35, 0, 0, 0, 0.35, 0, 0, 0, 0.35, -1.7811422, 0.526621
 
 [node name="GitViewport3D" parent="." unique_id=2045123456 instance=ExtResource("25_git_viewport")]
 transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 2.0526533, 0.75, -1.98)
+
+[node name="LegalViewport3D" parent="." unique_id=1684527312 instance=ExtResource("27_legal_viewport")]
+transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, -2.65, 0.7, -2.0)
 
 [node name="ConvexHullPen" parent="." unique_id=438475259 instance=ExtResource("23_convex_hull_pen")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, 1.5, -3)
