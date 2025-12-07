@@ -88,6 +88,15 @@ func _build_inspector_ui() -> void:
 	_add_readonly_property("Class", _current_node.get_class())
 	_add_readonly_property("Path", str(_current_node.get_path()))
 	
+	# Actions
+	if _can_teleport_node(_current_node):
+		_add_section_header("Actions")
+		_add_action_button(
+			"📍 Teleport to Node",
+			"Move the player to this node's position",
+			func(): _teleport_current_node()
+		)
+	
 	# Add transform section for Node3D
 	if _current_node is Node3D:
 		var node3d := _current_node as Node3D
@@ -345,6 +354,17 @@ func _add_string_property(label_text: String, value: String, prop_name: String) 
 	_property_controls[prop_name] = line_edit
 
 
+func _add_action_button(text: String, tooltip: String, on_pressed: Callable) -> void:
+	if not properties_container:
+		return
+	var btn = Button.new()
+	btn.text = text
+	btn.tooltip_text = tooltip
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.pressed.connect(on_pressed)
+	properties_container.add_child(btn)
+
+
 func _register_line_edit(line_edit: LineEdit) -> void:
 	# Find parent viewport for context
 	var viewport: SubViewport = null
@@ -482,3 +502,51 @@ func _on_property_changed(prop_name: String, new_value: Variant) -> void:
 		_current_node.set(prop_name, new_value)
 		print("NodeInspectorUI: Changed ", _current_node.name, ".", prop_name, " = ", new_value)
 		property_changed.emit(_current_node.get_path(), prop_name, new_value)
+
+
+func _teleport_current_node() -> void:
+	if not _current_node:
+		return
+	var target_pos: Vector3 = _get_node_global_position(_current_node)
+	if target_pos == null:
+		print("NodeInspectorUI: Teleport requires a node with a 3D transform - ", _current_node.name)
+		return
+	
+	target_pos += Vector3.UP * 0.5
+	var player: Node = get_tree().get_first_node_in_group("xr_player")
+	if not player:
+		player = get_tree().root.find_child("XRPlayer", true, false)
+	
+	if player and player.has_method("teleport_to"):
+		player.call_deferred("teleport_to", target_pos)
+		print("NodeInspectorUI: Teleporting player to ", _current_node.name, " at ", target_pos)
+	else:
+		print("NodeInspectorUI: Player not found or cannot teleport")
+
+
+func _can_teleport_node(node: Node) -> bool:
+	if not node:
+		return false
+	if "global_transform" in node:
+		var gt = node.get("global_transform")
+		if gt is Transform3D:
+			return true
+	if node.has_method("get_global_transform"):
+		var gt2 = node.call("get_global_transform")
+		if gt2 is Transform3D:
+			return true
+	return false
+
+
+func _get_node_global_position(node: Node) -> Variant:
+	if not node:
+		return null
+	if "global_transform" in node:
+		var gt = node.get("global_transform")
+		if gt is Transform3D:
+			return (gt as Transform3D).origin
+	if node.has_method("get_global_transform"):
+		var gt2 = node.call("get_global_transform")
+		if gt2 is Transform3D:
+			return (gt2 as Transform3D).origin
+	return null

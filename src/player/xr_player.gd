@@ -31,6 +31,16 @@ var _desktop_trigger_event: InputEventMouseButton = null
 @export var desktop_extra_collider_height: float = 1.2
 @export var desktop_extra_collider_radius: float = 0.2
 @export var desktop_extra_collider_offset: Vector3 = Vector3(0, 1.15, 0)
+@export var auto_scale_physics_hands: bool = true
+@export var auto_scale_head: bool = true
+
+# Player scale tracking
+var _manual_player_scale: float = 1.0
+var _last_world_scale: float = 1.0
+var _base_player_body_scale: Vector3 = Vector3.ONE
+var _base_left_hand_scale: Vector3 = Vector3.ONE
+var _base_right_hand_scale: Vector3 = Vector3.ONE
+var _base_head_area_scale: Vector3 = Vector3.ONE
 
 # Audio Listeners
 var vr_listener: AudioListener3D = null
@@ -38,6 +48,10 @@ var desktop_listener: AudioListener3D = null
 
 
 func _ready() -> void:
+	_cache_base_scales()
+	_last_world_scale = XRServer.world_scale
+	_apply_rig_scale()
+
 	# Initialize components
 	_setup_components()
 
@@ -155,6 +169,11 @@ func _setup_physics_hands() -> void:
 
 
 func _process(delta: float) -> void:
+	var current_world_scale := XRServer.world_scale
+	if not is_equal_approx(current_world_scale, _last_world_scale):
+		_last_world_scale = current_world_scale
+		_apply_rig_scale()
+
 	if movement_component:
 		movement_component.process_turning(delta)
 		movement_component.process_locomotion(delta)
@@ -372,6 +391,49 @@ func _remove_desktop_extra_collider() -> void:
 	var existing := player_body.get_node_or_null(cs_name)
 	if existing:
 		existing.queue_free()
+
+
+func set_player_scale(scale: float) -> void:
+	"""Apply a uniform scale to the whole player rig (body, physics hands, head)."""
+	_manual_player_scale = max(scale, 0.01)
+	if movement_component and movement_component.has_method("set_manual_player_scale"):
+		# Keep the movement component's cached value in sync for persistence/UI
+		movement_component.set_manual_player_scale(_manual_player_scale)
+	elif player_body:
+		player_body.scale = _base_player_body_scale * _manual_player_scale
+	_apply_rig_scale()
+
+
+func _cache_base_scales() -> void:
+	if player_body:
+		_base_player_body_scale = player_body.scale
+	if physics_hand_left:
+		_base_left_hand_scale = physics_hand_left.scale
+	if physics_hand_right:
+		_base_right_hand_scale = physics_hand_right.scale
+	if head_area:
+		_base_head_area_scale = head_area.scale
+
+
+func _apply_rig_scale() -> void:
+	var combined_scale := _manual_player_scale * XRServer.world_scale
+	if player_body:
+		player_body.scale = _base_player_body_scale * combined_scale
+	
+	if auto_scale_physics_hands:
+		if physics_hand_left:
+			physics_hand_left.scale = _base_left_hand_scale * combined_scale
+		if physics_hand_right:
+			physics_hand_right.scale = _base_right_hand_scale * combined_scale
+	
+	if auto_scale_head and head_area:
+		# XR tracking can ignore parent scale; compensate so the head area follows player scale.
+		var parent_scale: Vector3 = head_area.get_parent().global_transform.basis.get_scale()
+		var inherited_scale: float = (abs(parent_scale.x) + abs(parent_scale.y) + abs(parent_scale.z)) / 3.0
+		if inherited_scale < 0.0001:
+			inherited_scale = 1.0
+		var desired_local: float = combined_scale / inherited_scale
+		head_area.scale = _base_head_area_scale * desired_local
 
 
 func apply_texture_to_head(texture: ImageTexture) -> void:

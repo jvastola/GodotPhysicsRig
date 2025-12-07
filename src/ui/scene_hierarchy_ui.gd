@@ -48,7 +48,8 @@ enum ContextMenuID {
 	DELETE = 4,
 	TOGGLE_VISIBILITY = 5,
 	EXPAND_ALL = 6,
-	COLLAPSE_ALL = 7
+	COLLAPSE_ALL = 7,
+	TELEPORT_TO_NODE = 8
 }
 
 
@@ -115,6 +116,8 @@ func _setup_context_menu() -> void:
 	_context_menu.add_separator()
 	_context_menu.add_item("🗑️ Delete", ContextMenuID.DELETE)
 	_context_menu.add_separator()
+	_context_menu.add_item("📍 Teleport to Node", ContextMenuID.TELEPORT_TO_NODE)
+	_context_menu.add_separator()
 	_context_menu.add_item("👁️ Toggle Visibility", ContextMenuID.TOGGLE_VISIBILITY)
 	_context_menu.add_separator()
 	_context_menu.add_item("▼ Expand All", ContextMenuID.EXPAND_ALL)
@@ -133,7 +136,7 @@ func _on_tree_gui_input(event: InputEvent) -> void:
 				_context_target_item = item
 				_update_context_menu_state()
 				_show_context_menu(mouse_event.global_position)
-				mouse_event.accept()
+				accept_event()  # Stop further propagation of the right-click
 
 
 func _on_actions_button_pressed() -> void:
@@ -171,6 +174,7 @@ func _update_context_menu_state() -> void:
 		var node = get_node_or_null(node_path)
 		var is_root = (node == _root_scene)
 		_context_menu.set_item_disabled(ContextMenuID.DELETE, is_root)
+		_context_menu.set_item_disabled(ContextMenuID.TELEPORT_TO_NODE, not _can_teleport_node(node))
 
 
 func _on_context_menu_item_selected(id: int) -> void:
@@ -187,6 +191,8 @@ func _on_context_menu_item_selected(id: int) -> void:
 			_delete_selected_node()
 		ContextMenuID.TOGGLE_VISIBILITY:
 			_toggle_visibility_selected_node()
+		ContextMenuID.TELEPORT_TO_NODE:
+			_teleport_to_selected_node()
 		ContextMenuID.EXPAND_ALL:
 			_on_expand_pressed()
 		ContextMenuID.COLLAPSE_ALL:
@@ -363,6 +369,61 @@ func _toggle_visibility_selected_node() -> void:
 		print("SceneHierarchy: Toggled visibility - ", node.name, " = ", (node as CanvasItem).visible)
 	else:
 		print("SceneHierarchy: Node has no visible property - ", node.name)
+
+
+func _teleport_to_selected_node() -> void:
+	var selected = tree.get_selected()
+	if not selected:
+		return
+	
+	var node_path = selected.get_metadata(0)
+	var node = get_node_or_null(node_path)
+	if not node:
+		return
+	
+	var target_pos: Vector3 = _get_node_global_position(node)
+	if target_pos == null:
+		print("SceneHierarchy: Teleport requires a node with a 3D transform - ", node.name)
+		return
+	target_pos += Vector3.UP * 0.5
+	
+	var player: Node = get_tree().get_first_node_in_group("xr_player")
+	if not player:
+		player = get_tree().root.find_child("XRPlayer", true, false)
+	
+	if player and player.has_method("teleport_to"):
+		player.call_deferred("teleport_to", target_pos)
+		print("SceneHierarchy: Teleporting player to ", node.name, " at ", target_pos)
+	else:
+		print("SceneHierarchy: Player not found or cannot teleport")
+
+
+func _can_teleport_node(node: Node) -> bool:
+	if not node:
+		return false
+	if "global_transform" in node:
+		var gt = node.get("global_transform")
+		if gt is Transform3D:
+			return true
+	if node.has_method("get_global_transform"):
+		var gt2 = node.call("get_global_transform")
+		if gt2 is Transform3D:
+			return true
+	return false
+
+
+func _get_node_global_position(node: Node) -> Variant:
+	if not node:
+		return null
+	if "global_transform" in node:
+		var gt = node.get("global_transform")
+		if gt is Transform3D:
+			return (gt as Transform3D).origin
+	if node.has_method("get_global_transform"):
+		var gt2 = node.call("get_global_transform")
+		if gt2 is Transform3D:
+			return (gt2 as Transform3D).origin
+	return null
 
 
 func _generate_unique_name(parent: Node, base_name: String) -> String:

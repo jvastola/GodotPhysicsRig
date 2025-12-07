@@ -14,9 +14,18 @@ var _focused_viewport: SubViewport = null
 # Static instance for global access
 static var instance: KeyboardManager = null
 
+# Track whether we've attached right-click listeners to a control
+var _context_hooked: Dictionary = {}
+
+# Active popup menu for "bring keyboard" action
+var _active_popup: PopupMenu = null
+
 
 func _ready() -> void:
 	instance = self
+	# Watch the scene tree so any input-capable Control gets a right-click hook
+	_start_watching_tree()
+	_scan_existing_controls()
 
 
 func _notification(what: int) -> void:
@@ -338,3 +347,194 @@ func _on_control_focus_exited(control: Control) -> void:
 
 func _on_control_tree_exiting(control: Control) -> void:
 	unregister_control(control)
+
+
+# -----------------------------------------------------------------------------
+# Context menu support to summon keyboard on right-click
+# -----------------------------------------------------------------------------
+
+func _start_watching_tree() -> void:
+	var tree := get_tree()
+	if not tree:
+		return
+	if not tree.node_added.is_connected(_on_node_added):
+		tree.node_added.connect(_on_node_added)
+	if not tree.node_removed.is_connected(_on_node_removed):
+		tree.node_removed.connect(_on_node_removed)
+
+
+func _scan_existing_controls() -> void:
+	var root := get_tree().get_root()
+	if not root:
+		return
+	_scan_node_for_inputs(root)
+
+
+func _scan_node_for_inputs(node: Node) -> void:
+	if node is Control:
+		_try_attach_context_listener(node)
+	for child in node.get_children():
+		_scan_node_for_inputs(child)
+
+
+func _on_node_added(node: Node) -> void:
+	if node is Control:
+		_try_attach_context_listener(node)
+
+
+func _on_node_removed(node: Node) -> void:
+	if node is Control and _context_hooked.has(node):
+		_context_hooked.erase(node)
+
+
+func _try_attach_context_listener(control: Control) -> void:
+	# Only attach to controls that can accept text input
+	if not _is_input_candidate(control):
+		return
+	if _context_hooked.get(control, false):
+		return
+	_context_hooked[control] = true
+	# Listen for right-click to offer keyboard summon
+	control.gui_input.connect(_on_control_gui_input.bind(control))
+
+
+func _is_input_candidate(control: Control) -> bool:
+	return control is LineEdit or control is TextEdit or control is CodeEdit or control is SpinBox
+
+
+func _resolve_input_target(control: Control) -> Control:
+	if control is SpinBox:
+		var sb := control as SpinBox
+		if sb.has_method("get_line_edit"):
+			var le: LineEdit = sb.get_line_edit()
+			if le:
+				return le
+	return control
+
+
+func _is_control_editable(control: Control) -> bool:
+	if control is LineEdit:
+		var le := control as LineEdit
+		return le.editable
+	if control is TextEdit or control is CodeEdit:
+		var te := control as TextEdit
+		return te.editable
+	if control is SpinBox:
+		var le2: LineEdit = (control as SpinBox).get_line_edit()
+		return le2 != null and le2.editable
+	return true
+
+
+func _on_control_gui_input(event: InputEvent, control: Control) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var mb := event as InputEventMouseButton
+	if mb.button_index != MOUSE_BUTTON_RIGHT or not mb.pressed:
+		return
+	# Use the event position in the control's viewport; global_position is already
+	# in viewport space for UI events.
+	var popup_pos: Vector2 = mb.global_position
+	if popup_pos == Vector2.ZERO:
+		popup_pos = mb.position
+	_show_keyboard_popup(control, popup_pos)
+	# Stop default context menus so ours is always visible
+	control.accept_event()
+
+
+func _show_keyboard_popup(control: Control, global_pos: Vector2) -> void:
+	var viewport: SubViewport = control.get_viewport()
+	if not viewport:
+		return
+	if _active_popup and is_instance_valid(_active_popup):
+		_active_popup.queue_free()
+		_active_popup = null
+	
+	var popup := PopupMenu.new()
+	popup.name = "KeyboardSummonContext"
+	popup.add_item("Bring keyboard here", 0)
+	
+	var target := _resolve_input_target(control)
+	var has_target := target != null and is_instance_valid(target) and _is_control_editable(target)
+	popup.set_item_disabled(0, not has_target)
+	
+	popup.set_meta("target_control", target)
+	popup.set_meta("target_viewport", viewport)
+	popup.id_pressed.connect(_on_popup_id_pressed.bind(popup))
+	popup.popup_hide.connect(func(): _active_popup = null)
+	
+	viewport.add_child(popup)
+	popup.position = global_pos
+	popup.popup()
+	_active_popup = popup
+
+
+func _on_popup_id_pressed(id: int, popup: PopupMenu) -> void:
+	if id == 0:
+		var control: Control = popup.get_meta("target_control")
+		var viewport: SubViewport = popup.get_meta("target_viewport")
+		_focus_control_and_summon_keyboard(control, viewport)
+	
+	if is_instance_valid(popup):
+		popup.queue_free()
+	_active_popup = null
+
+
+func _focus_control_and_summon_keyboard(control: Control, viewport: SubViewport) -> void:
+	if not control or not is_instance_valid(control):
+		return
+	register_control(control, viewport)
+	control.grab_focus()
+	
+	if control is LineEdit:
+		var le := control as LineEdit
+		le.caret_column = le.text.length()
+	elif control is TextEdit or control is CodeEdit:
+		var te := control as TextEdit
+		var line := te.get_caret_line()
+		var column := te.get_line(line).length()
+		te.set_caret_line(line, true, true)
+		te.set_caret_column(column, true)
+	
+	set_focus(control, viewport)
+	_summon_keyboard_to_player()
+
+
+func _summon_keyboard_to_player() -> void:
+	var scene := get_tree().get_current_scene()
+	if not scene:
+		return
+	var keyboard_node: Node3D = scene.get_node_or_null("KeyboardFullViewport3D") as Node3D
+	if not keyboard_node:
+		return
+	
+	# Find the XR camera to position keyboard in front of the user
+	var xr_player: Node = get_tree().get_first_node_in_group("xr_player")
+	if not xr_player:
+		xr_player = get_tree().root.find_child("XRPlayer", true, false)
+	var camera: XRCamera3D = null
+	if xr_player and xr_player.has_node("PlayerBody/XROrigin3D/XRCamera3D"):
+		camera = xr_player.get_node("PlayerBody/XROrigin3D/XRCamera3D") as XRCamera3D
+	if not camera:
+		return
+	
+	var cam_tf := camera.global_transform
+	var forward := -cam_tf.basis.z.normalized()
+	var target_origin := cam_tf.origin + forward * 1.2 + Vector3(0, 0.05, 0)
+	
+	var xf := keyboard_node.global_transform
+	var original_scale := xf.basis.get_scale()
+	xf.origin = target_origin
+	
+	var dir := cam_tf.origin - target_origin
+	dir.y = 0
+	if dir.length_squared() > 0.0001:
+		dir = dir.normalized()
+		# Keyboard mesh faces +Z, so orient +Z toward camera (invert dir)
+		var look_basis := Basis().looking_at(-dir, Vector3.UP)
+		# Preserve existing scale so we don't blow up the keyboard size
+		look_basis = look_basis.scaled(original_scale)
+		xf.basis = look_basis
+	
+	keyboard_node.global_transform = xf
+	if keyboard_node.has_method("set_interactive"):
+		keyboard_node.call("set_interactive", true)

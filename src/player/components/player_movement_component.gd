@@ -34,8 +34,8 @@ enum HandAssignment { DEFAULT, SWAPPED }
 @export_range(10.0, 720.0, 10.0) var ui_scroll_wheel_factor: float = 240.0
 
 # === World Grab / Utility Settings ===
-@export var enable_two_hand_world_scale: bool = false
-@export var enable_two_hand_world_rotation: bool = false
+@export var enable_two_hand_world_scale: bool = true
+@export var enable_two_hand_world_rotation: bool = true
 @export_range(0.01, 20.0, 0.05) var world_scale_min: float = 0.1
 @export_range(0.1, 1000.0, 0.1) var world_scale_max: float = 15.0
 @export_range(0.05, 1.5, 0.05) var world_scale_sensitivity: float = 0.35
@@ -43,18 +43,18 @@ enum HandAssignment { DEFAULT, SWAPPED }
 @export_range(1.0, 90.0, 1.0) var world_rotation_max_delta_deg: float = 25.0
 @export_range(0.05, 3.0, 0.05) var world_grab_move_factor: float = 1.0
 @export_range(0.05, 1.0, 0.05) var world_grab_smooth_factor: float = 0.15
-@export var invert_two_hand_scale_direction: bool = false
+@export var invert_two_hand_scale_direction: bool = true
 @export var show_two_hand_rotation_visual: bool = false
 enum TwoHandPivot { MIDPOINT, PLAYER_ORIGIN }
 @export var two_hand_rotation_pivot: TwoHandPivot = TwoHandPivot.MIDPOINT
 @export var two_hand_left_action: String = "grip"
 @export var two_hand_right_action: String = "grip"
-@export var enable_one_hand_world_grab: bool = false
+@export var enable_one_hand_world_grab: bool = true
 @export var enable_one_hand_world_rotate: bool = true
-@export_range(0.0, 2.0, 0.05) var one_hand_world_move_sensitivity: float = 1.0
+@export_range(0.0, 2.0, 0.05) var one_hand_world_move_sensitivity: float = 0.25
 @export var apply_one_hand_release_velocity: bool = true
 enum OneHandGrabMode { RELATIVE, ANCHORED }
-@export var one_hand_grab_mode: OneHandGrabMode = OneHandGrabMode.ANCHORED
+@export var one_hand_grab_mode: OneHandGrabMode = OneHandGrabMode.RELATIVE
 @export var enable_one_hand_rotation: bool = true
 @export_range(0.01, 1.0, 0.01) var one_hand_rotation_smooth_factor: float = 0.2
 @export var invert_one_hand_rotation: bool = false
@@ -95,6 +95,7 @@ var _one_hand_initial_yaw := 0.0
 var _one_hand_rotation_pivot := Vector3.ZERO
 var _one_hand_prev_body_pos := Vector3.ZERO
 var _one_hand_last_move_velocity := Vector3.ZERO
+var _manual_player_scale: float = 1.0
 
 # Visual helpers
 var _visual_root: Node3D
@@ -102,6 +103,8 @@ var _one_hand_anchor_mesh: MeshInstance3D
 var _one_hand_line_mesh: MeshInstance3D
 var _two_hand_line_mesh: MeshInstance3D
 var _two_hand_midpoint_mesh: MeshInstance3D
+var _one_hand_anchor_mat: StandardMaterial3D
+var _one_hand_line_mat: StandardMaterial3D
 
 # Respawn helpers
 var _spawn_transform := Transform3D.IDENTITY
@@ -149,6 +152,7 @@ func setup(p_player_body: RigidBody3D, p_left_controller: XRController3D, p_righ
 	left_controller = p_left_controller
 	right_controller = p_right_controller
 	xr_camera = p_xr_camera
+	_apply_manual_player_scale()
 	if player_body:
 		_spawn_transform = player_body.global_transform
 	_initial_settings = _snapshot_settings()
@@ -626,6 +630,17 @@ func _handle_jump(delta: float) -> void:
 		_jump_cooldown_timer = jump_cooldown
 
 
+func set_manual_player_scale(scale: float) -> void:
+	_manual_player_scale = max(scale, 0.01)
+	_apply_manual_player_scale()
+
+
+func _apply_manual_player_scale() -> void:
+	if not player_body:
+		return
+	player_body.scale = Vector3.ONE * _manual_player_scale
+
+
 func _apply_player_gravity() -> void:
 	if player_body:
 		player_body.gravity_scale = 1.0 if player_gravity_enabled else 0.0
@@ -652,23 +667,23 @@ func _ensure_visuals() -> void:
 		var sphere := SphereMesh.new()
 		sphere.radius = 0.05
 		sphere.height = 0.1
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = Color(0.3, 0.9, 1.0, 0.8)
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_one_hand_anchor_mat = StandardMaterial3D.new()
+		_one_hand_anchor_mat.albedo_color = Color(0.3, 0.9, 1.0, 0.8)
+		_one_hand_anchor_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		_one_hand_anchor_mesh = MeshInstance3D.new()
 		_one_hand_anchor_mesh.mesh = sphere
-		_one_hand_anchor_mesh.material_override = mat
+		_one_hand_anchor_mesh.material_override = _one_hand_anchor_mat
 		_one_hand_anchor_mesh.visible = false
 		_visual_root.add_child(_one_hand_anchor_mesh)
 	if not _one_hand_line_mesh:
 		var im := ImmediateMesh.new()
-		var mat_line := StandardMaterial3D.new()
-		mat_line.albedo_color = Color(0.3, 0.9, 1.0, 0.9)
-		mat_line.unshaded = true
-		mat_line.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_one_hand_line_mat = StandardMaterial3D.new()
+		_one_hand_line_mat.albedo_color = Color(0.3, 0.9, 1.0, 0.9)
+		_one_hand_line_mat.unshaded = true
+		_one_hand_line_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		_one_hand_line_mesh = MeshInstance3D.new()
 		_one_hand_line_mesh.mesh = im
-		_one_hand_line_mesh.material_override = mat_line
+		_one_hand_line_mesh.material_override = _one_hand_line_mat
 		_one_hand_line_mesh.visible = false
 		_visual_root.add_child(_one_hand_line_mesh)
 	if show_two_hand_rotation_visual:
@@ -794,6 +809,7 @@ func _apply_settings_snapshot(data: Dictionary) -> void:
 func _update_one_hand_visual() -> void:
 	if not _one_hand_anchor_mesh:
 		return
+	_set_one_hand_visual_style()
 	_one_hand_anchor_mesh.visible = show_one_hand_grab_visual and _one_hand_grab_active
 	var anchor_world := _one_hand_grab_anchor
 	if _one_hand_anchor_mesh.visible:
@@ -848,6 +864,19 @@ func _clear_two_hand_visual() -> void:
 		_two_hand_midpoint_mesh.visible = false
 
 
+func _set_one_hand_visual_style() -> void:
+	# Anchored = cyan, Relative = orange
+	var anchor_color := Color(0.3, 0.9, 1.0, 0.8)
+	var line_color := Color(0.3, 0.9, 1.0, 0.9)
+	if one_hand_grab_mode == OneHandGrabMode.RELATIVE:
+		anchor_color = Color(1.0, 0.65, 0.2, 0.85)
+		line_color = Color(1.0, 0.5, 0.1, 0.95)
+	if _one_hand_anchor_mat:
+		_one_hand_anchor_mat.albedo_color = anchor_color
+	if _one_hand_line_mat:
+		_one_hand_line_mat.albedo_color = line_color
+
+
 func _check_auto_respawn() -> void:
 	if not auto_respawn_enabled or not player_body:
 		return
@@ -863,6 +892,35 @@ func respawn(hard: bool = false) -> void:
 	player_body.linear_velocity = Vector3.ZERO
 	player_body.angular_velocity = Vector3.ZERO
 	if hard:
+		# Reset world scale and player scale (body + hands + head)
+		XRServer.world_scale = 1.0
+		_manual_player_scale = 1.0
+		var player_root := player_body.get_parent()
+		if player_root and player_root.has_method("set_player_scale"):
+			player_root.set_player_scale(_manual_player_scale)
+		else:
+			_apply_manual_player_scale()
+		_reset_physics_hands()
+		_world_grab_initial_scale = 1.0
+		_world_grab_current_scale = 1.0
 		_apply_settings_snapshot(_initial_settings)
 		_apply_player_gravity()
 		_apply_player_drag()
+
+
+func _reset_physics_hands() -> void:
+	var player_root := player_body.get_parent()
+	if not player_root:
+		return
+	var left_hand := player_root.get_node_or_null("PhysicsHandLeft") as RigidBody3D
+	var right_hand := player_root.get_node_or_null("PhysicsHandRight") as RigidBody3D
+	if left_hand and left_controller:
+		left_hand.linear_velocity = Vector3.ZERO
+		left_hand.angular_velocity = Vector3.ZERO
+		left_hand.global_position = left_controller.global_position
+		left_hand.global_rotation = left_controller.global_rotation
+	if right_hand and right_controller:
+		right_hand.linear_velocity = Vector3.ZERO
+		right_hand.angular_velocity = Vector3.ZERO
+		right_hand.global_position = right_controller.global_position
+		right_hand.global_rotation = right_controller.global_rotation

@@ -33,7 +33,7 @@ size = Vector3(50, 5, 50)
 material = ExtResource("2_or5nu")
 size = Vector3(50, 5, 50)
 
-[node name="MainScene6" type="Node3D" unique_id=1547683746]
+[node name="MainScene14" type="Node3D" unique_id=1547683746]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1403982438]
 environment = SubResource("Environment_main")

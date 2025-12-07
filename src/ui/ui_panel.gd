@@ -345,10 +345,15 @@ func _on_cooldown_changed(value: float, label: Label) -> void:
 		label.text = "   Cooldown: %.2fs" % value
 
 func _on_player_scale_changed(value: float, label: Label) -> void:
-	# Apply uniform scale to the player's body
-	if player_body:
+	# Apply uniform scale to the player's rig (body, hands, head)
+	if xr_player and xr_player.has_method("set_player_scale"):
+		xr_player.set_player_scale(value)
+		label.text = "Player Scale: %.2fx" % value
+	elif player_body:
 		player_body.scale = Vector3(value, value, value)
 		label.text = "Player Scale: %.2fx" % value
+		if movement_component and movement_component.has_method("set_manual_player_scale"):
+			movement_component.set_manual_player_scale(value)
 	else:
 		print("UIPanel: Cannot change player scale, PlayerBody not found")
 
@@ -368,7 +373,12 @@ func _on_apply_scale_change(delta_sign: int, label: Label) -> void:
 	var change_amount = (scale_step_percent / 100.0) * delta_sign
 	var new_scale = clampf(current_scale + change_amount, 0.25, 3.0)
 	
-	player_body.scale = Vector3(new_scale, new_scale, new_scale)
+	if xr_player and xr_player.has_method("set_player_scale"):
+		xr_player.set_player_scale(new_scale)
+	else:
+		player_body.scale = Vector3(new_scale, new_scale, new_scale)
+		if movement_component and movement_component.has_method("set_manual_player_scale"):
+			movement_component.set_manual_player_scale(new_scale)
 	label.text = "Player Scale: %.2fx" % new_scale
 
 
