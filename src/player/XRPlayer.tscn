@@ -139,6 +139,7 @@ include_pointer_color = true
 pointer_color = Color(0.568627, 1, 1, 1)
 ray_visibility_mode = "on_hit_or_trigger"
 hit_visibility_mode = "always"
+hit_shape = "sphere"
 hit_min_scale = 0.2
 hit_max_scale = 1.0
 

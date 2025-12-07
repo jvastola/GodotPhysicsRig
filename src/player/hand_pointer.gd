@@ -43,6 +43,13 @@ signal hit_scale_changed(scale: float)
 @export var require_trigger_for_hit_scaling: bool = true
 @export var enable_hit_scaling: bool = true
 @export_enum("on_hit", "always", "on_trigger", "on_hit_or_trigger", "on_hit_and_trigger") var hit_visibility_mode: String = "on_hit"
+@export_enum("cylinder", "sphere") var hit_shape: String = "cylinder"
+@export var hit_color: Color = Color(0.9, 0.9, 1.0, 0.35)
+@export var hit_material_unshaded: bool = true
+@export var enable_hit_selector: bool = true
+@export_flags_3d_physics var hit_selector_collision_mask: int = 1 << 5
+@export var hit_selector_monitor_bodies: bool = true
+@export var hit_selector_monitor_areas: bool = true
 
 # Grip-based grab mode: hold grip while pointing at an object to grab and manipulate it
 @export_group("Grip Grab Mode")
@@ -68,6 +75,7 @@ signal hit_scale_changed(scale: float)
 @export var hit_max_scale: float = 0.2
 @export_range(1.0, 20.0, 0.1) var hit_far_distance: float = 8.0
 @export_range(0.05, 1.0, 0.01) var hit_far_scale: float = 0.35
+@export var use_hit_scale_limits: bool = false
 @export_range(0.05, 1.5, 0.01) var hit_scale_user_multiplier_min: float = 0.25
 @export_range(0.05, 2.0, 0.01) var hit_scale_user_multiplier_max: float = 1.5
 @export_range(0.05, 2.0, 0.01) var hit_scale_adjust_speed: float = 0.75
@@ -86,6 +94,11 @@ var _hit_scale_user_multiplier: float = 1.0
 var _last_emitted_hit_scale: float = -1.0
 var _movement_component: PlayerMovementComponent = null
 var _ui_scroll_active: bool = false
+var _hit_selector_area: Area3D
+var _hit_selector_shape: CollisionShape3D
+var _selection_bounds: MeshInstance3D
+var _selection_bounds_mesh: ImmediateMesh
+var _selected_objects: Array[Node3D] = []
 
 # Grip grab mode state
 var _grab_target: Node = null  # Currently grabbed object
@@ -120,7 +133,304 @@ func _ready() -> void:
 		_ray_visual.visible = true
 
 	if _ray_hit:
+		_configure_hit_visual()
 		_ray_hit.visible = false
+		_setup_hit_selector()
+	_setup_selection_bounds()
+
+
+func _configure_hit_visual() -> void:
+	if not _ray_hit:
+		return
+	_ray_hit.mesh = _create_hit_mesh()
+	_ray_hit.material_override = _build_hit_material()
+
+
+func _create_hit_mesh() -> PrimitiveMesh:
+	var base_radius: float = max(hit_min_scale, 0.001)
+	match hit_shape:
+		"sphere":
+			var sphere := SphereMesh.new()
+			sphere.radius = base_radius
+			sphere.height = base_radius * 2.0
+			sphere.radial_segments = 16
+			return sphere
+		_:
+			var cylinder := CylinderMesh.new()
+			cylinder.top_radius = base_radius
+			cylinder.bottom_radius = base_radius
+			cylinder.height = max(base_radius * 0.1, 0.0005)
+			cylinder.radial_segments = 16
+			return cylinder
+
+
+func _build_hit_material() -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	if hit_material_unshaded:
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = hit_color
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	return mat
+
+
+func _setup_hit_selector() -> void:
+	if not enable_hit_selector:
+		return
+	_hit_selector_area = Area3D.new()
+	_hit_selector_area.name = "HitSelectorArea"
+	_hit_selector_area.monitoring = false
+	_hit_selector_area.monitorable = true
+	_hit_selector_area.collision_mask = hit_selector_collision_mask
+	_hit_selector_area.collision_layer = 0
+	_hit_selector_area.body_entered.connect(_on_hit_selector_body_entered)
+	_hit_selector_area.area_entered.connect(_on_hit_selector_area_entered)
+	add_child(_hit_selector_area)
+	
+	_hit_selector_shape = CollisionShape3D.new()
+	_hit_selector_shape.name = "HitSelectorShape"
+	_hit_selector_shape.shape = _build_selector_shape(hit_min_scale)
+	_hit_selector_area.add_child(_hit_selector_shape)
+
+
+func _build_selector_shape(radius: float) -> Shape3D:
+	if hit_shape == "sphere":
+		var sphere := SphereShape3D.new()
+		sphere.radius = radius
+		return sphere
+	var cylinder := CylinderShape3D.new()
+	cylinder.radius = radius
+	cylinder.height = max(radius * 0.2, 0.0005)
+	return cylinder
+
+
+func _update_selector_shape(scale: float) -> void:
+	if not _hit_selector_shape or not _hit_selector_shape.shape:
+		return
+	var radius: float = max(scale, 0.0005)
+	if _hit_selector_shape.shape is SphereShape3D:
+		var sphere := _hit_selector_shape.shape as SphereShape3D
+		sphere.radius = radius
+	elif _hit_selector_shape.shape is CylinderShape3D:
+		var cylinder := _hit_selector_shape.shape as CylinderShape3D
+		cylinder.radius = radius
+		cylinder.height = max(radius * 0.2, 0.0005)
+
+
+func _setup_selection_bounds() -> void:
+	_selection_bounds_mesh = ImmediateMesh.new()
+	_selection_bounds = MeshInstance3D.new()
+	_selection_bounds.name = "SelectionBounds"
+	_selection_bounds.mesh = _selection_bounds_mesh
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(0.2, 0.8, 1.0, 0.6)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_selection_bounds.material_override = mat
+	_selection_bounds.visible = false
+	add_child(_selection_bounds)
+
+
+func _update_hit_selector(action_state: Dictionary, has_hit: bool, hit_scale: float, hit_transform: Transform3D) -> void:
+	if not enable_hit_selector or not _hit_selector_area:
+		return
+	var active: bool = action_state.get("pressed", false) and has_hit
+	_hit_selector_area.monitoring = active
+	_hit_selector_area.monitorable = active
+	_hit_selector_area.global_transform = hit_transform
+	if active:
+		_update_selector_shape(hit_scale)
+
+
+func _on_hit_selector_body_entered(body: Node) -> void:
+	if not hit_selector_monitor_bodies:
+		return
+	_add_selected_object(body)
+
+
+func _on_hit_selector_area_entered(area: Area3D) -> void:
+	if not hit_selector_monitor_areas:
+		return
+	_add_selected_object(area)
+
+
+func _add_selected_object(node: Node) -> void:
+	if not (node is Node3D):
+		return
+	var node3d := node as Node3D
+	if node3d == self or _selected_objects.has(node3d):
+		return
+	_selected_objects.append(node3d)
+	_update_selection_bounds()
+
+
+func _prune_selected_objects() -> void:
+	for i in range(_selected_objects.size() - 1, -1, -1):
+		if not is_instance_valid(_selected_objects[i]):
+			_selected_objects.remove_at(i)
+
+
+func _compute_selection_aabb() -> AABB:
+	_prune_selected_objects()
+	var has_box := false
+	var combined := AABB()
+	for node in _selected_objects:
+		var aabb := _get_object_aabb(node)
+		if aabb.size == Vector3.ZERO:
+			continue
+		if not has_box:
+			combined = aabb
+			has_box = true
+		else:
+			combined = combined.merge(aabb)
+	if has_box:
+		return combined
+	return AABB()
+
+
+func _get_object_aabb(node: Node3D) -> AABB:
+	var boxes: Array[AABB] = []
+	_collect_visual_aabbs(node, boxes)
+	_collect_collisionshape_aabbs(node, boxes)
+	if boxes.is_empty():
+		return AABB(node.global_transform.origin - Vector3.ONE * 0.05, Vector3.ONE * 0.1)
+	var combined := boxes[0]
+	for i in range(1, boxes.size()):
+		combined = combined.merge(boxes[i])
+	return combined
+
+
+func _collect_visual_aabbs(node: Node, boxes: Array[AABB]) -> void:
+	if node is VisualInstance3D:
+		var vi := node as VisualInstance3D
+		var local_aabb := vi.get_aabb()
+		if local_aabb.size != Vector3.ZERO:
+			var global_box := _transform_aabb(local_aabb, vi.global_transform)
+			boxes.append(global_box)
+	for child in node.get_children():
+		if child is Node:
+			_collect_visual_aabbs(child, boxes)
+
+
+func _collect_collisionshape_aabbs(node: Node, boxes: Array[AABB]) -> void:
+	if node is CollisionShape3D:
+		var cs := node as CollisionShape3D
+		if cs.shape:
+			var box := _shape_aabb(cs.shape, cs.global_transform)
+			if box.size != Vector3.ZERO:
+				boxes.append(box)
+	for child in node.get_children():
+		if child is Node:
+			_collect_collisionshape_aabbs(child, boxes)
+
+
+func _shape_aabb(shape: Shape3D, xform: Transform3D) -> AABB:
+	var local := AABB()
+	match shape:
+		BoxShape3D:
+			var s := shape as BoxShape3D
+			local = AABB(-s.extents, s.extents * 2.0)
+		SphereShape3D:
+			var sp := shape as SphereShape3D
+			var r := sp.radius
+			local = AABB(Vector3(-r, -r, -r), Vector3(r * 2.0, r * 2.0, r * 2.0))
+		CapsuleShape3D:
+			var cap := shape as CapsuleShape3D
+			var r2 := cap.radius
+			var h := cap.height
+			local = AABB(Vector3(-r2, -r2, -h * 0.5 - r2), Vector3(r2 * 2.0, r2 * 2.0, h + r2 * 2.0))
+		CylinderShape3D:
+			var cyl := shape as CylinderShape3D
+			var rc := cyl.radius
+			var hc := cyl.height * 0.5
+			local = AABB(Vector3(-rc, -hc, -rc), Vector3(rc * 2.0, hc * 2.0, rc * 2.0))
+		ConvexPolygonShape3D, ConcavePolygonShape3D, HeightMapShape3D:
+			var mesh := shape.get_debug_mesh()
+			if mesh:
+				local = mesh.get_aabb()
+		_:
+			var dbg := shape.get_debug_mesh()
+			if dbg:
+				local = dbg.get_aabb()
+	if local.size == Vector3.ZERO:
+		return AABB()
+	return _transform_aabb(local, xform)
+
+
+func _transform_aabb(box: AABB, xform: Transform3D) -> AABB:
+	var points := [
+		box.position,
+		box.position + Vector3(box.size.x, 0, 0),
+		box.position + Vector3(0, box.size.y, 0),
+		box.position + Vector3(0, 0, box.size.z),
+		box.position + Vector3(box.size.x, box.size.y, 0),
+		box.position + Vector3(box.size.x, 0, box.size.z),
+		box.position + Vector3(0, box.size.y, box.size.z),
+		box.position + box.size
+	]
+	var min_v: Vector3 = xform * points[0]
+	var max_v: Vector3 = min_v
+	for i in range(1, points.size()):
+		var p: Vector3 = xform * points[i]
+		min_v = min_v.min(p)
+		max_v = max_v.max(p)
+	return AABB(min_v, max_v - min_v)
+
+
+func _draw_selection_bounds(aabb: AABB) -> void:
+	if not _selection_bounds_mesh:
+		return
+	_selection_bounds_mesh.clear_surfaces()
+	if aabb.size == Vector3.ZERO:
+		_selection_bounds.visible = false
+		return
+	var min_v := aabb.position
+	var max_v := aabb.position + aabb.size
+	var p0 := Vector3(min_v.x, min_v.y, min_v.z)
+	var p1 := Vector3(max_v.x, min_v.y, min_v.z)
+	var p2 := Vector3(max_v.x, max_v.y, min_v.z)
+	var p3 := Vector3(min_v.x, max_v.y, min_v.z)
+	var p4 := Vector3(min_v.x, min_v.y, max_v.z)
+	var p5 := Vector3(max_v.x, min_v.y, max_v.z)
+	var p6 := Vector3(max_v.x, max_v.y, max_v.z)
+	var p7 := Vector3(min_v.x, max_v.y, max_v.z)
+	_selection_bounds_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
+	# Bottom
+	_selection_bounds_mesh.surface_add_vertex(p0); _selection_bounds_mesh.surface_add_vertex(p1)
+	_selection_bounds_mesh.surface_add_vertex(p1); _selection_bounds_mesh.surface_add_vertex(p2)
+	_selection_bounds_mesh.surface_add_vertex(p2); _selection_bounds_mesh.surface_add_vertex(p3)
+	_selection_bounds_mesh.surface_add_vertex(p3); _selection_bounds_mesh.surface_add_vertex(p0)
+	# Top
+	_selection_bounds_mesh.surface_add_vertex(p4); _selection_bounds_mesh.surface_add_vertex(p5)
+	_selection_bounds_mesh.surface_add_vertex(p5); _selection_bounds_mesh.surface_add_vertex(p6)
+	_selection_bounds_mesh.surface_add_vertex(p6); _selection_bounds_mesh.surface_add_vertex(p7)
+	_selection_bounds_mesh.surface_add_vertex(p7); _selection_bounds_mesh.surface_add_vertex(p4)
+	# Sides
+	_selection_bounds_mesh.surface_add_vertex(p0); _selection_bounds_mesh.surface_add_vertex(p4)
+	_selection_bounds_mesh.surface_add_vertex(p1); _selection_bounds_mesh.surface_add_vertex(p5)
+	_selection_bounds_mesh.surface_add_vertex(p2); _selection_bounds_mesh.surface_add_vertex(p6)
+	_selection_bounds_mesh.surface_add_vertex(p3); _selection_bounds_mesh.surface_add_vertex(p7)
+	_selection_bounds_mesh.surface_end()
+	_selection_bounds.global_transform = Transform3D.IDENTITY
+	_selection_bounds.visible = true
+
+
+func _update_selection_bounds() -> void:
+	if not _selection_bounds_mesh:
+		return
+	var combined := _compute_selection_aabb()
+	if combined.size == Vector3.ZERO:
+		_selection_bounds.visible = false
+		_selection_bounds_mesh.clear_surfaces()
+		return
+	_draw_selection_bounds(combined)
+
+
+func _clear_selection() -> void:
+	_selected_objects.clear()
+	if _selection_bounds_mesh:
+		_selection_bounds_mesh.clear_surfaces()
+	if _selection_bounds:
+		_selection_bounds.visible = false
 
 func _physics_process(delta: float) -> void:
 	if not _raycast:
@@ -157,6 +467,9 @@ func _physics_process(delta: float) -> void:
 	var handler: Node = null
 	var hit_player: bool = false
 	var has_hit: bool = _raycast.is_colliding()
+	var hit_transform := Transform3D.IDENTITY
+	if action_state["just_pressed"] and not has_hit:
+		_clear_selection()
 	
 	# Debug logging for Android troubleshooting
 	var is_android = OS.get_name() == "Android"
@@ -225,6 +538,7 @@ func _physics_process(delta: float) -> void:
 				up = Vector3.FORWARD
 			var x: Vector3 = up.cross(y).normalized()
 			var z: Vector3 = y.cross(x).normalized()
+			hit_transform = Transform3D(Basis(x, y, z), end)
 			# Create a basis scaled by the desired scale factor so we don't overwrite
 			# node scale by setting global_transform after changing scale.
 			var scale_factor: float = hit_scale
@@ -233,6 +547,13 @@ func _physics_process(delta: float) -> void:
 			var scaled_z: Vector3 = z * scale_factor
 			hit_xform.basis = Basis(scaled_x, scaled_y, scaled_z)
 			_ray_hit.global_transform = hit_xform
+		else:
+			hit_transform.origin = end
+	else:
+		hit_transform.origin = end
+
+	_update_hit_selector(action_state, has_hit, hit_scale, hit_transform)
+	_update_selection_bounds()
 
 	if _ray_visual and _line_mesh:
 		var show_ray: bool = _should_show_ray_visual(action_state, has_hit)
@@ -386,6 +707,9 @@ func _should_show_hit_visual(action_state: Dictionary, has_hit: bool) -> bool:
 			return true
 
 func _compute_hit_scale(distance: float) -> float:
+	if not use_hit_scale_limits:
+		var unclamped_scale: float = max(distance * hit_scale_per_meter, hit_min_scale)
+		return unclamped_scale * _hit_scale_user_multiplier
 	var near_reference: float = 1.5
 	var near_t: float = clamp(distance / near_reference, 0.0, 1.0)
 	var scale_factor: float = lerp(hit_min_scale, hit_max_scale, near_t)

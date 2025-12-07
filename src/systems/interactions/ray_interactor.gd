@@ -13,8 +13,9 @@ class_name RayInteractor
 @export var show_ray: bool = true
 @export var show_hit_marker: bool = true
 @export var ray_color: Color = Color(0.3, 0.7, 1.0, 0.8)
-@export var hit_color: Color = Color(1.0, 1.0, 1.0, 1.0)
+@export var hit_color: Color = Color(1.0, 1.0, 1.0, 0.35)
 @export var hit_scale: float = 0.05
+@export_enum("sphere", "cylinder") var hit_shape: String = "sphere"
 
 @export_group("Input")
 @export var select_action: String = "trigger_click"
@@ -72,17 +73,34 @@ func _setup_visuals() -> void:
 		_hit_visual.name = "HitMarker"
 		add_child(_hit_visual)
 		
-		var sphere = SphereMesh.new()
-		sphere.radius = hit_scale
-		sphere.height = hit_scale * 2.0
-		_hit_visual.mesh = sphere
-		
-		var mat = StandardMaterial3D.new()
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.albedo_color = hit_color
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		_hit_visual.material_override = mat
+		_hit_visual.mesh = _create_hit_mesh()
+		_hit_visual.material_override = _build_hit_material()
 		_hit_visual.visible = false
+
+
+func _create_hit_mesh() -> PrimitiveMesh:
+	match hit_shape:
+		"cylinder":
+			var cylinder := CylinderMesh.new()
+			cylinder.top_radius = hit_scale
+			cylinder.bottom_radius = hit_scale
+			cylinder.height = max(hit_scale * 0.02, 0.0005)
+			cylinder.radial_segments = 16
+			return cylinder
+		_:
+			var sphere := SphereMesh.new()
+			sphere.radius = hit_scale
+			sphere.height = hit_scale * 2.0
+			sphere.radial_segments = 16
+			return sphere
+
+
+func _build_hit_material() -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = hit_color
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	return mat
 
 
 func _physics_process(delta: float) -> void:
