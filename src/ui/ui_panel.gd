@@ -16,6 +16,15 @@ var _world_env_snapshot: Dictionary = {}
 var _root_viewport: Viewport
 var _viewport_transparent_default: bool = false
 
+const _UI_SCENE_PATHS := {
+	"MovementSettingsViewport3D2": "res://src/ui/MovementSettingsViewport2.tscn",
+	"KeyboardFullViewport3D": "res://src/ui/KeyboardFullViewport3D.tscn",
+	"FileSystemViewport3D": "res://src/ui/FileSystemViewport3D.tscn",
+	"SceneHierarchyViewport3D": "res://src/ui/SceneHierarchyViewport3D.tscn",
+	"DebugConsoleViewport3D": "res://src/ui/DebugConsoleViewport3D.tscn",
+	"GitViewport3D": "res://src/ui/git/GitViewport3D.tscn",
+}
+
 func _ready() -> void:
 	print("UIPanel: _ready() called")
 	# Find the player and movement component
@@ -511,7 +520,25 @@ func _move_ui_node_in_front(node_name: String, distance: float = 1.6, height_off
 	if not camera:
 		print("UIPanel: camera not found, cannot move UI")
 		return
-	var ui_node := get_tree().get_current_scene().get_node_or_null(node_name)
+	var scene_root: Node = get_tree().current_scene
+	if not scene_root:
+		var gm: Node = get_tree().root.get_node_or_null("GameManager")
+		if gm and gm.has_method("get") and gm.get("current_world"):
+			scene_root = gm.get("current_world")
+	if not scene_root:
+		print("UIPanel: current scene not found, cannot move UI")
+		return
+	var ui_node := scene_root.get_node_or_null(node_name)
+	if not ui_node:
+		var packed_path: String = _UI_SCENE_PATHS.get(node_name, "") as String
+		if packed_path != "":
+			var packed := load(packed_path)
+			if packed and packed is PackedScene:
+				ui_node = packed.instantiate()
+				if ui_node:
+					ui_node.name = node_name
+					scene_root.add_child(ui_node)
+					print("UIPanel: instantiated ", node_name, " into current scene")
 	if not ui_node or not (ui_node is Node3D):
 		print("UIPanel: node %s not found or not Node3D" % node_name)
 		return

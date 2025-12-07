@@ -291,6 +291,9 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 	# Instance new world
 	current_world = new_world_scene.instantiate()
 	get_tree().root.add_child(current_world)
+	# Keep SceneTree's current_scene in sync so helpers relying on it keep working
+	if get_tree().current_scene != current_world:
+		get_tree().set_current_scene(current_world)
 	print("GameManager: New world loaded: ", current_world.name)
 	
 	# Wait for world to be fully ready with physics
