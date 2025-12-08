@@ -66,6 +66,19 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
+[node name="OverlayAcceptButton" type="Button" parent="MarginContainer/VBoxContainer/TabContainer"]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+text = "Click/Tap to accept"
+flat = true
+theme_override_fonts/font_size = 18
+focus_mode = 0
+
 [node name="TOS" type="MarginContainer" parent="MarginContainer/VBoxContainer/TabContainer"]
 layout_mode = 2
 theme_override_constants/margin_left = 6
@@ -99,6 +112,24 @@ bbcode_enabled = true
 text = "Privacy Policy content will appear here."
 fit_content = true
 autowrap_mode = 2
+
+[node name="AcceptRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="AcceptButton" type="Button" parent="MarginContainer/VBoxContainer/AcceptRow"]
+layout_mode = 2
+text = "Hold to accept (0%)"
+custom_minimum_size = Vector2(0, 38)
+size_flags_horizontal = 3
+
+[node name="AcceptProgress" type="ProgressBar" parent="MarginContainer/VBoxContainer/AcceptRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 100.0
+step = 1.0
+value = 0.0
+custom_minimum_size = Vector2(0, 24)
 
 [node name="StatusLabel" type="Label" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2

@@ -9,6 +9,7 @@ var _save_data: Dictionary = {}
 var _save_dirty := false
 var _autosave_timer := 0.0
 const AUTOSAVE_INTERVAL := 2.0  # Auto-save every 2 seconds if dirty
+const LEGAL_KEY := "legal_acceptance"
 
 
 func _ready() -> void:
@@ -64,6 +65,39 @@ func load_game_state() -> void:
 	else:
 		push_error("SaveManager: Failed to read save file: ", FileAccess.get_open_error())
 		_save_data = {}
+
+
+# --- LEGAL ACCEPTANCE ---
+
+func get_legal_acceptance() -> Dictionary:
+	"""Return saved legal acceptance info {tos_version, privacy_version, agreed_at} or {}."""
+	if not _save_data.has(LEGAL_KEY):
+		return {}
+	var data: Dictionary = _save_data[LEGAL_KEY]
+	return {
+		"tos_version": data.get("tos_version", ""),
+		"privacy_version": data.get("privacy_version", ""),
+		"agreed_at": data.get("agreed_at", 0.0),
+	}
+
+
+func set_legal_acceptance(tos_version: String, privacy_version: String = "", timestamp: float = -1.0) -> void:
+	"""Persist the accepted TOS/Privacy versions with a timestamp."""
+	var ts := timestamp
+	if ts < 0.0:
+		ts = Time.get_unix_time_from_system()
+	_save_data[LEGAL_KEY] = {
+		"tos_version": tos_version,
+		"privacy_version": privacy_version if privacy_version != "" else tos_version,
+		"agreed_at": ts,
+	}
+	_save_dirty = true
+
+
+func clear_legal_acceptance() -> void:
+	if _save_data.has(LEGAL_KEY):
+		_save_data.erase(LEGAL_KEY)
+		_save_dirty = true
 
 
 # --- GRABBED OBJECTS PERSISTENCE ---

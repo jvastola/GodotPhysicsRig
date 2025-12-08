@@ -2,6 +2,7 @@ extends Node3D
 
 signal pointer_event(event: Dictionary)
 signal hit_scale_changed(scale: float)
+signal selection_handle_event(event: Dictionary)
 
 # hand_pointer.gd
 # Provides a versatile pointer that can interact with UI controls, specialised
@@ -51,6 +52,14 @@ signal hit_scale_changed(scale: float)
 @export var hit_selector_monitor_bodies: bool = true
 @export var hit_selector_monitor_areas: bool = true
 
+@export_group("Selection Handles")
+@export var show_selection_handles: bool = true
+@export_range(0.05, 1.5, 0.01) var selection_handle_length: float = 0.25
+@export_range(0.0, 0.5, 0.005) var selection_handle_offset: float = 0.05
+@export_range(0.005, 0.5, 0.005) var selection_handle_thickness: float = 0.02
+@export_range(0.1, 20.0, 0.1) var selection_handle_move_speed: float = 8.0
+@export_range(0.0, 0.2, 0.001) var selection_handle_move_deadzone: float = 0.0
+
 # Grip-based grab mode: hold grip while pointing at an object to grab and manipulate it
 @export_group("Grip Grab Mode")
 @export var enable_grip_grab: bool = true
@@ -99,6 +108,14 @@ var _hit_selector_shape: CollisionShape3D
 var _selection_bounds: MeshInstance3D
 var _selection_bounds_mesh: ImmediateMesh
 var _selected_objects: Array[Node3D] = []
+var _selection_handles: Array[Area3D] = []
+var _selection_handle_active_axis: Vector3 = Vector3.ZERO
+var _selection_handle_last_proj: float = 0.0
+var _pointer_hit_point: Vector3 = Vector3.ZERO
+var _selection_handle_grab_point: Vector3 = Vector3.ZERO
+var _selection_handle_line: MeshInstance3D
+var _selection_handle_line_mesh: ImmediateMesh
+var _selection_handle_grab_marker: MeshInstance3D
 
 # Grip grab mode state
 var _grab_target: Node = null  # Currently grabbed object
@@ -137,6 +154,8 @@ func _ready() -> void:
 		_ray_hit.visible = false
 		_setup_hit_selector()
 	_setup_selection_bounds()
+	_setup_selection_handles()
+	_setup_selection_handle_visuals()
 
 
 func _configure_hit_visual() -> void:
@@ -230,6 +249,96 @@ func _setup_selection_bounds() -> void:
 	add_child(_selection_bounds)
 
 
+func _setup_selection_handles() -> void:
+	if not show_selection_handles:
+		return
+	_selection_handles.clear()
+	var defs := [
+		{"axis": Vector3.RIGHT, "name": "HandleXPos", "color": Color(1.0, 0.25, 0.25)},
+		{"axis": Vector3.LEFT, "name": "HandleXNeg", "color": Color(0.9, 0.4, 0.4)},
+		{"axis": Vector3.UP, "name": "HandleYPos", "color": Color(0.35, 1.0, 0.35)},
+		{"axis": Vector3.DOWN, "name": "HandleYNeg", "color": Color(0.4, 0.9, 0.4)},
+		{"axis": Vector3.BACK, "name": "HandleZPos", "color": Color(0.3, 0.5, 1.0)}, # Godot forward is -Z
+		{"axis": Vector3.FORWARD, "name": "HandleZNeg", "color": Color(0.35, 0.6, 0.95)}
+	]
+	for def in defs:
+		var handle := Area3D.new()
+		handle.name = def["name"]
+		handle.monitorable = false # avoid being picked up by selector area
+		handle.collision_layer = pointer_collision_mask
+		handle.collision_mask = 0
+		handle.set_meta("selection_handle_axis", (def["axis"] as Vector3).normalized())
+		handle.set_meta("selection_handle_name", def["name"])
+		if pointer_handler_group != StringName():
+			handle.add_to_group(pointer_handler_group)
+		var mesh_instance := MeshInstance3D.new()
+		mesh_instance.name = "Visual"
+		mesh_instance.mesh = _build_handle_mesh(selection_handle_length)
+		mesh_instance.material_override = _build_handle_material(def["color"])
+		handle.add_child(mesh_instance)
+		var collider := CollisionShape3D.new()
+		collider.name = "Collision"
+		collider.shape = _build_handle_collision_shape(selection_handle_length)
+		collider.position = Vector3(0, 0, selection_handle_length * 0.5)
+		handle.add_child(collider)
+		handle.visible = false
+		add_child(handle)
+		_selection_handles.append(handle)
+
+
+func _setup_selection_handle_visuals() -> void:
+	_selection_handle_line_mesh = ImmediateMesh.new()
+	_selection_handle_line = MeshInstance3D.new()
+	_selection_handle_line.name = "SelectionHandleLine"
+	_selection_handle_line.mesh = _selection_handle_line_mesh
+	_selection_handle_line.material_override = _build_handle_material(Color(0.9, 0.9, 0.9, 0.8))
+	_selection_handle_line.visible = false
+	add_child(_selection_handle_line)
+
+	var marker_mesh := SphereMesh.new()
+	marker_mesh.radius = max(selection_handle_thickness * 0.6, 0.01)
+	marker_mesh.height = marker_mesh.radius * 2.0
+	marker_mesh.radial_segments = 8
+	_selection_handle_grab_marker = MeshInstance3D.new()
+	_selection_handle_grab_marker.name = "SelectionHandleGrabMarker"
+	_selection_handle_grab_marker.mesh = marker_mesh
+	_selection_handle_grab_marker.material_override = _build_handle_material(Color(1.0, 1.0, 0.2, 0.9))
+	_selection_handle_grab_marker.visible = false
+	add_child(_selection_handle_grab_marker)
+
+
+func _build_handle_material(color: Color) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = color
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.no_depth_test = false
+	return mat
+
+
+func _build_handle_mesh(length: float) -> ImmediateMesh:
+	var mesh := ImmediateMesh.new()
+	var head_len: float = max(length * 0.2, 0.02)
+	var shaft_len: float = max(length - head_len, 0.01)
+	var head_width: float = max(selection_handle_thickness * 1.5, head_len * 0.35)
+	mesh.surface_begin(Mesh.PRIMITIVE_LINES)
+	mesh.surface_add_vertex(Vector3.ZERO)
+	mesh.surface_add_vertex(Vector3(0, 0, shaft_len))
+	mesh.surface_add_vertex(Vector3(0, 0, shaft_len))
+	mesh.surface_add_vertex(Vector3(head_width, 0, shaft_len + head_len))
+	mesh.surface_add_vertex(Vector3(0, 0, shaft_len))
+	mesh.surface_add_vertex(Vector3(-head_width, 0, shaft_len + head_len))
+	mesh.surface_end()
+	return mesh
+
+
+func _build_handle_collision_shape(length: float) -> BoxShape3D:
+	var box := BoxShape3D.new()
+	var half_thickness: float = max(selection_handle_thickness * 0.5, 0.005)
+	box.extents = Vector3(half_thickness, half_thickness, max(length * 0.5, 0.01))
+	return box
+
+
 func _update_hit_selector(action_state: Dictionary, has_hit: bool, hit_scale: float, hit_transform: Transform3D) -> void:
 	if not enable_hit_selector or not _hit_selector_area:
 		return
@@ -257,10 +366,53 @@ func _add_selected_object(node: Node) -> void:
 	if not (node is Node3D):
 		return
 	var node3d := node as Node3D
-	if node3d == self or _selected_objects.has(node3d):
+	var target := _selection_move_target(node3d)
+	if target == self or _selected_objects.has(target):
 		return
-	_selected_objects.append(node3d)
+	_selected_objects.append(target)
 	_update_selection_bounds()
+
+
+func _selection_move_target(node: Node3D) -> Node3D:
+	var candidates: Array[Node3D] = []
+	var probe: Node = node
+	while probe and probe is Node3D and probe != self:
+		candidates.append(probe as Node3D)
+		probe = probe.get_parent()
+	# Prefer the nearest ancestor that has both visuals and collision, so meshes move with the collider.
+	for candidate in candidates:
+		if _has_visual_descendant(candidate) and _has_collision_descendant(candidate):
+			return candidate
+	# Otherwise prefer the nearest collision object (bodies/areas).
+	for candidate in candidates:
+		if candidate is CollisionObject3D:
+			return candidate
+	# Fallback to the original node.
+	return candidates[0] if not candidates.is_empty() else node
+
+
+func _has_visual_descendant(root: Node) -> bool:
+	var stack: Array[Node] = [root]
+	while not stack.is_empty():
+		var cur: Node = stack.pop_back()
+		if cur is VisualInstance3D:
+			return true
+		for child in cur.get_children():
+			if child is Node:
+				stack.append(child)
+	return false
+
+
+func _has_collision_descendant(root: Node) -> bool:
+	var stack: Array[Node] = [root]
+	while not stack.is_empty():
+		var cur: Node = stack.pop_back()
+		if cur is CollisionObject3D or cur is CollisionShape3D:
+			return true
+		for child in cur.get_children():
+			if child is Node:
+				stack.append(child)
+	return false
 
 
 func _prune_selected_objects() -> void:
@@ -414,6 +566,123 @@ func _draw_selection_bounds(aabb: AABB) -> void:
 	_selection_bounds.visible = true
 
 
+func _update_selection_handles(aabb: AABB) -> void:
+	if _selection_handles.is_empty() or not show_selection_handles:
+		return
+	var has_box: bool = aabb.size != Vector3.ZERO
+	if not has_box:
+		_hide_selection_handles()
+		return
+	var center: Vector3 = aabb.position + aabb.size * 0.5
+	var half_size: Vector3 = aabb.size * 0.5
+	for handle in _selection_handles:
+		if not is_instance_valid(handle):
+			continue
+		var axis_dir: Vector3 = handle.get_meta("selection_handle_axis", Vector3.ZERO)
+		if axis_dir == Vector3.ZERO:
+			handle.visible = false
+			handle.monitoring = false
+			continue
+		var face_offset := Vector3(
+			half_size.x * axis_dir.x,
+			half_size.y * axis_dir.y,
+			half_size.z * axis_dir.z
+		)
+		var pos: Vector3 = center + face_offset + axis_dir * selection_handle_offset
+		var up: Vector3 = Vector3.FORWARD if abs(axis_dir.dot(Vector3.UP)) > 0.95 else Vector3.UP
+		var basis := Basis().looking_at(-axis_dir, up)
+		handle.global_transform = Transform3D(basis, pos)
+		handle.visible = true
+		handle.monitoring = true
+
+
+func _hide_selection_handles() -> void:
+	if _selection_handles.is_empty():
+		return
+	for handle in _selection_handles:
+		if is_instance_valid(handle):
+			handle.visible = false
+			handle.monitoring = false
+
+
+func _update_selection_handle_movement(delta: float, action_state: Dictionary) -> void:
+	if _selection_handle_active_axis == Vector3.ZERO:
+		return
+	if not action_state.get("pressed", false):
+		_update_handle_visuals(false)
+		return
+	var axis: Vector3 = _selection_handle_active_axis
+	var current_proj: float = _pointer_hit_point.dot(axis)
+	var delta_proj: float = current_proj - _selection_handle_last_proj
+	if abs(delta_proj) <= selection_handle_move_deadzone:
+		return
+	# Move exactly by the pointer's delta along the locked axis so the hit point stays anchored.
+	var move_amount: float = delta_proj
+	_move_selected_objects_along_axis(axis, move_amount)
+	_selection_handle_last_proj = current_proj
+	_update_selection_bounds()
+	_update_handle_visuals(true)
+
+
+func _update_handle_visuals(active: bool) -> void:
+	if not _selection_handle_line or not _selection_handle_line_mesh or not _selection_handle_grab_marker:
+		return
+	_selection_handle_line.visible = active
+	_selection_handle_grab_marker.visible = active
+	_selection_handle_line_mesh.clear_surfaces()
+	if not active:
+		return
+	_selection_handle_line_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
+	_selection_handle_line_mesh.surface_add_vertex(_selection_handle_grab_point)
+	_selection_handle_line_mesh.surface_add_vertex(_pointer_hit_point)
+	_selection_handle_line_mesh.surface_end()
+	var marker_xform := _selection_handle_grab_marker.global_transform
+	marker_xform.origin = _selection_handle_grab_point
+	_selection_handle_grab_marker.global_transform = marker_xform
+
+
+func _move_selected_objects_along_axis(axis: Vector3, distance: float) -> void:
+	if axis == Vector3.ZERO:
+		return
+	var dir: Vector3 = axis.normalized()
+	for node in _selected_objects:
+		if is_instance_valid(node):
+			_move_node_along_axis(node, dir, distance)
+
+
+func _update_selection_handle_activation(action_state: Dictionary, handler: Node) -> void:
+	if not handler or not is_instance_valid(handler):
+		if action_state.get("just_released", false):
+			_selection_handle_active_axis = Vector3.ZERO
+			_update_handle_visuals(false)
+		return
+	if handler.has_meta("selection_handle_axis") and action_state.get("just_pressed", false):
+		var axis_meta = handler.get_meta("selection_handle_axis")
+		if axis_meta is Vector3:
+			_selection_handle_active_axis = (axis_meta as Vector3).normalized()
+			_selection_handle_last_proj = _pointer_hit_point.dot(_selection_handle_active_axis)
+			_selection_handle_grab_point = _pointer_hit_point
+			_update_handle_visuals(true)
+	if action_state.get("just_released", false):
+		_selection_handle_active_axis = Vector3.ZERO
+		_update_handle_visuals(false)
+
+
+func _move_node_along_axis(node: Node3D, dir: Vector3, distance: float) -> void:
+	var delta_vec: Vector3 = dir * distance
+	if node is RigidBody3D:
+		var rb := node as RigidBody3D
+		var xform := rb.global_transform
+		xform.origin += delta_vec
+		rb.global_transform = xform
+		# Keep body awake and prevent inherited momentum from old velocity
+		rb.linear_velocity = Vector3.ZERO
+		rb.angular_velocity = Vector3.ZERO
+		rb.sleeping = false
+	else:
+		node.global_position += delta_vec
+
+
 func _update_selection_bounds() -> void:
 	if not _selection_bounds_mesh:
 		return
@@ -421,8 +690,10 @@ func _update_selection_bounds() -> void:
 	if combined.size == Vector3.ZERO:
 		_selection_bounds.visible = false
 		_selection_bounds_mesh.clear_surfaces()
+		_update_selection_handles(combined)
 		return
 	_draw_selection_bounds(combined)
+	_update_selection_handles(combined)
 
 
 func _clear_selection() -> void:
@@ -431,6 +702,9 @@ func _clear_selection() -> void:
 		_selection_bounds_mesh.clear_surfaces()
 	if _selection_bounds:
 		_selection_bounds.visible = false
+	_hide_selection_handles()
+	_selection_handle_active_axis = Vector3.ZERO
+	_update_handle_visuals(false)
 
 func _physics_process(delta: float) -> void:
 	if not _raycast:
@@ -454,6 +728,7 @@ func _physics_process(delta: float) -> void:
 	
 	# Process grip grab mode (must be done before normal pointer events)
 	_process_grip_grab_mode(delta, controller)
+	_update_selection_handle_movement(delta, action_state)
 
 	_raycast.target_position = axis_local * ray_length
 	_raycast.force_raycast_update()
@@ -495,6 +770,8 @@ func _physics_process(delta: float) -> void:
 			print("HandPointer: Hit on Android - collider=", collider_obj, " handler=", handler)
 			print("  - collision_mask=", _raycast.collision_mask, " point=", end)
 
+	_pointer_hit_point = end
+
 	if handler:
 		var base_event: Dictionary = _build_event(handler, collider_obj, end, normal, axis_world, start, distance, action_state, controller)
 		if handler != _hover_target:
@@ -516,9 +793,13 @@ func _physics_process(delta: float) -> void:
 			_emit_event(handler, "release", base_event)
 		_process_secondary_actions(handler, base_event, action_state, controller, delta)
 		_process_ui_scroll(handler, base_event, controller, delta)
+		_update_selection_handle_activation(action_state, handler)
 	else:
 		_clear_hover_state()
 		_clear_ui_scroll_capture(controller)
+		if action_state.get("just_released", false):
+			_selection_handle_active_axis = Vector3.ZERO
+			_update_handle_visuals(false)
 
 	var hit_scale: float = _compute_hit_scale(distance)
 	_maybe_emit_hit_scale(hit_scale)
@@ -757,7 +1038,12 @@ func _build_event(handler: Node, collider: Object, hit_point: Vector3, normal: V
 func _emit_event(target: Node, event_type: StringName, base_event: Dictionary) -> void:
 	var payload: Dictionary = base_event.duplicate(true)
 	payload["type"] = event_type
+	if target and target.has_meta("selection_handle_axis"):
+		payload["selection_handle_axis"] = target.get_meta("selection_handle_axis")
+		payload["selection_handle_name"] = target.get_meta("selection_handle_name")
 	pointer_event.emit(payload.duplicate(true))
+	if payload.has("selection_handle_axis"):
+		selection_handle_event.emit(payload.duplicate(true))
 	if not target or not is_instance_valid(target):
 		return
 	var handler_payload: Dictionary = payload.duplicate(true)

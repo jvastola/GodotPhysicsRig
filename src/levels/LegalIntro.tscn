@@ -1,0 +1,20 @@
+[gd_scene load_steps=5 format=3 uid="uid://legal_intro_scene"]
+
+[ext_resource type="Script" path="res://src/legal/legal_intro.gd" id="1_intro"]
+[ext_resource type="PackedScene" path="res://src/player/MinimalXRPointerRig.tscn" id="2_pointer_rig"]
+[ext_resource type="PackedScene" path="res://src/ui/legal/LegalViewport3D.tscn" id="3_legal_viewport"]
+
+[sub_resource type="Environment" id="Environment_passthrough"]
+background_mode = 1
+background_color = Color(0, 0, 0, 0)
+
+[node name="LegalIntro" type="Node3D"]
+script = ExtResource("1_intro")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_passthrough")
+
+[node name="MinimalXRPointerRig" parent="." instance=ExtResource("2_pointer_rig")]
+
+[node name="LegalViewport3D" parent="." instance=ExtResource("3_legal_viewport")]
+transform = Transform3D(0.55, 0, 0, 0, 0.55, 0, 0, 0, 0.55, 0, 1.4, -1.5)

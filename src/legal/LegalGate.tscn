@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://legal_gate"]
+
+[ext_resource type="Script" path="res://src/legal/legal_gate.gd" id="1_gate"]
+
+[node name="LegalGate" type="Node3D"]
+script = ExtResource("1_gate")
