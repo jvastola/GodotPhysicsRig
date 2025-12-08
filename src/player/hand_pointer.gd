@@ -113,6 +113,8 @@ var _selection_handle_active_axis: Vector3 = Vector3.ZERO
 var _selection_handle_last_proj: float = 0.0
 var _pointer_hit_point: Vector3 = Vector3.ZERO
 var _selection_handle_grab_point: Vector3 = Vector3.ZERO
+var _selection_handle_grab_offset: float = 0.0
+var _selection_handle_active_handle: Node3D = null
 var _selection_handle_line: MeshInstance3D
 var _selection_handle_line_mesh: ImmediateMesh
 var _selection_handle_grab_marker: MeshInstance3D
@@ -611,6 +613,7 @@ func _update_selection_handle_movement(delta: float, action_state: Dictionary) -
 	if not action_state.get("pressed", false):
 		_update_handle_visuals(false)
 		return
+	_selection_handle_grab_point = _compute_active_grab_point()
 	var axis: Vector3 = _selection_handle_active_axis
 	var current_proj: float = _pointer_hit_point.dot(axis)
 	var delta_proj: float = current_proj - _selection_handle_last_proj
@@ -632,13 +635,19 @@ func _update_handle_visuals(active: bool) -> void:
 	_selection_handle_line_mesh.clear_surfaces()
 	if not active:
 		return
+	_selection_handle_line.global_transform = Transform3D.IDENTITY
 	_selection_handle_line_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
 	_selection_handle_line_mesh.surface_add_vertex(_selection_handle_grab_point)
 	_selection_handle_line_mesh.surface_add_vertex(_pointer_hit_point)
 	_selection_handle_line_mesh.surface_end()
-	var marker_xform := _selection_handle_grab_marker.global_transform
-	marker_xform.origin = _selection_handle_grab_point
-	_selection_handle_grab_marker.global_transform = marker_xform
+	_selection_handle_grab_marker.global_transform = Transform3D(Basis.IDENTITY, _selection_handle_grab_point)
+
+
+func _compute_active_grab_point() -> Vector3:
+	if _selection_handle_active_handle and is_instance_valid(_selection_handle_active_handle) and _selection_handle_active_axis != Vector3.ZERO:
+		var origin: Vector3 = _selection_handle_active_handle.global_transform.origin
+		return origin + _selection_handle_active_axis * _selection_handle_grab_offset
+	return _selection_handle_grab_point
 
 
 func _move_selected_objects_along_axis(axis: Vector3, distance: float) -> void:
@@ -654,17 +663,21 @@ func _update_selection_handle_activation(action_state: Dictionary, handler: Node
 	if not handler or not is_instance_valid(handler):
 		if action_state.get("just_released", false):
 			_selection_handle_active_axis = Vector3.ZERO
+			_selection_handle_active_handle = null
 			_update_handle_visuals(false)
 		return
 	if handler.has_meta("selection_handle_axis") and action_state.get("just_pressed", false):
 		var axis_meta = handler.get_meta("selection_handle_axis")
 		if axis_meta is Vector3:
 			_selection_handle_active_axis = (axis_meta as Vector3).normalized()
+			_selection_handle_active_handle = handler as Node3D
 			_selection_handle_last_proj = _pointer_hit_point.dot(_selection_handle_active_axis)
-			_selection_handle_grab_point = _pointer_hit_point
+			_selection_handle_grab_point = _compute_active_grab_point()
+			_selection_handle_grab_offset = (_selection_handle_grab_point - _selection_handle_active_handle.global_transform.origin).dot(_selection_handle_active_axis) if _selection_handle_active_handle else 0.0
 			_update_handle_visuals(true)
 	if action_state.get("just_released", false):
 		_selection_handle_active_axis = Vector3.ZERO
+		_selection_handle_active_handle = null
 		_update_handle_visuals(false)
 
 
@@ -704,6 +717,7 @@ func _clear_selection() -> void:
 		_selection_bounds.visible = false
 	_hide_selection_handles()
 	_selection_handle_active_axis = Vector3.ZERO
+	_selection_handle_active_handle = null
 	_update_handle_visuals(false)
 
 func _physics_process(delta: float) -> void:
@@ -799,6 +813,7 @@ func _physics_process(delta: float) -> void:
 		_clear_ui_scroll_capture(controller)
 		if action_state.get("just_released", false):
 			_selection_handle_active_axis = Vector3.ZERO
+			_selection_handle_active_handle = null
 			_update_handle_visuals(false)
 
 	var hit_scale: float = _compute_hit_scale(distance)
