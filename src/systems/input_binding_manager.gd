@@ -17,7 +17,8 @@ static func get_singleton() -> InputBindingManager:
 	var root: Node = Engine.get_main_loop().root
 	_instance = InputBindingManager.new()
 	if root:
-		root.add_child(_instance)
+		# Defer to avoid "parent busy setting up children" during scene _ready calls
+		root.call_deferred("add_child", _instance)
 	return _instance
 
 

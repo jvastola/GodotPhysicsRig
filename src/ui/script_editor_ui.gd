@@ -111,8 +111,8 @@ func _setup_gdscript_highlighter(hl: CodeHighlighter) -> void:
 		hl.add_keyword_color(t, type_color)
 	
 	# Annotations
-	hl.add_color_region("@", " ", Color(0.9, 0.6, 0.4), true)
-	hl.add_color_region("@", "\n", Color(0.9, 0.6, 0.4), true)
+	# Avoid color regions that end on whitespace/newline (Godot requires a symbol).
+	# Annotation-like keywords are already colored via the keyword list above.
 	
 	# Comments
 	hl.add_color_region("#", "\n", comment_color, true)

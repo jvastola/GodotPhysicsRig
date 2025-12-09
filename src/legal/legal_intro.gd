@@ -110,7 +110,7 @@ func _poll_accept_input() -> void:
 
 func _is_accept_pressed() -> bool:
 	# Support A/X (common on Quest controllers), trigger_click action, and Space for desktop.
-	if Input.is_action_pressed("trigger_click"):
+	if InputMap.has_action("trigger_click") and Input.is_action_pressed("trigger_click"):
 		return true
 	if Input.is_key_pressed(KEY_SPACE):
 		return true
