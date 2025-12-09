@@ -25,6 +25,13 @@ const _UI_SCENE_PATHS := {
 	"SceneHierarchyViewport3D": "res://src/ui/SceneHierarchyViewport3D.tscn",
 	"DebugConsoleViewport3D": "res://src/ui/DebugConsoleViewport3D.tscn",
 	"GitViewport3D": "res://src/ui/git/GitViewport3D.tscn",
+	"UnifiedRoomViewport3D": "res://src/ui/multiplayer/UnifiedRoomViewport3D.tscn",
+	"LiveKitViewport3D": "res://src/ui/livekit/LiveKitViewport3D.tscn",
+	"NodeInspectorViewport3D": "res://src/ui/NodeInspectorViewport3D.tscn",
+	"ScriptEditorViewport3D": "res://src/ui/ScriptEditorViewport3D.tscn",
+	"LegalViewport3D": "res://src/ui/legal/LegalViewport3D.tscn",
+	"ColorPickerViewport3D": "res://src/ui/ColorPickerViewport3D.tscn",
+	"PolyToolViewport3D": "res://src/ui/PolyToolViewport3D.tscn",
 }
 
 func _ready() -> void:
@@ -296,35 +303,27 @@ func _setup_ui() -> void:
 	quick_label.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
 	vbox_player.add_child(quick_label)
 
-	var btn_move_movement = Button.new()
-	btn_move_movement.text = "Move Movement Settings in Front"
-	btn_move_movement.pressed.connect(func(): _move_ui_node_in_front("MovementSettingsViewport3D2"))
-	vbox_player.add_child(btn_move_movement)
-
-	var btn_move_keyboard = Button.new()
-	btn_move_keyboard.text = "Move Keyboard in Front"
-	btn_move_keyboard.pressed.connect(func(): _move_ui_node_in_front("KeyboardFullViewport3D"))
-	vbox_player.add_child(btn_move_keyboard)
-
-	var btn_move_filesystem = Button.new()
-	btn_move_filesystem.text = "Move File System in Front"
-	btn_move_filesystem.pressed.connect(func(): _move_ui_node_in_front("FileSystemViewport3D"))
-	vbox_player.add_child(btn_move_filesystem)
-
-	var btn_move_hierarchy = Button.new()
-	btn_move_hierarchy.text = "Move Scene Hierarchy in Front"
-	btn_move_hierarchy.pressed.connect(func(): _move_ui_node_in_front("SceneHierarchyViewport3D"))
-	vbox_player.add_child(btn_move_hierarchy)
-
-	var btn_move_debug = Button.new()
-	btn_move_debug.text = "Move Debug Window in Front"
-	btn_move_debug.pressed.connect(func(): _move_ui_node_in_front("DebugConsoleViewport3D"))
-	vbox_player.add_child(btn_move_debug)
-
-	var btn_move_git = Button.new()
-	btn_move_git.text = "Move Git Tracker in Front"
-	btn_move_git.pressed.connect(func(): _move_ui_node_in_front("GitViewport3D"))
-	vbox_player.add_child(btn_move_git)
+	var quick_panels := [
+		{"label": "Move Movement Settings in Front", "node": "MovementSettingsViewport3D2"},
+		{"label": "Move Keyboard in Front", "node": "KeyboardFullViewport3D"},
+		{"label": "Move File System in Front", "node": "FileSystemViewport3D"},
+		{"label": "Move Scene Hierarchy in Front", "node": "SceneHierarchyViewport3D"},
+		{"label": "Move Node Inspector in Front", "node": "NodeInspectorViewport3D"},
+		{"label": "Move Script Editor in Front", "node": "ScriptEditorViewport3D"},
+		{"label": "Move Debug Window in Front", "node": "DebugConsoleViewport3D"},
+		{"label": "Move Git Tracker in Front", "node": "GitViewport3D"},
+		{"label": "Move Multiplayer Panel in Front", "node": "UnifiedRoomViewport3D"},
+		{"label": "Move LiveKit Settings in Front", "node": "LiveKitViewport3D"},
+		{"label": "Move Legal Panel in Front", "node": "LegalViewport3D"},
+		{"label": "Move Color Picker in Front", "node": "ColorPickerViewport3D"},
+		{"label": "Move Poly Tool Export in Front", "node": "PolyToolViewport3D"},
+	]
+	for entry in quick_panels:
+		var btn := Button.new()
+		btn.text = entry.get("label", "")
+		var target_node: String = entry.get("node", "")
+		btn.pressed.connect(func(node_name := target_node): _move_ui_node_in_front(node_name))
+		vbox_player.add_child(btn)
 	
 	# Scene management
 	_add_separator(vbox_player)

@@ -1,11 +1,13 @@
-extends Grabbable
 class_name PolyTool
+extends Grabbable
+const ColorPickerUI = preload("res://src/ui/color_picker_ui.gd")
 
 enum ToolMode {
 	PLACE,
 	EDIT,
 	REMOVE,
-	CONNECT
+	CONNECT,
+	PAINT
 }
 
 enum PointVisibilityMode {
@@ -30,8 +32,10 @@ enum PointVisibilityMode {
 @export var color_remove: Color = Color(1.0, 0.2, 0.2) # Red
 @export var color_connect: Color = Color(0.2, 0.6, 1.0) # Blue
 @export var color_mesh: Color = Color(0.8, 0.8, 0.8, 0.5)
+@export var color_paint_default: Color = Color(1.0, 1.0, 1.0, 1.0)
 
 # State
+static var instance: PolyTool
 var _current_mode: ToolMode = ToolMode.PLACE
 var _points: Array[Node3D] = []
 var _triangles: Array[Array] = [] # Array of [i0, i1, i2]
@@ -54,8 +58,11 @@ var _mesh_instance: MeshInstance3D
 var _mesh_params: ArrayMesh
 var _connect_line: MeshInstance3D
 var _connect_line_immediate: ImmediateMesh
+var _paint_dot: MeshInstance3D
+var _paint_mat: StandardMaterial3D
 
 func _ready() -> void:
+	instance = self
 	super._ready()
 	_create_visuals()
 	grabbed.connect(_on_grabbed)
@@ -81,7 +88,7 @@ func _create_visuals() -> void:
 	# If cull is disabled, they see both always. If cull is BACK (default), they only see front.
 	# Let's keep default culling so the winding matters visually.
 	mat.cull_mode = BaseMaterial3D.CULL_BACK 
-	mat.vertex_color_use_as_albedo = false
+	mat.vertex_color_use_as_albedo = true
 	_mesh_instance.material_override = mat
 	_add_to_root(_mesh_instance)
 
@@ -104,8 +111,12 @@ func _create_visuals() -> void:
 	_connect_line.material_override = line_mat
 	_add_to_root(_connect_line)
 
+	_ensure_paint_dot()
+
 func _exit_tree() -> void:
 	super._exit_tree()
+	if instance == self:
+		instance = null
 	if is_instance_valid(_point_container): _point_container.queue_free()
 	if is_instance_valid(_mesh_instance): _mesh_instance.queue_free()
 	if is_instance_valid(_preview_dot): _preview_dot.queue_free()
@@ -139,6 +150,7 @@ func _on_released() -> void:
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
 	_update_point_visibility()
+	_update_paint_dot()
 	
 	if not is_grabbed: 
 		return
@@ -217,12 +229,28 @@ func _handle_input() -> void:
 				# Implies the sequence is valid only while holding.
 				if not _connect_sequence.is_empty():
 					_connect_sequence.clear()
+		
+		ToolMode.PAINT:
+			if just_pressed:
+				var painted := false
+				if hover.index != -1 and hover.distance < selection_radius:
+					_set_point_color(hover.index, _get_paint_color())
+					painted = true
+				else:
+					var tri := _find_nearest_triangle(target)
+					if tri.has("index") and tri["index"] != -1:
+						var tri_indices: Array = _triangles[tri["index"]]
+						for v in tri_indices:
+							_set_point_color(v, _get_paint_color())
+						painted = true
+				if painted:
+					_rebuild_mesh()
 
 	_prev_trigger_pressed = trigger
 	_prev_grip_pressed = grip
 
 func _cycle_mode() -> void:
-	var next = (_current_mode + 1) % 4
+	var next = (_current_mode + 1) % 5
 	_current_mode = next as ToolMode
 	_update_mode_visuals()
 
@@ -234,11 +262,13 @@ func _update_mode_visuals() -> void:
 		ToolMode.EDIT: color = color_edit
 		ToolMode.REMOVE: color = color_remove
 		ToolMode.CONNECT: color = color_connect
+		ToolMode.PAINT: color = _get_paint_color()
 	
 	_orb_material.albedo_color = color
 	_orb_material.emission = color
 	if _preview_mat:
 		_preview_mat.albedo_color = color.lightened(0.5)
+	_update_paint_dot()
 
 func _add_point(pos: Vector3) -> void:
 	var node = Node3D.new()
@@ -308,8 +338,11 @@ func _rebuild_mesh() -> void:
 		
 		st.set_normal(normal)
 		# Add vertices in order
+		st.set_color(_get_point_color(_points[tri[0]]))
 		st.add_vertex(p0)  
+		st.set_color(_get_point_color(_points[tri[1]]))
 		st.add_vertex(p1)
+		st.set_color(_get_point_color(_points[tri[2]]))
 		st.add_vertex(p2)
 		
 	st.commit(_mesh_params)
@@ -363,6 +396,49 @@ func _get_nearest_point(pos: Vector3) -> Dictionary:
 			best_pos = p
 	return { "index": best_idx, "distance": best_dist, "position": best_pos }
 
+
+func _find_nearest_triangle(pos: Vector3) -> Dictionary:
+	var best_idx := -1
+	var best_dist := INF
+	for i in _triangles.size():
+		var tri = _triangles[i]
+		if tri.size() < 3:
+			continue
+		var p0 = _points[tri[0]].global_position
+		var p1 = _points[tri[1]].global_position
+		var p2 = _points[tri[2]].global_position
+		var plane_normal = (p1 - p0).cross(p2 - p0)
+		if plane_normal.length_squared() < 1e-6:
+			continue
+		var plane = Plane(p0, p1, p2)
+		var projected = plane.project(pos)
+		var inside = _is_point_in_triangle(projected, p0, p1, p2)
+		if not inside:
+			continue
+		var dist = projected.distance_to(pos)
+		if dist < best_dist:
+			best_dist = dist
+			best_idx = i
+	return {"index": best_idx, "distance": best_dist}
+
+
+func _is_point_in_triangle(p: Vector3, a: Vector3, b: Vector3, c: Vector3) -> bool:
+	var v0 = c - a
+	var v1 = b - a
+	var v2 = p - a
+	var dot00 = v0.dot(v0)
+	var dot01 = v0.dot(v1)
+	var dot02 = v0.dot(v2)
+	var dot11 = v1.dot(v1)
+	var dot12 = v1.dot(v2)
+	var denom = (dot00 * dot11 - dot01 * dot01)
+	if abs(denom) < 1e-6:
+		return false
+	var inv_denom = 1.0 / denom
+	var u = (dot11 * dot02 - dot01 * dot12) * inv_denom
+	var v = (dot00 * dot12 - dot01 * dot02) * inv_denom
+	return u >= -0.0001 and v >= -0.0001 and (u + v) <= 1.0001
+
 func _update_point_visibility() -> void:
 	if not is_instance_valid(_point_container):
 		return
@@ -398,6 +474,29 @@ func _get_point_mesh(point: Node3D) -> VisualInstance3D:
 			return child
 	return null
 
+
+func _get_point_color(point: Node3D) -> Color:
+	var mesh = _get_point_mesh(point)
+	if mesh and mesh.material_override and mesh.material_override is StandardMaterial3D:
+		return (mesh.material_override as StandardMaterial3D).albedo_color
+	return Color(0.8, 0.8, 0.8)
+
+
+func _set_point_color(index: int, color: Color) -> void:
+	if index < 0 or index >= _points.size():
+		return
+	var mesh = _get_point_mesh(_points[index])
+	if mesh:
+		var mat = mesh.material_override as StandardMaterial3D
+		if mat:
+			mat.albedo_color = color
+
+
+func _get_paint_color() -> Color:
+	if ColorPickerUI and ColorPickerUI.instance and is_instance_valid(ColorPickerUI.instance):
+		return ColorPickerUI.instance.get_current_color()
+	return color_paint_default
+
 func _make_sphere_mesh(r: float) -> SphereMesh:
 	var m = SphereMesh.new()
 	m.radius = r
@@ -424,7 +523,169 @@ func _ensure_preview_dot() -> void:
 	_preview_dot.visible = false
 	_add_to_root(_preview_dot)
 
+
+func _ensure_paint_dot() -> void:
+	if is_instance_valid(_paint_dot):
+		return
+	_paint_dot = MeshInstance3D.new()
+	_paint_dot.name = "PaintDot"
+	_paint_dot.mesh = _make_sphere_mesh(0.018)
+	_paint_mat = _make_unshaded_material(_get_paint_color())
+	_paint_dot.material_override = _paint_mat
+	_paint_dot.visible = true
+	add_child(_paint_dot)
+	_paint_dot.position = Vector3(0.05, 0.03, 0)
+
+
+func _update_paint_dot() -> void:
+	_ensure_paint_dot()
+	if not is_instance_valid(_paint_mat):
+		return
+	var color = _get_paint_color()
+	_paint_mat.albedo_color = color
+	_paint_mat.emission = color
+
 func _add_to_root(node: Node) -> void:
 	var root = get_tree().current_scene
 	if not root: root = get_tree().root
 	root.add_child(node)
+
+
+func get_point_count() -> int:
+	return _points.size()
+
+
+func get_triangle_count() -> int:
+	return _triangles.size()
+
+
+func get_default_export_path() -> String:
+	var timestamp := Time.get_datetime_string_from_system().replace(":", "-")
+	return "user://poly_exports/poly_%s.gltf" % timestamp
+
+
+func export_to_gltf(path: String) -> int:
+	# Ensure we have geometry to export
+	if not _mesh_params or _mesh_params.get_surface_count() == 0:
+		return ERR_CANT_CREATE
+	
+	# Build a minimal scene with the mesh
+	var root := Node3D.new()
+	root.name = "PolyToolExport"
+	var mesh_instance := MeshInstance3D.new()
+	mesh_instance.name = "PolyMesh"
+	mesh_instance.mesh = _mesh_params.duplicate()
+	if is_instance_valid(_mesh_instance) and _mesh_instance.material_override:
+		mesh_instance.material_override = _mesh_instance.material_override
+	root.add_child(mesh_instance)
+	
+	# Prepare target path
+	var target_path := path.strip_edges()
+	if target_path.is_empty():
+		target_path = get_default_export_path()
+	var base_dir := target_path.get_base_dir()
+	if base_dir != "":
+		var abs_dir := ProjectSettings.globalize_path(base_dir)
+		DirAccess.make_dir_recursive_absolute(abs_dir)
+	
+	# Export using GLTFDocument
+	var gltf := GLTFDocument.new()
+	var state := GLTFState.new()
+	var append_err := gltf.append_from_scene(root, state)
+	if append_err != OK:
+		return append_err
+	return gltf.write_to_filesystem(state, target_path)
+
+
+func load_from_gltf(path: String) -> int:
+	var target_path := path.strip_edges()
+	if target_path.is_empty():
+		return ERR_FILE_NOT_FOUND
+	if not target_path.begins_with("res://") and not target_path.begins_with("user://"):
+		target_path = "user://poly_exports".path_join(target_path)
+	if not FileAccess.file_exists(target_path):
+		return ERR_FILE_NOT_FOUND
+	
+	var gltf := GLTFDocument.new()
+	var state := GLTFState.new()
+	var append_err := gltf.append_from_file(target_path, state)
+	if append_err != OK:
+		return append_err
+	var scene := gltf.generate_scene(state)
+	if not scene:
+		return ERR_PARSE_ERROR
+	
+	var mesh_instance := _find_first_mesh_instance(scene)
+	if not mesh_instance or not mesh_instance.mesh:
+		return ERR_DOES_NOT_EXIST
+	
+	var array_mesh := mesh_instance.mesh
+	if not (array_mesh is ArrayMesh):
+		return ERR_INVALID_DATA
+	if array_mesh.get_surface_count() == 0:
+		return ERR_INVALID_DATA
+	
+	var arrays := array_mesh.surface_get_arrays(0)
+	var vertices: PackedVector3Array = arrays[ArrayMesh.ARRAY_VERTEX]
+	var indices: PackedInt32Array = arrays[ArrayMesh.ARRAY_INDEX]
+	var colors: PackedColorArray = arrays[ArrayMesh.ARRAY_COLOR]
+	if vertices.is_empty():
+		return ERR_INVALID_DATA
+	if indices.is_empty():
+		if vertices.size() % 3 != 0:
+			return ERR_INVALID_DATA
+		indices = PackedInt32Array()
+		for i in range(vertices.size()):
+			indices.append(i)
+	
+	_clear_geometry()
+	
+	# Recreate points
+	for i in vertices.size():
+		var node = Node3D.new()
+		node.name = "P%d" % i
+		var dot = MeshInstance3D.new()
+		dot.mesh = _make_sphere_mesh(0.015)
+		var color := Color(0.8, 0.8, 0.8)
+		if colors.size() == vertices.size():
+			color = colors[i]
+		dot.material_override = _make_unshaded_material(color)
+		node.add_child(dot)
+		_point_container.add_child(node)
+		node.global_position = vertices[i]
+		_points.append(node)
+	
+	# Recreate triangles
+	for t in range(0, indices.size(), 3):
+		if t + 2 >= indices.size():
+			break
+		_triangles.append([indices[t], indices[t + 1], indices[t + 2]])
+	
+	# Apply material if present
+	if mesh_instance.material_override:
+		_mesh_instance.material_override = mesh_instance.material_override
+	
+	_rebuild_mesh()
+	_update_point_visibility()
+	return OK
+
+
+func _find_first_mesh_instance(root: Node) -> MeshInstance3D:
+	var queue: Array = [root]
+	while not queue.is_empty():
+		var node: Node = queue.pop_front()
+		if node is MeshInstance3D and (node as MeshInstance3D).mesh:
+			return node as MeshInstance3D
+		for child in node.get_children():
+			queue.append(child)
+	return null
+
+
+func _clear_geometry() -> void:
+	for p in _points:
+		if is_instance_valid(p):
+			p.queue_free()
+	_points.clear()
+	_triangles.clear()
+	if _mesh_params:
+		_mesh_params.clear_surfaces()
