@@ -45,38 +45,50 @@ grow_horizontal = 2
 grow_vertical = 2
 current_tab = 0
 
-[node name="TurnVBox" type="VBoxContainer" parent="TabContainer"]
+[node name="TurnScroll" type="ScrollContainer" parent="TabContainer"]
 layout_mode = 2
-theme_override_constants/separation = 8
+follow_focus = true
+vertical_scroll_mode = 2
+horizontal_scroll_mode = 0
 metadata/_tab_index = 0
 
-[node name="TestLabel1" type="Label" parent="TabContainer/TurnVBox"]
+[node name="TurnVBox" type="VBoxContainer" parent="TabContainer/TurnScroll"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TestLabel1" type="Label" parent="TabContainer/TurnScroll/TurnVBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
 text = "UI IS WORKING!"
 horizontal_alignment = 1
 
-[node name="TestLabel2" type="Label" parent="TabContainer/TurnVBox"]
+[node name="TestLabel2" type="Label" parent="TabContainer/TurnScroll/TurnVBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 14
 text = "If you can read this, the viewport is rendering."
 
-[node name="TestLabel3" type="Label" parent="TabContainer/TurnVBox"]
+[node name="TestLabel3" type="Label" parent="TabContainer/TurnScroll/TurnVBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 14
 text = "Settings will populate when PlayerMovementComponent is found."
 
-[node name="TestButton" type="Button" parent="TabContainer/TurnVBox"]
+[node name="TestButton" type="Button" parent="TabContainer/TurnScroll/TurnVBox"]
 layout_mode = 2
 text = "Test Button - Click Me"
 
-[node name="PlayerVBox" type="VBoxContainer" parent="TabContainer"]
+[node name="PlayerScroll" type="ScrollContainer" parent="TabContainer"]
 visible = false
 layout_mode = 2
-theme_override_constants/separation = 8
+follow_focus = true
+vertical_scroll_mode = 2
+horizontal_scroll_mode = 0
 metadata/_tab_index = 1
 
-[node name="TestLabel4" type="Label" parent="TabContainer/PlayerVBox"]
+[node name="PlayerVBox" type="VBoxContainer" parent="TabContainer/PlayerScroll"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TestLabel4" type="Label" parent="TabContainer/PlayerScroll/PlayerVBox"]
 layout_mode = 2
 text = "Player Settings Tab"
 horizontal_alignment = 1

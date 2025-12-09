@@ -1,4 +1,4 @@
-[gd_scene load_steps=29 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=30 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -26,6 +26,7 @@
 [ext_resource type="PackedScene" path="res://src/ui/legal/LegalViewport3D.tscn" id="27_legal_viewport"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/TrianglePointTool.tscn" id="28_triangle_tool"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/PolyTool.tscn" id="29_poly_tool"]
+[ext_resource type="PackedScene" path="res://src/ui/ColorPickerViewport3D.tscn" id="30_color_picker_viewport"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -169,6 +170,9 @@ transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 2.0526533, 0.75, -1.98)
 
 [node name="LegalViewport3D" parent="." unique_id=1684527312 instance=ExtResource("27_legal_viewport")]
 transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, -2.65, 3.4655159, -2)
+
+[node name="ColorPickerViewport3D" parent="." unique_id=1187654321 instance=ExtResource("30_color_picker_viewport")]
+transform = Transform3D(0.38, 0, 0, 0, 0.38, 0, 0, 0, 0.38, -2.15, 0.92, -1.85)
 
 [node name="ConvexHullPen" parent="." unique_id=438475259 instance=ExtResource("23_convex_hull_pen")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, 1.5, -3)

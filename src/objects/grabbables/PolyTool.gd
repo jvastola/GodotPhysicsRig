@@ -8,12 +8,21 @@ enum ToolMode {
 	CONNECT
 }
 
+enum PointVisibilityMode {
+	ALWAYS,
+	WHEN_HELD,
+	WITHIN_RADIUS,
+	HELD_AND_RADIUS
+}
+
 # Configuration
 @export var snap_radius: float = 0.04
 @export var selection_radius: float = 0.05
 @export var trigger_threshold: float = 0.5
 @export var tip_forward_offset: float = 0.05
 @export var max_points: int = 128
+@export var point_visibility_mode: PointVisibilityMode = PointVisibilityMode.WITHIN_RADIUS
+@export var point_visibility_radius: float = 1.0
 
 # Colors
 @export var color_place: Color = Color(0.2, 1.0, 0.4) # Green
@@ -52,6 +61,7 @@ func _ready() -> void:
 	grabbed.connect(_on_grabbed)
 	released.connect(_on_released)
 	set_physics_process(false)
+	_update_point_visibility()
 
 func _create_visuals() -> void:
 	_tip = get_node_or_null("Tip")
@@ -115,6 +125,7 @@ func _on_grabbed(hand: RigidBody3D) -> void:
 	set_physics_process(true)
 	_orb.visible = true
 	_update_mode_visuals()
+	_update_point_visibility()
 	
 	# Initialize input state
 	_prev_trigger_pressed = _is_trigger_pressed()
@@ -128,9 +139,11 @@ func _on_released() -> void:
 	_orb.visible = false
 	_preview_dot.visible = false
 	_clear_connect_lines()
+	_update_point_visibility()
 
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
+	_update_point_visibility()
 	
 	if not is_grabbed: 
 		return
@@ -240,6 +253,7 @@ func _add_point(pos: Vector3) -> void:
 	_point_container.add_child(node)
 	node.global_position = pos # Important: set after adding to tree
 	_points.append(node)
+	_update_point_visibility()
 
 func _remove_point(index: int) -> void:
 	if index < 0 or index >= _points.size(): return
@@ -266,11 +280,13 @@ func _remove_point(index: int) -> void:
 		
 	_triangles = new_tris
 	_rebuild_mesh()
+	_update_point_visibility()
 
 func _move_point(index: int, pos: Vector3) -> void:
 	if index < 0 or index >= _points.size(): return
 	_points[index].global_position = pos
 	_rebuild_mesh()
+	_update_point_visibility()
 
 func _add_triangle(indices: Array) -> void:
 	_triangles.append(indices)
@@ -347,6 +363,41 @@ func _get_nearest_point(pos: Vector3) -> Dictionary:
 			best_idx = i
 			best_pos = p
 	return { "index": best_idx, "distance": best_dist, "position": best_pos }
+
+func _update_point_visibility() -> void:
+	if not is_instance_valid(_point_container):
+		return
+	var origin = _get_visibility_origin()
+	for point in _points:
+		var mesh = _get_point_mesh(point)
+		if mesh == null:
+			continue
+		mesh.visible = _is_point_visible(point.global_position, origin)
+
+func _is_point_visible(point_pos: Vector3, origin: Vector3) -> bool:
+	match point_visibility_mode:
+		PointVisibilityMode.ALWAYS:
+			return true
+		PointVisibilityMode.WHEN_HELD:
+			return is_grabbed
+		PointVisibilityMode.WITHIN_RADIUS:
+			return point_pos.distance_to(origin) <= point_visibility_radius
+		PointVisibilityMode.HELD_AND_RADIUS:
+			return is_grabbed and point_pos.distance_to(origin) <= point_visibility_radius
+	return true
+
+func _get_visibility_origin() -> Vector3:
+	if _tip:
+		return _tip.global_transform.origin
+	return global_transform.origin
+
+func _get_point_mesh(point: Node3D) -> VisualInstance3D:
+	if not is_instance_valid(point):
+		return null
+	for child in point.get_children():
+		if child is VisualInstance3D:
+			return child
+	return null
 
 func _make_sphere_mesh(r: float) -> SphereMesh:
 	var m = SphereMesh.new()

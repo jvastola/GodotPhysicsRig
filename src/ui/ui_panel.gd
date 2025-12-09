@@ -1,8 +1,8 @@
 extends Control
 
 @onready var tab = $TabContainer
-@onready var vbox_turn = $TabContainer/TurnVBox
-@onready var vbox_player = $TabContainer/PlayerVBox
+@onready var vbox_turn = $TabContainer/TurnScroll/TurnVBox
+@onready var vbox_player = $TabContainer/PlayerScroll/PlayerVBox
 
 var movement_component: PlayerMovementComponent
 var player_body: RigidBody3D
@@ -15,6 +15,8 @@ var _world_environment: WorldEnvironment
 var _world_env_snapshot: Dictionary = {}
 var _root_viewport: Viewport
 var _viewport_transparent_default: bool = false
+
+const MAIN_SCENE_PATH := "res://src/levels/MainScene.tscn"
 
 const _UI_SCENE_PATHS := {
 	"MovementSettingsViewport3D2": "res://src/ui/MovementSettingsViewport2.tscn",
@@ -77,6 +79,9 @@ func _setup_ui() -> void:
 	# Ensure both tabs are actually visible once populated
 	if vbox_player:
 		vbox_player.visible = true
+		var player_parent := vbox_player.get_parent()
+		if player_parent:
+			player_parent.visible = true
 	# Make a bit denser
 	if vbox_turn:
 		vbox_turn.add_theme_constant_override("separation", 8)
@@ -320,6 +325,20 @@ func _setup_ui() -> void:
 	btn_move_git.text = "Move Git Tracker in Front"
 	btn_move_git.pressed.connect(func(): _move_ui_node_in_front("GitViewport3D"))
 	vbox_player.add_child(btn_move_git)
+	
+	# Scene management
+	_add_separator(vbox_player)
+	var scene_label = Label.new()
+	scene_label.text = "Scene Management"
+	scene_label.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
+	vbox_player.add_child(scene_label)
+
+	var return_main_btn = Button.new()
+	return_main_btn.text = "Return to Main Scene"
+	return_main_btn.custom_minimum_size = Vector2(0, 40)
+	return_main_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return_main_btn.pressed.connect(_on_return_to_main_scene_pressed)
+	vbox_player.add_child(return_main_btn)
 
 	# Set tab titles if we have a TabContainer (Turn and Player)
 	if tab and tab.get_child_count() >= 2:
@@ -397,6 +416,18 @@ func _on_apply_scale_change(delta_sign: int, label: Label) -> void:
 func _on_respawn_pressed() -> void:
 	if movement_component:
 		movement_component.respawn(movement_component.hard_respawn_resets_settings)
+
+
+func _on_return_to_main_scene_pressed() -> void:
+	var target_scene := MAIN_SCENE_PATH
+	var player_state := {
+		"use_spawn_point": true,
+		"spawn_point": "SpawnPoint",
+	}
+	if GameManager and GameManager.has_method("change_scene_with_player"):
+		GameManager.call_deferred("change_scene_with_player", target_scene, player_state)
+	else:
+		get_tree().call_deferred("change_scene_to_file", target_scene)
 
 
 func _on_passthrough_toggled(enabled: bool) -> void:

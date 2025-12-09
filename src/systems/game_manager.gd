@@ -5,6 +5,9 @@ extends Node
 var current_world: Node = null
 var player_instance: Node = null
 var _is_changing_scene: bool = false
+var _fallback_environment: Environment = null
+
+const PLAYER_SCENE_PATH := "res://src/player/XRPlayer.tscn"
 
 
 func _ready() -> void:
@@ -17,6 +20,7 @@ func _setup_initial_world() -> void:
 	"""Set up tracking for the initial scene"""
 	await get_tree().process_frame
 	current_world = get_tree().current_scene
+	_cache_fallback_environment_from(current_world)
 	
 	# Find the XRPlayer root node (PlayerBody is in "player" group, but we need its parent)
 	var player_body = get_tree().get_first_node_in_group("player")
@@ -257,6 +261,7 @@ func _get_world_grabbables(world_root: Node) -> Array:
 
 func change_scene_with_player(scene_path: String, player_state: Dictionary = {}) -> void:
 	"""Change the world scene while keeping the player intact"""
+	print("GameManager: change_scene_with_player called with path=", scene_path, " player_state=", player_state)
 	# Prevent re-entrant scene changes
 	if _is_changing_scene:
 		print("GameManager: change_scene_with_player ignored - already changing scene")
@@ -269,21 +274,45 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 	if not new_world_scene:
 		print("GameManager: ERROR - Could not load scene ", scene_path)
 		return
+	if not (new_world_scene is PackedScene):
+		print("GameManager: ERROR - Loaded resource is not a PackedScene: ", new_world_scene)
+		return
+	print("GameManager: Loaded PackedScene OK: ", new_world_scene.resource_path if new_world_scene is Resource else "<no path>")
+	
+	# Ensure we have a cached environment before removing the current world
+	_cache_fallback_environment_from(current_world)
+	print("GameManager: _cache_fallback_environment_from done; fallback env exists? ", _fallback_environment != null)
 	
 	# Get or find player reference
 	if not player_instance:
 		var player_body = get_tree().get_first_node_in_group("player")
+		print("GameManager: player_instance missing; got player_body from group? ", player_body)
 		if player_body:
 			player_instance = player_body.get_parent()  # Get XRPlayer, not PlayerBody
 	
 	if not player_instance:
-		print("GameManager: ERROR - No player found!")
-		return
+		# Attempt to instantiate a fallback XRPlayer so scene changes do not crash
+		var player_res = ResourceLoader.load(PLAYER_SCENE_PATH)
+		if player_res and player_res is PackedScene:
+			player_instance = player_res.instantiate()
+			if player_instance:
+				add_child(player_instance)
+				print("GameManager: Instantiated fallback XRPlayer from ", PLAYER_SCENE_PATH)
+			else:
+				print("GameManager: Fallback XRPlayer instantiation returned null")
+		else:
+			print("GameManager: Could not load fallback XRPlayer at ", PLAYER_SCENE_PATH)
+		if not player_instance:
+			print("GameManager: ERROR - No player found and fallback XRPlayer could not be instantiated!")
+			return
+	else:
+		print("GameManager: player_instance present: ", player_instance.name)
 	
 	# Reparent player to GameManager temporarily to preserve it
 	var old_global_pos = player_instance.global_position
 	var old_global_rot = player_instance.global_rotation
 	var player_parent = player_instance.get_parent()
+	print("GameManager: player_parent before reparent: ", player_parent)
 	
 	# Find and preserve all grabbed objects by moving them to GameManager temporarily
 	var grabbed_objects = []
@@ -297,6 +326,7 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 				add_child(obj)
 				obj.global_transform = obj_transform
 				print("GameManager: Preserved grabbed object: ", obj.name)
+	print("GameManager: total grabbed_objects preserved: ", grabbed_objects.size())
 	
 	if player_parent and player_parent != self:
 		player_parent.remove_child(player_instance)
@@ -304,24 +334,45 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 		player_instance.global_position = old_global_pos
 		player_instance.global_rotation = old_global_rot
 		print("GameManager: Player temporarily moved to GameManager")
+	elif player_parent == self:
+		print("GameManager: Player already parented to GameManager")
+	else:
+		print("GameManager: No player_parent found during reparent step")
 	
 	# Remove old world
 	if current_world:
 		print("GameManager: Removing old world: ", current_world.name)
 		current_world.queue_free()
 		current_world = null
+	else:
+		print("GameManager: No current_world to remove (first load?)")
 	
 	# Instance new world
 	var raw_world: Node = new_world_scene.instantiate()
+	if not raw_world:
+		print("GameManager: ERROR - instantiate() returned null for ", scene_path)
+		_is_changing_scene = false
+		return
+	print("GameManager: instantiate() returned: ", raw_world, " class: ", raw_world.get_class())
 	current_world = _wrap_world_if_needed(raw_world)
+	print("GameManager: _wrap_world_if_needed => ", current_world, " class: ", current_world.get_class())
 	get_tree().root.add_child(current_world)
 	if current_world != raw_world:
 		current_world.add_child(raw_world)
 		print("GameManager: Wrapped world ", raw_world.name, " in a Node3D container for transforms")
+	
+	# Ensure the new world has an environment; if missing, apply the cached main-scene one
+	_ensure_world_environment(current_world)
+	var env_node_debug = _find_world_environment(current_world)
+	print("GameManager: Post-load environment node: ", env_node_debug, " (null means none)")
 	# Keep SceneTree's current_scene in sync so helpers relying on it keep working
 	if get_tree().current_scene != current_world:
 		get_tree().set_current_scene(current_world)
 	print("GameManager: New world loaded: ", current_world.name)
+	if get_tree().current_scene:
+		print("GameManager: SceneTree current_scene: ", get_tree().current_scene.name)
+	else:
+		print("GameManager: WARNING - SceneTree current_scene is null after load")
 	
 	# Wait for world to be fully ready with physics
 	await get_tree().process_frame
@@ -337,6 +388,7 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 	
 	# Remove any grabbable objects from the new scene that we already have preserved
 	# (prevents duplicates when returning to a scene that has the same grabbable)
+	print("GameManager: Checking duplicates in new scene; preserved count=", grabbed_objects.size())
 	for preserved_obj in grabbed_objects:
 		if not is_instance_valid(preserved_obj):
 			continue
@@ -367,6 +419,7 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 	await get_tree().process_frame
 	
 	# Move grabbed objects back to the new world
+	print("GameManager: Restoring grabbed_objects to new world; count=", grabbed_objects.size())
 	for obj in grabbed_objects:
 		if is_instance_valid(obj):
 			var obj_transform = obj.global_transform
@@ -537,4 +590,47 @@ func get_player() -> Node:
 	if player_body:
 		return player_body.get_parent()  # Return XRPlayer, not PlayerBody
 	
+	return null
+
+
+func _cache_fallback_environment_from(world_root: Node) -> void:
+	"""Cache the Environment resource from the current world (typically MainScene) for reuse."""
+	if _fallback_environment or not world_root:
+		return
+	var env_node := _find_world_environment(world_root)
+	if env_node and env_node.environment:
+		_fallback_environment = env_node.environment.duplicate()
+		print("GameManager: Cached fallback WorldEnvironment from ", world_root.name)
+
+
+func _ensure_world_environment(world_root: Node) -> void:
+	"""If the world has no Environment, apply the cached main-scene Environment."""
+	if not world_root:
+		print("GameManager: _ensure_world_environment called with null world_root")
+		return
+	var env_node := _find_world_environment(world_root)
+	if env_node and env_node.environment:
+		print("GameManager: _ensure_world_environment found existing environment on ", world_root.name)
+		return
+	
+	if not _fallback_environment:
+		print("GameManager: No fallback WorldEnvironment available; scene will use default environment")
+		return
+	
+	var new_env := WorldEnvironment.new()
+	new_env.name = "FallbackWorldEnvironment"
+	new_env.environment = _fallback_environment.duplicate()
+	world_root.add_child(new_env)
+	print("GameManager: Applied fallback WorldEnvironment to ", world_root.name)
+
+
+func _find_world_environment(world_root: Node) -> WorldEnvironment:
+	"""Locate a WorldEnvironment node within the given world."""
+	if not world_root:
+		return null
+	if world_root is WorldEnvironment:
+		return world_root
+	var found = world_root.find_child("WorldEnvironment", true, false)
+	if found and found is WorldEnvironment:
+		return found
 	return null

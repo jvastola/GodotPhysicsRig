@@ -80,7 +80,7 @@ size_flags_vertical = 3
 custom_minimum_size = Vector2(0, 320)
 bbcode_enabled = true
 text = "Terms of Service content will appear here."
-fit_content = true
+scroll_active = true
 autowrap_mode = 2
 
 [node name="Privacy" type="MarginContainer" parent="MarginContainer/VBoxContainer/TabContainer"]
@@ -97,7 +97,7 @@ size_flags_vertical = 3
 custom_minimum_size = Vector2(0, 320)
 bbcode_enabled = true
 text = "Privacy Policy content will appear here."
-fit_content = true
+scroll_active = true
 autowrap_mode = 2
 
 [node name="AcceptRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
