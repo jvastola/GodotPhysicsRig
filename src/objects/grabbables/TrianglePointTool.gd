@@ -444,7 +444,6 @@ func _add_point(pos: Vector3) -> void:
 	
 	var holder = Node3D.new()
 	holder.name = "TrianglePoint%d" % _points.size()
-	holder.global_position = pos
 	
 	var mesh_instance = MeshInstance3D.new()
 	mesh_instance.mesh = _make_sphere_mesh(0.018)
@@ -452,6 +451,7 @@ func _add_point(pos: Vector3) -> void:
 	holder.add_child(mesh_instance)
 	
 	_point_container.add_child(holder)
+	holder.global_position = pos
 	_points.append(holder)
 	_vertex_meshes.append(mesh_instance)
 	_emit_stroke(pos)

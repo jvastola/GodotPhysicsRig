@@ -1,0 +1,67 @@
+[gd_scene load_steps=7 format=3 uid="uid://wly7in1mfwww"]
+
+[ext_resource type="Script" path="res://src/objects/grabbables/PolyTool.gd" id="1_tool_script"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
+radius = 0.02
+height = 0.2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_body"]
+albedo_color = Color(0.25, 0.25, 0.3, 1)
+metallic = 0.5
+roughness = 0.3
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_body"]
+material = SubResource("StandardMaterial3D_body")
+radius = 0.02
+height = 0.2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tip"]
+albedo_color = Color(0.8, 0.8, 0.8, 1)
+emission_enabled = true
+emission = Color(0.8, 0.8, 0.8, 1)
+emission_energy_multiplier = 0.5
+
+[sub_resource type="SphereMesh" id="SphereMesh_tip"]
+material = SubResource("StandardMaterial3D_tip")
+radius = 0.02
+height = 0.04
+radial_segments = 12
+rings = 6
+
+[node name="PolyTool" type="RigidBody3D"]
+mass = 0.25
+gravity_scale = 0.5
+contact_monitor = true
+max_contacts_reported = 4
+script = ExtResource("1_tool_script")
+snap_radius = 0.04
+selection_radius = 0.05
+trigger_threshold = 0.5
+tip_forward_offset = 0.05
+max_points = 128
+color_place = Color(0.2, 1, 0.4, 1)
+color_edit = Color(1, 0.9, 0.2, 1)
+color_remove = Color(1, 0.2, 0.2, 1)
+color_connect = Color(0.2, 0.6, 1, 1)
+color_mesh = Color(0.8, 0.8, 0.8, 0.5)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape3D_body")
+
+[node name="BodyMesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("CapsuleMesh_body")
+
+[node name="Tip" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.107, 0)
+
+[node name="TipMesh" type="MeshInstance3D" parent="Tip"]
+mesh = SubResource("SphereMesh_tip")
+
+[node name="Label3D" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.22, 0)
+text = "Poly Tool
+Grip: Cycle Mode
+Trigger: Action"
+font_size = 16
+outline_size = 6
