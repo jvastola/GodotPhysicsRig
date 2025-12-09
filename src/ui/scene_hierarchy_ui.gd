@@ -159,7 +159,7 @@ func _on_actions_button_pressed() -> void:
 		_show_context_menu(get_global_mouse_position())
 
 
-func _show_context_menu(global_position: Vector2) -> void:
+func _show_context_menu(pos: Vector2) -> void:
 	if not _context_menu:
 		return
 	_context_menu.hide()
@@ -450,10 +450,10 @@ func _generate_unique_name(parent: Node, base_name: String) -> String:
 	return new_name
 
 
-func _set_owner_recursive(node: Node, owner: Node) -> void:
+func _set_owner_recursive(node: Node, new_owner: Node) -> void:
 	for child in node.get_children():
-		child.owner = owner
-		_set_owner_recursive(child, owner)
+		child.owner = new_owner
+		_set_owner_recursive(child, new_owner)
 
 
 # ============================================================================
@@ -546,11 +546,11 @@ func _apply_search_filter() -> void:
 		_filter_items_recursive(tree.get_root())
 
 
-func _set_all_items_visible(item: TreeItem, visible: bool) -> void:
-	item.visible = visible
+func _set_all_items_visible(item: TreeItem, is_visible: bool) -> void:
+	item.visible = is_visible
 	var child = item.get_first_child()
 	while child:
-		_set_all_items_visible(child, visible)
+		_set_all_items_visible(child, is_visible)
 		child = child.get_next()
 
 

@@ -19,7 +19,6 @@ extends Grabbable
 # State
 var _hull_points: PackedVector3Array = PackedVector3Array()  # Current hull vertices (minimal set)
 var _is_recording: bool = false
-var _preview_mesh: MeshInstance3D = null
 var _hull_mesh_instance: MeshInstance3D = null
 var _preview_material: StandardMaterial3D = null
 var _hull_material: StandardMaterial3D = null
@@ -33,10 +32,11 @@ var _preview_spheres: Array[MeshInstance3D] = []
 var _preview_container: Node3D = null
 
 # Performance optimization
-var _last_mesh_update_points: int = 0  # Track points when mesh was last updated
-var _mesh_update_interval: int = 3  # Only rebuild mesh every N new points
-var _cached_centroid: Vector3 = Vector3.ZERO  # Cache centroid calculation
-var _cached_hull_shape: ConvexPolygonShape3D = null  # Reuse for internal point checks
+# Performance optimization
+# var _last_mesh_update_points: int = 0  # Track points when mesh was last updated
+# var _mesh_update_interval: int = 3  # Only rebuild mesh every N new points
+# var _cached_centroid: Vector3 = Vector3.ZERO  # Cache centroid calculation
+# var _cached_hull_shape: ConvexPolygonShape3D = null  # Reuse for internal point checks
 
 
 func _ready() -> void:
@@ -409,7 +409,7 @@ func _compute_convex_hull_faces(points: PackedVector3Array, centroid: Vector3) -
 		
 		# Find faces visible from this point
 		var visible_faces: Array = []
-		var boundary_edges: Array = []
+		# var boundary_edges: Array = []
 		
 		for face_idx in range(faces.size() - 1, -1, -1):
 			var face = faces[face_idx]

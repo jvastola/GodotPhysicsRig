@@ -55,7 +55,7 @@ var _parent_viewport: SubViewport = null
 
 # Editable script code
 var _code_edit: CodeEdit = null
-var _is_edit_mode: bool = true  # Default to edit mode for VR
+# var _is_edit_mode: bool = true  # Default to edit mode for VR
 
 
 func _ready() -> void:

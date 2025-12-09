@@ -304,8 +304,8 @@ func _update_indicator_position() -> void:
 			adjusted_point += _hit_normal.normalized() * surface_offset
 	
 	# Snap to grid
-	var snapped = _snap_to_grid(adjusted_point)
-	indicator_mesh.global_position = snapped
+	var snapped_pos = _snap_to_grid(adjusted_point)
+	indicator_mesh.global_position = snapped_pos
 	indicator_mesh.global_rotation = Vector3.ZERO
 	
 	# Update color
@@ -332,7 +332,7 @@ func _place_voxel() -> void:
 			print("VoxelTool: ERROR - Could not find VoxelChunkManager!")
 			return
 	
-	print("VoxelTool: indicator_mesh valid: ", is_instance_valid(indicator_mesh), " visible: ", indicator_mesh.visible if is_instance_valid(indicator_mesh) else "N/A")
+	print("VoxelTool: indicator_mesh valid: ", is_instance_valid(indicator_mesh), " visible: ", str(indicator_mesh.visible if is_instance_valid(indicator_mesh) else "N/A"))
 	if not indicator_mesh or not indicator_mesh.visible:
 		print("VoxelTool: indicator_mesh not valid or not visible, skipping placement")
 		return
@@ -380,13 +380,13 @@ func _apply_voxel_size() -> void:
 		_voxel_manager.set_voxel_size(voxel_size)
 
 
-func _set_visuals_visible(visible: bool) -> void:
+func _set_visuals_visible(is_visible: bool) -> void:
 	if ray_visual:
-		ray_visual.visible = visible
+		ray_visual.visible = is_visible
 	if indicator_mesh:
-		indicator_mesh.visible = visible
+		indicator_mesh.visible = is_visible
 	if hit_marker:
-		hit_marker.visible = visible
+		hit_marker.visible = is_visible
 
 
 # === Public API ===

@@ -21,7 +21,7 @@ signal auto_connect_requested()
 
 # State
 var local_username: String = "User-" + str(randi() % 10000)
-var is_connected: bool = false
+var connected_state: bool = false
 
 
 func _ready():
@@ -150,7 +150,7 @@ func set_status(text: String):
 
 
 func set_connected(connected: bool, room_name: String = ""):
-	is_connected = connected
+	connected_state = connected
 	connect_button.disabled = connected
 	disconnect_button.disabled = not connected
 	

@@ -1291,7 +1291,7 @@ func _try_start_grab() -> void:
 func _end_grab() -> void:
 	"""End the current grab."""
 	if _grab_target:
-		print("HandPointer: Ended grab on ", _grab_target.name if is_instance_valid(_grab_target) else "invalid")
+		print("HandPointer: Ended grab on ", String(_grab_target.name) if is_instance_valid(_grab_target) else "invalid")
 	_grab_target = null
 	_grab_distance = 0.0
 	_grab_distance = 0.0

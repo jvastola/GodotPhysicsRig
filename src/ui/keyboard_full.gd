@@ -445,17 +445,17 @@ func _on_key_pressed(key: String) -> void:
 		
 		# Regular keys
 		_:
-			var char = _get_character(key)
-			_add_to_pending(char)
+			var character = _get_character(key)
+			_add_to_pending(character)
 
 
-func _add_to_pending(char: String) -> void:
-	_pending_text += char
+func _add_to_pending(character: String) -> void:
+	_pending_text += character
 	_update_preview()
-	text_input.emit(char)
+	text_input.emit(character)
 	
 	key_pressed.emit({
-		"key": char,
+		"key": character,
 		"shift": is_shift_left or is_shift_right,
 		"ctrl": is_ctrl,
 		"alt": is_alt,
@@ -506,15 +506,15 @@ func _select_all() -> void:
 
 
 func _get_character(key: String) -> String:
-	var is_shifted = is_shift_left or is_shift_right
+	var shift_active = is_shift_left or is_shift_right
 	
 	# Check for shift mappings (symbols)
-	if is_shifted and SHIFT_MAP.has(key):
+	if shift_active and SHIFT_MAP.has(key):
 		return SHIFT_MAP[key]
 	
 	# Letters
 	if key.length() == 1 and key >= "A" and key <= "Z":
-		if is_shifted or is_caps_lock:
+		if shift_active or is_caps_lock:
 			return key.to_upper()
 		else:
 			return key.to_lower()
@@ -541,10 +541,10 @@ func _update_key_labels() -> void:
 			btn.text = letter.to_lower()
 	
 	# Update symbol keys (only when shifted, not caps lock)
-	var is_shifted = is_shift_left or is_shift_right
+	var shift_active = is_shift_left or is_shift_right
 	for symbol in _symbol_buttons:
 		var btn: Button = _symbol_buttons[symbol]
-		if is_shifted and SHIFT_MAP.has(symbol):
+		if shift_active and SHIFT_MAP.has(symbol):
 			btn.text = SHIFT_MAP[symbol]
 		else:
 			btn.text = symbol

@@ -13,7 +13,7 @@ signal file_double_clicked(path: String)
 @onready var load_button: Button = $MarginContainer/VBoxContainer/ButtonRow/LoadButton
 @onready var spawn_button: Button = $MarginContainer/VBoxContainer/ButtonRow/SpawnButton
 
-var _root_path: String = "res://"
+# var _root_path: String = "res://"
 var _tree_root: TreeItem = null
 var _context_menu: PopupMenu = null
 var _context_target_path: String = ""
@@ -142,8 +142,8 @@ func _scan_directory(path: String, parent_item: TreeItem) -> void:
 		
 		# Skip hidden folders
 		var skip = false
-		for hidden in HIDDEN_FOLDERS:
-			if full_path.contains(hidden):
+		for hidden_folder in HIDDEN_FOLDERS:
+			if full_path.contains(hidden_folder):
 				skip = true
 				break
 		

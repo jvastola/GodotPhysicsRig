@@ -145,7 +145,7 @@ func disconnect_from_room() -> void:
 ## Send data to all participants
 ## @param data: The string data to send
 ## @param reliable: Whether to send reliably (default true)
-func send_data(data: String, reliable: bool = true) -> void:
+func send_data(data: String, _reliable: bool = true) -> void:
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
 			# Android plugin expects (ByteArray, topic: String)
@@ -160,7 +160,7 @@ func send_data(data: String, reliable: bool = true) -> void:
 ## @param data: The string data to send
 ## @param identity: Target participant identity
 ## @param reliable: Whether to send reliably
-func send_data_to(data: String, identity: String, reliable: bool = true) -> void:
+func send_data_to(data: String, identity: String, _reliable: bool = true) -> void:
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
 			# Android plugin expects (ByteArray, identity: String, topic: String)
@@ -325,9 +325,9 @@ func _on_connection_error(message: String) -> void:
 	connection_error.emit(message)
 
 
-func _on_participant_joined(identity: String, name: String) -> void:
-	print("[LiveKitWrapper] Participant joined: %s (%s)" % [identity, name])
-	participant_joined.emit(identity, name)
+func _on_participant_joined(identity: String, participant_name: String) -> void:
+	print("[LiveKitWrapper] Participant joined: %s (%s)" % [identity, participant_name])
+	participant_joined.emit(identity, participant_name)
 
 
 func _on_participant_joined_android(identity: String) -> void:
