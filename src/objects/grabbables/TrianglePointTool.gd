@@ -6,7 +6,9 @@ class_name TrianglePointTool
 @export var selection_radius: float = 0.05
 @export var edge_dot_spacing: float = 0.08
 @export var clear_action: String = "secondary_click"
+
 @export var trigger_threshold: float = 0.5
+@export var long_press_duration: float = 0.5
 
 # Visuals
 @export var preview_color: Color = Color(0.3, 1.0, 0.4, 0.6)
@@ -47,11 +49,13 @@ var _orb_material: StandardMaterial3D
 
 var _controller: Node = null
 var _prev_trigger_pressed: bool = false
+var _trigger_start_time: int = 0
+var _long_press_triggered: bool = false
 var _prev_toggle_pressed: bool = false
 var _drag_index: int = -1
 var _is_edit_mode: bool = false
 
-const MAX_POINTS := 3
+const MAX_POINTS := 32
 
 
 func _ready() -> void:
@@ -311,19 +315,43 @@ func _handle_trigger(snapped_point: Vector3, hover: Dictionary) -> void:
 	var trigger_just_pressed = trigger_pressed and not _prev_trigger_pressed
 	var trigger_just_released = not trigger_pressed and _prev_trigger_pressed
 	
+	var current_time = Time.get_ticks_msec()
+	
 	if trigger_just_pressed:
+		_trigger_start_time = current_time
+		_long_press_triggered = false
+		
+		# Check for drag start immediately (Edit Mode)
 		if _is_edit_mode:
 			if hover["index"] != -1 and hover["distance"] <= selection_radius:
 				_drag_index = hover["index"]
-		else:
-			if _points.size() < MAX_POINTS:
-				_add_point(snapped_point)
-				_update_triangle_visuals()
 	
-	if _drag_index != -1 and trigger_pressed:
-		_move_point(_drag_index, snapped_point)
-		_update_triangle_visuals()
-	elif _drag_index != -1 and trigger_just_released:
+	if trigger_pressed:
+		# Check for Long Press
+		if not _long_press_triggered and _drag_index == -1:
+			var elapsed = (current_time - _trigger_start_time) / 1000.0
+			if elapsed > long_press_duration:
+				# Switch Mode
+				_is_edit_mode = not _is_edit_mode
+				_apply_mode_visuals()
+				_long_press_triggered = true
+		
+		# Handle Dragging
+		if _drag_index != -1:
+			_move_point(_drag_index, snapped_point)
+			_update_triangle_visuals()
+	
+	if trigger_just_released:
+		if not _long_press_triggered:
+			# Short Press Action
+			# Only if NOT dragging (if we were dragging, releasing just ends drag)
+			if _drag_index == -1:
+				if not _is_edit_mode:
+					if _points.size() < MAX_POINTS:
+						_add_point(snapped_point)
+						_update_triangle_visuals()
+		
+		# Always end drag on release
 		_drag_index = -1
 	
 	_prev_trigger_pressed = trigger_pressed
@@ -567,10 +595,23 @@ func _order_clockwise(points: Array[Vector3]) -> Array[Vector3]:
 func _compute_normal(points: Array[Vector3]) -> Vector3:
 	if points.size() < 3:
 		return Vector3.ZERO
+	
+	# Try to find a valid normal using the first valid non-collinear triplet
 	var a = points[0]
-	var b = points[1]
-	var c = points[2]
-	return (b - a).cross(c - a)
+	var best_normal = Vector3.ZERO
+	var max_len_sq = 0.0
+	
+	# Check multiple triplets to find the best normal (avoids issues if first 3 are collinear)
+	for i in range(1, points.size() - 1):
+		var b = points[i]
+		var c = points[i+1]
+		var normal = (b - a).cross(c - a)
+		var len_sq = normal.length_squared()
+		if len_sq > max_len_sq:
+			max_len_sq = len_sq
+			best_normal = normal
+			
+	return best_normal
 
 
 func _build_triangle_mesh(points: Array[Vector3], normal: Vector3) -> void:
@@ -582,9 +623,16 @@ func _build_triangle_mesh(points: Array[Vector3], normal: Vector3) -> void:
 	st.set_color(triangle_color)
 	st.set_normal(normal.normalized())
 	
-	for p in points:
-		st.add_vertex(p)
-	st.index()
+	# Triangulate using a fan from the first point
+	# Since points are ordered clockwise/counter-clockwise, this fills a convex polygon
+	for i in range(1, points.size() - 1):
+		st.add_vertex(points[0])
+		st.add_vertex(points[i])
+		st.add_vertex(points[i+1])
+		
+	# st.index() isn't necessary for immediate rendering unless we want optimization, 
+	# and with fan generation we are submitting explicit triangles.
+	st.generate_normals() # Optional: regenerate normals if needed, but we set custom normal above
 	st.commit(_triangle_mesh)
 
 
