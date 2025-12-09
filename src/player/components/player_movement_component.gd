@@ -679,7 +679,7 @@ func _ensure_visuals() -> void:
 		var im := ImmediateMesh.new()
 		_one_hand_line_mat = StandardMaterial3D.new()
 		_one_hand_line_mat.albedo_color = Color(0.3, 0.9, 1.0, 0.9)
-		_one_hand_line_mat.unshaded = true
+		_one_hand_line_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		_one_hand_line_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		_one_hand_line_mesh = MeshInstance3D.new()
 		_one_hand_line_mesh.mesh = im
@@ -691,7 +691,7 @@ func _ensure_visuals() -> void:
 			var line_mesh := ImmediateMesh.new()
 			var mat2 := StandardMaterial3D.new()
 			mat2.albedo_color = Color(1.0, 0.6, 0.2, 0.85)
-			mat2.unshaded = true
+			mat2.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 			mat2.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			_two_hand_line_mesh = MeshInstance3D.new()
 			_two_hand_line_mesh.mesh = line_mesh
@@ -703,7 +703,7 @@ func _ensure_visuals() -> void:
 			m.size = Vector3(0.06, 0.06, 0.06)
 			var mat3 := StandardMaterial3D.new()
 			mat3.albedo_color = Color(1.0, 0.85, 0.2, 0.9)
-			mat3.unshaded = true
+			mat3.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 			mat3.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			_two_hand_midpoint_mesh = MeshInstance3D.new()
 			_two_hand_midpoint_mesh.mesh = m

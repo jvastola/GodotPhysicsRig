@@ -137,7 +137,7 @@ func _send_mouse_button(pos: Vector2, pressed: bool, just_changed: bool, button_
 	var button_event := InputEventMouseButton.new()
 	button_event.position = pos
 	button_event.global_position = pos
-	button_event.button_index = button_index
+	button_event.button_index = button_index as MouseButton
 	button_event.pressed = pressed
 	button_event.double_click = false
 	
@@ -155,7 +155,7 @@ func _send_scroll(pos: Vector2, amount: float) -> void:
 	var scroll_event := InputEventMouseButton.new()
 	scroll_event.position = pos
 	scroll_event.global_position = pos
-	scroll_event.button_index = MOUSE_BUTTON_WHEEL_UP if amount > 0.0 else MOUSE_BUTTON_WHEEL_DOWN
+	scroll_event.button_index = (MOUSE_BUTTON_WHEEL_UP if amount > 0.0 else MOUSE_BUTTON_WHEEL_DOWN) as MouseButton
 	scroll_event.pressed = true
 	scroll_event.factor = abs(amount)
 	viewport.push_input(scroll_event)
@@ -176,7 +176,7 @@ func _handle_potential_double_click(pos: Vector2) -> void:
 		var dc_event := InputEventMouseButton.new()
 		dc_event.position = pos
 		dc_event.global_position = pos
-		dc_event.button_index = MOUSE_BUTTON_LEFT
+		dc_event.button_index = MOUSE_BUTTON_LEFT as MouseButton
 		dc_event.pressed = true
 		dc_event.double_click = true
 		viewport.push_input(dc_event)

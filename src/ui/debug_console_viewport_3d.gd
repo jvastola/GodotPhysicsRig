@@ -79,7 +79,7 @@ func handle_pointer_event(event: Dictionary) -> void:
 				viewport_pos,
 				true,
 				event.get("secondary_just_pressed", event.get("action_just_pressed", true)),
-				MOUSE_BUTTON_RIGHT
+				MOUSE_BUTTON_RIGHT as MouseButton
 			)
 		"secondary_release":
 			_send_mouse_motion(viewport_pos)
@@ -87,7 +87,7 @@ func handle_pointer_event(event: Dictionary) -> void:
 				viewport_pos,
 				false,
 				event.get("secondary_just_released", event.get("action_just_released", true)),
-				MOUSE_BUTTON_RIGHT
+				MOUSE_BUTTON_RIGHT as MouseButton
 			)
 		"scroll":
 			_send_mouse_motion(viewport_pos)
@@ -149,7 +149,7 @@ func _send_scroll(pos: Vector2, amount: float) -> void:
 	var scroll_event := InputEventMouseButton.new()
 	scroll_event.position = pos
 	scroll_event.global_position = pos
-	scroll_event.button_index = MOUSE_BUTTON_WHEEL_UP if amount > 0.0 else MOUSE_BUTTON_WHEEL_DOWN
+	scroll_event.button_index = (MOUSE_BUTTON_WHEEL_UP if amount > 0.0 else MOUSE_BUTTON_WHEEL_DOWN) as MouseButton
 	scroll_event.pressed = true
 	scroll_event.factor = abs(amount)
 	viewport.push_input(scroll_event)

@@ -393,9 +393,9 @@ func _remove_desktop_extra_collider() -> void:
 		existing.queue_free()
 
 
-func set_player_scale(scale: float) -> void:
+func set_player_scale(new_scale: float) -> void:
 	"""Apply a uniform scale to the whole player rig (body, physics hands, head)."""
-	_manual_player_scale = max(scale, 0.01)
+	_manual_player_scale = max(new_scale, 0.01)
 	if movement_component and movement_component.has_method("set_manual_player_scale"):
 		# Keep the movement component's cached value in sync for persistence/UI
 		movement_component.set_manual_player_scale(_manual_player_scale)

@@ -419,27 +419,27 @@ func _apply_spawn_transform(node: Node) -> void:
 
 
 func _make_unique_name(parent: Node, base_name: String) -> String:
-	var name := base_name
+	var unique_name := base_name
 	var counter := 2
-	while _has_child_with_name(parent, name):
-		name = "%s%d" % [base_name, counter]
+	while _has_child_with_name(parent, unique_name):
+		unique_name = "%s%d" % [base_name, counter]
 		counter += 1
-	return name
+	return unique_name
 
 
-func _has_child_with_name(parent: Node, name: String) -> bool:
+func _has_child_with_name(parent: Node, target_name: String) -> bool:
 	for child in parent.get_children():
-		if child.name == name:
+		if child.name == target_name:
 			return true
 	return false
 
 
-func _set_owner_recursive(node: Node, owner: Node) -> void:
-	if not node or not owner:
+func _set_owner_recursive(node: Node, new_owner: Node) -> void:
+	if not node or not new_owner:
 		return
-	node.owner = owner
+	node.owner = new_owner
 	for child in node.get_children():
-		_set_owner_recursive(child, owner)
+		_set_owner_recursive(child, new_owner)
 
 
 func _refresh_scene_hierarchy() -> void:

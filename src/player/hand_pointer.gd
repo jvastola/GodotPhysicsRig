@@ -224,10 +224,10 @@ func _build_selector_shape(radius: float) -> Shape3D:
 	return cylinder
 
 
-func _update_selector_shape(scale: float) -> void:
+func _update_selector_shape(new_scale: float) -> void:
 	if not _hit_selector_shape or not _hit_selector_shape.shape:
 		return
-	var radius: float = max(scale, 0.0005)
+	var radius: float = max(new_scale, 0.0005)
 	if _hit_selector_shape.shape is SphereShape3D:
 		var sphere := _hit_selector_shape.shape as SphereShape3D
 		sphere.radius = radius
@@ -592,8 +592,8 @@ func _update_selection_handles(aabb: AABB) -> void:
 		)
 		var pos: Vector3 = center + face_offset + axis_dir * selection_handle_offset
 		var up: Vector3 = Vector3.FORWARD if abs(axis_dir.dot(Vector3.UP)) > 0.95 else Vector3.UP
-		var basis := Basis().looking_at(-axis_dir, up)
-		handle.global_transform = Transform3D(basis, pos)
+		var new_basis := Basis.looking_at(-axis_dir, up)
+		handle.global_transform = Transform3D(new_basis, pos)
 		handle.visible = true
 		handle.monitoring = true
 
@@ -607,7 +607,7 @@ func _hide_selection_handles() -> void:
 			handle.monitoring = false
 
 
-func _update_selection_handle_movement(delta: float, action_state: Dictionary) -> void:
+func _update_selection_handle_movement(_delta: float, action_state: Dictionary) -> void:
 	if _selection_handle_active_axis == Vector3.ZERO:
 		return
 	if not action_state.get("pressed", false):

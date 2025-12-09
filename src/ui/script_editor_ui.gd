@@ -115,8 +115,8 @@ func _setup_gdscript_highlighter(hl: CodeHighlighter) -> void:
 	# Annotation-like keywords are already colored via the keyword list above.
 	
 	# Comments
-	hl.add_color_region("#", "\n", comment_color, true)
-	hl.add_color_region("##", "\n", Color(0.55, 0.55, 0.6), true)
+	hl.add_color_region("#", "", comment_color, true)
+	hl.add_color_region("##", "", Color(0.55, 0.55, 0.6), true)
 	
 	# Strings
 	hl.add_color_region("\"", "\"", string_color, false)

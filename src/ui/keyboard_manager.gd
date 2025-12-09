@@ -536,7 +536,7 @@ func _summon_keyboard_to_player() -> void:
 	if dir.length_squared() > 0.0001:
 		dir = dir.normalized()
 		# Keyboard mesh faces +Z, so orient +Z toward camera (invert dir)
-		var look_basis := Basis().looking_at(-dir, Vector3.UP)
+		var look_basis := Basis.looking_at(-dir, Vector3.UP)
 		# Preserve existing scale so we don't blow up the keyboard size
 		look_basis = look_basis.scaled(original_scale)
 		xf.basis = look_basis

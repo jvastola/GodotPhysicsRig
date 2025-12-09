@@ -36,4 +36,3 @@ func _switch_to_scene(scene: PackedScene, connect_intro: bool = false) -> void:
 func _on_legal_accepted() -> void:
 	SaveManager.set_legal_acceptance(CURRENT_TOS_VERSION)
 	_switch_to_scene(MAIN_SCENE)
-

@@ -1,4 +1,3 @@
-class_name InputBindingManager
 extends Node
 ## Runtime input binding helper that supports multi-press combos and sequences.
 
@@ -9,13 +8,13 @@ const MODE_SEQUENCE := "sequence"
 const CHORD_WINDOW_MS := 350
 const SEQUENCE_WINDOW_MS := 900
 
-static var _instance: InputBindingManager
+static var _instance: Node
 
-static func get_singleton() -> InputBindingManager:
+static func get_singleton() -> Node:
 	if _instance:
 		return _instance
 	var root: Node = Engine.get_main_loop().root
-	_instance = InputBindingManager.new()
+	_instance = (load("res://src/systems/input_binding_manager.gd") as Script).new()
 	if root:
 		# Defer to avoid "parent busy setting up children" during scene _ready calls
 		root.call_deferred("add_child", _instance)

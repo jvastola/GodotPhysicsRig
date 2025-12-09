@@ -8,6 +8,14 @@ var participants_list: ParticipantsList
 
 # LiveKit manager reference
 var livekit_manager: Node
+# Current room (used for status/labels)
+var _current_room_name: String = ""
+var current_room_name: String:
+	get:
+		return _current_room_name
+	set(value):
+		_current_room_name = value
+		_update_room_name_label()
 
 # Status label
 @onready var status_label: Label = $CenterContainer/MainCard/Margin/VBox/Header/StatusLabel
@@ -72,6 +80,9 @@ func _setup_components():
 	participants_list = ParticipantsListScene.instantiate()
 	participants_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right_column.add_child(participants_list)
+	
+	# Reflect any pre-set room name
+	_update_room_name_label()
 
 
 func _connect_livekit_signals():
@@ -178,6 +189,8 @@ func _on_room_connected():
 	var room_name = ""
 	if livekit_manager.has_method("get_current_room"):
 		room_name = livekit_manager.get_current_room()
+	# Keep local state in sync for external UI updates
+	current_room_name = room_name
 	
 	_set_status("✅ Connected" + (" to: " + room_name if not room_name.is_empty() else ""))
 	connection_panel.set_connected(true, room_name)
@@ -195,6 +208,7 @@ func _on_room_connected():
 
 func _on_room_disconnected():
 	print("📴 Disconnected from room")
+	current_room_name = ""
 	_set_status("Disconnected")
 	connection_panel.set_connected(false)
 	participants_list.clear()
@@ -231,3 +245,12 @@ func _on_error(msg: String):
 func _set_status(text: String):
 	if status_label:
 		status_label.text = text
+
+
+func _update_room_name_label():
+	# Update the room label shown in the connection panel
+	if connection_panel and connection_panel.room_info_label:
+		if _current_room_name.is_empty():
+			connection_panel.room_info_label.text = "Room: Not connected"
+		else:
+			connection_panel.room_info_label.text = "🎙️ Room: " + _current_room_name

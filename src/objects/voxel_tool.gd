@@ -332,7 +332,7 @@ func _place_voxel() -> void:
 			print("VoxelTool: ERROR - Could not find VoxelChunkManager!")
 			return
 	
-	print("VoxelTool: indicator_mesh valid: ", is_instance_valid(indicator_mesh), " visible: ", str(indicator_mesh.visible if is_instance_valid(indicator_mesh) else "N/A"))
+	print("VoxelTool: indicator_mesh valid: ", is_instance_valid(indicator_mesh), " visible: ", str(indicator_mesh.visible) if is_instance_valid(indicator_mesh) else "N/A")
 	if not indicator_mesh or not indicator_mesh.visible:
 		print("VoxelTool: indicator_mesh not valid or not visible, skipping placement")
 		return
@@ -380,13 +380,13 @@ func _apply_voxel_size() -> void:
 		_voxel_manager.set_voxel_size(voxel_size)
 
 
-func _set_visuals_visible(is_visible: bool) -> void:
+func _set_visuals_visible(visible_state: bool) -> void:
 	if ray_visual:
-		ray_visual.visible = is_visible
+		ray_visual.visible = visible_state
 	if indicator_mesh:
-		indicator_mesh.visible = is_visible
+		indicator_mesh.visible = visible_state
 	if hit_marker:
-		hit_marker.visible = is_visible
+		hit_marker.visible = visible_state
 
 
 # === Public API ===

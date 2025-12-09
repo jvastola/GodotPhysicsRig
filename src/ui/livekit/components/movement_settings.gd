@@ -321,7 +321,7 @@ func _build_ui():
 		0.6,
 		0.02,
 		initial_loco_deadzone,
-		func(value): return " %.2f"
+		func(value): return " %.2f" % value
 	)
 	locomotion_deadzone_label = loco_deadzone_block.label
 	locomotion_deadzone_slider = loco_deadzone_block.slider
@@ -432,7 +432,7 @@ func _build_ui():
 		0.9,
 		0.02,
 		initial_deadzone,
-		func(value): return " %.2f"
+		func(value): return " %.2f" % value
 	)
 	deadzone_label = deadzone_block.label
 	deadzone_slider = deadzone_block.slider
@@ -852,7 +852,7 @@ func _build_ui():
 		30.0,
 		0.5,
 		initial_jump_impulse,
-		func(value): return " %.1f"
+		func(value): return " %.1f" % value
 	)
 	jump_impulse_label = jump_impulse_block.label
 	jump_impulse_slider = jump_impulse_block.slider
@@ -1226,7 +1226,7 @@ func _on_mode_changed(action: String):
 	var manager := InputBindingManager.get_singleton()
 	if not manager:
 		return
-	var binding := manager.get_binding(action)
+	var binding: Dictionary = manager.get_binding(action)
 	var events: Array = binding.get("events", [])
 	if events.is_empty():
 		return
@@ -1660,8 +1660,8 @@ func _refresh_profiles():
 func _on_save_profile_pressed():
 	if not profile_name_field:
 		return
-	var name := profile_name_field.text.strip_edges()
-	if name == "":
+	var profile_name := profile_name_field.text.strip_edges()
+	if profile_name == "":
 		if profile_status_label:
 			profile_status_label.text = "Enter a profile name to save"
 		return
@@ -1672,7 +1672,7 @@ func _on_save_profile_pressed():
 		if profile_status_label:
 			profile_status_label.text = "Save failed: %s" % err
 		return
-	cf.set_value("profiles", name, data)
+	cf.set_value("profiles", profile_name, data)
 	err = cf.save(_profile_path())
 	if err != OK:
 		if profile_status_label:
@@ -1680,7 +1680,7 @@ func _on_save_profile_pressed():
 		return
 	_refresh_profiles()
 	if profile_status_label:
-		profile_status_label.text = "Saved profile \"%s\"" % name
+		profile_status_label.text = "Saved profile \"%s\"" % profile_name
 
 
 func _on_load_profile_pressed():
@@ -1688,21 +1688,21 @@ func _on_load_profile_pressed():
 		if profile_status_label:
 			profile_status_label.text = "No profiles to load"
 		return
-	var name := profile_selector.get_item_text(profile_selector.selected)
+	var profile_name := profile_selector.get_item_text(profile_selector.selected)
 	var cf := ConfigFile.new()
 	var err = cf.load(_profile_path())
 	if err != OK:
 		if profile_status_label:
 			profile_status_label.text = "Load failed: %s" % err
 		return
-	var data: Dictionary = cf.get_value("profiles", name, {})
+	var data: Dictionary = cf.get_value("profiles", profile_name, {})
 	if typeof(data) != TYPE_DICTIONARY:
 		if profile_status_label:
-			profile_status_label.text = "Profile \"%s\" missing data" % name
+			profile_status_label.text = "Profile \"%s\" missing data" % profile_name
 		return
 	_apply_defaults(data)
 	if profile_status_label:
-		profile_status_label.text = "Loaded profile \"%s\"" % name
+		profile_status_label.text = "Loaded profile \"%s\"" % profile_name
 	settings_changed.emit()
 
 
@@ -1823,7 +1823,7 @@ func _refresh_input_row(action: String):
 	if not row:
 		return
 	var manager := InputBindingManager.get_singleton()
-	var binding := manager.get_binding(action) if manager else {}
+	var binding: Dictionary = manager.get_binding(action) if manager else {}
 	if binding.is_empty():
 		var existing := InputMap.action_get_events(action) if InputMap.has_action(action) else []
 		if manager:

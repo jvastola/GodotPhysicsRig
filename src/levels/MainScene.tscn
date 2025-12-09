@@ -1,4 +1,4 @@
-[gd_scene load_steps=28 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=29 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -24,6 +24,7 @@
 [ext_resource type="PackedScene" path="res://src/ui/git/GitViewport3D.tscn" id="25_git_viewport"]
 [ext_resource type="PackedScene" path="res://src/ui/MovementSettingsViewport2.tscn" id="26_movement_settings_v2"]
 [ext_resource type="PackedScene" path="res://src/ui/legal/LegalViewport3D.tscn" id="27_legal_viewport"]
+[ext_resource type="PackedScene" path="res://src/objects/grabbables/TrianglePointTool.tscn" id="28_triangle_tool"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -179,3 +180,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5714846, 1.5, -3)
 hull_color = Color(0.34145394, 0.09690256, 0.22746554, 1)
 invert_faces = true
 show_hull_points = false
+
+[node name="TrianglePointTool" parent="." unique_id=1808455527 instance=ExtResource("28_triangle_tool")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 1.5, -3)

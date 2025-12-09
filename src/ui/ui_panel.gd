@@ -446,7 +446,7 @@ func _set_environment_blend_mode(mode: int) -> void:
 	if _xr_interface.has_method("set_environment_blend_mode"):
 		_xr_interface.set_environment_blend_mode(mode)
 	else:
-		_xr_interface.environment_blend_mode = mode
+		_xr_interface.environment_blend_mode = mode as XRInterface.EnvironmentBlendMode
 
 
 func _apply_passthrough_enabled(enabled: bool) -> void:
@@ -553,7 +553,7 @@ func _move_ui_node_in_front(node_name: String, distance: float = 1.6, height_off
 	dir_to_camera.y = 0
 	if dir_to_camera.length_squared() > 0.0001:
 		dir_to_camera = dir_to_camera.normalized()
-		var facing_basis := Basis().looking_at(-dir_to_camera, Vector3.UP)
+		var facing_basis := Basis.looking_at(-dir_to_camera, Vector3.UP)
 		xf.basis = facing_basis.scaled(current_scale)
 	else:
 		# Keep upright even if camera is on top of the target origin

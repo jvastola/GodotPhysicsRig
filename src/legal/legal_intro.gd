@@ -70,9 +70,8 @@ func _position_panel_in_front() -> void:
 	if forward.length_squared() < 0.0001:
 		return
 	var target_position: Vector3 = cam.global_position + forward * panel_distance + Vector3(0, panel_height_offset, 0)
-	var basis := Basis()
-	basis = basis.looking_at(forward, Vector3.UP)
-	legal_panel.global_transform = Transform3D(basis, target_position)
+	var look_basis := Basis.looking_at(forward, Vector3.UP)
+	legal_panel.global_transform = Transform3D(look_basis, target_position)
 
 
 func _on_panel_accepted() -> void:

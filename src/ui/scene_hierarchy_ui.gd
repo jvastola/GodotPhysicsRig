@@ -159,7 +159,7 @@ func _on_actions_button_pressed() -> void:
 		_show_context_menu(get_global_mouse_position())
 
 
-func _show_context_menu(pos: Vector2) -> void:
+func _show_context_menu(_pos: Vector2) -> void:
 	if not _context_menu:
 		return
 	_context_menu.hide()
@@ -546,11 +546,11 @@ func _apply_search_filter() -> void:
 		_filter_items_recursive(tree.get_root())
 
 
-func _set_all_items_visible(item: TreeItem, is_visible: bool) -> void:
-	item.visible = is_visible
+func _set_all_items_visible(item: TreeItem, should_be_visible: bool) -> void:
+	item.visible = should_be_visible
 	var child = item.get_first_child()
 	while child:
-		_set_all_items_visible(child, is_visible)
+		_set_all_items_visible(child, should_be_visible)
 		child = child.get_next()
 
 
@@ -616,8 +616,8 @@ func _populate_tree() -> void:
 		return
 	
 	# Build the tree recursively
-	var root_item = tree.create_item()
-	_add_node_to_tree(_root_scene, root_item)
+	var main_root = tree.create_item()
+	_add_node_to_tree(_root_scene, main_root)
 	_update_status_label()
 
 
