@@ -1,6 +1,9 @@
 # Test Inventory System
 extends Node
 
+@export var quit_when_done: bool = false
+@export_file("*.tscn") var return_scene: String = "res://src/levels/MainScene.tscn"
+
 var test_results: Array[String] = []
 
 
@@ -26,9 +29,16 @@ func _ready() -> void:
 	
 	print("\n=== TEST COMPLETE ===")
 	
-	# Quit after testing
+	# After tests, either quit (desktop) or return to main scene (device)
 	await get_tree().create_timer(0.5).timeout
-	get_tree().quit()
+	if quit_when_done:
+		print("TestInventory: quit_when_done=true, exiting tree")
+		get_tree().quit()
+	elif GameManager and GameManager.has_method("change_scene_with_player"):
+		print("TestInventory: returning to main scene via GameManager")
+		GameManager.call_deferred("change_scene_with_player", return_scene, { "use_spawn_point": true, "spawn_point": "SpawnPoint" })
+	else:
+		print("TestInventory: no GameManager; staying in test scene")
 
 
 func test_autoloads() -> void:

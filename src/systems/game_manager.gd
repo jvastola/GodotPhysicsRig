@@ -434,89 +434,40 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 	var spawn_name = player_state.get("spawn_point", "SpawnPoint")
 	print("GameManager: spawn request - use_spawn=", use_spawn, ", spawn_name=", spawn_name)
 	var spawn_point: Node3D = null
-	if use_spawn:
-		spawn_point = _find_spawn_point(current_world, spawn_name)
-		print("GameManager: _find_spawn_point returned: ", spawn_point)
-		if spawn_point:
-			var target_pos = spawn_point.global_position
-			print("GameManager: spawn_point global_position=", target_pos)
-			# Reparent player into new world
-			if player_instance.get_parent() == self:
-				remove_child(player_instance)
-			if player_instance.get_parent() != current_world:
-				current_world.add_child(player_instance)
-			await get_tree().process_frame
-			var player_body = player_instance.get_node_or_null("PlayerBody")
-			if player_body and player_body is RigidBody3D:
-				player_body.freeze = true
-				# Prefer a teleport method on the player (handles XR offsets) if available
-				if player_instance.has_method("teleport_to"):
-					player_instance.call_deferred("teleport_to", target_pos)
-					print("GameManager: used XRPlayer.teleport_to for teleport")
-				else:
-					player_instance.global_position = target_pos
-					print("GameManager: set player_instance.global_position = ", target_pos)
-				await get_tree().physics_frame
-				await get_tree().physics_frame
-				player_body.linear_velocity = Vector3.ZERO
-				player_body.angular_velocity = Vector3.ZERO
-				player_body.freeze = false
-			else:
-				if player_instance.has_method("teleport_to"):
-					player_instance.call_deferred("teleport_to", target_pos)
-				else:
-					player_instance.global_position = target_pos
-			print("GameManager: Player moved to spawn point in new world at ", target_pos)
-			# Debug: confirm player's actual global position after move
-			print("GameManager: player global position after move = ", player_instance.global_position)
-		else:
-			print("GameManager: WARNING - use_spawn_point requested but spawn not found: ", spawn_name)
-			# Fallback: reparent and keep old global position
-			if player_instance.get_parent() == self:
-				remove_child(player_instance)
-			if player_instance.get_parent() != current_world:
-				current_world.add_child(player_instance)
-			await get_tree().process_frame
-			var player_body2 = player_instance.get_node_or_null("PlayerBody")
-			if player_body2 and player_body2 is RigidBody3D:
-				player_body2.freeze = true
-				if player_instance.has_method("teleport_to"):
-					player_instance.call_deferred("teleport_to", old_global_pos)
-				else:
-					player_instance.global_position = old_global_pos
-				await get_tree().physics_frame
-				player_body2.linear_velocity = Vector3.ZERO
-				player_body2.freeze = false
-			else:
-				if player_instance.has_method("teleport_to"):
-					player_instance.call_deferred("teleport_to", old_global_pos)
-				else:
-					player_instance.global_position = old_global_pos
-			print("GameManager: Player restored to previous global position at ", old_global_pos)
-			print("GameManager: player global position after restore = ", player_instance.global_position)
+	var safe_fallback_pos := Vector3(0, 2, 0)
+	var spawn_candidate := _find_spawn_point(current_world, spawn_name)
+	if spawn_candidate:
+		print("GameManager: _find_spawn_point returned: ", spawn_candidate)
+		spawn_point = spawn_candidate
+	# If not using spawn but we have one, decide whether to auto-use based on player position sanity
+	if not use_spawn:
+		var needs_safe_spawn: bool = is_nan(old_global_pos.length()) or abs(old_global_pos.y) > 500.0
+		if spawn_point and needs_safe_spawn:
+			print("GameManager: Auto-enabling spawn because old_global_pos looks unsafe: ", old_global_pos)
+			use_spawn = true
+		elif needs_safe_spawn:
+			print("GameManager: No spawn found; using safe fallback position instead of unsafe old_global_pos=", old_global_pos)
+			spawn_point = null
+			use_spawn = true
+	# If use_spawn is requested (or enabled), but spawn_point missing, use safe fallback
+	if use_spawn and not spawn_point:
+		print("GameManager: WARNING - Spawn point requested but not found: ", spawn_name, " | current_world=", current_world, " | using safe fallback pos ", safe_fallback_pos)
+		var target_pos_safe = safe_fallback_pos
+		_reparent_player_into_world(current_world)
+		await _teleport_player_to(target_pos_safe)
+		print("GameManager: Player moved to safe fallback position at ", target_pos_safe)
+		print("GameManager: player global position after move = ", player_instance.global_position)
+	elif use_spawn and spawn_point:
+		var target_pos = spawn_point.global_position
+		print("GameManager: spawn_point global_position=", target_pos)
+		_reparent_player_into_world(current_world)
+		await _teleport_player_to(target_pos)
+		print("GameManager: Player moved to spawn point in new world at ", target_pos)
+		print("GameManager: player global position after move = ", player_instance.global_position)
 	else:
 		# Maintain player's previous global position across the world swap
-		if player_instance.get_parent() == self:
-			remove_child(player_instance)
-		if player_instance.get_parent() != current_world:
-			current_world.add_child(player_instance)
-		await get_tree().process_frame
-		var player_body3 = player_instance.get_node_or_null("PlayerBody")
-		if player_body3 and player_body3 is RigidBody3D:
-			player_body3.freeze = true
-			if player_instance.has_method("teleport_to"):
-				player_instance.call_deferred("teleport_to", old_global_pos)
-			else:
-				player_instance.global_position = old_global_pos
-			await get_tree().physics_frame
-			player_body3.linear_velocity = Vector3.ZERO
-			player_body3.angular_velocity = Vector3.ZERO
-			player_body3.freeze = false
-		else:
-			if player_instance.has_method("teleport_to"):
-				player_instance.call_deferred("teleport_to", old_global_pos)
-			else:
-				player_instance.global_position = old_global_pos
+		_reparent_player_into_world(current_world)
+		await _teleport_player_to(old_global_pos)
 		print("GameManager: Player maintained previous global position at ", old_global_pos)
 
 	# Finished changing scene
@@ -624,13 +575,68 @@ func _ensure_world_environment(world_root: Node) -> void:
 	print("GameManager: Applied fallback WorldEnvironment to ", world_root.name)
 
 
+func _reparent_player_into_world(world_root: Node) -> void:
+	if not player_instance or not world_root:
+		print("GameManager: _reparent_player_into_world missing player or world")
+		return
+	if player_instance.get_parent() == self:
+		remove_child(player_instance)
+	if player_instance.get_parent() != world_root:
+		world_root.add_child(player_instance)
+	await get_tree().process_frame
+
+
+func _teleport_player_to(target_pos: Vector3) -> void:
+	if not player_instance:
+		print("GameManager: _teleport_player_to called without player_instance")
+		return
+	var player_body = player_instance.get_node_or_null("PlayerBody")
+	if player_body and player_body is RigidBody3D:
+		player_body.freeze = true
+		if player_instance.has_method("teleport_to"):
+			player_instance.call_deferred("teleport_to", target_pos)
+			print("GameManager: used XRPlayer.teleport_to for teleport")
+		else:
+			player_instance.global_position = target_pos
+			print("GameManager: set player_instance.global_position = ", target_pos)
+		await get_tree().physics_frame
+		await get_tree().physics_frame
+		player_body.linear_velocity = Vector3.ZERO
+		player_body.angular_velocity = Vector3.ZERO
+		player_body.freeze = false
+	else:
+		if player_instance.has_method("teleport_to"):
+			player_instance.call_deferred("teleport_to", target_pos)
+			print("GameManager: used XRPlayer.teleport_to for teleport (no rigidbody)")
+		else:
+			player_instance.global_position = target_pos
+	await get_tree().process_frame
+
+
 func _find_world_environment(world_root: Node) -> WorldEnvironment:
 	"""Locate a WorldEnvironment node within the given world."""
 	if not world_root:
 		return null
 	if world_root is WorldEnvironment:
 		return world_root
+	# Prefer a child literally named WorldEnvironment, but fall back to any WorldEnvironment in the tree,
+	# including our injected FallbackWorldEnvironment.
 	var found = world_root.find_child("WorldEnvironment", true, false)
 	if found and found is WorldEnvironment:
 		return found
+	if world_root is Node:
+		for child in world_root.get_children():
+			if child is WorldEnvironment:
+				return child
+			if child is Node:
+				var env := child.find_child("WorldEnvironment", true, false)
+				if env and env is WorldEnvironment:
+					return env
+				# Also accept fallback-named envs
+				var env_fallback := child.find_child("FallbackWorldEnvironment", true, false)
+				if env_fallback and env_fallback is WorldEnvironment:
+					return env_fallback
+	var fallback_named = world_root.find_child("FallbackWorldEnvironment", true, false)
+	if fallback_named and fallback_named is WorldEnvironment:
+		return fallback_named
 	return null

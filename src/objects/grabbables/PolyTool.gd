@@ -94,13 +94,7 @@ func _create_visuals() -> void:
 	add_child(_orb)
 	_orb.position = Vector3(0.05, 0, 0) # Offset relative to tool
 
-	_preview_dot = MeshInstance3D.new()
-	_preview_dot.name = "PreviewDot"
-	_preview_dot.mesh = _make_sphere_mesh(0.015)
-	_preview_mat = _make_unshaded_material(Color.WHITE)
-	_preview_dot.material_override = _preview_mat
-	_preview_dot.visible = false
-	_add_to_root(_preview_dot)
+	_ensure_preview_dot()
 	
 	_connect_line = MeshInstance3D.new()
 	_connect_line.name = "ConnectLine"
@@ -137,7 +131,8 @@ func _on_released() -> void:
 	_drag_index = -1
 	_connect_sequence.clear()
 	_orb.visible = false
-	_preview_dot.visible = false
+	if is_instance_valid(_preview_dot):
+		_preview_dot.visible = false
 	_clear_connect_lines()
 	_update_point_visibility()
 
@@ -147,6 +142,8 @@ func _physics_process(delta: float) -> void:
 	
 	if not is_grabbed: 
 		return
+
+	_ensure_preview_dot()
 
 	_handle_input()
 	
@@ -230,6 +227,7 @@ func _cycle_mode() -> void:
 	_update_mode_visuals()
 
 func _update_mode_visuals() -> void:
+	_ensure_preview_dot()
 	var color = Color.WHITE
 	match _current_mode:
 		ToolMode.PLACE: color = color_place
@@ -239,7 +237,8 @@ func _update_mode_visuals() -> void:
 	
 	_orb_material.albedo_color = color
 	_orb_material.emission = color
-	_preview_mat.albedo_color = color.lightened(0.5)
+	if _preview_mat:
+		_preview_mat.albedo_color = color.lightened(0.5)
 
 func _add_point(pos: Vector3) -> void:
 	var node = Node3D.new()
@@ -413,6 +412,17 @@ func _make_unshaded_material(c: Color) -> StandardMaterial3D:
 	m.albedo_color = c
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	return m
+
+func _ensure_preview_dot() -> void:
+	if is_instance_valid(_preview_dot):
+		return
+	_preview_dot = MeshInstance3D.new()
+	_preview_dot.name = "PreviewDot"
+	_preview_dot.mesh = _make_sphere_mesh(0.015)
+	_preview_mat = _make_unshaded_material(Color.WHITE)
+	_preview_dot.material_override = _preview_mat
+	_preview_dot.visible = false
+	_add_to_root(_preview_dot)
 
 func _add_to_root(node: Node) -> void:
 	var root = get_tree().current_scene
