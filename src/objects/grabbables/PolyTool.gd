@@ -89,13 +89,15 @@ func _create_visuals() -> void:
 	_mesh_params = ArrayMesh.new()
 	_mesh_instance.mesh = _mesh_params
 	var mat = StandardMaterial3D.new()
-	mat.albedo_color = color_mesh
+	# Let vertex colors (including alpha) drive appearance
+	mat.albedo_color = Color(1, 1, 1, 1)
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED # Show both sides? User wanted winding to matter, so maybe enabled.
 	# Actually, user said "clockwise... front face... counter clockwise... other side".
 	# If cull is disabled, they see both always. If cull is BACK (default), they only see front.
 	# Let's keep default culling so the winding matters visually.
 	mat.cull_mode = BaseMaterial3D.CULL_BACK 
 	mat.vertex_color_use_as_albedo = true
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_mesh_instance.material_override = mat
 	_add_to_root(_mesh_instance)
 
@@ -517,7 +519,20 @@ func _set_point_color(index: int, color: Color) -> void:
 func _get_paint_color() -> Color:
 	if ColorPickerUI and ColorPickerUI.instance and is_instance_valid(ColorPickerUI.instance):
 		return ColorPickerUI.instance.get_current_color()
+	var picker := _find_color_picker()
+	if picker:
+		return picker.get_current_color()
 	return color_paint_default
+
+
+func _find_color_picker() -> ColorPickerUI:
+	if not get_tree():
+		return null
+	# Prefer group lookup to avoid deep scans
+	var node = get_tree().get_first_node_in_group("color_picker_ui")
+	if node and node is ColorPickerUI:
+		return node
+	return null
 
 func _make_sphere_mesh(r: float) -> SphereMesh:
 	var m = SphereMesh.new()

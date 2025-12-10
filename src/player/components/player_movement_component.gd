@@ -35,20 +35,21 @@ enum HandAssignment { DEFAULT, SWAPPED }
 
 # === World Grab / Utility Settings ===
 @export var enable_two_hand_world_scale: bool = true
-@export var enable_two_hand_world_rotation: bool = true
+@export var enable_two_hand_world_rotation: bool = false
 @export_range(0.01, 20.0, 0.05) var world_scale_min: float = 0.1
 @export_range(0.1, 1000.0, 0.1) var world_scale_max: float = 15.0
 @export_range(0.05, 1.5, 0.05) var world_scale_sensitivity: float = 0.35
 @export_range(0.05, 2.0, 0.05) var world_rotation_sensitivity: float = 0.6
-@export_range(1.0, 90.0, 1.0) var world_rotation_max_delta_deg: float = 25.0
+@export_range(1.0, 180.0, 1.0) var world_rotation_max_delta_deg: float = 180.0
 @export_range(0.05, 3.0, 0.05) var world_grab_move_factor: float = 1.0
 @export_range(0.05, 1.0, 0.05) var world_grab_smooth_factor: float = 0.15
 @export var invert_two_hand_scale_direction: bool = true
-@export var show_two_hand_rotation_visual: bool = false
+@export var show_two_hand_rotation_visual: bool = true
 enum TwoHandPivot { MIDPOINT, PLAYER_ORIGIN }
 @export var two_hand_rotation_pivot: TwoHandPivot = TwoHandPivot.MIDPOINT
-@export var two_hand_left_action: String = "grip"
-@export var two_hand_right_action: String = "grip"
+@export var two_hand_left_action: String = "trigger"
+@export var two_hand_right_action: String = "trigger"
+@export var debug_world_grab_logs: bool = true
 @export var enable_one_hand_world_grab: bool = true
 @export var enable_one_hand_world_rotate: bool = true
 @export_range(0.0, 2.0, 0.05) var one_hand_world_move_sensitivity: float = 0.25
@@ -103,8 +104,16 @@ var _one_hand_anchor_mesh: MeshInstance3D
 var _one_hand_line_mesh: MeshInstance3D
 var _two_hand_line_mesh: MeshInstance3D
 var _two_hand_midpoint_mesh: MeshInstance3D
+var _two_hand_midpoint_line_mesh: MeshInstance3D
+var _two_hand_anchor_xz_line_mesh: MeshInstance3D
+var _world_grab_left_anchor: Vector3 = Vector3.ZERO
+var _world_grab_right_anchor: Vector3 = Vector3.ZERO
+var _world_grab_target_left_anchor: Vector3 = Vector3.ZERO
+var _world_grab_target_right_anchor: Vector3 = Vector3.ZERO
 var _one_hand_anchor_mat: StandardMaterial3D
 var _one_hand_line_mat: StandardMaterial3D
+var _two_hand_midpoint_line_mat: StandardMaterial3D
+var _two_hand_anchor_xz_line_mat: StandardMaterial3D
 
 # Respawn helpers
 var _spawn_transform := Transform3D.IDENTITY
@@ -404,6 +413,14 @@ func _get_yaw(xf: Transform3D) -> float:
 	return xf.basis.get_euler().y
 
 
+func _get_player_up() -> Vector3:
+	if player_body:
+		var up := player_body.global_transform.basis.y
+		if up.length_squared() > 0.0001:
+			return up.normalized()
+	return Vector3.UP
+
+
 func _get_two_hand_pivot_point(midpoint: Vector3) -> Vector3:
 	if two_hand_rotation_pivot == TwoHandPivot.PLAYER_ORIGIN and player_body:
 		return player_body.global_transform.origin
@@ -470,15 +487,21 @@ func _is_action_pressed(controller: XRController3D, action: String) -> bool:
 
 func _start_world_grab() -> void:
 	_world_grab_active = true
-	_world_grab_initial_distance = max(0.01, left_controller.global_position.distance_to(right_controller.global_position))
+	var up := _get_player_up()
+	var initial_vec := (right_controller.global_position - left_controller.global_position).slide(up)
+	_world_grab_initial_distance = max(0.01, initial_vec.length())
 	_world_grab_initial_scale = XRServer.world_scale
 	_world_grab_current_scale = XRServer.world_scale
 	_world_grab_smoothed_move = Vector3.ZERO
-	_world_grab_initial_vector = right_controller.global_position - left_controller.global_position
+	_world_grab_initial_vector = initial_vec
 	_world_grab_prev_vector = _world_grab_initial_vector
 	_world_grab_initial_midpoint = (left_controller.global_position + right_controller.global_position) * 0.5
 	_world_grab_prev_midpoint = _world_grab_initial_midpoint
 	_world_grab_initial_yaw = _get_yaw(player_body.global_transform)
+	_world_grab_left_anchor = left_controller.global_position
+	_world_grab_right_anchor = right_controller.global_position
+	_world_grab_target_left_anchor = _world_grab_left_anchor
+	_world_grab_target_right_anchor = _world_grab_right_anchor
 	_update_two_hand_visual(left_controller.global_position, right_controller.global_position, _world_grab_initial_midpoint)
 
 
@@ -486,25 +509,58 @@ func _update_world_grab() -> void:
 	if not _world_grab_active:
 		return
 
-	var current_vector: Vector3 = right_controller.global_position - left_controller.global_position
-	var current_distance: float = max(0.01, left_controller.global_position.distance_to(right_controller.global_position))
-	var current_midpoint: Vector3 = (left_controller.global_position + right_controller.global_position) * 0.5
+	var up := _get_player_up()
+	var raw_vector: Vector3 = (right_controller.global_position - left_controller.global_position).slide(up)
+	var raw_midpoint: Vector3 = (left_controller.global_position + right_controller.global_position) * 0.5
+	# Low-pass filter controller delta to reduce jitter before applying scale/rotation.
+	_world_grab_prev_vector = _world_grab_prev_vector.lerp(raw_vector, world_grab_smooth_factor)
+	var current_vector: Vector3 = _world_grab_prev_vector
+	var current_distance: float = max(0.01, current_vector.length())
+	var current_midpoint: Vector3 = _world_grab_prev_midpoint.lerp(raw_midpoint, world_grab_smooth_factor)
 
 	if enable_two_hand_world_scale and _world_grab_initial_distance > 0.01:
 		var ratio: float = current_distance / _world_grab_initial_distance
 		var effective_ratio: float = ratio if not invert_two_hand_scale_direction else (1.0 / max(ratio, 0.0001))
-		var scale_factor: float = 1.0 + (effective_ratio - 1.0) * world_scale_sensitivity
-		var target_scale: float = clampf(
-			_world_grab_initial_scale * scale_factor,
-			world_scale_min,
-			world_scale_max
-		)
-		_world_grab_current_scale = lerpf(_world_grab_current_scale, target_scale, world_grab_smooth_factor)
-		XRServer.world_scale = _world_grab_current_scale
+		# Ignore micro-changes to avoid jitter from controller noise.
+		if abs(effective_ratio - 1.0) > 0.01:
+			var scale_factor: float = 1.0 + (effective_ratio - 1.0) * world_scale_sensitivity
+			var target_scale: float = clampf(
+				_world_grab_initial_scale * scale_factor,
+				world_scale_min,
+				world_scale_max
+			)
+			_world_grab_current_scale = lerpf(_world_grab_current_scale, target_scale, world_grab_smooth_factor)
+			var anchor_point := xr_camera.global_transform.origin if xr_camera else player_body.global_transform.origin
+			XRServer.world_scale = _world_grab_current_scale
+			_reanchor_player(anchor_point)
+	
+	# Update target anchors to account for scale about the initial midpoint.
+	var safe_scale: float = max(_world_grab_current_scale, 0.0001)
+	var scale_ratio: float = _world_grab_initial_scale / safe_scale
+	_world_grab_target_left_anchor = _world_grab_initial_midpoint + (_world_grab_left_anchor - _world_grab_initial_midpoint) * scale_ratio
+	_world_grab_target_right_anchor = _world_grab_initial_midpoint + (_world_grab_right_anchor - _world_grab_initial_midpoint) * scale_ratio
 
-	# Translate player opposite to midpoint movement (grabbed-panel style)
-	var move_delta: Vector3 = (_world_grab_prev_midpoint - current_midpoint) * world_grab_move_factor
-	_world_grab_smoothed_move = _world_grab_smoothed_move.lerp(move_delta, world_grab_smooth_factor)
+	# Keep the original grab anchors fixed in world space (average correction).
+	var anchor_err_left := left_controller.global_position - _world_grab_target_left_anchor if _world_grab_left_anchor != Vector3.ZERO else Vector3.ZERO
+	var anchor_err_right := right_controller.global_position - _world_grab_target_right_anchor if _world_grab_right_anchor != Vector3.ZERO else Vector3.ZERO
+	var avg_err := (anchor_err_left + anchor_err_right) * 0.5
+	var vertical_correction := Vector3(0.0, -avg_err.y * world_grab_move_factor, 0.0)
+	var horizontal_correction := -Vector3(avg_err.x, 0.0, avg_err.z) * world_grab_move_factor
+	var anchor_max_step := 0.15
+	horizontal_correction = horizontal_correction.limit_length(anchor_max_step)
+	_world_grab_smoothed_move = _world_grab_smoothed_move.lerp(horizontal_correction + vertical_correction, world_grab_smooth_factor)
+	if debug_world_grab_logs:
+		print(
+			"[WorldGrab] Lpos=", left_controller.global_position,
+			" Rpos=", right_controller.global_position,
+			" Lanchor=", _world_grab_target_left_anchor,
+			" Ranchor=", _world_grab_target_right_anchor,
+			" Lerr=", anchor_err_left,
+			" Rerr=", anchor_err_right,
+			" AvgErr=", avg_err,
+			" AvgLen=", avg_err.length(),
+			" Scale=", _world_grab_current_scale
+		)
 	if _world_grab_smoothed_move.length_squared() > 0.000001:
 		var xf := player_body.global_transform
 		var lv = player_body.linear_velocity
@@ -515,21 +571,31 @@ func _update_world_grab() -> void:
 		player_body.angular_velocity = av
 
 	if enable_two_hand_world_rotation:
-		var init_2d := Vector2(_world_grab_initial_vector.x, _world_grab_initial_vector.z)
-		var curr_2d := Vector2(current_vector.x, current_vector.z)
-		if init_2d.length_squared() > 0.0001 and curr_2d.length_squared() > 0.0001:
-			var signed_angle := _signed_angle_2d(init_2d, curr_2d)
+		var init_vec := _world_grab_initial_vector
+		var curr_vec := current_vector
+		if init_vec.length_squared() > 0.0001 and curr_vec.length_squared() > 0.0001:
+			# Rotate world opposite to hand rotation (negative sign).
+			var signed_angle := -init_vec.signed_angle_to(curr_vec, up) * world_rotation_sensitivity
 			var target_yaw := _world_grab_initial_yaw + signed_angle
 			var current_yaw := _get_yaw(player_body.global_transform)
 			var delta_yaw := wrapf(target_yaw - current_yaw, -PI, PI)
-			var applied := delta_yaw * world_grab_smooth_factor
-			if abs(applied) > 0.0001:
-				var lv = player_body.linear_velocity
-				var av = player_body.angular_velocity
-				player_body.rotate_y(applied)
-				player_body.linear_velocity = lv
-				player_body.angular_velocity = av
+			var rotation_deadzone := deg_to_rad(0.35)
+			if abs(delta_yaw) > rotation_deadzone:
+				var dot_sign := init_vec.normalized().dot(curr_vec.normalized())
+				var hands_crossed := dot_sign < 0.0
+				var max_step := deg_to_rad(world_rotation_max_delta_deg)
+				if hands_crossed:
+					max_step = abs(delta_yaw)  # allow full 180 catch-up when swapping
+				var applied := clampf(delta_yaw, -max_step, max_step)
+				if abs(applied) > 0.0001:
+					var lv = player_body.linear_velocity
+					var av = player_body.angular_velocity
+					var pivot := _get_two_hand_pivot_point(current_midpoint)
+					_rotate_body_around_point(applied, pivot)
+					player_body.linear_velocity = lv
+					player_body.angular_velocity = av
 	_world_grab_prev_midpoint = current_midpoint
+	_world_grab_prev_vector = current_vector
 	_update_two_hand_visual(left_controller.global_position, right_controller.global_position, current_midpoint)
 
 
@@ -608,6 +674,12 @@ func _end_one_hand_grab() -> void:
 
 func _end_world_grab() -> void:
 	_world_grab_active = false
+	_world_grab_left_anchor = Vector3.ZERO
+	_world_grab_right_anchor = Vector3.ZERO
+	_world_grab_target_left_anchor = Vector3.ZERO
+	_world_grab_target_right_anchor = Vector3.ZERO
+	_world_grab_target_left_anchor = Vector3.ZERO
+	_world_grab_target_right_anchor = Vector3.ZERO
 	_clear_two_hand_visual()
 
 
@@ -698,6 +770,28 @@ func _ensure_visuals() -> void:
 			_two_hand_line_mesh.material_override = mat2
 			_two_hand_line_mesh.visible = false
 			_visual_root.add_child(_two_hand_line_mesh)
+		if not _two_hand_midpoint_line_mesh:
+			var line_mesh_mid := ImmediateMesh.new()
+			_two_hand_midpoint_line_mat = StandardMaterial3D.new()
+			_two_hand_midpoint_line_mat.albedo_color = Color(0.4, 0.9, 0.4, 0.85)
+			_two_hand_midpoint_line_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			_two_hand_midpoint_line_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			_two_hand_midpoint_line_mesh = MeshInstance3D.new()
+			_two_hand_midpoint_line_mesh.mesh = line_mesh_mid
+			_two_hand_midpoint_line_mesh.material_override = _two_hand_midpoint_line_mat
+			_two_hand_midpoint_line_mesh.visible = false
+			_visual_root.add_child(_two_hand_midpoint_line_mesh)
+		if not _two_hand_anchor_xz_line_mesh:
+			var line_mesh_xz := ImmediateMesh.new()
+			_two_hand_anchor_xz_line_mat = StandardMaterial3D.new()
+			_two_hand_anchor_xz_line_mat.albedo_color = Color(0.2, 0.8, 1.0, 0.8)
+			_two_hand_anchor_xz_line_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			_two_hand_anchor_xz_line_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			_two_hand_anchor_xz_line_mesh = MeshInstance3D.new()
+			_two_hand_anchor_xz_line_mesh.mesh = line_mesh_xz
+			_two_hand_anchor_xz_line_mesh.material_override = _two_hand_anchor_xz_line_mat
+			_two_hand_anchor_xz_line_mesh.visible = false
+			_visual_root.add_child(_two_hand_anchor_xz_line_mesh)
 		if not _two_hand_midpoint_mesh:
 			var m := BoxMesh.new()
 			m.size = Vector3(0.06, 0.06, 0.06)
@@ -846,11 +940,58 @@ func _update_two_hand_visual(left_pos: Vector3, right_pos: Vector3, mid: Vector3
 		im.surface_add_vertex(rp)
 		im.surface_end()
 		_two_hand_line_mesh.visible = true
+	if _two_hand_midpoint_line_mesh and _two_hand_midpoint_line_mesh.mesh is ImmediateMesh:
+		var im2 := _two_hand_midpoint_line_mesh.mesh as ImmediateMesh
+		im2.clear_surfaces()
+		im2.surface_begin(Mesh.PRIMITIVE_LINES)
+		var la_world := _world_grab_target_left_anchor
+		var ra_world := _world_grab_target_right_anchor
+		if la_world != Vector3.ZERO and player_body:
+			var la := player_body.to_local(la_world)
+			var lc_world := Vector3(la_world.x, left_pos.y, la_world.z) # show vertical-only offset
+			var lc := player_body.to_local(lc_world)
+			im2.surface_add_vertex(la)
+			im2.surface_add_vertex(lc)
+		if ra_world != Vector3.ZERO and player_body:
+			var ra := player_body.to_local(ra_world)
+			var rc_world := Vector3(ra_world.x, right_pos.y, ra_world.z) # show vertical-only offset
+			var rc := player_body.to_local(rc_world)
+			im2.surface_add_vertex(ra)
+			im2.surface_add_vertex(rc)
+		im2.surface_end()
+		_two_hand_midpoint_line_mesh.visible = true
+	if _two_hand_anchor_xz_line_mesh and _two_hand_anchor_xz_line_mesh.mesh is ImmediateMesh:
+		var im3 := _two_hand_anchor_xz_line_mesh.mesh as ImmediateMesh
+		im3.clear_surfaces()
+		im3.surface_begin(Mesh.PRIMITIVE_LINES)
+		var la_world2 := _world_grab_target_left_anchor
+		var ra_world2 := _world_grab_target_right_anchor
+		if la_world2 != Vector3.ZERO and player_body:
+			var la_ground := la_world2
+			var lc_ground := Vector3(left_pos.x, la_world2.y, left_pos.z)
+			im3.surface_add_vertex(player_body.to_local(la_ground))
+			im3.surface_add_vertex(player_body.to_local(lc_ground))
+		if ra_world2 != Vector3.ZERO and player_body:
+			var ra_ground := ra_world2
+			var rc_ground := Vector3(right_pos.x, ra_world2.y, right_pos.z)
+			im3.surface_add_vertex(player_body.to_local(ra_ground))
+			im3.surface_add_vertex(player_body.to_local(rc_ground))
+		im3.surface_end()
+		_two_hand_anchor_xz_line_mesh.visible = true
 	if _two_hand_midpoint_mesh:
 		_two_hand_midpoint_mesh.visible = true
 		var xf := _two_hand_midpoint_mesh.global_transform
 		xf.origin = mid
-		xf.basis = Basis.IDENTITY.scaled(Vector3.ONE * XRServer.world_scale)
+		var dir := right_pos - left_pos
+		if dir.length_squared() > 0.000001:
+			var up := _get_player_up()
+			if abs(dir.normalized().dot(up)) > 0.98:
+				up = Vector3.UP
+			var basis := Basis.IDENTITY.looking_at(dir.normalized(), up)
+			xf.basis = basis.scaled(Vector3.ONE * XRServer.world_scale)
+		else:
+			var basis_src := player_body.global_transform.basis if player_body else Basis.IDENTITY
+			xf.basis = basis_src.scaled(Vector3.ONE * XRServer.world_scale)
 		_two_hand_midpoint_mesh.global_transform = xf
 
 
@@ -860,8 +1001,36 @@ func _clear_two_hand_visual() -> void:
 		im.clear_surfaces()
 	if _two_hand_line_mesh:
 		_two_hand_line_mesh.visible = false
+	if _two_hand_midpoint_line_mesh and _two_hand_midpoint_line_mesh.mesh is ImmediateMesh:
+		var im2 := _two_hand_midpoint_line_mesh.mesh as ImmediateMesh
+		im2.clear_surfaces()
+	if _two_hand_midpoint_line_mesh:
+		_two_hand_midpoint_line_mesh.visible = false
+	if _two_hand_anchor_xz_line_mesh and _two_hand_anchor_xz_line_mesh.mesh is ImmediateMesh:
+		var im3 := _two_hand_anchor_xz_line_mesh.mesh as ImmediateMesh
+		im3.clear_surfaces()
+	if _two_hand_anchor_xz_line_mesh:
+		_two_hand_anchor_xz_line_mesh.visible = false
 	if _two_hand_midpoint_mesh:
 		_two_hand_midpoint_mesh.visible = false
+	_world_grab_left_anchor = Vector3.ZERO
+	_world_grab_right_anchor = Vector3.ZERO
+
+
+func _reanchor_player(anchor_point: Vector3) -> void:
+	if not player_body:
+		return
+	var current_anchor := xr_camera.global_transform.origin if xr_camera else player_body.global_transform.origin
+	var delta := current_anchor - anchor_point
+	if delta.length_squared() < 0.00000001:
+		return
+	var xf := player_body.global_transform
+	var lv := player_body.linear_velocity
+	var av := player_body.angular_velocity
+	xf.origin -= delta
+	player_body.global_transform = xf
+	player_body.linear_velocity = lv
+	player_body.angular_velocity = av
 
 
 func _set_one_hand_visual_style() -> void:

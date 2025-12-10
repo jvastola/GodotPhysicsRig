@@ -314,30 +314,86 @@ func _build_handle_material(color: Color) -> StandardMaterial3D:
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.albedo_color = color
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.no_depth_test = false
+	# Draw on top of scene geometry (like the red grapple ball).
+	mat.no_depth_test = true
+	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	mat.render_priority = 2
 	return mat
 
 
-func _build_handle_mesh(length: float) -> ImmediateMesh:
-	var mesh := ImmediateMesh.new()
-	var head_len: float = max(length * 0.2, 0.02)
-	var shaft_len: float = max(length - head_len, 0.01)
-	var head_width: float = max(selection_handle_thickness * 1.5, head_len * 0.35)
-	mesh.surface_begin(Mesh.PRIMITIVE_LINES)
-	mesh.surface_add_vertex(Vector3.ZERO)
-	mesh.surface_add_vertex(Vector3(0, 0, shaft_len))
-	mesh.surface_add_vertex(Vector3(0, 0, shaft_len))
-	mesh.surface_add_vertex(Vector3(head_width, 0, shaft_len + head_len))
-	mesh.surface_add_vertex(Vector3(0, 0, shaft_len))
-	mesh.surface_add_vertex(Vector3(-head_width, 0, shaft_len + head_len))
-	mesh.surface_end()
+func _build_handle_mesh(length: float) -> Mesh:
+	# Build a low-poly solid arrow: cylinder shaft + cone head.
+	var st: SurfaceTool = SurfaceTool.new()
+	var mesh: ArrayMesh = ArrayMesh.new()
+
+	var sides: int = 10
+	var radius: float = max(selection_handle_thickness * 1.2, 0.01)
+	var shaft_len: float = max(length * 0.55, 0.015)
+	var head_len: float = max(length * 0.45, 0.01)
+	var tip_z: float = shaft_len + head_len
+	var head_radius: float = radius * 1.35
+
+	# Shaft (cylinder)
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in range(sides):
+		var a0: float = TAU * float(i) / float(sides)
+		var a1: float = TAU * float((i + 1) % sides) / float(sides)
+		var p0: Vector3 = Vector3(cos(a0) * radius, sin(a0) * radius, 0.0)
+		var p1: Vector3 = Vector3(cos(a1) * radius, sin(a1) * radius, 0.0)
+		var p0_top: Vector3 = Vector3(p0.x, p0.y, shaft_len)
+		var p1_top: Vector3 = Vector3(p1.x, p1.y, shaft_len)
+
+		# quad split into two triangles
+		st.add_vertex(p0)
+		st.add_vertex(p1_top)
+		st.add_vertex(p0_top)
+
+		st.add_vertex(p0)
+		st.add_vertex(p1)
+		st.add_vertex(p1_top)
+	st.generate_normals()
+	st.commit(mesh)
+
+	# Head (cone)
+	st = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var tip: Vector3 = Vector3(0, 0, tip_z)
+	for i in range(sides):
+		var a0: float = TAU * float(i) / float(sides)
+		var a1: float = TAU * float((i + 1) % sides) / float(sides)
+		var b0: Vector3 = Vector3(cos(a0) * head_radius, sin(a0) * head_radius, shaft_len)
+		var b1: Vector3 = Vector3(cos(a1) * head_radius, sin(a1) * head_radius, shaft_len)
+
+		st.add_vertex(tip)
+		st.add_vertex(b1)
+		st.add_vertex(b0)
+	st.generate_normals()
+	st.commit(mesh)
+
+	# Cap the cone base so the underside is solid.
+	st = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var base_center: Vector3 = Vector3(0, 0, shaft_len)
+	for i in range(sides):
+		var a0: float = TAU * float(i) / float(sides)
+		var a1: float = TAU * float((i + 1) % sides) / float(sides)
+		var b0: Vector3 = Vector3(cos(a0) * head_radius, sin(a0) * head_radius, shaft_len)
+		var b1: Vector3 = Vector3(cos(a1) * head_radius, sin(a1) * head_radius, shaft_len)
+		# Wind so normals face outward/downward.
+		st.add_vertex(base_center)
+		st.add_vertex(b0)
+		st.add_vertex(b1)
+	st.generate_normals()
+	st.commit(mesh)
+
 	return mesh
 
 
 func _build_handle_collision_shape(length: float) -> BoxShape3D:
 	var box := BoxShape3D.new()
-	var half_thickness: float = max(selection_handle_thickness * 0.5, 0.005)
-	box.extents = Vector3(half_thickness, half_thickness, max(length * 0.5, 0.01))
+	var radius: float = max(selection_handle_thickness * 1.2, 0.01)
+	var half_thickness: float = max(radius * 1.1, 0.01)
+	box.extents = Vector3(half_thickness, half_thickness, max(length * 0.35, 0.01))
 	return box
 
 
@@ -594,6 +650,8 @@ func _update_selection_handles(aabb: AABB) -> void:
 		var up: Vector3 = Vector3.FORWARD if abs(axis_dir.dot(Vector3.UP)) > 0.95 else Vector3.UP
 		var new_basis := Basis.looking_at(-axis_dir, up)
 		handle.global_transform = Transform3D(new_basis, pos)
+		# Inherit player scaling via scene graph; avoid double-scaling.
+		handle.scale = Vector3.ONE
 		handle.visible = true
 		handle.monitoring = true
 

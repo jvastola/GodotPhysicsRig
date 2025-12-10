@@ -135,13 +135,19 @@ mesh = SubResource("SphereMesh_watch_hit")
 [node name="HandPointer" type="Node3D" parent="PlayerBody/XROrigin3D/LeftController" unique_id=1391630202]
 script = ExtResource("6_pointer")
 ray_length = 1.5
+ray_length_min = 0.001
+ray_length_max = 1000000.0
 include_pointer_color = true
 pointer_color = Color(0.568627, 1, 1, 1)
 ray_visibility_mode = "on_hit_or_trigger"
 hit_visibility_mode = "always"
 hit_shape = "sphere"
-hit_min_scale = 0.2
-hit_max_scale = 1.0
+hit_min_scale = 0.05
+hit_scale_per_meter = 0.5
+hit_max_scale = 1000000000.0
+hit_scale_user_multiplier_min = 0.01
+hit_scale_user_multiplier_max = 10.0
+use_hit_scale_limits = false
 
 [node name="PointerFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer" unique_id=1064310651]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.07)
@@ -173,9 +179,17 @@ mesh = SubResource("BoxMesh_hand")
 [node name="HandPointer" type="Node3D" parent="PlayerBody/XROrigin3D/RightController" unique_id=492218641]
 script = ExtResource("6_pointer")
 ray_length = 1.5
-ray_visibility_mode = "on_hit_and_trigger"
-hit_min_scale = 0.2
-hit_max_scale = 1.0
+ray_length_min = 0.001
+ray_length_max = 1000000.0
+ray_visibility_mode = "on_hit_or_trigger"
+hit_visibility_mode = "always"
+hit_shape = "sphere"
+hit_min_scale = 0.05
+hit_scale_per_meter = 0.5
+hit_max_scale = 1000000000.0
+hit_scale_user_multiplier_min = 0.01
+hit_scale_user_multiplier_max = 10.0
+use_hit_scale_limits = false
 
 [node name="PointerFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/RightController/HandPointer" unique_id=611834496]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.07)
@@ -199,7 +213,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.755936, 0)
 [node name="CenterPointer" type="Node3D" parent="PlayerBody/DesktopCamera" unique_id=424202139]
 script = ExtResource("6_pointer")
 ray_length = 3.5
+ray_length_min = 0.001
+ray_length_max = 1000000.0
 include_pointer_color = true
+hit_scale_user_multiplier_min = 0.01
+hit_scale_user_multiplier_max = 10.0
 
 [node name="PointerFace" type="MeshInstance3D" parent="PlayerBody/DesktopCamera/CenterPointer" unique_id=424887867]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, -0.07)

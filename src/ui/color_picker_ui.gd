@@ -12,6 +12,7 @@ static var instance: ColorPickerUI = null
 
 func _ready() -> void:
 	instance = self
+	add_to_group("color_picker_ui")
 	if color_picker:
 		color_picker.color_changed.connect(_on_color_changed)
 		_on_color_changed(color_picker.color)

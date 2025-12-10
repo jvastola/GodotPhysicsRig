@@ -1,0 +1,44 @@
+[gd_scene load_steps=6 format=3 uid="uid://action_map_viewport3d"]
+
+[ext_resource type="Script" path="res://src/ui/ui_viewport_3d.gd" id="1_viewport_script"]
+[ext_resource type="PackedScene" path="res://src/ui/ActionMapUI.tscn" id="2_action_map_ui"]
+
+[sub_resource type="ViewportTexture" id="ViewportTexture_action_map"]
+viewport_path = NodePath("SubViewport")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_action_map"]
+resource_local_to_scene = true
+transparency = 1
+shading_mode = 0
+albedo_texture = SubResource("ViewportTexture_action_map")
+
+[sub_resource type="QuadMesh" id="QuadMesh_action_map"]
+size = Vector2(2.2, 1.7)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_action_map"]
+size = Vector3(2.2, 1.7, 0.01)
+
+[node name="ActionMapViewport3D" type="Node3D"]
+script = ExtResource("1_viewport_script")
+ui_size = Vector2(900, 700)
+quad_size = Vector2(2.2, 1.7)
+
+[node name="SubViewport" type="SubViewport" parent="."]
+transparent_bg = true
+size = Vector2i(900, 700)
+render_target_update_mode = 4
+gui_embed_subwindows = true
+
+[node name="ActionMapUI" parent="SubViewport" instance=ExtResource("2_action_map_ui")]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("StandardMaterial3D_action_map")
+cast_shadow = 0
+mesh = SubResource("QuadMesh_action_map")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="MeshInstance3D"]
+collision_layer = 32
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D/StaticBody3D"]
+shape = SubResource("BoxShape3D_action_map")

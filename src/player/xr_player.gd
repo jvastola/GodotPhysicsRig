@@ -12,6 +12,16 @@ extends Node3D
 @onready var desktop_controller: Node = $PlayerBody/DesktopController
 @onready var physics_hand_left: RigidBody3D = $PhysicsHandLeft
 @onready var physics_hand_right: RigidBody3D = $PhysicsHandRight
+@onready var left_hand_mesh: Node3D = $PlayerBody/XROrigin3D/LeftController/LeftHandMesh
+@onready var left_hand_pointer: Node3D = $PlayerBody/XROrigin3D/LeftController/HandPointer
+@onready var left_watch: Node3D = $PlayerBody/XROrigin3D/LeftController/Watch
+@onready var left_watch_face: Node3D = $PlayerBody/XROrigin3D/LeftController/Watch/WatchFace
+@onready var left_watch_needle: Node3D = $PlayerBody/XROrigin3D/LeftController/Watch/Needle
+@onready var left_watch_ray_visual: Node3D = $PlayerBody/XROrigin3D/LeftController/Watch/RayVisual
+@onready var left_watch_ray_hit: Node3D = $PlayerBody/XROrigin3D/LeftController/Watch/RayHit
+@onready var right_hand_mesh: Node3D = $PlayerBody/XROrigin3D/RightController/RightHandMesh
+@onready var right_hand_pointer: Node3D = $PlayerBody/XROrigin3D/RightController/HandPointer
+@onready var center_pointer: Node3D = $PlayerBody/DesktopCamera/CenterPointer
 @onready var head_area: Area3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea
 @onready var head_collision_shape: CollisionShape3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadCollisionShape
 @onready var head_mesh: MeshInstance3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadMesh
@@ -33,6 +43,7 @@ var _desktop_trigger_event: InputEventMouseButton = null
 @export var desktop_extra_collider_offset: Vector3 = Vector3(0, 1.15, 0)
 @export var auto_scale_physics_hands: bool = true
 @export var auto_scale_head: bool = true
+@export var auto_scale_hand_visuals: bool = true
 
 # Player scale tracking
 var _manual_player_scale: float = 1.0
@@ -41,6 +52,9 @@ var _base_player_body_scale: Vector3 = Vector3.ONE
 var _base_left_hand_scale: Vector3 = Vector3.ONE
 var _base_right_hand_scale: Vector3 = Vector3.ONE
 var _base_head_area_scale: Vector3 = Vector3.ONE
+var _hand_visual_nodes: Array[Node3D] = []
+var _base_hand_visual_scales: Dictionary = {}
+var _base_hand_visual_transforms: Dictionary = {}
 
 # Audio Listeners
 var vr_listener: AudioListener3D = null
@@ -413,10 +427,34 @@ func _cache_base_scales() -> void:
 		_base_right_hand_scale = physics_hand_right.scale
 	if head_area:
 		_base_head_area_scale = head_area.scale
+	_cache_hand_visual_data()
+
+
+func _cache_hand_visual_data() -> void:
+	_hand_visual_nodes.clear()
+	_base_hand_visual_scales.clear()
+	_base_hand_visual_transforms.clear()
+
+	var hand_visual_candidates: Array = [
+		left_hand_mesh,
+		left_hand_pointer,
+		left_watch,
+		right_hand_mesh,
+		right_hand_pointer,
+		center_pointer,
+	]
+
+	for node in hand_visual_candidates:
+		if node and node is Node3D:
+			var node3d := node as Node3D
+			_hand_visual_nodes.append(node3d)
+			_base_hand_visual_scales[node3d] = node3d.scale
+			_base_hand_visual_transforms[node3d] = node3d.transform
 
 
 func _apply_rig_scale() -> void:
 	var combined_scale := _manual_player_scale * XRServer.world_scale
+	var visual_scale_vec := Vector3.ONE * combined_scale
 	if player_body:
 		player_body.scale = _base_player_body_scale * combined_scale
 	
@@ -434,6 +472,14 @@ func _apply_rig_scale() -> void:
 			inherited_scale = 1.0
 		var desired_local: float = combined_scale / inherited_scale
 		head_area.scale = _base_head_area_scale * desired_local
+
+	if auto_scale_hand_visuals and not _hand_visual_nodes.is_empty():
+		for node in _hand_visual_nodes:
+			if node and is_instance_valid(node):
+				var base_xf: Transform3D = _base_hand_visual_transforms.get(node, node.transform)
+				var scaled_basis := base_xf.basis.scaled(Vector3.ONE * combined_scale)
+				var scaled_origin := base_xf.origin * combined_scale
+				node.transform = Transform3D(scaled_basis, scaled_origin)
 
 
 func apply_texture_to_head(texture: ImageTexture) -> void:

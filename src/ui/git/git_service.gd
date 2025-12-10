@@ -229,7 +229,10 @@ func _copy_dir_filtered(src_abs: String, dst_abs: String) -> void:
 	var dir := DirAccess.open(src_abs)
 	if dir == null:
 		return
-	dir.list_dir_begin()
+	var err := dir.list_dir_begin()
+	if err != OK:
+		push_warning("_copy_dir_filtered: failed to list %s (err %s)" % [src_abs, err])
+		return
 	var name := dir.get_next()
 	while name != "":
 		if name == "." or name == "..":
