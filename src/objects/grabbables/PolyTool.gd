@@ -60,6 +60,13 @@ var _connect_line: MeshInstance3D
 var _connect_line_immediate: ImmediateMesh
 var _paint_dot: MeshInstance3D
 var _paint_mat: StandardMaterial3D
+var _mode_select_nodes: Array[MeshInstance3D] = []
+var _mode_select_modes: Array[ToolMode] = []
+var _is_selecting_mode: bool = false
+var _mode_select_radius: float = 0.12
+var _mode_select_height: float = 0.02
+const _MODE_ORDER := [ToolMode.PLACE, ToolMode.EDIT, ToolMode.REMOVE, ToolMode.CONNECT, ToolMode.PAINT]
+var _mode_labels: Array[MeshInstance3D] = []
 
 func _ready() -> void:
 	instance = self
@@ -121,6 +128,7 @@ func _exit_tree() -> void:
 	if is_instance_valid(_mesh_instance): _mesh_instance.queue_free()
 	if is_instance_valid(_preview_dot): _preview_dot.queue_free()
 	if is_instance_valid(_connect_line): _connect_line.queue_free()
+	_clear_mode_select_nodes()
 
 func _on_grabbed(hand: RigidBody3D) -> void:
 	_controller = null
@@ -146,11 +154,15 @@ func _on_released() -> void:
 		_preview_dot.visible = false
 	_clear_connect_lines()
 	_update_point_visibility()
+	_end_mode_select()
 
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
 	_update_point_visibility()
 	_update_paint_dot()
+	
+	if not is_inside_tree():
+		return
 	
 	if not is_grabbed: 
 		return
@@ -180,9 +192,23 @@ func _handle_input() -> void:
 	var trigger = _is_trigger_pressed()
 	var grip = _is_grip_pressed()
 	
-	# Grip Cycle Mode
+	if not is_inside_tree():
+		_prev_trigger_pressed = trigger
+		_prev_grip_pressed = grip
+		return
+	
+	# Grip: enter/exit radial mode select
 	if grip and not _prev_grip_pressed:
-		_cycle_mode()
+		_begin_mode_select()
+	elif not grip and _prev_grip_pressed and _is_selecting_mode:
+		_commit_mode_select()
+	
+	# If selecting mode, don't perform other actions
+	if _is_selecting_mode:
+		_update_mode_select_visuals()
+		_prev_trigger_pressed = trigger
+		_prev_grip_pressed = grip
+		return
 	
 	# Trigger Actions
 	var just_pressed = trigger and not _prev_trigger_pressed
@@ -256,14 +282,7 @@ func _cycle_mode() -> void:
 
 func _update_mode_visuals() -> void:
 	_ensure_preview_dot()
-	var color = Color.WHITE
-	match _current_mode:
-		ToolMode.PLACE: color = color_place
-		ToolMode.EDIT: color = color_edit
-		ToolMode.REMOVE: color = color_remove
-		ToolMode.CONNECT: color = color_connect
-		ToolMode.PAINT: color = _get_paint_color()
-	
+	var color = _mode_color(_current_mode)
 	_orb_material.albedo_color = color
 	_orb_material.emission = color
 	if _preview_mat:
@@ -462,7 +481,10 @@ func _is_point_visible(point_pos: Vector3, origin: Vector3) -> bool:
 	return true
 
 func _get_visibility_origin() -> Vector3:
-	if _tip:
+	# Safe origin even if not in tree
+	if not is_inside_tree():
+		return Vector3.ZERO
+	if is_instance_valid(_tip) and _tip.is_inside_tree():
 		return _tip.global_transform.origin
 	return global_transform.origin
 
@@ -544,11 +566,166 @@ func _update_paint_dot() -> void:
 	var color = _get_paint_color()
 	_paint_mat.albedo_color = color
 	_paint_mat.emission = color
+	# Keep paint dot visible as a legend for current paint color
+	_paint_dot.visible = true
+
+
+func _mode_color(mode: ToolMode) -> Color:
+	match mode:
+		ToolMode.PLACE:
+			return color_place
+		ToolMode.EDIT:
+			return color_edit
+		ToolMode.REMOVE:
+			return color_remove
+		ToolMode.CONNECT:
+			return color_connect
+		ToolMode.PAINT:
+			return _get_paint_color()
+	return Color.WHITE
 
 func _add_to_root(node: Node) -> void:
 	var root = get_tree().current_scene
 	if not root: root = get_tree().root
 	root.add_child(node)
+
+
+func _begin_mode_select() -> void:
+	if not is_inside_tree():
+		return
+	# Guard against missing root
+	if get_tree() == null:
+		return
+	_clear_mode_select_nodes()
+	_is_selecting_mode = true
+	# Extra safety: require a valid transform
+	if get_tree().root == null:
+		return
+	if not is_inside_tree():
+		return
+	var xf := global_transform
+	var anchor := _get_visibility_origin()
+	var basis := xf.basis
+	# Arrange in a forward-facing arc to avoid side dots
+	var count := _MODE_ORDER.size()
+	for i in count:
+		var mode: ToolMode = _MODE_ORDER[i]
+		# Spread across -60..60 degrees
+		var angle = deg_to_rad(-60.0 + (120.0 * float(i) / max(1.0, float(count - 1))))
+		var offset_local = Vector3(sin(angle), 0, -cos(angle)) * _mode_select_radius + Vector3(0, _mode_select_height, 0)
+		var pos = anchor + basis * offset_local
+		var m := MeshInstance3D.new()
+		m.mesh = _make_sphere_mesh(0.01)
+		var mat := _make_unshaded_material(_mode_color(mode))
+		mat.emission = _mode_color(mode)
+		m.material_override = mat
+		_mode_select_nodes.append(m)
+		_mode_select_modes.append(mode)
+		_add_to_root(m)
+		m.global_position = pos
+		_add_mode_label(mode, pos)
+	_update_mode_select_visuals()
+
+
+func _update_mode_select_visuals() -> void:
+	if not _is_selecting_mode:
+		return
+	var nearest_idx := _nearest_mode_index()
+	for i in _mode_select_nodes.size():
+		var node = _mode_select_nodes[i]
+		if not is_instance_valid(node):
+			continue
+		var scale := 1.0
+		if i == nearest_idx:
+			scale = 1.5
+		node.scale = Vector3.ONE * scale
+	if nearest_idx != -1 and nearest_idx < _mode_select_modes.size():
+		var color := _mode_color(_mode_select_modes[nearest_idx])
+		_orb_material.albedo_color = color
+		_orb_material.emission = color
+	for i in _mode_labels.size():
+		var lbl = _mode_labels[i]
+		if not is_instance_valid(lbl):
+			continue
+		var tint = Color(1, 1, 1, 1.0) if i == nearest_idx else Color(0.7, 0.7, 0.7, 0.85)
+		if lbl.material_override and lbl.material_override is StandardMaterial3D:
+			var mat := lbl.material_override as StandardMaterial3D
+			mat.albedo_color = tint
+
+
+func _commit_mode_select() -> void:
+	var idx := _nearest_mode_index()
+	if idx != -1 and idx < _mode_select_modes.size():
+		_current_mode = _mode_select_modes[idx]
+	_update_mode_visuals()
+	_end_mode_select()
+
+
+func _end_mode_select() -> void:
+	_is_selecting_mode = false
+	_clear_mode_select_nodes()
+
+
+func _clear_mode_select_nodes() -> void:
+	for n in _mode_select_nodes:
+		if is_instance_valid(n):
+			n.queue_free()
+	_mode_select_nodes.clear()
+	_mode_select_modes.clear()
+	_clear_mode_labels()
+
+
+func _add_mode_label(mode: ToolMode, pos: Vector3) -> void:
+	var text_mesh := TextMesh.new()
+	text_mesh.text = _mode_name(mode)
+	text_mesh.font_size = 48
+	text_mesh.pixel_size = 0.0008
+	text_mesh.depth = 0.001
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(1, 1, 1, 0.95)
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_FIXED_Y
+	var lbl := MeshInstance3D.new()
+	lbl.mesh = text_mesh
+	lbl.material_override = mat
+	_add_to_root(lbl)
+	lbl.global_position = pos + Vector3(0, 0.025, 0)
+	lbl.scale = Vector3.ONE * 0.006
+	_mode_labels.append(lbl)
+
+
+func _clear_mode_labels() -> void:
+	for l in _mode_labels:
+		if is_instance_valid(l):
+			l.queue_free()
+	_mode_labels.clear()
+
+
+func _mode_name(mode: ToolMode) -> String:
+	match mode:
+		ToolMode.PLACE: return "Place"
+		ToolMode.EDIT: return "Edit"
+		ToolMode.REMOVE: return "Remove"
+		ToolMode.CONNECT: return "Connect"
+		ToolMode.PAINT: return "Paint"
+	return "Mode"
+
+
+func _nearest_mode_index() -> int:
+	if _mode_select_nodes.is_empty():
+		return -1
+	var tip_pos := _get_visibility_origin()
+	var best_idx := -1
+	var best_dist := INF
+	for i in _mode_select_nodes.size():
+		var node = _mode_select_nodes[i]
+		if not is_instance_valid(node):
+			continue
+		var d = node.global_position.distance_to(tip_pos)
+		if d < best_dist:
+			best_dist = d
+			best_idx = i
+	return best_idx
 
 
 func get_point_count() -> int:
