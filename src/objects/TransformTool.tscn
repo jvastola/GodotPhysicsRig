@@ -1,0 +1,28 @@
+[gd_scene load_steps=4 format=3 uid="uid://transform_tool_scene"]
+
+[ext_resource type="Script" path="res://src/objects/transform_tool.gd" id="1_transform_tool"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_transform_tool"]
+size = Vector3(0.06, 0.06, 0.2)
+
+[sub_resource type="BoxMesh" id="BoxMesh_transform_tool"]
+size = Vector3(0.06, 0.06, 0.2)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_transform_tool"]
+albedo_color = Color(0.4, 0.2, 0.7, 1)
+metallic = 0.35
+roughness = 0.35
+
+[node name="TransformTool" type="RigidBody3D" groups=["grabbable"]]
+mass = 0.3
+script = ExtResource("1_transform_tool")
+save_id = "TransformTool"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.08)
+shape = SubResource("BoxShape3D_transform_tool")
+
+[node name="ToolMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.08)
+mesh = SubResource("BoxMesh_transform_tool")
+surface_material_override/0 = SubResource("StandardMaterial3D_transform_tool")

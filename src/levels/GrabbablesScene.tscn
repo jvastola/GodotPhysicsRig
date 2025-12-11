@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=3 uid="uid://ctam55k3jq6cl"]
+[gd_scene load_steps=21 format=3 uid="uid://ctam55k3jq6cl"]
 
 [ext_resource type="Script" uid="uid://ct42jl8bcsjkj" path="res://src/objects/floor_interactable.gd" id="1_ra6av"]
 [ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://src/objects/Portal.tscn" id="2_portal"]
@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/GrabbableBall.tscn" id="7_grabbable_ball"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/GrabbableBall2.tscn" id="8_grabbable_ball2"]
 [ext_resource type="PackedScene" path="res://src/objects/VoxelTool.tscn" id="9_voxel_tool"]
+[ext_resource type="PackedScene" path="res://src/objects/TransformTool.tscn" id="10_transform_tool"]
 
 [sub_resource type="Environment" id="Environment_second"]
 background_mode = 1
@@ -160,6 +161,9 @@ outline_size = 8
 
 [node name="VoxelTool" parent="." instance=ExtResource("9_voxel_tool")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -3)
+
+[node name="TransformTool" parent="." instance=ExtResource("10_transform_tool")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1.5, -3)
 
 [node name="ViewportMirror" type="Node3D" parent="."]
 transform = Transform3D(0.184826, 0, 0.982771, 0, 1, 0, -0.982771, 0, 0.184826, -4.32121, 0.881646, 0)

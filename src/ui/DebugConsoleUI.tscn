@@ -15,6 +15,7 @@ corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 
 [node name="DebugConsoleUI" type="PanelContainer"]
+process_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -65,6 +66,7 @@ selection_enabled = true
 layout_mode = 2
 
 [node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+process_mode = 3
 layout_mode = 2
 theme_override_constants/separation = 8
 alignment = 1
@@ -79,7 +81,42 @@ custom_minimum_size = Vector2(80, 0)
 layout_mode = 2
 theme_override_font_sizes/font_size = 11
 
+[node name="PhysicsToggleButton" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer"]
+process_mode = 3
+custom_minimum_size = Vector2(120, 28)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.95, 1.0, 1.0)
+theme_override_font_sizes/font_size = 11
+toggle_mode = true
+text = "⏸️ Pause Physics"
+
+[node name="SavePhysicsButton" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer"]
+process_mode = 3
+custom_minimum_size = Vector2(120, 28)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.95, 1.0, 1.0)
+theme_override_font_sizes/font_size = 11
+text = "💾 Save Physics"
+
+[node name="ResetPhysicsButton" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer"]
+process_mode = 3
+custom_minimum_size = Vector2(120, 28)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.95, 1.0, 1.0)
+theme_override_font_sizes/font_size = 11
+text = "🔄 Reset Physics"
+
+[node name="PlayerExcludeButton" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer"]
+process_mode = 3
+custom_minimum_size = Vector2(140, 28)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.95, 1.0, 1.0)
+theme_override_font_sizes/font_size = 11
+toggle_mode = true
+text = "🙋 Exclude Player"
+
 [node name="ClearButton" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer"]
+process_mode = 3
 custom_minimum_size = Vector2(70, 28)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.95, 1.0, 1.0)

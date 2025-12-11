@@ -53,10 +53,20 @@ signal selection_handle_event(event: Dictionary)
 @export var hit_selector_monitor_areas: bool = true
 
 @export_group("Selection Handles")
+@export var enable_selection_bounds: bool = false
 @export var show_selection_handles: bool = true
-@export_range(0.05, 1.5, 0.01) var selection_handle_length: float = 0.25
+@export_range(0.025, 1.0, 0.01) var selection_handle_length: float = 0.125
 @export_range(0.0, 0.5, 0.005) var selection_handle_offset: float = 0.05
-@export_range(0.005, 0.5, 0.005) var selection_handle_thickness: float = 0.02
+@export_range(0.0, 0.3, 0.005) var selection_handle_spacing: float = 0.03
+@export_range(0.0025, 0.5, 0.0025) var selection_handle_thickness: float = 0.01
+@export_range(0.005, 0.25, 0.005) var selection_handle_base_size: float = 0.02
+@export_range(0.0, 0.5, 0.005) var selection_handle_base_gap: float = 0.03
+@export_range(0.0, 1.0, 0.01) var selection_handle_base_gap_ratio: float = 0.35
+@export_range(0.005, 0.25, 0.005) var selection_handle_cap_size: float = 0.015
+@export_range(0.0025, 0.25, 0.0025) var selection_handle_cap_depth: float = 0.01
+@export_range(0.01, 0.5, 0.01) var selection_handle_ring_radius: float = 0.06
+@export_range(0.0025, 0.25, 0.0025) var selection_handle_ring_thickness: float = 0.0075
+@export_range(0.0, 0.5, 0.005) var selection_handle_ring_gap: float = 0.015
 @export_range(0.1, 20.0, 0.1) var selection_handle_move_speed: float = 8.0
 @export_range(0.0, 0.2, 0.001) var selection_handle_move_deadzone: float = 0.0
 
@@ -110,6 +120,7 @@ var _selection_bounds_mesh: ImmediateMesh
 var _selected_objects: Array[Node3D] = []
 var _selection_handles: Array[Area3D] = []
 var _selection_handle_active_axis: Vector3 = Vector3.ZERO
+var _selection_handle_active_mode: String = "translate" # "translate" or "scale"
 var _selection_handle_last_proj: float = 0.0
 var _pointer_hit_point: Vector3 = Vector3.ZERO
 var _selection_handle_grab_point: Vector3 = Vector3.ZERO
@@ -118,6 +129,12 @@ var _selection_handle_active_handle: Node3D = null
 var _selection_handle_line: MeshInstance3D
 var _selection_handle_line_mesh: ImmediateMesh
 var _selection_handle_grab_marker: MeshInstance3D
+var _selection_handle_scale_reference: float = 0.1
+var _selection_last_half_size: Vector3 = Vector3.ZERO
+var _selection_last_center: Vector3 = Vector3.ZERO
+var _selection_handle_rotate_ref: Vector3 = Vector3.ZERO
+var _selection_handle_rotate_last_angle: float = 0.0
+var _selection_handle_rotate_center: Vector3 = Vector3.ZERO
 
 # Grip grab mode state
 var _grab_target: Node = null  # Currently grabbed object
@@ -155,9 +172,10 @@ func _ready() -> void:
 		_configure_hit_visual()
 		_ray_hit.visible = false
 		_setup_hit_selector()
-	_setup_selection_bounds()
-	_setup_selection_handles()
-	_setup_selection_handle_visuals()
+	if enable_selection_bounds:
+		_setup_selection_bounds()
+		_setup_selection_handles()
+		_setup_selection_handle_visuals()
 
 
 func _configure_hit_visual() -> void:
@@ -238,6 +256,8 @@ func _update_selector_shape(new_scale: float) -> void:
 
 
 func _setup_selection_bounds() -> void:
+	if not enable_selection_bounds:
+		return
 	_selection_bounds_mesh = ImmediateMesh.new()
 	_selection_bounds = MeshInstance3D.new()
 	_selection_bounds.name = "SelectionBounds"
@@ -252,6 +272,8 @@ func _setup_selection_bounds() -> void:
 
 
 func _setup_selection_handles() -> void:
+	if not enable_selection_bounds:
+		return
 	if not show_selection_handles:
 		return
 	_selection_handles.clear()
@@ -264,13 +286,16 @@ func _setup_selection_handles() -> void:
 		{"axis": Vector3.FORWARD, "name": "HandleZNeg", "color": Color(0.35, 0.6, 0.95)}
 	]
 	for def in defs:
+		var axis_vec: Vector3 = (def["axis"] as Vector3).normalized()
+		# Translate handle (arrow)
 		var handle := Area3D.new()
 		handle.name = def["name"]
 		handle.monitorable = false # avoid being picked up by selector area
 		handle.collision_layer = pointer_collision_mask
 		handle.collision_mask = 0
-		handle.set_meta("selection_handle_axis", (def["axis"] as Vector3).normalized())
+		handle.set_meta("selection_handle_axis", axis_vec)
 		handle.set_meta("selection_handle_name", def["name"])
+		handle.set_meta("selection_handle_mode", "translate")
 		if pointer_handler_group != StringName():
 			handle.add_to_group(pointer_handler_group)
 		var mesh_instance := MeshInstance3D.new()
@@ -286,6 +311,60 @@ func _setup_selection_handles() -> void:
 		handle.visible = false
 		add_child(handle)
 		_selection_handles.append(handle)
+
+		# Scale handle (cube)
+		var base_handle := Area3D.new()
+		base_handle.name = def["name"] + "Base"
+		base_handle.monitorable = false
+		base_handle.collision_layer = pointer_collision_mask
+		base_handle.collision_mask = 0
+		base_handle.set_meta("selection_handle_axis", axis_vec)
+		base_handle.set_meta("selection_handle_name", def["name"] + "Base")
+		base_handle.set_meta("selection_handle_mode", "scale")
+		if pointer_handler_group != StringName():
+			base_handle.add_to_group(pointer_handler_group)
+		var base_instance := MeshInstance3D.new()
+		base_instance.name = "Base"
+		base_instance.mesh = _build_handle_base_mesh()
+		base_instance.material_override = _build_handle_material(def["color"])
+		base_handle.add_child(base_instance)
+		var cap_instance := MeshInstance3D.new()
+		cap_instance.name = "Cap"
+		cap_instance.mesh = _build_handle_cap_mesh()
+		cap_instance.material_override = base_instance.material_override
+		cap_instance.position = Vector3(0, 0, -(selection_handle_base_size * 0.5 + selection_handle_cap_depth * 0.5))
+		base_handle.add_child(cap_instance)
+		var base_collider := CollisionShape3D.new()
+		base_collider.name = "Collision"
+		base_collider.shape = _build_handle_base_collision_shape()
+		base_handle.add_child(base_collider)
+		base_handle.visible = false
+		add_child(base_handle)
+		_selection_handles.append(base_handle)
+
+		# Rotate handle (ring)
+		var ring_handle := Area3D.new()
+		ring_handle.name = def["name"] + "Rotate"
+		ring_handle.monitorable = false
+		ring_handle.collision_layer = pointer_collision_mask
+		ring_handle.collision_mask = 0
+		ring_handle.set_meta("selection_handle_axis", axis_vec)
+		ring_handle.set_meta("selection_handle_name", def["name"] + "Rotate")
+		ring_handle.set_meta("selection_handle_mode", "rotate")
+		if pointer_handler_group != StringName():
+			ring_handle.add_to_group(pointer_handler_group)
+		var ring_instance := MeshInstance3D.new()
+		ring_instance.name = "Ring"
+		ring_instance.mesh = _build_handle_ring_mesh()
+		ring_instance.material_override = _build_handle_material(def["color"])
+		ring_handle.add_child(ring_instance)
+		var ring_collider := CollisionShape3D.new()
+		ring_collider.name = "Collision"
+		ring_collider.shape = _build_handle_ring_collision_shape()
+		ring_handle.add_child(ring_collider)
+		ring_handle.visible = false
+		add_child(ring_handle)
+		_selection_handles.append(ring_handle)
 
 
 func _setup_selection_handle_visuals() -> void:
@@ -387,6 +466,43 @@ func _build_handle_mesh(length: float) -> Mesh:
 	st.commit(mesh)
 
 	return mesh
+
+
+func _build_handle_base_mesh() -> Mesh:
+	var box := BoxMesh.new()
+	var base_size: float = max(selection_handle_thickness * 3.0, selection_handle_base_size)
+	box.size = Vector3(base_size, base_size, base_size) # make it a cube
+	return box
+
+
+func _build_handle_cap_mesh() -> Mesh:
+	var box := BoxMesh.new()
+	var size_xy: float = max(selection_handle_cap_size, selection_handle_thickness * 2.0)
+	var depth: float = max(selection_handle_cap_depth, selection_handle_thickness)
+	box.size = Vector3(size_xy, size_xy, depth)
+	return box
+
+
+func _build_handle_ring_mesh() -> Mesh:
+	var torus := TorusMesh.new()
+	torus.inner_radius = max(selection_handle_ring_radius * 0.5, selection_handle_ring_thickness * 2.0)
+	torus.outer_radius = max(selection_handle_ring_radius, torus.inner_radius + selection_handle_ring_thickness)
+	torus.ring_segments = 32
+	return torus
+
+
+func _build_handle_base_collision_shape() -> BoxShape3D:
+	var box := BoxShape3D.new()
+	var half: float = max(selection_handle_base_size * 0.5, selection_handle_thickness * 1.5)
+	box.extents = Vector3(half, half, half)
+	return box
+
+
+func _build_handle_ring_collision_shape() -> CylinderShape3D:
+	var cyl := CylinderShape3D.new()
+	cyl.radius = max(selection_handle_ring_radius, selection_handle_ring_thickness * 2.0)
+	cyl.height = max(selection_handle_ring_thickness * 3.0, selection_handle_cap_depth)
+	return cyl
 
 
 func _build_handle_collision_shape(length: float) -> BoxShape3D:
@@ -633,6 +749,8 @@ func _update_selection_handles(aabb: AABB) -> void:
 		return
 	var center: Vector3 = aabb.position + aabb.size * 0.5
 	var half_size: Vector3 = aabb.size * 0.5
+	_selection_last_half_size = half_size
+	_selection_last_center = center
 	for handle in _selection_handles:
 		if not is_instance_valid(handle):
 			continue
@@ -641,15 +759,33 @@ func _update_selection_handles(aabb: AABB) -> void:
 			handle.visible = false
 			handle.monitoring = false
 			continue
+		var mode: String = handle.get_meta("selection_handle_mode", "translate")
+		var axis_unit: Vector3 = axis_dir.normalized()
 		var face_offset := Vector3(
 			half_size.x * axis_dir.x,
 			half_size.y * axis_dir.y,
 			half_size.z * axis_dir.z
 		)
-		var pos: Vector3 = center + face_offset + axis_dir * selection_handle_offset
-		var up: Vector3 = Vector3.FORWARD if abs(axis_dir.dot(Vector3.UP)) > 0.95 else Vector3.UP
-		var new_basis := Basis.looking_at(-axis_dir, up)
-		handle.global_transform = Transform3D(new_basis, pos)
+		# Keep consistent spacing relative to each element (box -> ring -> arrow) regardless of selection size.
+		var cube_center_offset: float = selection_handle_base_gap + selection_handle_base_size * 0.5
+		var ring_center_offset: float = cube_center_offset + selection_handle_base_size * 0.5 + selection_handle_ring_gap + selection_handle_ring_radius
+		var extra: float = cube_center_offset
+		if mode == "translate":
+			# Place arrow further out so the cube and ring sit between box and arrow.
+			extra = ring_center_offset + selection_handle_ring_radius + selection_handle_ring_thickness + selection_handle_spacing
+		elif mode == "rotate":
+			extra = ring_center_offset
+		var pos: Vector3 = center + face_offset + axis_unit * extra
+		if mode == "rotate":
+			var y := axis_unit
+			var x := _any_perpendicular(y)
+			var z := x.cross(y).normalized()
+			var ring_basis := Basis(x, y, z)
+			handle.global_transform = Transform3D(ring_basis, pos)
+		else:
+			var up: Vector3 = Vector3.FORWARD if abs(axis_unit.dot(Vector3.UP)) > 0.95 else Vector3.UP
+			var new_basis := Basis.looking_at(-axis_unit, up)
+			handle.global_transform = Transform3D(new_basis, pos)
 		# Inherit player scaling via scene graph; avoid double-scaling.
 		handle.scale = Vector3.ONE
 		handle.visible = true
@@ -666,6 +802,8 @@ func _hide_selection_handles() -> void:
 
 
 func _update_selection_handle_movement(_delta: float, action_state: Dictionary) -> void:
+	if not enable_selection_bounds or not show_selection_handles:
+		return
 	if _selection_handle_active_axis == Vector3.ZERO:
 		return
 	if not action_state.get("pressed", false):
@@ -675,11 +813,29 @@ func _update_selection_handle_movement(_delta: float, action_state: Dictionary) 
 	var axis: Vector3 = _selection_handle_active_axis
 	var current_proj: float = _pointer_hit_point.dot(axis)
 	var delta_proj: float = current_proj - _selection_handle_last_proj
-	if abs(delta_proj) <= selection_handle_move_deadzone:
-		return
-	# Move exactly by the pointer's delta along the locked axis so the hit point stays anchored.
-	var move_amount: float = delta_proj
-	_move_selected_objects_along_axis(axis, move_amount)
+	if _selection_handle_active_mode == "scale":
+		if abs(delta_proj) <= selection_handle_move_deadzone:
+			return
+		if _selection_handle_scale_reference <= 0.0:
+			return
+		var scale_factor: float = 1.0 + (delta_proj / _selection_handle_scale_reference)
+		scale_factor = clamp(scale_factor, 0.05, 10.0)
+		_scale_selected_objects_along_axis(axis, scale_factor)
+	elif _selection_handle_active_mode == "rotate":
+		var cur_vec := _project_on_plane(_pointer_hit_point - _selection_handle_rotate_center, axis)
+		if cur_vec.length() < 0.0001 or _selection_handle_rotate_ref.length() < 0.0001:
+			return
+		var angle := _signed_angle_on_plane(_selection_handle_rotate_ref, cur_vec, axis)
+		var delta_angle := angle - _selection_handle_rotate_last_angle
+		if abs(delta_angle) > 0.0001:
+			_rotate_selected_objects(axis, _selection_handle_rotate_center, delta_angle)
+			_selection_handle_rotate_last_angle = angle
+	else:
+		# Move exactly by the pointer's delta along the locked axis so the hit point stays anchored.
+		if abs(delta_proj) <= selection_handle_move_deadzone:
+			return
+		var move_amount: float = delta_proj
+		_move_selected_objects_along_axis(axis, move_amount)
 	_selection_handle_last_proj = current_proj
 	_update_selection_bounds()
 	_update_handle_visuals(true)
@@ -717,11 +873,34 @@ func _move_selected_objects_along_axis(axis: Vector3, distance: float) -> void:
 			_move_node_along_axis(node, dir, distance)
 
 
+func _scale_selected_objects_along_axis(axis: Vector3, scale_factor: float) -> void:
+	if axis == Vector3.ZERO:
+		return
+	var dir: Vector3 = axis.normalized()
+	for node in _selected_objects:
+		if is_instance_valid(node):
+			_scale_node_along_axis(node, dir, scale_factor)
+
+
+func _rotate_selected_objects(axis: Vector3, pivot: Vector3, angle: float) -> void:
+	if axis == Vector3.ZERO or angle == 0.0:
+		return
+	var dir: Vector3 = axis.normalized()
+	for node in _selected_objects:
+		if is_instance_valid(node):
+			_rotate_node_around_axis(node, pivot, dir, angle)
+
+
 func _update_selection_handle_activation(action_state: Dictionary, handler: Node) -> void:
+	if not enable_selection_bounds or not show_selection_handles:
+		return
 	if not handler or not is_instance_valid(handler):
 		if action_state.get("just_released", false):
 			_selection_handle_active_axis = Vector3.ZERO
 			_selection_handle_active_handle = null
+			_selection_handle_active_mode = "translate"
+			_selection_handle_rotate_ref = Vector3.ZERO
+			_selection_handle_rotate_last_angle = 0.0
 			_update_handle_visuals(false)
 		return
 	if handler.has_meta("selection_handle_axis") and action_state.get("just_pressed", false):
@@ -729,13 +908,26 @@ func _update_selection_handle_activation(action_state: Dictionary, handler: Node
 		if axis_meta is Vector3:
 			_selection_handle_active_axis = (axis_meta as Vector3).normalized()
 			_selection_handle_active_handle = handler as Node3D
+			_selection_handle_active_mode = handler.get_meta("selection_handle_mode", "translate")
 			_selection_handle_last_proj = _pointer_hit_point.dot(_selection_handle_active_axis)
 			_selection_handle_grab_point = _compute_active_grab_point()
 			_selection_handle_grab_offset = (_selection_handle_grab_point - _selection_handle_active_handle.global_transform.origin).dot(_selection_handle_active_axis) if _selection_handle_active_handle else 0.0
+			var ref_extent: float = abs(_selection_last_half_size.x * _selection_handle_active_axis.x) + abs(_selection_last_half_size.y * _selection_handle_active_axis.y) + abs(_selection_last_half_size.z * _selection_handle_active_axis.z)
+			_selection_handle_scale_reference = max(ref_extent, 0.05)
+			if _selection_handle_active_mode == "rotate":
+				_selection_handle_rotate_center = _selection_last_center
+				var ref_vec := _project_on_plane(_pointer_hit_point - _selection_handle_rotate_center, _selection_handle_active_axis)
+				if ref_vec.length() < 0.0001:
+					ref_vec = _any_perpendicular(_selection_handle_active_axis)
+				_selection_handle_rotate_ref = ref_vec
+				_selection_handle_rotate_last_angle = 0.0
 			_update_handle_visuals(true)
 	if action_state.get("just_released", false):
 		_selection_handle_active_axis = Vector3.ZERO
 		_selection_handle_active_handle = null
+		_selection_handle_active_mode = "translate"
+		_selection_handle_rotate_ref = Vector3.ZERO
+		_selection_handle_rotate_last_angle = 0.0
 		_update_handle_visuals(false)
 
 
@@ -754,7 +946,68 @@ func _move_node_along_axis(node: Node3D, dir: Vector3, distance: float) -> void:
 		node.global_position += delta_vec
 
 
+func _project_on_plane(vec: Vector3, axis: Vector3) -> Vector3:
+	var n := axis.normalized()
+	return vec - n * vec.dot(n)
+
+
+func _signed_angle_on_plane(ref: Vector3, cur: Vector3, axis: Vector3) -> float:
+	var a := ref.normalized()
+	var b := cur.normalized()
+	var dot_ab: float = clamp(a.dot(b), -1.0, 1.0)
+	var cross_ab: Vector3 = a.cross(b)
+	var angle := acos(dot_ab)
+	var sign := 1.0 if cross_ab.dot(axis) >= 0.0 else -1.0
+	return angle * sign
+
+
+func _any_perpendicular(axis: Vector3) -> Vector3:
+	var n := axis.normalized()
+	if abs(n.dot(Vector3.UP)) < 0.99:
+		return n.cross(Vector3.UP).normalized()
+	return n.cross(Vector3.FORWARD).normalized()
+
+
+func _scale_node_along_axis(node: Node3D, dir: Vector3, scale_factor: float) -> void:
+	if scale_factor == 1.0:
+		return
+	# Map world axis into the node's local space to scale the most aligned components.
+	var local_axis: Vector3 = node.global_transform.basis.inverse() * dir
+	var weights := Vector3(abs(local_axis.x), abs(local_axis.y), abs(local_axis.z))
+	# Avoid zero weights so we at least apply some scaling.
+	var safe_weights := Vector3(
+		max(weights.x, 0.001),
+		max(weights.y, 0.001),
+		max(weights.z, 0.001)
+	)
+	var scale_vec := Vector3(
+		lerp(1.0, scale_factor, clamp(safe_weights.x, 0.0, 1.0)),
+		lerp(1.0, scale_factor, clamp(safe_weights.y, 0.0, 1.0)),
+		lerp(1.0, scale_factor, clamp(safe_weights.z, 0.0, 1.0))
+	)
+	node.scale = node.scale * scale_vec
+
+
+func _rotate_node_around_axis(node: Node3D, pivot: Vector3, axis: Vector3, angle: float) -> void:
+	var basis_rot := Basis(axis, angle)
+	var xform := node.global_transform
+	var offset := xform.origin - pivot
+	offset = basis_rot * offset
+	xform.origin = pivot + offset
+	xform.basis = basis_rot * xform.basis
+	if node is RigidBody3D:
+		var rb := node as RigidBody3D
+		rb.global_transform = xform
+		rb.linear_velocity = Vector3.ZERO
+		rb.angular_velocity = Vector3.ZERO
+		rb.sleeping = false
+	else:
+		node.global_transform = xform
+
+
 func _update_selection_bounds() -> void:
+	if not enable_selection_bounds:
+		return
 	if not _selection_bounds_mesh:
 		return
 	var combined := _compute_selection_aabb()
@@ -768,6 +1021,8 @@ func _update_selection_bounds() -> void:
 
 
 func _clear_selection() -> void:
+	if not enable_selection_bounds:
+		return
 	_selected_objects.clear()
 	if _selection_bounds_mesh:
 		_selection_bounds_mesh.clear_surfaces()

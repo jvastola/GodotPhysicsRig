@@ -35,7 +35,7 @@ enum HandAssignment { DEFAULT, SWAPPED }
 
 # === World Grab / Utility Settings ===
 @export var enable_two_hand_world_scale: bool = true
-@export var enable_two_hand_world_rotation: bool = false
+@export var enable_two_hand_world_rotation: bool = true
 @export_range(0.01, 20.0, 0.05) var world_scale_min: float = 0.1
 @export_range(0.1, 1000.0, 0.1) var world_scale_max: float = 15.0
 @export_range(0.05, 1.5, 0.05) var world_scale_sensitivity: float = 0.35

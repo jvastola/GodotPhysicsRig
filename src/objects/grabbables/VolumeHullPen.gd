@@ -259,9 +259,17 @@ func _create_preview_point(pos: Vector3) -> void:
 	var sphere = MeshInstance3D.new()
 	sphere.mesh = _preview_sphere_mesh
 	sphere.material_override = _preview_material
-	sphere.global_position = pos
 	
+	# Add to the preview container before setting transforms to avoid
+	# get_global_transform warnings when the node is not yet inside the tree.
 	_preview_container.add_child(sphere)
+	
+	if sphere.is_inside_tree():
+		sphere.global_position = pos
+	else:
+		# Fallback to local position if the node hasn't entered the tree yet
+		sphere.position = pos
+	
 	_preview_spheres.append(sphere)
 
 

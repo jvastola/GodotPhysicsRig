@@ -1,4 +1,4 @@
-[gd_scene load_steps=33 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=34 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -29,6 +29,7 @@
 [ext_resource type="PackedScene" path="res://src/ui/ColorPickerViewport3D.tscn" id="30_color_picker_viewport"]
 [ext_resource type="PackedScene" path="res://src/ui/PolyToolViewport3D.tscn" id="31_poly_tool_viewport"]
 [ext_resource type="PackedScene" path="res://src/ui/ActionMapViewport3D.tscn" id="32_action_map_viewport"]
+[ext_resource type="PackedScene" path="res://src/objects/TransformTool.tscn" id="33_transform_tool"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -101,6 +102,9 @@ height_noise_scale = 0.0
 
 [node name="VoxelTool" parent="." unique_id=884242549 instance=ExtResource("15_voxel_tool")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1, 1.3955536)
+
+[node name="TransformTool" parent="." unique_id=1583429753 instance=ExtResource("33_transform_tool")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.6, 1, 1.3955536)
 
 [node name="MovementSettingsViewport3D2" parent="." unique_id=866338396 instance=ExtResource("26_movement_settings_v2")]
 transform = Transform3D(0.42, 0, 0, 0, 0.42, 0, 0, 0, 0.42, -0.1, 1.6099689, 2.5455537)
