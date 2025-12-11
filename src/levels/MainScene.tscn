@@ -27,6 +27,7 @@
 [ext_resource type="PackedScene" uid="uid://cqtv3jhgmgsfw" path="res://src/levels/poly_exports/poly_2025-12-09T16-25-02.gltf" id="28_wb7rf"]
 [ext_resource type="PackedScene" uid="uid://wly7in1mfwww" path="res://src/objects/grabbables/PolyTool.tscn" id="29_poly_tool"]
 [ext_resource type="PackedScene" path="res://src/ui/ColorPickerViewport3D.tscn" id="30_color_picker_viewport"]
+[ext_resource type="PackedScene" path="res://src/ui/PerformanceSettingsViewport3D.tscn" id="40_perf_panel"]
 [ext_resource type="PackedScene" path="res://src/ui/PolyToolViewport3D.tscn" id="31_poly_tool_viewport"]
 [ext_resource type="PackedScene" path="res://src/ui/ActionMapViewport3D.tscn" id="32_action_map_viewport"]
 [ext_resource type="PackedScene" path="res://src/objects/TransformTool.tscn" id="33_transform_tool"]
@@ -143,6 +144,8 @@ transform = Transform3D(0.38, 0, 0, 0, 0.38, 0, 0, 0, 0.38, -2.15, 0.92, 2.54555
 [node name="ConvexHullPen" parent="." unique_id=438475259 instance=ExtResource("23_convex_hull_pen")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, 1.5, 1.3955536)
 
+[node name="PerformanceSettingsViewport3D" parent="." unique_id=999123001 instance=ExtResource("40_perf_panel")]
+transform = Transform3D(0.38, 0, 0, 0, 0.38, 0, 0, 0, 0.38, 2.7, 0.85, 2.3955536)
 [node name="VolumeHullPen" parent="." unique_id=510759392 instance=ExtResource("24_volume_hull_pen")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1.5, 1.3955536)
 

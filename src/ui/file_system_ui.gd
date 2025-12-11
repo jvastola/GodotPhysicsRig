@@ -1,6 +1,8 @@
 extends PanelContainer
 class_name FileSystemUI
 
+const PerformanceMonitor = preload("res://src/systems/performance_monitor.gd")
+
 ## FileSystemUI - Displays project files in a tree structure
 ## Works like Godot's FileSystem dock for VR browsing
 
@@ -362,6 +364,12 @@ func _try_instance_scene_from_path(path: String) -> void:
 		return
 	inst.name = _make_unique_name(parent, inst.name)
 	parent.add_child(inst)
+	if PerformanceMonitor and PerformanceMonitor.instance:
+		PerformanceMonitor.instance.register_spawn(inst)
+		print("FileSystemUI: Active spawned count = %d / %d" % [
+			PerformanceMonitor.instance.get_spawn_count(),
+			PerformanceMonitor.instance.max_spawned_nodes
+		])
 	_set_owner_recursive(inst, parent)
 	_apply_spawn_transform(inst)
 	print("FileSystemUI: Spawned scene into world: ", inst.name, " from ", scene_path)

@@ -1,5 +1,7 @@
 extends Control
 
+const PerformanceMonitor = preload("res://src/systems/performance_monitor.gd")
+
 @onready var tab = $TabContainer
 @onready var vbox_turn = $TabContainer/TurnScroll/TurnVBox
 @onready var vbox_player = $TabContainer/PlayerScroll/PlayerVBox
@@ -15,6 +17,9 @@ var _world_environment: WorldEnvironment
 var _world_env_snapshot: Dictionary = {}
 var _root_viewport: Viewport
 var _viewport_transparent_default: bool = false
+var _perf_mode_check: CheckBox
+var _perf_mode_label: Label
+var _perf_panel_instance: Node3D
 
 const MAIN_SCENE_PATH := "res://src/levels/MainScene.tscn"
 
@@ -95,7 +100,31 @@ func _setup_ui() -> void:
 	if vbox_player:
 		vbox_player.add_theme_constant_override("separation", 8)
 	
+	# Ensure main-scene PerformanceSettingsViewport3D exists; if not, try to add it
+	_ensure_perf_viewport_in_scene()
+	
 	# === Turn Settings Tab ===
+	# Performance mode toggle (default ON)
+	var perf_row = HBoxContainer.new()
+	perf_row.add_theme_constant_override("separation", 10)
+	_perf_mode_label = Label.new()
+	_perf_mode_label.text = "Performance Mode:"
+	_perf_mode_label.custom_minimum_size = Vector2(140, 0)
+	perf_row.add_child(_perf_mode_label)
+	_perf_mode_check = CheckBox.new()
+	_perf_mode_check.text = "On"
+	var perf_on := true
+	if Engine.has_singleton("GameManager"):
+		var gm = GameManager
+		if gm and gm.performance_monitor:
+			perf_on = gm.performance_monitor.perf_mode_enabled
+	elif PerformanceMonitor and PerformanceMonitor.instance:
+		perf_on = PerformanceMonitor.instance.perf_mode_enabled
+	_perf_mode_check.button_pressed = perf_on
+	_perf_mode_check.toggled.connect(_on_perf_mode_toggled)
+	perf_row.add_child(_perf_mode_check)
+	vbox_turn.add_child(perf_row)
+	_add_separator(vbox_turn)
 	
 	# Add Turn Mode (Snap/Smooth)
 	var mode_h = HBoxContainer.new()
@@ -350,6 +379,18 @@ func _add_separator(parent: VBoxContainer) -> void:
 	separator.custom_minimum_size = Vector2(0, 4)
 	parent.add_child(separator)
 
+
+func _on_perf_mode_toggled(enabled: bool) -> void:
+	if _perf_mode_check:
+		_perf_mode_check.text = "On" if enabled else "Off"
+	if Engine.has_singleton("GameManager"):
+		var gm = GameManager
+		if gm and gm.performance_monitor:
+			gm.performance_monitor.set_perf_mode(enabled)
+			return
+	if PerformanceMonitor and PerformanceMonitor.instance:
+		PerformanceMonitor.instance.set_perf_mode(enabled)
+
 func _on_mode_selected(index: int) -> void:
 	if movement_component:
 		movement_component.turn_mode = index as PlayerMovementComponent.TurnMode
@@ -450,6 +491,29 @@ func _find_world_environment() -> void:
 				"background_color": env.background_color,
 				"sky": env.sky,
 			}
+
+
+func _ensure_perf_viewport_in_scene() -> void:
+	if _perf_panel_instance and is_instance_valid(_perf_panel_instance):
+		return
+	var root := get_tree().current_scene
+	if not root:
+		return
+	var existing := root.find_child("PerformanceSettingsViewport3D", true, false)
+	if existing and existing is Node3D:
+		_perf_panel_instance = existing as Node3D
+		return
+	var res := ResourceLoader.load("res://src/ui/PerformanceSettingsViewport3D.tscn")
+	if res and res is PackedScene:
+		var inst: Node = res.instantiate()
+		if inst and inst is Node3D:
+			var n3d := inst as Node3D
+			_perf_panel_instance = n3d
+			n3d.transform = Transform3D(
+				Basis.IDENTITY.scaled(Vector3(0.38, 0.38, 0.38)),
+				Vector3(2.7, 0.85, 2.3955536)
+			)
+			root.add_child(n3d)
 
 
 func _supports_alpha_passthrough() -> bool:

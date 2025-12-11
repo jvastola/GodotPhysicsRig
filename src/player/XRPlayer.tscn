@@ -106,6 +106,7 @@ show_line = false
 show_hitpoint = false
 
 [node name="UIViewportWatch" parent="PlayerBody/XROrigin3D/LeftController/Watch" unique_id=766114696 instance=ExtResource("7_ui_viewport")]
+visible = false
 transform = Transform3D(0.12, 0, 0, 0, 0.055748, 0.106271, 0, -0.106271, 0.055748, 0, 0.058575, -0.118114)
 
 [node name="WatchFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch" unique_id=1295475450]

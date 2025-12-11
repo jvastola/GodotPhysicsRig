@@ -2,16 +2,22 @@
 # Manages global game state and scene transitions
 extends Node
 
+const PerformanceMonitor = preload("res://src/systems/performance_monitor.gd")
+
 var current_world: Node = null
 var player_instance: Node = null
 var _is_changing_scene: bool = false
 var _fallback_environment: Environment = null
+var performance_monitor: PerformanceMonitor = null
 
 const PLAYER_SCENE_PATH := "res://src/player/XRPlayer.tscn"
 
 
 func _ready() -> void:
 	print("GameManager: Ready")
+	# Attach lightweight perf monitor (dynamic resolution + spawn capping)
+	performance_monitor = PerformanceMonitor.new()
+	add_child(performance_monitor)
 	# Track the initial scene as current_world
 	call_deferred("_setup_initial_world")
 
@@ -21,6 +27,8 @@ func _setup_initial_world() -> void:
 	await get_tree().process_frame
 	current_world = get_tree().current_scene
 	_cache_fallback_environment_from(current_world)
+	if performance_monitor and current_world:
+		performance_monitor.register_tools_in_world(current_world)
 	
 	# Find the XRPlayer root node (PlayerBody is in "player" group, but we need its parent)
 	var player_body = get_tree().get_first_node_in_group("player")
@@ -359,6 +367,8 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 	get_tree().root.add_child(current_world)
 	if current_world != raw_world:
 		current_world.add_child(raw_world)
+	if performance_monitor and current_world:
+		performance_monitor.register_tools_in_world(current_world)
 		print("GameManager: Wrapped world ", raw_world.name, " in a Node3D container for transforms")
 	
 	# Ensure the new world has an environment; if missing, apply the cached main-scene one
