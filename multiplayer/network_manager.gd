@@ -78,9 +78,21 @@ var _ping_check_interval: float = 1.0  # Check ping every second
 var _last_bytes_sent: int = 0
 var _last_bytes_received: int = 0
 var _monitor_timer: Timer = null
+var _metrics := {
+	"connect_attempts": 0,
+	"connect_successes": 0,
+	"connect_failures": 0,
+	"last_connect_start_msec": 0,
+	"last_connect_latency_ms": 0,
+	"disconnects": 0,
+	"reconnect_attempts": 0,
+	"send_failures": 0,
+	"last_send_failure": ""
+}
 
 signal connection_quality_changed(quality: ConnectionQuality)
 signal network_stats_updated(stats: Dictionary)
+signal metrics_updated(metrics: Dictionary)
 
 # Push-to-talk
 enum VoiceMode {
@@ -157,15 +169,23 @@ func generate_room_code() -> String:
 
 ## Create a server (host) with optional room code
 func create_server(port: int = DEFAULT_PORT, use_room_code: bool = true) -> Error:
+	_metrics["connect_attempts"] += 1
+	_metrics["last_connect_start_msec"] = Time.get_ticks_msec()
+	_emit_metrics()
 	peer = ENetMultiplayerPeer.new()
 	var error = peer.create_server(port, MAX_CLIENTS)
 	
 	if error != OK:
 		push_error("Failed to create server: " + str(error))
+		_metrics["connect_failures"] += 1
+		_emit_metrics()
 		return error
 	
 	multiplayer.multiplayer_peer = peer
 	print("Server created on port ", port)
+	_metrics["connect_successes"] += 1
+	_metrics["last_connect_latency_ms"] = 0
+	_emit_metrics()
 	
 	# Generate room code if requested
 	if use_room_code:
@@ -222,11 +242,16 @@ func join_by_room_code(room_code: String) -> void:
 
 ## Join a server (client)
 func join_server(address: String, port: int = DEFAULT_PORT) -> Error:
+	_metrics["connect_attempts"] += 1
+	_metrics["last_connect_start_msec"] = Time.get_ticks_msec()
+	_emit_metrics()
 	peer = ENetMultiplayerPeer.new()
 	var error = peer.create_client(address, port)
 	
 	if error != OK:
 		push_error("Failed to join server: " + str(error))
+		_metrics["connect_failures"] += 1
+		_emit_metrics()
 		return error
 	
 	multiplayer.multiplayer_peer = peer
@@ -382,6 +407,11 @@ func _on_peer_disconnected(id: int) -> void:
 
 func _on_connected_to_server() -> void:
 	print("Successfully connected to server")
+	if _metrics["last_connect_start_msec"] > 0:
+		_metrics["last_connect_latency_ms"] = Time.get_ticks_msec() - int(_metrics["last_connect_start_msec"])
+	_metrics["connect_successes"] += 1
+	_metrics["reconnect_attempts"] = _reconnection_attempt
+	_emit_metrics()
 	_register_local_player()
 	
 	# Request existing player list from server
@@ -393,6 +423,8 @@ func _on_connected_to_server() -> void:
 
 func _on_connection_failed() -> void:
 	push_error("Failed to connect to server")
+	_metrics["connect_failures"] += 1
+	_emit_metrics()
 	peer = null
 	multiplayer.multiplayer_peer = null
 	connection_failed.emit()
@@ -401,6 +433,8 @@ func _on_connection_failed() -> void:
 
 func _on_server_disconnected() -> void:
 	print("Server disconnected")
+	_metrics["disconnects"] += 1
+	_emit_metrics()
 	peer = null
 	multiplayer.multiplayer_peer = null
 	players.clear()
@@ -949,6 +983,8 @@ func _attempt_reconnection() -> void:
 		return
 	
 	_reconnection_attempt += 1
+	_metrics["reconnect_attempts"] = _reconnection_attempt
+	_emit_metrics()
 	print("NetworkManager: Reconnection attempt ", _reconnection_attempt, "/", MAX_RECONNECTION_ATTEMPTS)
 	
 	if _last_connection_address != "" and _last_connection_port > 0:
@@ -969,6 +1005,18 @@ func _attempt_reconnection() -> void:
 func get_network_stats() -> Dictionary:
 	"""Get current network statistics"""
 	return network_stats.duplicate()
+
+func get_metrics() -> Dictionary:
+	"""Get lightweight connection/reconnect metrics"""
+	return _metrics.duplicate()
+
+func _emit_metrics() -> void:
+	metrics_updated.emit(_metrics.duplicate())
+
+func _record_send_failure(reason: String) -> void:
+	_metrics["send_failures"] += 1
+	_metrics["last_send_failure"] = reason
+	_emit_metrics()
 
 
 func get_connection_quality() -> ConnectionQuality:

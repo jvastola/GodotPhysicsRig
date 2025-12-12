@@ -17,6 +17,17 @@ func _log_warn(msg: String, extra: Variant = null) -> void:
 func _log_error(msg: String, extra: Variant = null) -> void:
 	AppLogger.error("LiveKit", msg, extra)
 
+func get_metrics() -> Dictionary:
+	return _metrics.duplicate()
+
+func _emit_metrics() -> void:
+	metrics_updated.emit(_metrics.duplicate())
+
+func _record_send_failure(reason: String) -> void:
+	_metrics["send_failures"] += 1
+	_metrics["last_send_failure"] = reason
+	_emit_metrics()
+
 # Signals - unified across platforms
 signal room_connected()
 signal room_disconnected()
@@ -31,6 +42,7 @@ signal audio_track_published()
 signal audio_track_unpublished()
 signal audio_frame_received(peer_id: String, frame: PackedVector2Array)
 signal chat_message_received(sender: String, message: String, timestamp: int)
+signal metrics_updated(metrics: Dictionary)
 
 # Platform detection
 enum Platform { DESKTOP, ANDROID }
@@ -45,6 +57,17 @@ var _is_connected: bool = false
 var _local_identity: String = ""
 var _is_muted: bool = false  # Track mute state for desktop (Rust doesn't have enable_microphone)
 var _current_room: String = ""
+var _metrics := {
+	"connect_attempts": 0,
+	"connect_successes": 0,
+	"connect_failures": 0,
+	"last_connect_start_msec": 0,
+	"last_connect_latency_ms": 0,
+	"reconnect_attempts": 0,
+	"send_failures": 0,
+	"last_send_failure": "",
+	"last_disconnect_msec": 0
+}
 
 
 func _ready() -> void:
@@ -129,6 +152,9 @@ func _connect_rust_signals() -> void:
 func connect_to_room(url: String, token: String) -> void:
 	_log_info("Connecting to room", url)
 	_current_room = url
+	_metrics["connect_attempts"] += 1
+	_metrics["last_connect_start_msec"] = Time.get_ticks_msec()
+	_emit_metrics()
 	
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
@@ -167,9 +193,13 @@ func send_data(data: String, _reliable: bool = true) -> void:
 		if _android_plugin:
 			var bytes = data.to_utf8_buffer()
 			_send_bytes_android(bytes, "", reliable)
+		else:
+			_record_send_failure("android_plugin_missing")
 	else:
 		if _rust_manager:
 			_send_data_rust(data, reliable)
+		else:
+			_record_send_failure("rust_manager_missing")
 
 
 ## Send data to a specific participant
@@ -182,9 +212,13 @@ func send_data_to(data: String, identity: String, _reliable: bool = true) -> voi
 		if _android_plugin:
 			var bytes = data.to_utf8_buffer()
 			_send_bytes_android(bytes, "", reliable, identity)
+		else:
+			_record_send_failure("android_plugin_missing")
 	else:
 		if _rust_manager:
 			_send_data_rust(data, reliable, identity)
+		else:
+			_record_send_failure("rust_manager_missing")
 
 
 # Internal: route data send to Android plugin with best-effort reliability handling.
@@ -371,18 +405,28 @@ func set_participant_muted(identity: String, muted: bool) -> void:
 
 func _on_room_connected() -> void:
 	_is_connected = true
+	if _metrics["last_connect_start_msec"] > 0:
+		_metrics["last_connect_latency_ms"] = Time.get_ticks_msec() - int(_metrics["last_connect_start_msec"])
+	_metrics["connect_successes"] += 1
+	_metrics["reconnect_attempts"] = 0
+	_emit_metrics()
 	_log_info("Room connected")
 	room_connected.emit()
 
 
 func _on_room_disconnected() -> void:
 	_is_connected = false
+	_metrics["last_disconnect_msec"] = Time.get_ticks_msec()
+	_emit_metrics()
 	_log_info("Room disconnected")
 	room_disconnected.emit()
 
 
 func _on_connection_error(message: String) -> void:
 	_is_connected = false
+	_metrics["connect_failures"] += 1
+	_metrics["last_disconnect_msec"] = Time.get_ticks_msec()
+	_emit_metrics()
 	_log_error("Connection error", message)
 	connection_error.emit(message)
 
