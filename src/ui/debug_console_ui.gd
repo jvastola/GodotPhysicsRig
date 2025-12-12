@@ -2,6 +2,7 @@ extends PanelContainer
 
 # Debug Console UI - Displays print output and errors in 3D worldspace
 # Captures messages via a custom logger
+const AppLogger = preload("res://src/systems/logger.gd")
 
 signal console_cleared
 
@@ -18,6 +19,9 @@ signal console_cleared
 @onready var save_physics_button: Button = $MarginContainer/VBoxContainer/HBoxContainer/SavePhysicsButton
 @onready var reset_physics_button: Button = $MarginContainer/VBoxContainer/HBoxContainer/ResetPhysicsButton
 @onready var player_exclude_button: Button = $MarginContainer/VBoxContainer/HBoxContainer/PlayerExcludeButton
+@onready var log_level_option: OptionButton = $MarginContainer/VBoxContainer/HBoxContainer/LogLevelOption
+@onready var command_line: LineEdit = $MarginContainer/VBoxContainer/CommandRow/CommandLine
+@onready var command_run_button: Button = $MarginContainer/VBoxContainer/CommandRow/CommandRunButton
 
 var _messages: Array[Dictionary] = []
 var _filter: int = 0  # 0=All, 1=Info, 2=Warning, 3=Error
@@ -44,6 +48,7 @@ static var instance: PanelContainer = null
 
 func _ready() -> void:
 	instance = self
+	AppLogger.apply_project_setting_default()
 	
 	if clear_button:
 		clear_button.pressed.connect(_on_clear_pressed)
@@ -54,6 +59,10 @@ func _ready() -> void:
 		filter_option.add_item("Warning", 2)
 		filter_option.add_item("Error", 3)
 		filter_option.item_selected.connect(_on_filter_changed)
+	
+	if log_level_option:
+		_populate_log_level_option()
+		log_level_option.item_selected.connect(_on_log_level_selected)
 	
 	if physics_toggle_button:
 		# PhysicsServer3D does not expose a getter for active state; assume enabled
@@ -75,6 +84,15 @@ func _ready() -> void:
 		output_label.bbcode_enabled = true
 		output_label.scroll_following = auto_scroll
 		output_label.add_theme_font_size_override("normal_font_size", font_size)
+	
+	if command_line:
+		command_line.placeholder_text = "loglevel debug|info|warn|error"
+		command_line.text_submitted.connect(_on_command_submitted)
+	if command_run_button:
+		command_run_button.pressed.connect(func():
+			var text := command_line.text if command_line else ""
+			_on_command_submitted(text)
+		)
 	
 	# Add startup message
 	log_system("Debug Console initialized")
@@ -114,6 +132,13 @@ static func log_error(message: String) -> void:
 ## Log a system message
 func log_system(message: String) -> void:
 	_add_message(message, MessageType.SYSTEM)
+
+
+## Run a console command (e.g., "loglevel debug")
+static func run_command(command: String) -> bool:
+	if instance:
+		return instance._handle_command(command)
+	return false
 
 
 ## Add a message to the console
@@ -196,6 +221,34 @@ func _on_clear_pressed() -> void:
 func _on_filter_changed(index: int) -> void:
 	_filter = index
 	_refresh_display()
+
+
+func _populate_log_level_option() -> void:
+	log_level_option.clear()
+	log_level_option.add_item("Debug", AppLogger.Level.DEBUG)
+	log_level_option.add_item("Info", AppLogger.Level.INFO)
+	log_level_option.add_item("Warn", AppLogger.Level.WARN)
+	log_level_option.add_item("Error", AppLogger.Level.ERROR)
+	_update_log_level_option_selection()
+
+
+func _update_log_level_option_selection() -> void:
+	if not log_level_option:
+		return
+	var current_level := AppLogger.get_level()
+	var item_index := log_level_option.get_item_index(current_level)
+	if item_index >= 0:
+		log_level_option.select(item_index)
+
+
+func _on_log_level_selected(index: int) -> void:
+	if not log_level_option:
+		return
+	var level_id := log_level_option.get_item_id(index)
+	var previous_label := AppLogger.get_level_label()
+	AppLogger.set_level(level_id)
+	_update_log_level_option_selection()
+	log_system("Log level set to %s (was %s)" % [AppLogger.get_level_label(), previous_label])
 
 
 func _on_physics_toggled(pressed: bool) -> void:
@@ -409,6 +462,33 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		physics_toggle_button.button_pressed = not _physics_active
 		_on_physics_toggled(physics_toggle_button.button_pressed)
+
+
+func _handle_command(command: String) -> bool:
+	var trimmed := command.strip_edges()
+	if trimmed == "":
+		log_warning("No command provided")
+		return false
+	var lower := trimmed.to_lower()
+	if lower.begins_with("loglevel"):
+		var parts := trimmed.split(" ", false, 2)
+		if parts.size() < 2:
+			log_warning("Usage: loglevel <debug|info|warn|error>")
+			return false
+		var previous_label := AppLogger.get_level_label()
+		AppLogger.set_level_from_label(parts[1])
+		_update_log_level_option_selection()
+		log_system("Log level set to %s (was %s)" % [AppLogger.get_level_label(), previous_label])
+		return true
+	
+	log_warning("Unknown command: %s" % trimmed)
+	return false
+
+
+func _on_command_submitted(text: String) -> void:
+	var handled := _handle_command(text)
+	if handled and command_line:
+		command_line.text = ""
 
 
 ## Clear all messages

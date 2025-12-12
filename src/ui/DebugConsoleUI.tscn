@@ -81,6 +81,16 @@ custom_minimum_size = Vector2(80, 0)
 layout_mode = 2
 theme_override_font_sizes/font_size = 11
 
+[node name="LogLevelLabel" type="Label" parent="MarginContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Log:"
+
+[node name="LogLevelOption" type="OptionButton" parent="MarginContainer/VBoxContainer/HBoxContainer"]
+custom_minimum_size = Vector2(110, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+
 [node name="PhysicsToggleButton" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer"]
 process_mode = 3
 custom_minimum_size = Vector2(120, 28)
@@ -122,3 +132,26 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.95, 1.0, 1.0)
 theme_override_font_sizes/font_size = 11
 text = "🗑️ Clear"
+
+[node name="CommandRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CommandLabel" type="Label" parent="MarginContainer/VBoxContainer/CommandRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Command:"
+
+[node name="CommandLine" type="LineEdit" parent="MarginContainer/VBoxContainer/CommandRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "loglevel debug"
+clear_button_enabled = true
+
+[node name="CommandRunButton" type="Button" parent="MarginContainer/VBoxContainer/CommandRow"]
+process_mode = 3
+custom_minimum_size = Vector2(70, 28)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.95, 1.0, 1.0)
+theme_override_font_sizes/font_size = 11
+text = "Run"

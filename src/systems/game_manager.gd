@@ -57,7 +57,8 @@ func _log_error(msg: String, extra: Variant = null) -> void:
 
 
 func _ready() -> void:
-	_log_info("Ready")
+	AppLogger.apply_project_setting_default()
+	_log_info("Ready (log level: %s)" % AppLogger.get_level_label())
 	set_process(true)
 	# Track the initial scene as current_world
 	call_deferred("_setup_initial_world")
