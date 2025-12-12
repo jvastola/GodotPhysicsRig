@@ -1,5 +1,6 @@
-extends Grabbable
 class_name VoxelTool
+extends Grabbable
+const ToolPoolManager = preload("res://src/systems/tool_pool_manager.gd")
 ## Grabbable Voxel Tool - Place and remove voxels with adjustable ray and grid size
 
 # === Ray Settings ===
@@ -42,10 +43,14 @@ var _is_remove_mode: bool = false
 var _has_hit: bool = false
 var _hit_point: Vector3 = Vector3.ZERO
 var _hit_normal: Vector3 = Vector3.UP
+const POOL_TYPE := "voxel_tool"
 
 
 func _ready() -> void:
 	super._ready()
+	var pool := ToolPoolManager.find()
+	if pool:
+		pool.register_instance(POOL_TYPE, self)
 	
 	# Create child nodes
 	_create_raycast()
@@ -387,6 +392,20 @@ func _set_visuals_visible(visible_state: bool) -> void:
 		indicator_mesh.visible = visible_state
 	if hit_marker:
 		hit_marker.visible = visible_state
+
+
+func on_pooled() -> void:
+	set_physics_process(false)
+	_was_trigger_pressed = false
+	_set_visuals_visible(false)
+	visible = false
+
+
+func on_unpooled() -> void:
+	visible = true
+	_was_trigger_pressed = false
+	_ensure_visuals_in_tree()
+	set_physics_process(false)
 
 
 # === Public API ===

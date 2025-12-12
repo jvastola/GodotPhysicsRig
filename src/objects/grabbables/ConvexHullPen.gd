@@ -1,6 +1,7 @@
 # ConvexHullPen - A grabbable pen that creates convex hull meshes
 # Hold trigger while gripping to record points, release to generate hull
 extends Grabbable
+const ToolPoolManager = preload("res://src/systems/tool_pool_manager.gd")
 
 # Configuration
 @export var tip_offset: Vector3 = Vector3(0, 0, -0.15)  # Offset from center to pen tip
@@ -24,11 +25,15 @@ var _prev_trigger_pressed: bool = false
 # Shared resources for preview spheres
 var _preview_sphere_mesh: SphereMesh = null
 var _preview_material: StandardMaterial3D = null
+const POOL_TYPE := "convex_hull"
 
 
 func _ready() -> void:
 	# Call parent Grabbable._ready() for standard grabbable setup
 	super._ready()
+	var pool := ToolPoolManager.find()
+	if pool:
+		pool.register_instance(POOL_TYPE, self)
 	
 	# Connect to our own signals
 	grabbed.connect(_on_pen_grabbed)
@@ -216,6 +221,12 @@ func _generate_convex_hull() -> void:
 	"""Generate a convex hull mesh and physics body from recorded points"""
 	if _recorded_points.size() < min_points:
 		print("ConvexHullPen: Cannot generate hull - not enough points")
+		return
+	
+	# Check hull limit before creating
+	var pool := ToolPoolManager.find()
+	if pool and not pool.can_create_hull():
+		print("ConvexHullPen: Hull limit reached, cannot create more hulls")
 		return
 	
 	print("ConvexHullPen: Generating convex hull from ", _recorded_points.size(), " points")
@@ -409,6 +420,29 @@ func _order_points_for_mesh(points: PackedVector3Array, centroid: Vector3) -> Ar
 		ordered.append(pa["point"])
 	
 	return ordered
+
+
+func on_pooled() -> void:
+	set_physics_process(false)
+	_is_recording = false
+	_recorded_points.clear()
+	_prev_trigger_pressed = false
+	_cleanup_previews()
+	if is_instance_valid(_preview_container):
+		_preview_container.queue_free()
+		_preview_container = null
+	_controller = null
+	_hand = null
+	visible = false
+
+
+func on_unpooled() -> void:
+	visible = true
+	if not is_instance_valid(_preview_container):
+		_create_preview_container()
+	_recorded_points.clear()
+	_prev_trigger_pressed = false
+	set_physics_process(false)
 
 
 func _exit_tree() -> void:

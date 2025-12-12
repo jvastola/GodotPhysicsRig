@@ -1,0 +1,110 @@
+[gd_scene load_steps=2 format=3 uid="uid://performance_panel_ui"]
+
+[ext_resource type="Script" path="res://src/ui/performance_panel_ui.gd" id="1_script"]
+
+[node name="PerformancePanelUI" type="PanelContainer"]
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_type_variation = &"Panel"
+script = ExtResource("1_script")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+text = "Performance / Tool Pool"
+theme_override_colors/font_color = Color(0.8, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 20
+
+[node name="SubtitleLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+text = "Limit active tool spawns; extra instances are pooled automatically."
+theme_override_colors/font_color = Color(0.7, 0.85, 0.95, 1)
+theme_override_font_sizes/font_size = 13
+
+[node name="LimitGrid" type="GridContainer" parent="MarginContainer/VBoxContainer"]
+columns = 1
+theme_override_constants/separation = 6
+
+[node name="PolyRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer/LimitGrid"]
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MarginContainer/VBoxContainer/LimitGrid/PolyRow"]
+text = "Poly Tool"
+custom_minimum_size = Vector2(140, 0)
+
+[node name="Spin" type="SpinBox" parent="MarginContainer/VBoxContainer/LimitGrid/PolyRow"]
+min_value = 0.0
+max_value = 8.0
+step = 1.0
+value = 1.0
+custom_minimum_size = Vector2(120, 0)
+
+[node name="Counts" type="Label" parent="MarginContainer/VBoxContainer/LimitGrid/PolyRow"]
+text = "Active 0 / Pooled 0 (Limit 1)"
+size_flags_horizontal = 3
+
+[node name="ConvexRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer/LimitGrid"]
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MarginContainer/VBoxContainer/LimitGrid/ConvexRow"]
+text = "Convex Hull Pen"
+custom_minimum_size = Vector2(140, 0)
+
+[node name="Spin" type="SpinBox" parent="MarginContainer/VBoxContainer/LimitGrid/ConvexRow"]
+min_value = 0.0
+max_value = 8.0
+step = 1.0
+value = 1.0
+custom_minimum_size = Vector2(120, 0)
+
+[node name="Counts" type="Label" parent="MarginContainer/VBoxContainer/LimitGrid/ConvexRow"]
+text = "Active 0 / Pooled 0 (Limit 1)"
+size_flags_horizontal = 3
+
+[node name="VolumeRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer/LimitGrid"]
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MarginContainer/VBoxContainer/LimitGrid/VolumeRow"]
+text = "Volume Hull Pen"
+custom_minimum_size = Vector2(140, 0)
+
+[node name="Spin" type="SpinBox" parent="MarginContainer/VBoxContainer/LimitGrid/VolumeRow"]
+min_value = 0.0
+max_value = 8.0
+step = 1.0
+value = 1.0
+custom_minimum_size = Vector2(120, 0)
+
+[node name="Counts" type="Label" parent="MarginContainer/VBoxContainer/LimitGrid/VolumeRow"]
+text = "Active 0 / Pooled 0 (Limit 1)"
+size_flags_horizontal = 3
+
+[node name="VoxelRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer/LimitGrid"]
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MarginContainer/VBoxContainer/LimitGrid/VoxelRow"]
+text = "Voxel Tool"
+custom_minimum_size = Vector2(140, 0)
+
+[node name="Spin" type="SpinBox" parent="MarginContainer/VBoxContainer/LimitGrid/VoxelRow"]
+min_value = 0.0
+max_value = 8.0
+step = 1.0
+value = 1.0
+custom_minimum_size = Vector2(120, 0)
+
+[node name="Counts" type="Label" parent="MarginContainer/VBoxContainer/LimitGrid/VoxelRow"]
+text = "Active 0 / Pooled 0 (Limit 1)"
+size_flags_horizontal = 3
+
+[node name="StatusLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+text = "Ready"
+theme_override_colors/font_color = Color(0.75, 1, 0.75, 1)

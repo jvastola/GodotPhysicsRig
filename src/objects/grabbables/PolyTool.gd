@@ -1,5 +1,6 @@
 class_name PolyTool
 extends Grabbable
+const ToolPoolManager = preload("res://src/systems/tool_pool_manager.gd")
 const ColorPickerUI = preload("res://src/ui/color_picker_ui.gd")
 
 enum ToolMode {
@@ -67,9 +68,13 @@ var _mode_select_radius: float = 0.12
 var _mode_select_height: float = 0.02
 const _MODE_ORDER := [ToolMode.PLACE, ToolMode.EDIT, ToolMode.REMOVE, ToolMode.CONNECT, ToolMode.PAINT]
 var _mode_labels: Array[MeshInstance3D] = []
+const POOL_TYPE := "poly_tool"
 
 func _ready() -> void:
 	instance = self
+	var pool := ToolPoolManager.find()
+	if pool:
+		pool.register_instance(POOL_TYPE, self)
 	super._ready()
 	_create_visuals()
 	grabbed.connect(_on_grabbed)
@@ -871,6 +876,43 @@ func _find_first_mesh_instance(root: Node) -> MeshInstance3D:
 		for child in node.get_children():
 			queue.append(child)
 	return null
+
+
+func on_pooled() -> void:
+	if instance == self:
+		instance = null
+	set_physics_process(false)
+	_controller = null
+	_drag_index = -1
+	_connect_sequence.clear()
+	_clear_connect_lines()
+	_clear_geometry()
+	_end_mode_select()
+	if is_instance_valid(_preview_dot):
+		_preview_dot.visible = false
+	if is_instance_valid(_paint_dot):
+		_paint_dot.visible = false
+	if is_instance_valid(_mesh_instance):
+		_mesh_instance.visible = false
+	if is_instance_valid(_point_container):
+		_point_container.visible = false
+	visible = false
+
+
+func on_unpooled() -> void:
+	visible = true
+	if not is_instance_valid(_point_container) or not is_instance_valid(_mesh_instance):
+		_create_visuals()
+	if is_instance_valid(_mesh_instance):
+		_mesh_instance.visible = true
+	if is_instance_valid(_point_container):
+		_point_container.visible = true
+	if is_instance_valid(_preview_dot):
+		_preview_dot.visible = false
+	_update_point_visibility()
+	_clear_connect_lines()
+	set_physics_process(false)
+	instance = self
 
 
 func _clear_geometry() -> void:

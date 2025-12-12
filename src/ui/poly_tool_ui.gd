@@ -1,5 +1,5 @@
-extends PanelContainer
 class_name PolyToolUI
+extends PanelContainer
 
 @onready var path_edit: LineEdit = $MarginContainer/VBoxContainer/PathRow/PathEdit
 @onready var status_label: Label = $MarginContainer/VBoxContainer/StatusLabel
@@ -190,4 +190,3 @@ func _selected_file_path() -> String:
 	if name.begins_with("("):
 		return ""
 	return DEFAULT_DIR.path_join(name)
-

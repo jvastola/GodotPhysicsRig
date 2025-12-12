@@ -1,5 +1,6 @@
 extends PanelContainer
 class_name FileSystemUI
+const ToolPoolManager = preload("res://src/systems/tool_pool_manager.gd")
 
 ## FileSystemUI - Displays project files in a tree structure
 ## Works like Godot's FileSystem dock for VR browsing
@@ -352,19 +353,43 @@ func _try_instance_scene_from_path(path: String) -> void:
 	if not (res and res is PackedScene):
 		print("FileSystemUI: Selected file is not a PackedScene: ", scene_path)
 		return
+	
+	# Check spawn limits before instantiating
+	var pool := ToolPoolManager.find()
+	if pool and not pool.can_spawn_scene():
+		var count := pool.get_spawned_scene_count()
+		var max_count := pool.get_max_spawned_scenes()
+		print("FileSystemUI: Spawn limit reached (%d/%d). Clear spawned scenes first." % [count, max_count])
+		_show_spawn_limit_warning(count, max_count)
+		return
+	
 	var parent := _get_world_root()
 	if not parent:
 		print("FileSystemUI: No active world to spawn into")
 		return
-	var inst = res.instantiate()
+	var spawn_transform := _get_spawn_transform()
+	var inst: Node = null
+	var pooled := false
+	if pool:
+		inst = pool.request_scene_instance(scene_path, parent, spawn_transform)
+		pooled = inst != null
 	if not inst:
-		print("FileSystemUI: Failed to instantiate scene: ", scene_path)
-		return
+		inst = res.instantiate()
+		if not inst:
+			print("FileSystemUI: Failed to instantiate scene: ", scene_path)
+			return
+		parent.add_child(inst)
 	inst.name = _make_unique_name(parent, inst.name)
-	parent.add_child(inst)
 	_set_owner_recursive(inst, parent)
-	_apply_spawn_transform(inst)
-	print("FileSystemUI: Spawned scene into world: ", inst.name, " from ", scene_path)
+	if inst is Node3D:
+		(inst as Node3D).global_transform = spawn_transform
+	
+	# Register the spawned scene for tracking
+	if pool:
+		pool.register_spawned_scene(inst, scene_path)
+	
+	var mode_label := "pooled" if pooled else "new"
+	print("FileSystemUI: Spawned scene into world (%s): %s from %s" % [mode_label, inst.name, scene_path])
 	_refresh_scene_hierarchy()
 
 
@@ -484,3 +509,34 @@ func _find_item_by_path(item: TreeItem, path: String) -> TreeItem:
 		child = child.get_next()
 	
 	return null
+
+
+func _show_spawn_limit_warning(current: int, limit: int) -> void:
+	"""Show a warning popup when spawn limit is reached."""
+	# Create a temporary warning label that fades out
+	var warning := Label.new()
+	warning.text = "⚠️ Spawn limit reached (%d/%d)\nClear spawned scenes first" % [current, limit]
+	warning.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	warning.add_theme_color_override("font_color", Color(1, 0.65, 0.65))
+	warning.add_theme_font_size_override("font_size", 14)
+	
+	var container := $MarginContainer/VBoxContainer
+	if container:
+		container.add_child(warning)
+		container.move_child(warning, 0)
+		
+		# Auto-remove after 3 seconds
+		var timer := get_tree().create_timer(3.0)
+		timer.timeout.connect(func(): 
+			if is_instance_valid(warning):
+				warning.queue_free()
+		)
+
+
+## Clear all spawned scenes (utility for performance)
+func clear_spawned_scenes() -> void:
+	var pool := ToolPoolManager.find()
+	if pool:
+		pool.clear_all_spawned_scenes()
+		print("FileSystemUI: Cleared all spawned scenes")
+		_refresh_scene_hierarchy()
