@@ -149,14 +149,14 @@ func disconnect_from_room() -> void:
 ## @param data: The string data to send
 ## @param reliable: Whether to send reliably (default true)
 func send_data(data: String, _reliable: bool = true) -> void:
+	var reliable := _reliable
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
-			# Android plugin expects (ByteArray, topic: String)
 			var bytes = data.to_utf8_buffer()
-			_android_plugin.sendData(bytes, "")
+			_send_bytes_android(bytes, "", reliable)
 	else:
 		if _rust_manager:
-			_rust_manager.send_chat_message(data)  # Rust uses chat message API
+			_send_data_rust(data, reliable)
 
 
 ## Send data to a specific participant
@@ -164,16 +164,63 @@ func send_data(data: String, _reliable: bool = true) -> void:
 ## @param identity: Target participant identity
 ## @param reliable: Whether to send reliably
 func send_data_to(data: String, identity: String, _reliable: bool = true) -> void:
+	var reliable := _reliable
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
-			# Android plugin expects (ByteArray, identity: String, topic: String)
 			var bytes = data.to_utf8_buffer()
-			_android_plugin.sendDataTo(bytes, identity, "")
+			_send_bytes_android(bytes, "", reliable, identity)
 	else:
 		if _rust_manager:
-			# Rust backend might not support targeted sending directly
-			# Fall back to broadcast
-			_rust_manager.send_chat_message(data)
+			_send_data_rust(data, reliable, identity)
+
+
+# Internal: route data send to Android plugin with best-effort reliability handling.
+func _send_bytes_android(bytes: PackedByteArray, topic: String, reliable: bool, identity: String = "") -> void:
+	if not _android_plugin:
+		return
+	var wants_target := identity != ""
+	if wants_target:
+		if reliable and _android_plugin.has_method("sendDataToReliable"):
+			_android_plugin.call("sendDataToReliable", bytes, identity, topic)
+			return
+		if not reliable and _android_plugin.has_method("sendDataToUnreliable"):
+			_android_plugin.call("sendDataToUnreliable", bytes, identity, topic)
+			return
+		# Fallback to existing API
+		_android_plugin.sendDataTo(bytes, identity, topic)
+		return
+	# Broadcast path
+	if reliable and _android_plugin.has_method("sendDataReliable"):
+		_android_plugin.call("sendDataReliable", bytes, topic)
+		return
+	if not reliable and _android_plugin.has_method("sendDataUnreliable"):
+		_android_plugin.call("sendDataUnreliable", bytes, topic)
+		return
+	_android_plugin.sendData(bytes, topic)
+
+
+# Internal: route data send to Rust backend with best-effort reliability handling.
+func _send_data_rust(data: String, reliable: bool, identity: String = "") -> void:
+	if not _rust_manager:
+		return
+	var wants_target := identity != ""
+	if wants_target and _rust_manager.has_method("send_data_to"):
+		_rust_manager.call("send_data_to", data, identity, reliable)
+		return
+	if reliable:
+		if _rust_manager.has_method("send_reliable_data"):
+			_rust_manager.call("send_reliable_data", data)
+			return
+	else:
+		if _rust_manager.has_method("send_unreliable_data"):
+			_rust_manager.call("send_unreliable_data", data)
+			return
+	# Fallback to generic data/chat message path
+	if _rust_manager.has_method("send_data"):
+		_rust_manager.call("send_data", data, reliable)
+		return
+	if _rust_manager.has_method("send_chat_message"):
+		_rust_manager.call("send_chat_message", data)
 
 
 ## Publish the local microphone audio track

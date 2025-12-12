@@ -7,6 +7,21 @@ var player_instance: Node = null
 var _is_changing_scene: bool = false
 var _fallback_environment: Environment = null
 
+# Scope guard that invokes a callback when freed, ensuring cleanup even if the
+# function exits early.
+class SceneChangeResetGuard:
+	extends RefCounted
+	var _on_exit: Callable
+	var _did_run := false
+
+	func _init(on_exit: Callable) -> void:
+		_on_exit = on_exit
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_PREDELETE and _on_exit and not _did_run:
+			_did_run = true
+			_on_exit.call()
+
 const PLAYER_SCENE_PATH := "res://src/player/XRPlayer.tscn"
 
 # Safety / recovery guards
@@ -402,9 +417,14 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 		print("GameManager: change_scene_with_player ignored - already changing scene")
 		return
 	_is_changing_scene = true
+	var _reset_called := false
 	var _reset_scene_change := func() -> void:
+		if _reset_called:
+			return
+		_reset_called = true
 		_is_changing_scene = false
 		_scene_change_started_msec = 0
+	var _scene_change_guard := SceneChangeResetGuard.new(_reset_scene_change)
 	print("GameManager: Changing world to ", scene_path)
 	_scene_change_started_msec = Time.get_ticks_msec()
 	
@@ -630,8 +650,7 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 	if joined_main:
 		print("GameManager: Entered MainScene — scheduling saved-grabbable restore")
 		call_deferred("_deferred_restore_saved_grabs")
-	_is_changing_scene = false
-	_scene_change_started_msec = 0
+	_reset_scene_change.call()
 
 
 func _find_spawn_point(scene_root: Node, spawn_name: String = "SpawnPoint") -> Node3D:

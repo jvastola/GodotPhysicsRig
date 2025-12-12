@@ -3,12 +3,14 @@
 extends Node
 
 const SAVE_FILE_PATH := "user://save_data.json"
+const SAVE_TEMP_PATH := "user://save_data.tmp"
 
 # Cached save data
 var _save_data: Dictionary = {}
 var _save_dirty := false
 var _autosave_timer := 0.0
-const AUTOSAVE_INTERVAL := 2.0  # Auto-save every 2 seconds if dirty
+# Debounce autosave writes to reduce churn on mobile/Quest storage.
+const AUTOSAVE_INTERVAL := 5.0  # seconds
 const LEGAL_KEY := "legal_acceptance"
 
 
@@ -43,15 +45,10 @@ func _maybe_flush_save(reason: String = "") -> void:
 func save_game_state() -> void:
 	"""Write current save data to disk"""
 	var json_string := JSON.stringify(_save_data, "\t")
-	var file := FileAccess.open(SAVE_FILE_PATH, FileAccess.WRITE)
-	
-	if file:
-		file.store_string(json_string)
-		file.close()
+	if _write_atomic(json_string):
 		_save_dirty = false
+		_autosave_timer = 0.0
 		print("SaveManager: Game state saved to ", SAVE_FILE_PATH)
-	else:
-		push_error("SaveManager: Failed to write save file: ", FileAccess.get_open_error())
 
 
 func load_game_state() -> void:
@@ -78,6 +75,32 @@ func load_game_state() -> void:
 	else:
 		push_error("SaveManager: Failed to read save file: ", FileAccess.get_open_error())
 		_save_data = {}
+
+
+# Write JSON atomically: write to temp, flush, then rename over the real file.
+func _write_atomic(json_string: String) -> bool:
+	var dir := DirAccess.open("user://")
+	if dir == null:
+		push_error("SaveManager: Cannot open user:// directory")
+		return false
+
+	# Write to temp file first
+	var tmp_file := FileAccess.open(SAVE_TEMP_PATH, FileAccess.WRITE_READ)
+	if tmp_file == null:
+		push_error("SaveManager: Failed to open temp save file: ", FileAccess.get_open_error())
+		return false
+	tmp_file.store_string(json_string)
+	tmp_file.flush()
+	tmp_file.close()
+
+	# Replace existing save atomically
+	if dir.file_exists(SAVE_FILE_PATH):
+		dir.remove(SAVE_FILE_PATH)
+	var err := dir.rename(SAVE_TEMP_PATH, SAVE_FILE_PATH)
+	if err != OK:
+		push_error("SaveManager: Failed to finalize save (rename): ", err)
+		return false
+	return true
 
 
 # --- LEGAL ACCEPTANCE ---
