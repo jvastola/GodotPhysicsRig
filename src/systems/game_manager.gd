@@ -1,6 +1,7 @@
 # GameManager Autoload
 # Manages global game state and scene transitions
 extends Node
+const AppLogger = preload("res://src/systems/logger.gd")
 
 var current_world: Node = null
 var player_instance: Node = null
@@ -42,9 +43,21 @@ var _last_recovery_msec: int = 0
 var _safety_grace_until_msec: int = 0
 var _recent_recoveries: Array = []
 
+func _log_debug(msg: String, extra: Variant = null) -> void:
+	AppLogger.debug("GameManager", msg, extra)
+
+func _log_info(msg: String, extra: Variant = null) -> void:
+	AppLogger.info("GameManager", msg, extra)
+
+func _log_warn(msg: String, extra: Variant = null) -> void:
+	AppLogger.warn("GameManager", msg, extra)
+
+func _log_error(msg: String, extra: Variant = null) -> void:
+	AppLogger.error("GameManager", msg, extra)
+
 
 func _ready() -> void:
-	print("GameManager: Ready")
+	_log_info("Ready")
 	set_process(true)
 	# Track the initial scene as current_world
 	call_deferred("_setup_initial_world")
@@ -67,9 +80,9 @@ func _setup_initial_world() -> void:
 		player_instance = player_body.get_parent()  # Get XRPlayer, not PlayerBody
 	
 	if current_world:
-		print("GameManager: Initial world tracked: ", current_world.name)
+		_log_info("Initial world tracked", current_world.name)
 	if player_instance:
-		print("GameManager: Initial player tracked: ", player_instance.name)
+		_log_info("Initial player tracked", player_instance.name)
 
 	# Allow the world and player to finish initializing, then restore any saved grabbed objects
 	call_deferred("_deferred_restore_saved_grabs")
@@ -85,7 +98,7 @@ func _monitor_scene_change_timeout() -> void:
 		return
 	var elapsed := Time.get_ticks_msec() - _scene_change_started_msec
 	if elapsed > SCENE_CHANGE_TIMEOUT_MS:
-		print("GameManager: WARNING - scene change exceeded timeout; clearing busy flag so retry can proceed")
+		_log_warn("Scene change exceeded timeout; clearing busy flag so retry can proceed")
 		_is_changing_scene = false
 		_scene_change_started_msec = 0
 
@@ -116,13 +129,13 @@ func _monitor_player_safety() -> void:
 	_recent_recoveries = _recent_recoveries.filter(func(ts): return ts >= cutoff)
 	if _recent_recoveries.size() > SAFETY_RECENT_MAX:
 		_safety_grace_until_msec = now + SAFETY_GRACE_MS
-		print("GameManager: Pausing safety recovery temporarily to avoid spam (grace ", SAFETY_GRACE_MS, " ms)")
+		_log_debug("Pausing safety recovery temporarily to avoid spam", SAFETY_GRACE_MS)
 		return
 	_last_recovery_msec = now
 	_is_recovering_player = true
 	var target := _get_safe_recover_position()
 	_ensure_emergency_floor(target)
-	print("GameManager: Safety recovery triggered; teleporting player to ", target)
+	_log_warn("Safety recovery triggered; teleporting player", target)
 	await _teleport_player_to(target)
 	_last_known_safe_position = target
 	_safety_grace_until_msec = Time.get_ticks_msec() + SAFETY_GRACE_MS
@@ -175,7 +188,7 @@ func _deferred_restore_saved_grabs() -> void:
 	# Run a couple frames to ensure nodes are ready
 	await get_tree().process_frame
 	await get_tree().process_frame
-	print("GameManager: _deferred_restore_saved_grabs running")
+	_log_debug("_deferred_restore_saved_grabs running")
 	# Guard: need SaveManager and current_world and player_instance
 	if not SaveManager or not current_world or not player_instance:
 		return
@@ -189,7 +202,7 @@ func _deferred_restore_saved_grabs() -> void:
 		if not entry.get("grabbed", false):
 			continue
 		# Diagnostic output for saved entry
-		print("GameManager: Restore entry for ", save_id, ": ", entry)
+		_log_debug("Restore entry", [save_id, entry])
 		# Previously we skipped restores when the saved scene didn't match the
 		# currently loaded world. That caused misses when scenes are reparented
 		# or scene file paths are not available at runtime. Instead, just try
@@ -214,7 +227,7 @@ func _deferred_restore_saved_grabs() -> void:
 		
 		# If target exists and is already grabbed, skip restoration (already preserved)
 		if target and target.has_method("get") and target.get("is_grabbed"):
-			print("GameManager: Object ", save_id, " already grabbed, skipping restore")
+			_log_debug("Object already grabbed, skipping restore", save_id)
 			continue
 		
 		if not target:
@@ -224,9 +237,9 @@ func _deferred_restore_saved_grabs() -> void:
 			for x in candidates:
 				if is_instance_valid(x):
 					candidate_names.append(str(x.name))
-			print("GameManager: Could not find saved grabbable node: ", save_id, ". Candidates: ", candidate_names)
+			_log_debug("Could not find saved grabbable node", [save_id, candidate_names])
 			if saved_scene_path != "":
-				print("GameManager: saved scene path present for ", save_id, ": ", saved_scene_path)
+				_log_debug("Saved scene path present", [save_id, saved_scene_path])
 				# Attempt to load the saved resource. Only instantiate if it is a PackedScene
 				var res = ResourceLoader.load(saved_scene_path)
 				if res and res is PackedScene:
@@ -267,20 +280,20 @@ func _deferred_restore_saved_grabs() -> void:
 						# If the instance is grabbable, use it as target
 						if inst.has_method("try_grab"):
 							target = inst
-							print("GameManager: Instantiated missing grabbable from ", saved_scene_path, " as ", inst.name)
+							_log_debug("Instantiated missing grabbable", [saved_scene_path, inst.name])
 						else:
 							# Not a grabbable, remove to avoid clutter
 							inst.queue_free()
 					else:
-						print("GameManager: Failed to instantiate resource: ", saved_scene_path)
+						_log_warn("Failed to instantiate resource", saved_scene_path)
 				else:
 					# If resource is not a PackedScene, skip instancing
-					print("GameManager: Saved scene path is not a PackedScene or missing: ", saved_scene_path)
+					_log_warn("Saved scene path is not a PackedScene or missing", saved_scene_path)
 			# If instantiation from saved_scene_path did not yield a target, try fallback
 			if not target:
 				var proto_path := _find_prototype_scene_for_save_id(save_id)
 				if proto_path != "":
-					print("GameManager: Found prototype fallback for ", save_id, ": ", proto_path)
+					_log_debug("Found prototype fallback", [save_id, proto_path])
 					var proto_res = ResourceLoader.load(proto_path)
 					if proto_res and proto_res is PackedScene:
 						var proto_inst = proto_res.instantiate()
@@ -317,18 +330,18 @@ func _deferred_restore_saved_grabs() -> void:
 								proto_inst.set("save_id", save_id)
 							if proto_inst.has_method("try_grab"):
 								target = proto_inst
-								print("GameManager: Fallback instantiated and will use: ", proto_inst.name)
+								_log_debug("Fallback instantiated", proto_inst.name)
 							else:
 								proto_inst.queue_free()
 					else:
-						print("GameManager: Failed to load/instantiate prototype: ", proto_path)
+						_log_warn("Failed to load/instantiate prototype", proto_path)
 				else:
-					print("GameManager: No prototype fallback for ", save_id)
+					_log_debug("No prototype fallback", save_id)
 			# If we still have no target after this, continue to next saved id
 			if not target:
 				continue
 		if not target.has_method("try_grab"):
-			print("GameManager: Found node but it's not grabbable: ", save_id)
+			_log_debug("Found node but it's not grabbable", save_id)
 			continue
 
 		# Determine which hand to restore to
@@ -343,7 +356,7 @@ func _deferred_restore_saved_grabs() -> void:
 			hand = player_instance.get_node_or_null("PhysicsHandLeft")
 
 		if not hand or not is_instance_valid(hand):
-			print("GameManager: Could not find hand '" + str(hand_name) + "' to restore ", save_id)
+			_log_warn("Could not find hand to restore", [hand_name, save_id])
 			continue
 
 		# If the save contains a transform relative to the hand, apply it so
@@ -355,20 +368,20 @@ func _deferred_restore_saved_grabs() -> void:
 			var rel_quat = Quaternion(rr[0], rr[1], rr[2], rr[3])
 			# Debug: log hand and saved relative transforms
 			if is_instance_valid(hand):
-				print("GameManager: Restoring ", save_id, " to hand ", hand_name)
-				print("  - hand global_transform: ", hand.global_transform)
-				print("  - saved relative pos/quaternion: ", rel_pos, rel_quat)
+				_log_debug("Restoring to hand", [save_id, hand_name])
+				_log_debug("hand global_transform", hand.global_transform)
+				_log_debug("saved relative pos/quaternion", [rel_pos, rel_quat])
 			# Compute world transform so that: world_tf = hand.global_transform * rel_tf
 			var rel_tf = Transform3D(Basis(rel_quat), rel_pos)
 			if is_instance_valid(hand):
 				var computed_world: Transform3D = hand.global_transform * rel_tf
 				# Debug: computed world transform we're about to apply
-				print("  - computed world transform: ", computed_world)
+				_log_debug("computed world transform", computed_world)
 				target.global_transform = computed_world
-				print("GameManager: Applied relative transform for ", save_id)
+				_log_debug("Applied relative transform", save_id)
 		# Attempt to grab the object with the hand (deferred so _ready finishes)
 		target.call_deferred("try_grab", hand)
-		print("GameManager: Restored grabbed object ", save_id, " to hand ", hand_name)
+		_log_debug("Restored grabbed object to hand", [save_id, hand_name])
 
 
 func _wrap_world_if_needed(world_root: Node) -> Node:
@@ -411,10 +424,10 @@ func _get_world_grabbables(world_root: Node) -> Array:
 
 func change_scene_with_player(scene_path: String, player_state: Dictionary = {}) -> void:
 	"""Change the world scene while keeping the player intact"""
-	print("GameManager: change_scene_with_player called with path=", scene_path, " player_state=", player_state)
+	_log_info("change_scene_with_player called", [scene_path, player_state])
 	# Prevent re-entrant scene changes
 	if _is_changing_scene:
-		print("GameManager: change_scene_with_player ignored - already changing scene")
+		_log_warn("change_scene_with_player ignored - already changing scene")
 		return
 	_is_changing_scene = true
 	var _reset_called := false
@@ -425,41 +438,41 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 		_is_changing_scene = false
 		_scene_change_started_msec = 0
 	var _scene_change_guard := SceneChangeResetGuard.new(_reset_scene_change)
-	print("GameManager: Changing world to ", scene_path)
+	_log_info("Changing world to", scene_path)
 	_scene_change_started_msec = Time.get_ticks_msec()
 	
 	# Load the new world scene
 	var new_world_scene = load(scene_path)
 	if not new_world_scene:
-		print("GameManager: ERROR - Could not load scene ", scene_path)
+		_log_error("Could not load scene", scene_path)
 		_reset_scene_change.call()
 		return
 	if not (new_world_scene is PackedScene):
-		print("GameManager: ERROR - Loaded resource is not a PackedScene: ", new_world_scene)
+		_log_error("Loaded resource is not a PackedScene", new_world_scene)
 		_reset_scene_change.call()
 		return
-	print("GameManager: Loaded PackedScene OK: ", new_world_scene.resource_path if new_world_scene is Resource else "<no path>")
+	_log_debug("Loaded PackedScene OK", new_world_scene.resource_path if new_world_scene is Resource else "<no path>")
 
 	# Instantiate early to validate the target world before tearing down the current one
 	var raw_world: Node = new_world_scene.instantiate()
 	if not raw_world:
-		print("GameManager: ERROR - instantiate() returned null for ", scene_path)
+		_log_error("instantiate() returned null", scene_path)
 		_reset_scene_change.call()
 		return
 	if not _is_valid_world_scene(raw_world):
-		print("GameManager: WARNING - Scene ", scene_path, " does not look like a world (no spawn point / likely object). Ignoring scene change.")
+		_log_warn("Scene does not look like a world (no spawn point / likely object)", scene_path)
 		raw_world.queue_free()
 		_reset_scene_change.call()
 		return
 	
 	# Ensure we have a cached environment before removing the current world
 	_cache_fallback_environment_from(current_world)
-	print("GameManager: _cache_fallback_environment_from done; fallback env exists? ", _fallback_environment != null)
+	_log_debug("_cache_fallback_environment_from done; fallback env exists?", _fallback_environment != null)
 	
 	# Get or find player reference
 	if not player_instance:
 		var player_body = get_tree().get_first_node_in_group("player")
-		print("GameManager: player_instance missing; got player_body from group? ", player_body)
+		_log_debug("player_instance missing; got player_body from group?", player_body)
 		if player_body:
 			player_instance = player_body.get_parent()  # Get XRPlayer, not PlayerBody
 	
@@ -470,24 +483,24 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 			player_instance = player_res.instantiate()
 			if player_instance:
 				add_child(player_instance)
-				print("GameManager: Instantiated fallback XRPlayer from ", PLAYER_SCENE_PATH)
+				_log_warn("Instantiated fallback XRPlayer from", PLAYER_SCENE_PATH)
 			else:
-				print("GameManager: Fallback XRPlayer instantiation returned null")
+				_log_error("Fallback XRPlayer instantiation returned null")
 		else:
-			print("GameManager: Could not load fallback XRPlayer at ", PLAYER_SCENE_PATH)
+			_log_error("Could not load fallback XRPlayer", PLAYER_SCENE_PATH)
 		if not player_instance:
-			print("GameManager: ERROR - No player found and fallback XRPlayer could not be instantiated!")
+			_log_error("No player found and fallback XRPlayer could not be instantiated!")
 			_reset_scene_change.call()
 			raw_world.queue_free()
 			return
 	else:
-		print("GameManager: player_instance present: ", player_instance.name)
+		_log_debug("player_instance present", player_instance.name)
 	
 	# Reparent player to GameManager temporarily to preserve it
 	var old_global_pos = player_instance.global_position
 	var old_global_rot = player_instance.global_rotation
 	var player_parent = player_instance.get_parent()
-	print("GameManager: player_parent before reparent: ", player_parent)
+	_log_debug("player_parent before reparent", player_parent)
 	
 	# Find and preserve all grabbed objects by moving them to GameManager temporarily
 	var grabbed_objects = []
@@ -500,49 +513,49 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 				obj_parent.remove_child(obj)
 				add_child(obj)
 				obj.global_transform = obj_transform
-				print("GameManager: Preserved grabbed object: ", obj.name)
-	print("GameManager: total grabbed_objects preserved: ", grabbed_objects.size())
+				_log_debug("Preserved grabbed object", obj.name)
+	_log_debug("total grabbed_objects preserved", grabbed_objects.size())
 	
 	if player_parent and player_parent != self:
 		player_parent.remove_child(player_instance)
 		add_child(player_instance)
 		player_instance.global_position = old_global_pos
 		player_instance.global_rotation = old_global_rot
-		print("GameManager: Player temporarily moved to GameManager")
+		_log_debug("Player temporarily moved to GameManager")
 	elif player_parent == self:
-		print("GameManager: Player already parented to GameManager")
+		_log_debug("Player already parented to GameManager")
 	else:
-		print("GameManager: No player_parent found during reparent step")
+		_log_warn("No player_parent found during reparent step")
 	
 	# Remove old world
 	if current_world:
-		print("GameManager: Removing old world: ", current_world.name)
+		_log_debug("Removing old world", current_world.name)
 		current_world.queue_free()
 		current_world = null
 	else:
-		print("GameManager: No current_world to remove (first load?)")
+		_log_debug("No current_world to remove (first load?)")
 	
 	# raw_world was already instantiated and validated above
-	print("GameManager: instantiate() returned: ", raw_world, " class: ", raw_world.get_class())
+	_log_debug("instantiate() returned", [raw_world, raw_world.get_class()])
 	current_world = _wrap_world_if_needed(raw_world)
-	print("GameManager: _wrap_world_if_needed => ", current_world, " class: ", current_world.get_class())
+	_log_debug("_wrap_world_if_needed =>", [current_world, current_world.get_class()])
 	get_tree().root.add_child(current_world)
 	if current_world != raw_world:
 		current_world.add_child(raw_world)
-		print("GameManager: Wrapped world ", raw_world.name, " in a Node3D container for transforms")
+		_log_debug("Wrapped world in Node3D container", raw_world.name)
 	
 	# Ensure the new world has an environment; if missing, apply the cached main-scene one
 	_ensure_world_environment(current_world)
 	var env_node_debug = _find_world_environment(current_world)
-	print("GameManager: Post-load environment node: ", env_node_debug, " (null means none)")
+	_log_debug("Post-load environment node", env_node_debug)
 	# Keep SceneTree's current_scene in sync so helpers relying on it keep working
 	if get_tree().current_scene != current_world:
 		get_tree().set_current_scene(current_world)
-	print("GameManager: New world loaded: ", current_world.name)
+	_log_info("New world loaded", current_world.name)
 	if get_tree().current_scene:
-		print("GameManager: SceneTree current_scene: ", get_tree().current_scene.name)
+		_log_debug("SceneTree current_scene", get_tree().current_scene.name)
 	else:
-		print("GameManager: WARNING - SceneTree current_scene is null after load")
+		_log_warn("SceneTree current_scene is null after load")
 	
 	# Wait for world to be fully ready with physics
 	await get_tree().process_frame
@@ -552,13 +565,13 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 	# Remove any player instance that came with the new world scene
 	var scene_player = current_world.get_node_or_null("XRPlayer")
 	if scene_player and scene_player != player_instance:
-		print("GameManager: Removing duplicate player from new scene")
+		_log_debug("Removing duplicate player from new scene")
 		scene_player.queue_free()
 		await get_tree().process_frame
 	
 	# Remove any grabbable objects from the new scene that we already have preserved
 	# (prevents duplicates when returning to a scene that has the same grabbable)
-	print("GameManager: Checking duplicates in new scene; preserved count=", grabbed_objects.size())
+	_log_debug("Checking duplicates in new scene", grabbed_objects.size())
 	for preserved_obj in grabbed_objects:
 		if not is_instance_valid(preserved_obj):
 			continue
@@ -583,62 +596,62 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 			
 			# Check if this is a duplicate (same name or same save_id)
 			if scene_name == preserved_name or (preserved_save_id != "" and scene_save_id == preserved_save_id):
-				print("GameManager: Removing duplicate grabbable from new scene: ", scene_name)
+				_log_debug("Removing duplicate grabbable from new scene", scene_name)
 				scene_grabbable.queue_free()
 	
 	await get_tree().process_frame
 	
 	# Move grabbed objects back to the new world
-	print("GameManager: Restoring grabbed_objects to new world; count=", grabbed_objects.size())
+	_log_debug("Restoring grabbed_objects to new world", grabbed_objects.size())
 	for obj in grabbed_objects:
 		if is_instance_valid(obj):
 			var obj_transform = obj.global_transform
 			remove_child(obj)
 			current_world.add_child(obj)
 			obj.global_transform = obj_transform
-			print("GameManager: Restored grabbed object to new world: ", obj.name)
+			_log_debug("Restored grabbed object to new world", obj.name)
 	
 	# Find spawn point and move player to new world
 	# Determine whether to use a spawn point or maintain player's previous global position
 	var use_spawn: bool = player_state.get("use_spawn_point", false)
 	var spawn_name = player_state.get("spawn_point", "SpawnPoint")
-	print("GameManager: spawn request - use_spawn=", use_spawn, ", spawn_name=", spawn_name)
+	_log_debug("spawn request", [use_spawn, spawn_name])
 	var spawn_point: Node3D = null
 	var safe_fallback_pos := Vector3(0, 2, 0)
 	var spawn_candidate := _find_spawn_point(current_world, spawn_name)
 	if spawn_candidate:
-		print("GameManager: _find_spawn_point returned: ", spawn_candidate)
+		_log_debug("_find_spawn_point returned", spawn_candidate)
 		spawn_point = spawn_candidate
 	# If not using spawn but we have one, decide whether to auto-use based on player position sanity
 	if not use_spawn:
 		var needs_safe_spawn: bool = is_nan(old_global_pos.length()) or abs(old_global_pos.y) > 500.0
 		if spawn_point and needs_safe_spawn:
-			print("GameManager: Auto-enabling spawn because old_global_pos looks unsafe: ", old_global_pos)
+			_log_warn("Auto-enabling spawn because old_global_pos looks unsafe", old_global_pos)
 			use_spawn = true
 		elif needs_safe_spawn:
-			print("GameManager: No spawn found; using safe fallback position instead of unsafe old_global_pos=", old_global_pos)
+			_log_warn("No spawn found; using safe fallback position; old_global_pos unsafe", old_global_pos)
 			spawn_point = null
 			use_spawn = true
 	# If use_spawn is requested (or enabled), but spawn_point missing, use safe fallback
 	if use_spawn and not spawn_point:
-		print("GameManager: WARNING - Spawn point requested but not found: ", spawn_name, " | current_world=", current_world, " | using safe fallback pos ", safe_fallback_pos)
+		_log_warn("Spawn point requested but not found; using safe fallback", [spawn_name, current_world, safe_fallback_pos])
 		var target_pos_safe = safe_fallback_pos
 		_reparent_player_into_world(current_world)
 		await _teleport_player_to(target_pos_safe)
-		print("GameManager: Player moved to safe fallback position at ", target_pos_safe)
-		print("GameManager: player global position after move = ", player_instance.global_position)
+		_log_info("Player moved to safe fallback position", target_pos_safe)
+		_log_debug("player global position after move", player_instance.global_position)
 	elif use_spawn and spawn_point:
 		var target_pos = spawn_point.global_position
-		print("GameManager: spawn_point global_position=", target_pos)
+		_log_debug("spawn_point global_position", target_pos)
 		_reparent_player_into_world(current_world)
 		await _teleport_player_to(target_pos)
-		print("GameManager: Player moved to spawn point in new world at ", target_pos)
-		print("GameManager: player global position after move = ", player_instance.global_position)
+		_log_info("Player moved to spawn point in new world", target_pos)
+		_log_debug("player global position after move", player_instance.global_position)
 	else:
 		# Maintain player's previous global position across the world swap
 		_reparent_player_into_world(current_world)
 		await _teleport_player_to(old_global_pos)
-		print("GameManager: Player maintained previous global position at ", old_global_pos)
+		_log_info("Player maintained previous global position", old_global_pos)
 
 	# Finished changing scene
 	# If we just entered the main scene, schedule restoration of saved grabs
@@ -648,7 +661,7 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 	elif current_world and current_world.name == "MainScene":
 		joined_main = true
 	if joined_main:
-		print("GameManager: Entered MainScene — scheduling saved-grabbable restore")
+		_log_info("Entered MainScene — scheduling saved-grabbable restore")
 		call_deferred("_deferred_restore_saved_grabs")
 	_reset_scene_change.call()
 
@@ -721,33 +734,33 @@ func _cache_fallback_environment_from(world_root: Node) -> void:
 	var env_node := _find_world_environment(world_root)
 	if env_node and env_node.environment:
 		_fallback_environment = env_node.environment.duplicate()
-		print("GameManager: Cached fallback WorldEnvironment from ", world_root.name)
+		_log_debug("Cached fallback WorldEnvironment from", world_root.name)
 
 
 func _ensure_world_environment(world_root: Node) -> void:
 	"""If the world has no Environment, apply the cached main-scene Environment."""
 	if not world_root:
-		print("GameManager: _ensure_world_environment called with null world_root")
+		_log_warn("_ensure_world_environment called with null world_root")
 		return
 	var env_node := _find_world_environment(world_root)
 	if env_node and env_node.environment:
-		print("GameManager: _ensure_world_environment found existing environment on ", world_root.name)
+		_log_debug("_ensure_world_environment found existing environment", world_root.name)
 		return
 	
 	if not _fallback_environment:
-		print("GameManager: No fallback WorldEnvironment available; scene will use default environment")
+		_log_warn("No fallback WorldEnvironment available; scene will use default environment")
 		return
 	
 	var new_env := WorldEnvironment.new()
 	new_env.name = "FallbackWorldEnvironment"
 	new_env.environment = _fallback_environment.duplicate()
 	world_root.add_child(new_env)
-	print("GameManager: Applied fallback WorldEnvironment to ", world_root.name)
+	_log_info("Applied fallback WorldEnvironment", world_root.name)
 
 
 func _reparent_player_into_world(world_root: Node) -> void:
 	if not player_instance or not world_root:
-		print("GameManager: _reparent_player_into_world missing player or world")
+		_log_warn("_reparent_player_into_world missing player or world")
 		return
 	if player_instance.get_parent() == self:
 		remove_child(player_instance)
@@ -758,17 +771,17 @@ func _reparent_player_into_world(world_root: Node) -> void:
 
 func _teleport_player_to(target_pos: Vector3) -> void:
 	if not player_instance:
-		print("GameManager: _teleport_player_to called without player_instance")
+		_log_warn("_teleport_player_to called without player_instance")
 		return
 	var player_body = player_instance.get_node_or_null("PlayerBody")
 	if player_body and player_body is RigidBody3D:
 		player_body.freeze = true
 		if player_instance.has_method("teleport_to"):
 			player_instance.call_deferred("teleport_to", target_pos)
-			print("GameManager: used XRPlayer.teleport_to for teleport")
+			_log_debug("used XRPlayer.teleport_to for teleport")
 		else:
 			player_instance.global_position = target_pos
-			print("GameManager: set player_instance.global_position = ", target_pos)
+			_log_debug("set player_instance.global_position", target_pos)
 		await get_tree().physics_frame
 		await get_tree().physics_frame
 		player_body.linear_velocity = Vector3.ZERO
@@ -779,7 +792,7 @@ func _teleport_player_to(target_pos: Vector3) -> void:
 	else:
 		if player_instance.has_method("teleport_to"):
 			player_instance.call_deferred("teleport_to", target_pos)
-			print("GameManager: used XRPlayer.teleport_to for teleport (no rigidbody)")
+			_log_debug("used XRPlayer.teleport_to for teleport (no rigidbody)")
 		else:
 			player_instance.global_position = target_pos
 	await get_tree().process_frame

@@ -3,6 +3,19 @@
 ## Provides a unified API across all platforms
 # class_name LiveKitWrapper removed to avoid autoload conflict
 extends Node
+const AppLogger = preload("res://src/systems/logger.gd")
+
+func _log_debug(msg: String, extra: Variant = null) -> void:
+	AppLogger.debug("LiveKit", msg, extra)
+
+func _log_info(msg: String, extra: Variant = null) -> void:
+	AppLogger.info("LiveKit", msg, extra)
+
+func _log_warn(msg: String, extra: Variant = null) -> void:
+	AppLogger.warn("LiveKit", msg, extra)
+
+func _log_error(msg: String, extra: Variant = null) -> void:
+	AppLogger.error("LiveKit", msg, extra)
 
 # Signals - unified across platforms
 signal room_connected()
@@ -43,10 +56,10 @@ func _detect_platform() -> void:
 	var os_name = OS.get_name()
 	if os_name == "Android":
 		current_platform = Platform.ANDROID
-		print("[LiveKitWrapper] Platform: Android")
+		_log_info("Platform: Android")
 	else:
 		current_platform = Platform.DESKTOP
-		print("[LiveKitWrapper] Platform: Desktop (%s)" % os_name)
+		_log_info("Platform: Desktop (%s)" % os_name)
 
 
 func _initialize_backend() -> void:
@@ -59,7 +72,7 @@ func _initialize_backend() -> void:
 func _initialize_android() -> void:
 	if Engine.has_singleton("GodotLiveKit"):
 		_android_plugin = Engine.get_singleton("GodotLiveKit")
-		print("[LiveKitWrapper] Android plugin loaded successfully")
+		_log_info("Android plugin loaded successfully")
 		_connect_android_signals()
 	else:
 		push_error("[LiveKitWrapper] GodotLiveKit Android plugin not found! Make sure it's enabled in export settings.")
@@ -71,7 +84,7 @@ func _initialize_desktop() -> void:
 	if ClassDB.class_exists("LiveKitManager"):
 		_rust_manager = ClassDB.instantiate("LiveKitManager")
 		add_child(_rust_manager)
-		print("[LiveKitWrapper] Rust LiveKitManager instantiated")
+		_log_info("Rust LiveKitManager instantiated")
 		_connect_rust_signals()
 	else:
 		push_error("[LiveKitWrapper] LiveKitManager class not found! Make sure the Rust GDExtension is loaded.")
@@ -114,7 +127,7 @@ func _connect_rust_signals() -> void:
 ## @param url: The LiveKit server URL (e.g., "wss://your-server.livekit.cloud")
 ## @param token: The access token for authentication
 func connect_to_room(url: String, token: String) -> void:
-	print("[LiveKitWrapper] Connecting to room: %s" % url)
+	_log_info("Connecting to room", url)
 	_current_room = url
 	
 	if current_platform == Platform.ANDROID:
@@ -133,7 +146,7 @@ func connect_to_room(url: String, token: String) -> void:
 
 ## Disconnect from the current room
 func disconnect_from_room() -> void:
-	print("[LiveKitWrapper] Disconnecting from room")
+	_log_info("Disconnecting from room")
 	_current_room = ""
 	
 	if current_platform == Platform.ANDROID:
@@ -225,7 +238,7 @@ func _send_data_rust(data: String, reliable: bool, identity: String = "") -> voi
 
 ## Publish the local microphone audio track
 func publish_audio_track() -> void:
-	print("[LiveKitWrapper] Publishing audio track")
+	_log_info("Publishing audio track")
 	
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
@@ -235,12 +248,12 @@ func publish_audio_track() -> void:
 		# Desktop: The Rust client auto-publishes track on connect
 		# We just need to ensure we're not muted
 		_is_muted = false
-		print("[LiveKitWrapper] Desktop: Audio track publishing (unmuted)")
+		_log_debug("Desktop: Audio track publishing (unmuted)")
 
 
 ## Unpublish the local audio track
 func unpublish_audio_track() -> void:
-	print("[LiveKitWrapper] Unpublishing audio track")
+	_log_info("Unpublishing audio track")
 	
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
@@ -248,7 +261,7 @@ func unpublish_audio_track() -> void:
 	else:
 		# Desktop: Set muted flag, push_mic_audio will respect this
 		_is_muted = true
-		print("[LiveKitWrapper] Desktop: Audio track unpublished (muted)")
+		_log_debug("Desktop: Audio track unpublished (muted)")
 
 
 ## Set the local participant's metadata
@@ -302,15 +315,15 @@ func get_participant_identities() -> PackedStringArray:
 
 ## Enable or disable the local audio track
 func set_audio_enabled(enabled: bool) -> void:
-	print("[LiveKitWrapper] set_audio_enabled: ", enabled)
+	_log_debug("set_audio_enabled", enabled)
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
 			_android_plugin.setAudioEnabled(enabled)
-			print("[LiveKitWrapper] Called Android plugin setAudioEnabled(", enabled, ")")
+			_log_debug("Called Android plugin setAudioEnabled", enabled)
 	else:
 		# Desktop: Track mute state, push_mic_audio will respect this
 		_is_muted = !enabled
-		print("[LiveKitWrapper] Desktop: _is_muted set to ", _is_muted)
+		_log_debug("Desktop: _is_muted set", _is_muted)
 
 
 ## Push microphone audio buffer (Desktop/Rust only)
@@ -338,7 +351,7 @@ func get_current_room() -> String:
 ## @param identity: Participant identity
 ## @param volume: Volume level (0.0 = muted, 1.0 = normal, up to 10.0 for boost)
 func set_participant_volume(identity: String, volume: float) -> void:
-	print("[LiveKitWrapper] set_participant_volume: %s -> %.2f" % [identity, volume])
+	_log_debug("set_participant_volume", [identity, volume])
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
 			_android_plugin.setParticipantVolume(identity, volume)
@@ -348,7 +361,7 @@ func set_participant_volume(identity: String, volume: float) -> void:
 ## @param identity: Participant identity
 ## @param muted: Whether to mute the participant
 func set_participant_muted(identity: String, muted: bool) -> void:
-	print("[LiveKitWrapper] set_participant_muted: %s -> %s" % [identity, muted])
+	_log_debug("set_participant_muted", [identity, muted])
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
 			_android_plugin.setParticipantMuted(identity, muted)
@@ -358,46 +371,46 @@ func set_participant_muted(identity: String, muted: bool) -> void:
 
 func _on_room_connected() -> void:
 	_is_connected = true
-	print("[LiveKitWrapper] Room connected")
+	_log_info("Room connected")
 	room_connected.emit()
 
 
 func _on_room_disconnected() -> void:
 	_is_connected = false
-	print("[LiveKitWrapper] Room disconnected")
+	_log_info("Room disconnected")
 	room_disconnected.emit()
 
 
 func _on_connection_error(message: String) -> void:
 	_is_connected = false
-	print("[LiveKitWrapper] Connection error: %s" % message)
+	_log_error("Connection error", message)
 	connection_error.emit(message)
 
 
 func _on_participant_joined(identity: String, participant_name: String) -> void:
-	print("[LiveKitWrapper] Participant joined: %s (%s)" % [identity, participant_name])
+	_log_info("Participant joined", [identity, participant_name])
 	participant_joined.emit(identity, participant_name)
 
 
 func _on_participant_joined_android(identity: String) -> void:
 	# Android plugin only sends identity, use it as name too
-	print("[LiveKitWrapper] Participant joined (Android): %s" % identity)
+	_log_info("Participant joined (Android)", identity)
 	participant_joined.emit(identity, identity)
 
 
 func _on_participant_joined_rust(identity: String) -> void:
 	# Rust only sends identity, use it as name too
-	print("[LiveKitWrapper] Participant joined (Rust): %s" % identity)
+	_log_info("Participant joined (Rust)", identity)
 	participant_joined.emit(identity, identity)
 
 
 func _on_participant_left(identity: String) -> void:
-	print("[LiveKitWrapper] Participant left: %s" % identity)
+	_log_info("Participant left", identity)
 	participant_left.emit(identity)
 
 
 func _on_participant_metadata_changed(identity: String, metadata: String) -> void:
-	print("[LiveKitWrapper] Participant metadata changed: %s" % identity)
+	_log_debug("Participant metadata changed", identity)
 	participant_metadata_changed.emit(identity, metadata)
 
 
@@ -408,27 +421,27 @@ func _on_participant_name_changed_rust(identity: String, username: String) -> vo
 
 
 func _on_data_received(sender_identity: String, data: String) -> void:
-	print("[LiveKitWrapper] Data received from %s: %s" % [sender_identity, data])
+	_log_debug("Data received", [sender_identity, data])
 	data_received.emit(sender_identity, data)
 
 
 func _on_track_subscribed(participant_identity: String, track_sid: String) -> void:
-	print("[LiveKitWrapper] Track subscribed: %s from %s" % [track_sid, participant_identity])
+	_log_debug("Track subscribed", [track_sid, participant_identity])
 	track_subscribed.emit(participant_identity, track_sid)
 
 
 func _on_track_unsubscribed(participant_identity: String, track_sid: String) -> void:
-	print("[LiveKitWrapper] Track unsubscribed: %s from %s" % [track_sid, participant_identity])
+	_log_debug("Track unsubscribed", [track_sid, participant_identity])
 	track_unsubscribed.emit(participant_identity, track_sid)
 
 
 func _on_audio_track_published() -> void:
-	print("[LiveKitWrapper] Audio track published")
+	_log_debug("Audio track published")
 	audio_track_published.emit()
 
 
 func _on_audio_track_unpublished() -> void:
-	print("[LiveKitWrapper] Audio track unpublished")
+	_log_debug("Audio track unpublished")
 	audio_track_unpublished.emit()
 
 
