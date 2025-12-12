@@ -146,6 +146,19 @@ var _grab_offset: Vector3 = Vector3.ZERO  # Offset from grab point to object cen
 var _prev_grip_pressed: bool = false  # For edge detection
 var _grab_should_rotate: bool = false # Whether current grab target allows rotation
 
+
+func get_hit_point() -> Vector3:
+	"""Get the current world-space hit point of the pointer raycast"""
+	return _pointer_hit_point
+
+
+func get_hit_collider() -> Object:
+	"""Get the current collider hit by the pointer raycast"""
+	if not _raycast:
+		return null
+	return _raycast.get_collider()
+
+
 func _ready() -> void:
 	_clamp_ray_length()
 	if _pointer_face:
