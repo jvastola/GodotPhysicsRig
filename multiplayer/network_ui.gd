@@ -21,6 +21,8 @@ var virtual_keyboard: Node = null
 @onready var room_list_vbox: VBoxContainer = $Panel/VBoxContainer/RoomListScroll/RoomListVBox
 var room_refresh_timer: float = 0.0
 const ROOM_REFRESH_INTERVAL: float = 5.0
+const UI_POLL_INTERVAL: float = 0.2
+var _ui_poll_timer: Timer
 
 # Network stats labels (optional nodes - may not exist in scene yet)
 @onready var ping_label: Label = get_node_or_null("Panel/VBoxContainer/StatsContainer/PingLabel")
@@ -102,6 +104,17 @@ func _ready() -> void:
 		network_manager.network_stats_updated.connect(_on_network_stats_updated)
 		network_manager.connection_quality_changed.connect(_on_connection_quality_changed)
 	
+	# Timer-driven UI polling instead of per-frame processing
+	_ui_poll_timer = Timer.new()
+	_ui_poll_timer.wait_time = UI_POLL_INTERVAL
+	_ui_poll_timer.one_shot = false
+	_ui_poll_timer.autostart = true
+	add_child(_ui_poll_timer)
+	_ui_poll_timer.timeout.connect(_on_ui_poll_timeout)
+	set_process(false)
+	visibility_changed.connect(_on_visibility_changed)
+	_on_visibility_changed()
+	
 	_update_status()
 	_update_network_stats_visibility()
 	
@@ -110,15 +123,28 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	# Per-frame polling replaced by timer-driven updates
+	pass
+
+
+func _on_ui_poll_timeout() -> void:
 	_update_player_list()
 	_update_voice_button_text()
 	
 	# Auto-refresh room list when authenticated, socket connected, but not in a match
 	if is_nakama_authenticated and nakama_manager.is_socket_connected and not network_manager.use_nakama:
-		room_refresh_timer += _delta
+		room_refresh_timer += UI_POLL_INTERVAL
 		if room_refresh_timer >= ROOM_REFRESH_INTERVAL:
 			room_refresh_timer = 0.0
 			nakama_manager.list_matches()
+
+
+func _on_visibility_changed() -> void:
+	var visible_now := is_visible_in_tree()
+	if _ui_poll_timer:
+		_ui_poll_timer.paused = not visible_now
+	if visible_now:
+		room_refresh_timer = 0.0
 
 
 func _on_host_pressed() -> void:

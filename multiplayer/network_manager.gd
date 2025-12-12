@@ -77,6 +77,7 @@ var _ping_timer: float = 0.0
 var _ping_check_interval: float = 1.0  # Check ping every second
 var _last_bytes_sent: int = 0
 var _last_bytes_received: int = 0
+var _monitor_timer: Timer = null
 
 signal connection_quality_changed(quality: ConnectionQuality)
 signal network_stats_updated(stats: Dictionary)
@@ -118,6 +119,16 @@ func _ready() -> void:
 	# Connect Nakama signals
 	if NakamaManager:
 		NakamaManager.match_state_received.connect(_on_nakama_match_state_received)
+	
+	# Timer-based connection monitoring to avoid per-frame polling
+	_monitor_timer = Timer.new()
+	_monitor_timer.wait_time = _ping_check_interval
+	_monitor_timer.one_shot = false
+	_monitor_timer.autostart = false
+	add_child(_monitor_timer)
+	_monitor_timer.timeout.connect(_on_monitor_timeout)
+	set_process(false)
+	_update_monitoring_state()
 
 
 func _setup_nakama_integration() -> void:
@@ -377,6 +388,7 @@ func _on_connected_to_server() -> void:
 	request_player_list.rpc_id(1)
 	
 	connection_succeeded.emit()
+	_update_monitoring_state()
 
 
 func _on_connection_failed() -> void:
@@ -384,6 +396,7 @@ func _on_connection_failed() -> void:
 	peer = null
 	multiplayer.multiplayer_peer = null
 	connection_failed.emit()
+	_update_monitoring_state()
 
 
 func _on_server_disconnected() -> void:
@@ -393,6 +406,7 @@ func _on_server_disconnected() -> void:
 	players.clear()
 	grabbed_objects.clear()
 	server_disconnected.emit()
+	_update_monitoring_state()
 
 
 # ============================================================================
@@ -412,12 +426,14 @@ func _on_nakama_match_joined(match_id: String) -> void:
 	# Trigger avatar send after a short delay to ensure everything is set up
 	await get_tree().create_timer(0.5).timeout
 	send_local_avatar.emit()
+	_update_monitoring_state()
 
 func _on_nakama_match_left() -> void:
 	print("NetworkManager: Left Nakama match")
 	players.clear()
 	grabbed_objects.clear()
 	server_disconnected.emit()
+	_update_monitoring_state()
 
 func _on_nakama_match_presence(joins: Array, leaves: Array) -> void:
 	var my_id = get_nakama_user_id()
@@ -824,27 +840,10 @@ func _parse_color(data) -> Color:
 # Connection Quality Monitoring
 # ============================================================================
 
-func _process(delta: float) -> void:
-	"""Monitor network stats and connection quality"""
-	if not peer or not peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
-		return
-	
-	# Update ping timer
-	_ping_timer += delta
-	if _ping_timer >= _ping_check_interval:
-		_ping_timer = 0.0
-		_update_network_stats()
-	
-	# Handle push-to-talk
+func _process(_delta: float) -> void:
+	# Only track push-to-talk per-frame when active; everything else is timer-driven
 	if voice_mode == VoiceMode.PUSH_TO_TALK:
 		is_push_to_talk_pressed = Input.is_key_pressed(push_to_talk_key)
-	
-	# Check for connection timeout
-	if not is_server():
-		var current_time = Time.get_ticks_msec() / 1000.0
-		if current_time - _last_server_response_time > connection_timeout:
-			print("NetworkManager: Connection timeout detected")
-			_attempt_reconnection()
 
 
 func _update_network_stats() -> void:
@@ -880,6 +879,44 @@ func _update_network_stats() -> void:
 		connection_quality_changed.emit(new_quality)
 	
 	network_stats_updated.emit(network_stats.duplicate())
+
+
+func _on_monitor_timeout() -> void:
+	"""Timer-based connection monitoring to avoid per-frame polling"""
+	if not _is_connection_active():
+		_update_monitoring_state()
+		return
+	
+	_update_network_stats()
+	
+	# Check for connection timeout (only for client side)
+	if not is_server():
+		var current_time = Time.get_ticks_msec() / 1000.0
+		if current_time - _last_server_response_time > connection_timeout:
+			print("NetworkManager: Connection timeout detected")
+			_attempt_reconnection()
+
+
+func _is_connection_active() -> bool:
+	if peer and peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+		return true
+	if use_nakama and NakamaManager and NakamaManager.is_socket_connected:
+		return true
+	return false
+
+
+func _update_monitoring_state() -> void:
+	if _monitor_timer:
+		_monitor_timer.wait_time = _ping_check_interval
+		var should_run := _is_connection_active()
+		_monitor_timer.paused = not should_run
+		if should_run:
+			_monitor_timer.start()
+		else:
+			_monitor_timer.stop()
+	
+	var should_process_ptt := voice_mode == VoiceMode.PUSH_TO_TALK and _is_connection_active()
+	set_process(should_process_ptt)
 
 
 func _estimate_ping() -> float:

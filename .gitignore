@@ -42,3 +42,4 @@ local.properties
 # Temporary scripts
 add_jitpack.py
 create_local_prop.py
+AUDIT.md

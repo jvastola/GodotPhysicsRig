@@ -5,6 +5,7 @@ class_name GridSnapIndicator
 var _grid_size: float = 0.1
 var _snap_interval: float = 0.1
 var _build_parent_path: NodePath = NodePath()
+var _build_mode_enabled: bool = false
 
 @export_enum("on_hit", "always", "manual") var follow_mode: String = "on_hit"
 @export var align_with_surface_normal: bool = false
@@ -14,7 +15,13 @@ var _build_parent_path: NodePath = NodePath()
 @export_range(0.01, 10.0, 0.01) var pointer_scale_grid_multiplier: float = 1.0
 @export_range(0.005, 2.0, 0.005) var pointer_scale_min_grid_size: float = 0.01
 @export_range(0.0, 0.25, 0.001) var surface_normal_offset: float = 0.01
-@export var build_mode_enabled: bool = false  # Disabled - use VoxelTool grabbable instead
+@export var build_mode_enabled: bool:
+	set(value):
+		_build_mode_enabled = value
+		_accumulated_time = 0.0
+		_update_processing_state()
+	get:
+		return _build_mode_enabled
 @export var build_mode_toggle_action: String = ""
 @export var build_cube_scene: PackedScene
 @export var default_build_color: Color = Color(0.6, 0.6, 0.6, 1.0)
@@ -82,6 +89,15 @@ func _ready() -> void:
 		if _voxel_manager:
 			_voxel_manager.set_voxel_size(grid_size * build_scale_multiplier)
 			print("GridSnapIndicator: Using voxel chunk system")
+	
+	_update_processing_state()
+
+
+func _update_processing_state() -> void:
+	var should_process := build_mode_toggle_action != "" or _build_mode_enabled
+	set_process(should_process)
+	var should_physics := _build_mode_enabled and auto_sample_from_raycast and _raycast and follow_mode != "manual"
+	set_physics_process(should_physics)
 
 func _physics_process(delta: float) -> void:
 	if not auto_sample_from_raycast or not _raycast:

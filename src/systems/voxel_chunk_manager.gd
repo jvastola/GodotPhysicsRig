@@ -72,6 +72,8 @@ func _ready() -> void:
 			network_manager.voxel_placed_network.connect(_on_network_voxel_placed)
 		if network_manager.has_signal("voxel_removed_network"):
 			network_manager.voxel_removed_network.connect(_on_network_voxel_removed)
+	
+	set_process(false)
 
 func _process(delta: float) -> void:
 	if _voxel_queue.size() > 0:
@@ -441,6 +443,7 @@ func _queue_voxel_update(type: int, pos: Vector3, color: Color = Color.WHITE) ->
 		"p": pos,
 		"c": color
 	})
+	set_process(true)
 
 
 func _flush_voxel_queue() -> void:
@@ -455,3 +458,4 @@ func _flush_voxel_queue() -> void:
 	
 	_voxel_queue.clear()
 	_batch_timer = 0.0
+	set_process(false)

@@ -40,6 +40,8 @@ signal selection_handle_event(event: Dictionary)
 @export_range(0.1, 2.0, 0.05) var secondary_long_press_time: float = 0.65
 @export var collide_with_areas: bool = true
 @export var collide_with_bodies: bool = true
+@export var enable_pointer_processing: bool = true
+@export var enable_debug_logs: bool = false
 @export_enum("always", "on_hit", "on_trigger", "on_hit_or_trigger", "on_hit_and_trigger") var ray_visibility_mode: String = "always"
 @export var require_trigger_for_hit_scaling: bool = true
 @export var enable_hit_scaling: bool = true
@@ -176,6 +178,8 @@ func _ready() -> void:
 		_setup_selection_bounds()
 		_setup_selection_handles()
 		_setup_selection_handle_visuals()
+	
+	set_physics_process(enable_pointer_processing)
 
 
 func _configure_hit_visual() -> void:
@@ -1034,6 +1038,8 @@ func _clear_selection() -> void:
 	_update_handle_visuals(false)
 
 func _physics_process(delta: float) -> void:
+	if not enable_pointer_processing:
+		return
 	if not _raycast:
 		return
 	_get_movement_component()
@@ -1093,7 +1099,7 @@ func _physics_process(delta: float) -> void:
 				handler = null
 		
 		# Debug: Log hit info on Android
-		if is_android and action_state["just_pressed"]:
+		if enable_debug_logs and is_android and action_state["just_pressed"]:
 			print("HandPointer: Hit on Android - collider=", collider_obj, " handler=", handler)
 			print("  - collision_mask=", _raycast.collision_mask, " point=", end)
 
