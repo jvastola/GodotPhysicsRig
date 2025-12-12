@@ -271,16 +271,28 @@ func _try_load_scene_from_path(path: String) -> void:
 	var scene_path := _resolve_scene_path(path)
 	if scene_path == "":
 		return
-	# If resource exists, great; if not, still attempt so Godot can resolve remap
-	if ResourceLoader.exists(scene_path):
-		print("FileSystemUI: Loading scene from resource: ", scene_path)
+	# Decide whether to change the world or just spawn the scene into the current world
+	var res = ResourceLoader.load(scene_path)
+	if not (res and res is PackedScene):
+		print("FileSystemUI: Selected file is not a PackedScene: ", scene_path)
+		return
+	var temp_inst := (res as PackedScene).instantiate()
+	var is_world_scene := _looks_like_world_scene(temp_inst, scene_path)
+	if temp_inst:
+		temp_inst.queue_free()
+	if is_world_scene:
+		if ResourceLoader.exists(scene_path):
+			print("FileSystemUI: Loading scene from resource: ", scene_path)
+		else:
+			print("FileSystemUI: Attempting to load (may rely on remap): ", scene_path)
+		print("FileSystemUI: Changing world to scene: ", scene_path)
+		if GameManager and GameManager.has_method("change_scene_with_player"):
+			GameManager.call_deferred("change_scene_with_player", scene_path, {})
+		else:
+			get_tree().call_deferred("change_scene_to_file", scene_path)
 	else:
-		print("FileSystemUI: Attempting to load (may rely on remap): ", scene_path)
-	print("FileSystemUI: Loading scene from file: ", scene_path)
-	if GameManager and GameManager.has_method("change_scene_with_player"):
-		GameManager.call_deferred("change_scene_with_player", scene_path, {})
-	else:
-		get_tree().call_deferred("change_scene_to_file", scene_path)
+		print("FileSystemUI: Scene looks like a tool/object; spawning into current world instead of changing scene: ", scene_path)
+		_try_instance_scene_from_path(path)
 
 
 func _can_load_scene(path: String) -> bool:
@@ -343,6 +355,23 @@ func _resolve_scene_path(path: String) -> String:
 	if not (scene_path.ends_with(".tscn") or scene_path.ends_with(".tscn.remap")):
 		return ""
 	return scene_path
+
+
+func _looks_like_world_scene(root: Node, scene_path: String) -> bool:
+	if not root:
+		return false
+	# Level directory heuristic
+	if scene_path.contains("/levels/"):
+		return true
+	# If it has a SpawnPoint, treat as world
+	var spawn := root.find_child("SpawnPoint", true, false)
+	if spawn and spawn is Node3D:
+		return true
+	# If root is RigidBody3D with no children, it's almost certainly a single tool/object
+	if root is RigidBody3D and root.get_child_count() == 0:
+		return false
+	# Default: treat as non-world (safer) to avoid nuking the current scene for tools
+	return false
 
 
 func _try_instance_scene_from_path(path: String) -> void:

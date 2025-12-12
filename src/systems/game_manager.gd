@@ -9,11 +9,35 @@ var _fallback_environment: Environment = null
 
 const PLAYER_SCENE_PATH := "res://src/player/XRPlayer.tscn"
 
+# Safety / recovery guards
+const FALL_Y_THRESHOLD := -25.0
+const MAX_POSITION_MAGNITUDE := 5000.0
+const SCENE_CHANGE_TIMEOUT_MS := 8000
+const SAFETY_FLOOR_NAME := "_EmergencySafetyFloor"
+const SAFETY_MIN_Y := 1.5
+const SAFETY_COOLDOWN_MS := 2000
+const SAFETY_GRACE_MS := 3000
+const SAFETY_RECENT_WINDOW_MS := 5000
+const SAFETY_RECENT_MAX := 3
+
+var _last_known_safe_position: Vector3 = Vector3(0, 2, 0)
+var _scene_change_started_msec: int = 0
+var _is_recovering_player: bool = false
+var _last_recovery_msec: int = 0
+var _safety_grace_until_msec: int = 0
+var _recent_recoveries: Array = []
+
 
 func _ready() -> void:
 	print("GameManager: Ready")
+	set_process(true)
 	# Track the initial scene as current_world
 	call_deferred("_setup_initial_world")
+
+
+func _process(_delta: float) -> void:
+	_monitor_scene_change_timeout()
+	await _monitor_player_safety()
 
 
 func _setup_initial_world() -> void:
@@ -34,6 +58,102 @@ func _setup_initial_world() -> void:
 
 	# Allow the world and player to finish initializing, then restore any saved grabbed objects
 	call_deferred("_deferred_restore_saved_grabs")
+
+
+func _monitor_scene_change_timeout() -> void:
+	"""If a scene change gets stuck, allow subsequent requests after a timeout."""
+	if not _is_changing_scene:
+		_scene_change_started_msec = 0
+		return
+	if _scene_change_started_msec == 0:
+		_scene_change_started_msec = Time.get_ticks_msec()
+		return
+	var elapsed := Time.get_ticks_msec() - _scene_change_started_msec
+	if elapsed > SCENE_CHANGE_TIMEOUT_MS:
+		print("GameManager: WARNING - scene change exceeded timeout; clearing busy flag so retry can proceed")
+		_is_changing_scene = false
+		_scene_change_started_msec = 0
+
+
+func _monitor_player_safety() -> void:
+	"""Prevent runaway falling/NaN states by teleporting to a safe spot."""
+	if _is_recovering_player or _is_changing_scene:
+		return
+	var now := Time.get_ticks_msec()
+	if now < _safety_grace_until_msec:
+		return
+	var body := _get_player_body()
+	if not body:
+		return
+	var pos := body.global_transform.origin
+	var coords_ok := pos.is_finite() and not (is_nan(pos.x) or is_nan(pos.y) or is_nan(pos.z))
+	var magnitude := pos.length()
+	if coords_ok and pos.y > FALL_Y_THRESHOLD and magnitude < MAX_POSITION_MAGNITUDE:
+		_last_known_safe_position = pos
+		return
+	# Cooldown to avoid spam if recovery location is still marginal
+	if _last_recovery_msec != 0 and now - _last_recovery_msec < SAFETY_COOLDOWN_MS:
+		return
+	# Too many recoveries in a short window? Enter a longer grace to avoid spam.
+	_recent_recoveries.append(now)
+	# Prune window
+	var cutoff := now - SAFETY_RECENT_WINDOW_MS
+	_recent_recoveries = _recent_recoveries.filter(func(ts): return ts >= cutoff)
+	if _recent_recoveries.size() > SAFETY_RECENT_MAX:
+		_safety_grace_until_msec = now + SAFETY_GRACE_MS
+		print("GameManager: Pausing safety recovery temporarily to avoid spam (grace ", SAFETY_GRACE_MS, " ms)")
+		return
+	_last_recovery_msec = now
+	_is_recovering_player = true
+	var target := _get_safe_recover_position()
+	_ensure_emergency_floor(target)
+	print("GameManager: Safety recovery triggered; teleporting player to ", target)
+	await _teleport_player_to(target)
+	_last_known_safe_position = target
+	_safety_grace_until_msec = Time.get_ticks_msec() + SAFETY_GRACE_MS
+	_is_recovering_player = false
+
+
+func _get_player_body() -> RigidBody3D:
+	if not player_instance:
+		return null
+	return player_instance.get_node_or_null("PlayerBody") as RigidBody3D
+
+
+func _get_safe_recover_position() -> Vector3:
+	var spawn := _find_spawn_point(current_world, "SpawnPoint")
+	if spawn:
+		return _clamp_safe_height(spawn.global_position + Vector3(0, 0.5, 0))
+	if _last_known_safe_position.length() > 0.01 and not (is_nan(_last_known_safe_position.x) or is_nan(_last_known_safe_position.y) or is_nan(_last_known_safe_position.z)):
+		return _clamp_safe_height(_last_known_safe_position)
+	return _clamp_safe_height(Vector3(0, 2, 0))
+
+
+func _clamp_safe_height(pos: Vector3) -> Vector3:
+	var y: float = max(pos.y, SAFETY_MIN_Y)
+	return Vector3(pos.x, y, pos.z)
+
+
+func _ensure_emergency_floor(at_position: Vector3) -> void:
+	if not current_world or not (current_world is Node):
+		return
+	var parent: Node = current_world
+	var existing = parent.get_node_or_null(SAFETY_FLOOR_NAME)
+	if not existing and parent is Node3D:
+		var floor := StaticBody3D.new()
+		floor.name = SAFETY_FLOOR_NAME
+		# Match default world layer (1) and allow interaction with player (mask includes 1 + 2)
+		floor.collision_layer = 1
+		floor.collision_mask = 1 | 2
+		var cs := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = Vector3(20, 2, 20)
+		cs.shape = box
+		floor.add_child(cs)
+		parent.add_child(floor)
+		existing = floor
+	if existing and existing is Node3D:
+		existing.global_position = Vector3(at_position.x, at_position.y - 1.0, at_position.z)
 
 
 func _deferred_restore_saved_grabs() -> void:
@@ -246,6 +366,21 @@ func _wrap_world_if_needed(world_root: Node) -> Node:
 	return wrapper
 
 
+func _is_valid_world_scene(root: Node) -> bool:
+	"""Basic heuristic: must be a Node (any), and contain a SpawnPoint marker or any Marker3D named SpawnPoint."""
+	if not root:
+		return false
+	# Prefer presence of a spawn point marker
+	var spawn := _find_spawn_point(root, "SpawnPoint")
+	if spawn:
+		return true
+	# If no spawn, but root is clearly a standalone tool (RigidBody3D with no children), reject
+	if root is RigidBody3D and root.get_child_count() == 0:
+		return false
+	# Allow other scenes but warn will be logged by caller if needed
+	return true
+
+
 func _get_world_grabbables(world_root: Node) -> Array:
 	"""Return all grabbable descendants of the world root."""
 	var result: Array = []
@@ -269,7 +404,9 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 	_is_changing_scene = true
 	var _reset_scene_change := func() -> void:
 		_is_changing_scene = false
+		_scene_change_started_msec = 0
 	print("GameManager: Changing world to ", scene_path)
+	_scene_change_started_msec = Time.get_ticks_msec()
 	
 	# Load the new world scene
 	var new_world_scene = load(scene_path)
@@ -282,6 +419,18 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 		_reset_scene_change.call()
 		return
 	print("GameManager: Loaded PackedScene OK: ", new_world_scene.resource_path if new_world_scene is Resource else "<no path>")
+
+	# Instantiate early to validate the target world before tearing down the current one
+	var raw_world: Node = new_world_scene.instantiate()
+	if not raw_world:
+		print("GameManager: ERROR - instantiate() returned null for ", scene_path)
+		_reset_scene_change.call()
+		return
+	if not _is_valid_world_scene(raw_world):
+		print("GameManager: WARNING - Scene ", scene_path, " does not look like a world (no spawn point / likely object). Ignoring scene change.")
+		raw_world.queue_free()
+		_reset_scene_change.call()
+		return
 	
 	# Ensure we have a cached environment before removing the current world
 	_cache_fallback_environment_from(current_world)
@@ -309,6 +458,7 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 		if not player_instance:
 			print("GameManager: ERROR - No player found and fallback XRPlayer could not be instantiated!")
 			_reset_scene_change.call()
+			raw_world.queue_free()
 			return
 	else:
 		print("GameManager: player_instance present: ", player_instance.name)
@@ -352,12 +502,7 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 	else:
 		print("GameManager: No current_world to remove (first load?)")
 	
-	# Instance new world
-	var raw_world: Node = new_world_scene.instantiate()
-	if not raw_world:
-		print("GameManager: ERROR - instantiate() returned null for ", scene_path)
-		_reset_scene_change.call()
-		return
+	# raw_world was already instantiated and validated above
 	print("GameManager: instantiate() returned: ", raw_world, " class: ", raw_world.get_class())
 	current_world = _wrap_world_if_needed(raw_world)
 	print("GameManager: _wrap_world_if_needed => ", current_world, " class: ", current_world.get_class())
@@ -486,6 +631,7 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 		print("GameManager: Entered MainScene — scheduling saved-grabbable restore")
 		call_deferred("_deferred_restore_saved_grabs")
 	_is_changing_scene = false
+	_scene_change_started_msec = 0
 
 
 func _find_spawn_point(scene_root: Node, spawn_name: String = "SpawnPoint") -> Node3D:
@@ -609,6 +755,8 @@ func _teleport_player_to(target_pos: Vector3) -> void:
 		player_body.linear_velocity = Vector3.ZERO
 		player_body.angular_velocity = Vector3.ZERO
 		player_body.freeze = false
+		# After teleport, give a brief grace period so safety monitor doesn't fire while physics settles
+		_safety_grace_until_msec = Time.get_ticks_msec() + SAFETY_GRACE_MS
 	else:
 		if player_instance.has_method("teleport_to"):
 			player_instance.call_deferred("teleport_to", target_pos)
