@@ -178,8 +178,8 @@ func _move_to_pool(tool_type: String, node: Node) -> void:
 	var data := _ensure_pool(tool_type)
 	data.active.erase(node)
 	if node.get_parent():
-		node.get_parent().remove_child(node)
-	_pool_root.add_child(node)
+		node.get_parent().call_deferred("remove_child", node)
+	_pool_root.call_deferred("add_child", node)
 	_set_node_active(node, false)
 	if node.has_method("on_pooled"):
 		node.call_deferred("on_pooled")
@@ -190,9 +190,9 @@ func _activate_node(node: Node, parent: Node) -> void:
 	if not node or not is_instance_valid(node):
 		return
 	if node.get_parent():
-		node.get_parent().remove_child(node)
+		node.get_parent().call_deferred("remove_child", node)
 	if parent:
-		parent.add_child(node)
+		parent.call_deferred("add_child", node)
 	_set_node_active(node, true)
 	if node.has_method("on_unpooled"):
 		node.call_deferred("on_unpooled")

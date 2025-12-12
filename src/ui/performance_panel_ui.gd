@@ -258,28 +258,28 @@ func _update_world_stats() -> void:
 	var stats := pool.get_world_stats()
 	
 	if _voxel_label:
-		var voxels := stats.get("voxels", 0)
-		var max_voxels := stats.get("max_voxels", 500)
-		var chunks := stats.get("chunks", 0)
+		var voxels: int = stats.get("voxels", 0)
+		var max_voxels: int = stats.get("max_voxels", 500)
+		var chunks: int = stats.get("chunks", 0)
 		_voxel_label.text = "Voxels: %d / %d (%d chunks)" % [voxels, max_voxels, chunks]
 		_voxel_label.add_theme_color_override("font_color", Color(1, 0.65, 0.65) if voxels >= max_voxels else Color(0.85, 0.85, 0.85))
 	
 	if _hull_label:
-		var hulls := stats.get("hulls", 0)
-		var max_hulls := stats.get("max_hulls", 10)
+		var hulls: int = stats.get("hulls", 0)
+		var max_hulls: int = stats.get("max_hulls", 10)
 		_hull_label.text = "Hulls: %d / %d" % [hulls, max_hulls]
 		_hull_label.add_theme_color_override("font_color", Color(1, 0.65, 0.65) if hulls >= max_hulls else Color(0.85, 0.85, 0.85))
 	
 	if _poly_label:
-		var polys := stats.get("polys", 0)
-		var max_polys := stats.get("max_polys", 50)
-		var points := stats.get("poly_points", 0)
+		var polys: int = stats.get("polys", 0)
+		var max_polys: int = stats.get("max_polys", 50)
+		var points: int = stats.get("poly_points", 0)
 		_poly_label.text = "Poly Triangles: %d / %d (%d points)" % [polys, max_polys, points]
 		_poly_label.add_theme_color_override("font_color", Color(1, 0.65, 0.65) if polys >= max_polys else Color(0.85, 0.85, 0.85))
 	
 	if _scene_spawn_label:
-		var spawned := stats.get("spawned_scenes", 0)
-		var max_spawned := stats.get("max_spawned_scenes", 1)
+		var spawned: int = stats.get("spawned_scenes", 0)
+		var max_spawned: int = stats.get("max_spawned_scenes", 1)
 		_scene_spawn_label.text = "Spawned: %d / %d" % [spawned, max_spawned]
 		_scene_spawn_label.add_theme_color_override("font_color", Color(1, 0.65, 0.65) if spawned >= max_spawned else Color(0.85, 0.85, 0.85))
 

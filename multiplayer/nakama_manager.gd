@@ -118,6 +118,19 @@ func _get_or_create_device_id() -> String:
 
 ## Authenticate with Nakama using device ID
 func authenticate_device() -> void:
+	# Guard against duplicate auth attempts
+	if is_authenticated:
+		print("NakamaManager: Already authenticated, skipping")
+		authenticated.emit(session)
+		return
+	
+	# Check if HTTP client is busy
+	if http_client.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
+		print("NakamaManager: HTTP client busy, cancelling previous request")
+		http_client.cancel_request()
+		# Wait a frame before retrying
+		await get_tree().process_frame
+	
 	print("NakamaManager: Authenticating with device ID...")
 	
 	var url = _get_nakama_url() + "/v2/account/authenticate/device?create=true"
@@ -130,7 +143,10 @@ func authenticate_device() -> void:
 		"Authorization: Basic " + Marshalls.utf8_to_base64(nakama_server_key + ":")
 	]
 	
-	http_client.request(url, headers, HTTPClient.METHOD_POST, body)
+	var err = http_client.request(url, headers, HTTPClient.METHOD_POST, body)
+	if err != OK:
+		push_error("NakamaManager: Failed to start auth request: ", err)
+		authentication_failed.emit("Request failed: " + str(err))
 
 
 ## Connect WebSocket after authentication
