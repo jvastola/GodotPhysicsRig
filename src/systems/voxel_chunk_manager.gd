@@ -52,7 +52,7 @@ signal voxel_removed(world_pos: Vector3)
 
 class VoxelChunk:
 	var coord: Vector3i  # Chunk coordinate
-	var voxels: Dictionary = {}  # Vector3i (local voxel pos) -> bool (occupied)
+	var voxels: Dictionary = {}  # Vector3i (local voxel pos) -> Color
 	var mesh_instance: MeshInstance3D = null
 	var static_body: StaticBody3D = null
 	var collision_shape: CollisionShape3D = null
@@ -90,20 +90,24 @@ func add_voxel(world_pos: Vector3, color: Color = Color.WHITE, sync_network: boo
 	
 	var chunk := _get_or_create_chunk(chunk_coord)
 	if not chunk.voxels.has(local_pos):
-		chunk.voxels[local_pos] = true
+		chunk.voxels[local_pos] = color
 		chunk.dirty = true
 		_mark_neighbors_dirty(chunk_coord, local_pos)
-		
-		# Sync to network
-		if sync_network:
-			if network_manager and network_manager.get("use_nakama") and nakama_manager:
-				# Queue for Nakama batching
-				_queue_voxel_update(0, world_pos, color)
-			elif network_manager and network_manager.has_method("sync_voxel_placed"):
-				# Send via ENet
-				network_manager.sync_voxel_placed(world_pos, color)
-		
-		voxel_placed.emit(world_pos, color)
+	else:
+		# Update color if voxel already exists
+		chunk.voxels[local_pos] = color
+		chunk.dirty = true
+	
+	# Sync to network
+	if sync_network:
+		if network_manager and network_manager.get("use_nakama") and nakama_manager:
+			# Queue for Nakama batching
+			_queue_voxel_update(0, world_pos, color)
+		elif network_manager and network_manager.has_method("sync_voxel_placed"):
+			# Send via ENet
+			network_manager.sync_voxel_placed(world_pos, color)
+	
+	voxel_placed.emit(world_pos, color)
 
 ## Remove a voxel at world position
 func remove_voxel(world_pos: Vector3, sync_network: bool = true) -> void:
@@ -151,7 +155,8 @@ func get_all_voxels() -> Array[Dictionary]:
 		var chunk: VoxelChunk = _chunks[chunk_coord]
 		for local_pos in chunk.voxels.keys():
 			var world_pos = local_to_world_voxel(local_pos, chunk_coord)
-			all_voxels.append({"pos": world_pos, "color": Color.WHITE})
+			var stored_color: Color = chunk.voxels.get(local_pos, Color.WHITE)
+			all_voxels.append({"pos": world_pos, "color": stored_color})
 	return all_voxels
 
 
@@ -308,6 +313,7 @@ func _rebuild_chunk_mesh(chunk: VoxelChunk) -> void:
 func _generate_chunk_mesh(chunk: VoxelChunk) -> Dictionary:
 	var vertices: PackedVector3Array = PackedVector3Array()
 	var normals: PackedVector3Array = PackedVector3Array()
+	var colors: PackedColorArray = PackedColorArray()
 	var indices: PackedInt32Array = PackedInt32Array()
 	var collision_faces: PackedVector3Array = PackedVector3Array()
 	
@@ -316,6 +322,7 @@ func _generate_chunk_mesh(chunk: VoxelChunk) -> Dictionary:
 	
 	# Iterate through all voxels in chunk
 	for local_pos in chunk.voxels.keys():
+		var voxel_color: Color = chunk.voxels.get(local_pos, Color(0.7, 0.7, 0.7))
 		# Calculate voxel center position (offset by half voxel size to center on grid)
 		var voxel_world_pos := chunk_world_origin + Vector3(local_pos) * _voxel_size
 		var voxel_offset := Vector3(-0.5, -0.5, -0.5) * _voxel_size  # Center the cube
@@ -338,6 +345,7 @@ func _generate_chunk_mesh(chunk: VoxelChunk) -> Dictionary:
 				var vert: Vector3 = voxel_world_pos + voxel_offset + face_verts[i] * _voxel_size
 				vertices.append(vert)
 				normals.append(face_normal)
+				colors.append(voxel_color)
 			
 			# Add 2 triangles (6 indices) for this face
 			indices.append(vertex_offset + 0)
@@ -364,6 +372,7 @@ func _generate_chunk_mesh(chunk: VoxelChunk) -> Dictionary:
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
 	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_COLOR] = colors
 	arrays[Mesh.ARRAY_INDEX] = indices
 	
 	return {

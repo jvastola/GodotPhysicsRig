@@ -405,6 +405,8 @@ func _update_player_button_text() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	# Fallback: allow toggling via common actions even if pointer click is blocked.
 	if event.is_action_pressed("ui_accept") or event.is_action_pressed("ui_cancel"):
+		if not physics_toggle_button:
+			return
 		physics_toggle_button.button_pressed = not _physics_active
 		_on_physics_toggled(physics_toggle_button.button_pressed)
 

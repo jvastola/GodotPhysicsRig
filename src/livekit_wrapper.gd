@@ -31,6 +31,7 @@ var _android_plugin: Object = null  # GodotLiveKit Android plugin
 var _is_connected: bool = false
 var _local_identity: String = ""
 var _is_muted: bool = false  # Track mute state for desktop (Rust doesn't have enable_microphone)
+var _current_room: String = ""
 
 
 func _ready() -> void:
@@ -114,6 +115,7 @@ func _connect_rust_signals() -> void:
 ## @param token: The access token for authentication
 func connect_to_room(url: String, token: String) -> void:
 	print("[LiveKitWrapper] Connecting to room: %s" % url)
+	_current_room = url
 	
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
@@ -132,6 +134,7 @@ func connect_to_room(url: String, token: String) -> void:
 ## Disconnect from the current room
 func disconnect_from_room() -> void:
 	print("[LiveKitWrapper] Disconnecting from room")
+	_current_room = ""
 	
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
@@ -281,8 +284,7 @@ func set_mic_sample_rate(rate: int) -> void:
 
 ## Get current room name
 func get_current_room() -> String:
-	# TODO: Implement for Android if needed
-	return ""
+	return _current_room
 
 
 ## Set volume for a specific remote participant (Android only)

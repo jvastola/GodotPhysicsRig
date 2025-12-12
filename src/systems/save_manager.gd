@@ -18,6 +18,13 @@ func _ready() -> void:
 	print("SaveManager: Initialized, save file: ", SAVE_FILE_PATH)
 
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_maybe_flush_save("wm_close_request")
+	elif what == NOTIFICATION_EXIT_TREE:
+		_maybe_flush_save("exit_tree")
+
+
 func _process(delta: float) -> void:
 	# Auto-save if data has changed
 	if _save_dirty:
@@ -25,6 +32,12 @@ func _process(delta: float) -> void:
 		if _autosave_timer >= AUTOSAVE_INTERVAL:
 			save_game_state()
 			_autosave_timer = 0.0
+
+
+func _maybe_flush_save(reason: String = "") -> void:
+	if _save_dirty:
+		print("SaveManager: Flushing dirty save_data before exit (", reason, ")")
+		save_game_state()
 
 
 func save_game_state() -> void:

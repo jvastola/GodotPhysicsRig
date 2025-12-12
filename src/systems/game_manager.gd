@@ -267,15 +267,19 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 		print("GameManager: change_scene_with_player ignored - already changing scene")
 		return
 	_is_changing_scene = true
+	var _reset_scene_change := func() -> void:
+		_is_changing_scene = false
 	print("GameManager: Changing world to ", scene_path)
 	
 	# Load the new world scene
 	var new_world_scene = load(scene_path)
 	if not new_world_scene:
 		print("GameManager: ERROR - Could not load scene ", scene_path)
+		_reset_scene_change.call()
 		return
 	if not (new_world_scene is PackedScene):
 		print("GameManager: ERROR - Loaded resource is not a PackedScene: ", new_world_scene)
+		_reset_scene_change.call()
 		return
 	print("GameManager: Loaded PackedScene OK: ", new_world_scene.resource_path if new_world_scene is Resource else "<no path>")
 	
@@ -304,6 +308,7 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 			print("GameManager: Could not load fallback XRPlayer at ", PLAYER_SCENE_PATH)
 		if not player_instance:
 			print("GameManager: ERROR - No player found and fallback XRPlayer could not be instantiated!")
+			_reset_scene_change.call()
 			return
 	else:
 		print("GameManager: player_instance present: ", player_instance.name)
@@ -351,7 +356,7 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 	var raw_world: Node = new_world_scene.instantiate()
 	if not raw_world:
 		print("GameManager: ERROR - instantiate() returned null for ", scene_path)
-		_is_changing_scene = false
+		_reset_scene_change.call()
 		return
 	print("GameManager: instantiate() returned: ", raw_world, " class: ", raw_world.get_class())
 	current_world = _wrap_world_if_needed(raw_world)
