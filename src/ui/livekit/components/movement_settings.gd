@@ -28,8 +28,8 @@ const DEFAULTS := {
 	"invert_turn_x": false,
 	"ui_scroll_steals_stick": false,
 	"hand_assignment": PlayerMovementComponent.HandAssignment.DEFAULT,
-	"enable_two_hand_world_scale": true,
-	"enable_two_hand_world_rotation": true,
+	"enable_two_hand_world_scale": false,
+	"enable_two_hand_world_rotation": false,
 	"world_scale_min": 0.1,
 	"world_scale_max": 15.0,
 	"world_scale_sensitivity": 0.35,
@@ -59,6 +59,24 @@ const DEFAULTS := {
 	"jump_cooldown": 0.4,
 	"player_gravity_enabled": false,
 	"player_drag_force": 0.85,
+	# V2 Two-Hand Grab Settings
+	"enable_two_hand_grab_v2": false,
+	"v2_scale_enabled": false,
+	"v2_rotation_enabled": false,
+	"v2_world_scale_min": 0.1,
+	"v2_world_scale_max": 15.0,
+	"v2_left_action": "trigger",
+	"v2_right_action": "trigger",
+	"v2_show_visual": true,
+	"v2_debug_logs": false,
+	# V3 Two-Hand Grab Settings (XRTools style)
+	"enable_two_hand_grab_v3": false,
+	"v3_world_scale_min": 0.5,
+	"v3_world_scale_max": 2.0,
+	"v3_left_action": "trigger",
+	"v3_right_action": "trigger",
+	"v3_show_visual": true,
+	"v3_debug_logs": false,
 }
 
 const INPUT_ACTIONS := [
@@ -140,6 +158,26 @@ var profile_status_label: Label
 
 var snap_container: VBoxContainer
 var smooth_container: VBoxContainer
+
+# V2 Two-Hand Grab UI
+var v2_enable_check: CheckBox
+var v2_scale_check: CheckBox
+var v2_rotation_check: CheckBox
+var v2_scale_min_slider: HSlider
+var v2_scale_min_label: Label
+var v2_scale_max_slider: HSlider
+var v2_scale_max_label: Label
+var v2_show_visual_check: CheckBox
+var v2_debug_check: CheckBox
+
+# V3 Two-Hand Grab UI (XRTools style)
+var v3_enable_check: CheckBox
+var v3_scale_min_slider: HSlider
+var v3_scale_min_label: Label
+var v3_scale_max_slider: HSlider
+var v3_scale_max_label: Label
+var v3_show_visual_check: CheckBox
+var v3_debug_check: CheckBox
 
 # Input mapping UI state
 var input_rows := {}
@@ -766,8 +804,159 @@ func _build_ui():
 	one_hand_rotation_smooth_slider = one_hand_rot_smooth_block.slider
 	one_hand_rotation_smooth_slider.value_changed.connect(func(value: float): _on_one_hand_rotation_smooth_changed(value))
 
+	# === V2 World Grab (Horizon Worlds Style) ===
+	var v2_card = _create_card(main_vbox, "V2 World Scale/Rotate", "Horizon Worlds-style locked point grab system", "🎮")
+	
+	v2_enable_check = CheckBox.new()
+	v2_enable_check.text = "Enable V2 Two-Hand Grab (replaces V1)"
+	v2_enable_check.add_theme_font_size_override("font_size", 12)
+	if movement_component:
+		v2_enable_check.button_pressed = movement_component.enable_two_hand_grab_v2
+	else:
+		v2_enable_check.button_pressed = defaults_snapshot["enable_two_hand_grab_v2"]
+	v2_enable_check.toggled.connect(func(pressed: bool): _on_v2_enable_toggled(pressed))
+	v2_enable_check.tooltip_text = "Use the new V2 grab system. When enabled, V1 two-hand controls are disabled."
+	v2_card.add_child(v2_enable_check)
+	
+	v2_scale_check = CheckBox.new()
+	v2_scale_check.text = "V2 Scale Enabled"
+	v2_scale_check.add_theme_font_size_override("font_size", 12)
+	if movement_component:
+		v2_scale_check.button_pressed = movement_component.v2_scale_enabled
+	else:
+		v2_scale_check.button_pressed = defaults_snapshot["v2_scale_enabled"]
+	v2_scale_check.toggled.connect(func(pressed: bool): _on_v2_scale_toggled(pressed))
+	v2_scale_check.tooltip_text = "Pull hands apart to shrink world (grow player). Push together to expand world (shrink player)."
+	v2_card.add_child(v2_scale_check)
+	
+	v2_rotation_check = CheckBox.new()
+	v2_rotation_check.text = "V2 Rotation Enabled"
+	v2_rotation_check.add_theme_font_size_override("font_size", 12)
+	if movement_component:
+		v2_rotation_check.button_pressed = movement_component.v2_rotation_enabled
+	else:
+		v2_rotation_check.button_pressed = defaults_snapshot["v2_rotation_enabled"]
+	v2_rotation_check.toggled.connect(func(pressed: bool): _on_v2_rotation_toggled(pressed))
+	v2_rotation_check.tooltip_text = "Rotate hands to rotate world. Moving one hand in front of the other = 90°."
+	v2_card.add_child(v2_rotation_check)
+	
+	var v2_min_block = _add_slider_block(
+		v2_card,
+		"V2 Scale Min",
+		"Lower bound for V2 world scaling.",
+		0.05,
+		10.0,
+		0.05,
+		movement_component.v2_world_scale_min if movement_component else defaults_snapshot["v2_world_scale_min"],
+		func(value): return " %.2fx" % value
+	)
+	v2_scale_min_label = v2_min_block.label
+	v2_scale_min_slider = v2_min_block.slider
+	v2_scale_min_slider.value_changed.connect(func(value: float): _on_v2_scale_min_changed(value))
+	
+	var v2_max_block = _add_slider_block(
+		v2_card,
+		"V2 Scale Max",
+		"Upper bound for V2 world scaling.",
+		0.5,
+		1000.0,
+		0.5,
+		movement_component.v2_world_scale_max if movement_component else defaults_snapshot["v2_world_scale_max"],
+		func(value): return " %.2fx" % value
+	)
+	v2_scale_max_label = v2_max_block.label
+	v2_scale_max_slider = v2_max_block.slider
+	v2_scale_max_slider.value_changed.connect(func(value: float): _on_v2_scale_max_changed(value))
+	
+	v2_show_visual_check = CheckBox.new()
+	v2_show_visual_check.text = "V2 Show Grab Visual"
+	v2_show_visual_check.add_theme_font_size_override("font_size", 12)
+	if movement_component:
+		v2_show_visual_check.button_pressed = movement_component.v2_show_visual
+	else:
+		v2_show_visual_check.button_pressed = defaults_snapshot["v2_show_visual"]
+	v2_show_visual_check.toggled.connect(func(pressed: bool): _on_v2_show_visual_toggled(pressed))
+	v2_show_visual_check.tooltip_text = "Display anchor points and connecting line during V2 grab."
+	v2_card.add_child(v2_show_visual_check)
+	
+	v2_debug_check = CheckBox.new()
+	v2_debug_check.text = "V2 Debug Logs"
+	v2_debug_check.add_theme_font_size_override("font_size", 12)
+	if movement_component:
+		v2_debug_check.button_pressed = movement_component.v2_debug_logs
+	else:
+		v2_debug_check.button_pressed = defaults_snapshot["v2_debug_logs"]
+	v2_debug_check.toggled.connect(func(pressed: bool): _on_v2_debug_toggled(pressed))
+	v2_debug_check.tooltip_text = "Print debug info to console during V2 grab."
+	v2_card.add_child(v2_debug_check)
+
+	# === V3 World Grab (XRToolsMovementWorldGrab Style) ===
+	var v3_card = _create_card(main_vbox, "V3 World Scale/Rotate", "XRToolsMovementWorldGrab style - locked world point grabbing", "🔄")
+	
+	v3_enable_check = CheckBox.new()
+	v3_enable_check.text = "Enable V3 Two-Hand Grab (replaces V1/V2)"
+	v3_enable_check.add_theme_font_size_override("font_size", 12)
+	if movement_component:
+		v3_enable_check.button_pressed = movement_component.enable_two_hand_grab_v3
+	else:
+		v3_enable_check.button_pressed = defaults_snapshot["enable_two_hand_grab_v3"]
+	v3_enable_check.toggled.connect(func(pressed: bool): _on_v3_enable_toggled(pressed))
+	v3_enable_check.tooltip_text = "Use V3 grab system (XRTools algorithm). Hands lock to world positions; moving closer = scale up, apart = scale down."
+	v3_card.add_child(v3_enable_check)
+	
+	var v3_min_block = _add_slider_block(
+		v3_card,
+		"V3 Scale Min",
+		"Lower bound for V3 world scaling.",
+		0.1,
+		10.0,
+		0.1,
+		movement_component.v3_world_scale_min if movement_component else defaults_snapshot["v3_world_scale_min"],
+		func(value): return " %.1fx" % value
+	)
+	v3_scale_min_label = v3_min_block.label
+	v3_scale_min_slider = v3_min_block.slider
+	v3_scale_min_slider.value_changed.connect(func(value: float): _on_v3_scale_min_changed(value))
+	
+	var v3_max_block = _add_slider_block(
+		v3_card,
+		"V3 Scale Max",
+		"Upper bound for V3 world scaling.",
+		0.5,
+		100.0,
+		0.5,
+		movement_component.v3_world_scale_max if movement_component else defaults_snapshot["v3_world_scale_max"],
+		func(value): return " %.1fx" % value
+	)
+	v3_scale_max_label = v3_max_block.label
+	v3_scale_max_slider = v3_max_block.slider
+	v3_scale_max_slider.value_changed.connect(func(value: float): _on_v3_scale_max_changed(value))
+	
+	v3_show_visual_check = CheckBox.new()
+	v3_show_visual_check.text = "V3 Show Grab Visual"
+	v3_show_visual_check.add_theme_font_size_override("font_size", 12)
+	if movement_component:
+		v3_show_visual_check.button_pressed = movement_component.v3_show_visual
+	else:
+		v3_show_visual_check.button_pressed = defaults_snapshot["v3_show_visual"]
+	v3_show_visual_check.toggled.connect(func(pressed: bool): _on_v3_show_visual_toggled(pressed))
+	v3_show_visual_check.tooltip_text = "Display anchor points and connecting line during V3 grab."
+	v3_card.add_child(v3_show_visual_check)
+	
+	v3_debug_check = CheckBox.new()
+	v3_debug_check.text = "V3 Debug Logs"
+	v3_debug_check.add_theme_font_size_override("font_size", 12)
+	if movement_component:
+		v3_debug_check.button_pressed = movement_component.v3_debug_logs
+	else:
+		v3_debug_check.button_pressed = defaults_snapshot["v3_debug_logs"]
+	v3_debug_check.toggled.connect(func(pressed: bool): _on_v3_debug_toggled(pressed))
+	v3_debug_check.tooltip_text = "Print debug info to console during V3 grab."
+	v3_card.add_child(v3_debug_check)
+
 	# === Player ===
 	var player_card = _create_card(main_vbox, "Player", "Gravity and safety preferences", "🧍")
+
 
 	gravity_check = CheckBox.new()
 	gravity_check.text = "Player Gravity Enabled"
@@ -1186,6 +1375,94 @@ func _on_gravity_toggled(pressed: bool):
 	settings_changed.emit()
 
 
+# === V2 Two-Hand Grab Handlers ===
+
+func _on_v2_enable_toggled(pressed: bool):
+	if movement_component:
+		movement_component.enable_two_hand_grab_v2 = pressed
+	settings_changed.emit()
+
+
+func _on_v2_scale_toggled(pressed: bool):
+	if movement_component:
+		movement_component.v2_scale_enabled = pressed
+	settings_changed.emit()
+
+
+func _on_v2_rotation_toggled(pressed: bool):
+	if movement_component:
+		movement_component.v2_rotation_enabled = pressed
+	settings_changed.emit()
+
+
+func _on_v2_scale_min_changed(value: float):
+	if v2_scale_max_slider and value > v2_scale_max_slider.value:
+		v2_scale_max_slider.value = value
+	if movement_component:
+		movement_component.v2_world_scale_min = value
+	v2_scale_min_label.text = "V2 Scale Min: %.2fx" % value
+	settings_changed.emit()
+
+
+func _on_v2_scale_max_changed(value: float):
+	if v2_scale_min_slider and value < v2_scale_min_slider.value:
+		v2_scale_min_slider.value = value
+	if movement_component:
+		movement_component.v2_world_scale_max = value
+	v2_scale_max_label.text = "V2 Scale Max: %.2fx" % value
+	settings_changed.emit()
+
+
+func _on_v2_show_visual_toggled(pressed: bool):
+	if movement_component:
+		movement_component.v2_show_visual = pressed
+	settings_changed.emit()
+
+
+func _on_v2_debug_toggled(pressed: bool):
+	if movement_component:
+		movement_component.v2_debug_logs = pressed
+	settings_changed.emit()
+
+
+# === V3 Two-Hand Grab Handlers ===
+
+func _on_v3_enable_toggled(pressed: bool):
+	if movement_component:
+		movement_component.enable_two_hand_grab_v3 = pressed
+	settings_changed.emit()
+
+
+func _on_v3_scale_min_changed(value: float):
+	if v3_scale_max_slider and value > v3_scale_max_slider.value:
+		v3_scale_max_slider.value = value
+	if movement_component:
+		movement_component.v3_world_scale_min = value
+	v3_scale_min_label.text = "V3 Scale Min: %.1fx" % value
+	settings_changed.emit()
+
+
+func _on_v3_scale_max_changed(value: float):
+	if v3_scale_min_slider and value < v3_scale_min_slider.value:
+		v3_scale_min_slider.value = value
+	if movement_component:
+		movement_component.v3_world_scale_max = value
+	v3_scale_max_label.text = "V3 Scale Max: %.1fx" % value
+	settings_changed.emit()
+
+
+func _on_v3_show_visual_toggled(pressed: bool):
+	if movement_component:
+		movement_component.v3_show_visual = pressed
+	settings_changed.emit()
+
+
+func _on_v3_debug_toggled(pressed: bool):
+	if movement_component:
+		movement_component.v3_debug_logs = pressed
+	settings_changed.emit()
+
+
 func _on_auto_respawn_toggled(pressed: bool):
 	if movement_component:
 		movement_component.auto_respawn_enabled = pressed
@@ -1406,10 +1683,26 @@ func refresh():
 			jump_impulse_slider.value = movement_component.jump_impulse
 		if jump_cooldown_slider:
 			jump_cooldown_slider.value = movement_component.jump_cooldown
+		# V2 Settings
+		if v2_enable_check:
+			v2_enable_check.button_pressed = movement_component.enable_two_hand_grab_v2
+		if v2_scale_check:
+			v2_scale_check.button_pressed = movement_component.v2_scale_enabled
+		if v2_rotation_check:
+			v2_rotation_check.button_pressed = movement_component.v2_rotation_enabled
+		if v2_scale_min_slider:
+			v2_scale_min_slider.value = movement_component.v2_world_scale_min
+		if v2_scale_max_slider:
+			v2_scale_max_slider.value = movement_component.v2_world_scale_max
+		if v2_show_visual_check:
+			v2_show_visual_check.button_pressed = movement_component.v2_show_visual
+		if v2_debug_check:
+			v2_debug_check.button_pressed = movement_component.v2_debug_logs
 	
 	_update_turn_mode_ui()
 	_update_locomotion_controls_enabled()
 	_update_status_label()
+
 
 
 # === Helpers ===

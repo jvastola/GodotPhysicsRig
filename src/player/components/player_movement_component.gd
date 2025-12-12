@@ -34,8 +34,8 @@ enum HandAssignment { DEFAULT, SWAPPED }
 @export_range(10.0, 720.0, 10.0) var ui_scroll_wheel_factor: float = 240.0
 
 # === World Grab / Utility Settings ===
-@export var enable_two_hand_world_scale: bool = true
-@export var enable_two_hand_world_rotation: bool = true
+@export var enable_two_hand_world_scale: bool = false
+@export var enable_two_hand_world_rotation: bool = false
 @export_range(0.01, 20.0, 0.05) var world_scale_min: float = 0.1
 @export_range(0.1, 1000.0, 0.1) var world_scale_max: float = 15.0
 @export_range(0.05, 1.5, 0.05) var world_scale_sensitivity: float = 0.35
@@ -71,6 +71,28 @@ enum OneHandGrabMode { RELATIVE, ANCHORED }
 @export_range(0.0, 2.0, 0.05) var jump_cooldown: float = 0.4
 @export var player_gravity_enabled: bool = false
 @export_range(0.0, 5.0, 0.05) var player_drag_force: float = 0.85
+
+# === Two-Hand Grab V2 Settings ===
+# Completely separate from V1 - uses locked world point approach like Horizon Worlds
+@export var enable_two_hand_grab_v2: bool = false
+@export var v2_scale_enabled: bool = false
+@export var v2_rotation_enabled: bool = false
+@export_range(0.01, 20.0, 0.05) var v2_world_scale_min: float = 0.1
+@export_range(0.1, 1000.0, 0.1) var v2_world_scale_max: float = 15.0
+@export var v2_left_action: String = "trigger"
+@export var v2_right_action: String = "trigger"
+@export var v2_show_visual: bool = true
+@export var v2_debug_logs: bool = false
+
+# === Two-Hand Grab V3 Settings ===
+# XRToolsMovementWorldGrab style - exact algorithm from godot-xr-tools
+@export var enable_two_hand_grab_v3: bool = false
+@export_range(0.1, 20.0, 0.1) var v3_world_scale_min: float = 0.5
+@export_range(0.5, 100.0, 0.5) var v3_world_scale_max: float = 2.0
+@export var v3_left_action: String = "trigger"
+@export var v3_right_action: String = "trigger"
+@export var v3_show_visual: bool = true
+@export var v3_debug_logs: bool = false
 
 # Turning state
 var can_snap_turn := true
@@ -131,6 +153,12 @@ var _jump_cooldown_timer := 0.0
 # Input mapping helper
 var _input_binding_manager: InputBindingManager
 
+# Two-Hand Grab V2 component
+var _two_hand_grab_v2: TwoHandGrabV2
+
+# Two-Hand Grab V3 component
+var _two_hand_grab_v3: TwoHandGrabV3
+
 # References
 var player_body: RigidBody3D
 var left_controller: XRController3D
@@ -168,7 +196,10 @@ func setup(p_player_body: RigidBody3D, p_left_controller: XRController3D, p_righ
 	_apply_player_gravity()
 	_apply_player_drag()
 	_ensure_visuals()
+	_setup_two_hand_grab_v2()
+	_setup_two_hand_grab_v3()
 	print("PlayerMovementComponent: Setup with both controllers")
+
 
 
 func _ready() -> void:
@@ -437,10 +468,34 @@ func _signed_angle_2d(a: Vector2, b: Vector2) -> float:
 
 func physics_process_world_grab(delta: float) -> void:
 	"""Allow two-hand grab gestures to scale/rotate the world."""
-	var two_hand_enabled := enable_two_hand_world_scale or enable_two_hand_world_rotation
+	
+	# === V3 Mode: XRToolsMovementWorldGrab style ===
+	if enable_two_hand_grab_v3 and _two_hand_grab_v3:
+		_sync_v3_settings()
+		var v3_handled := _two_hand_grab_v3.process_grab(delta)
+		# If V3 is active, skip V1/V2 logic entirely
+		if _two_hand_grab_v3.is_active():
+			_end_world_grab()  # Ensure V1 state is cleaned up
+			_end_one_hand_grab()
+			return
+		# If V3 not grabbing, fall through to one-hand grab if enabled
+	
+	# === V2 Mode: Completely separate implementation ===
+	if enable_two_hand_grab_v2 and _two_hand_grab_v2 and not enable_two_hand_grab_v3:
+		_sync_v2_settings()
+		_two_hand_grab_v2.process_grab(delta)
+		# If V2 is active, skip V1 logic entirely
+		if _two_hand_grab_v2.is_active():
+			_end_world_grab()  # Ensure V1 state is cleaned up
+			_end_one_hand_grab()
+			return
+		# If V2 not grabbing, fall through to one-hand grab if enabled
+	
+	# === V1 Mode: Original implementation ===
+	var two_hand_v1_enabled := (enable_two_hand_world_scale or enable_two_hand_world_rotation) and not enable_two_hand_grab_v2 and not enable_two_hand_grab_v3
 	var one_hand_enabled := enable_one_hand_world_grab or enable_one_hand_world_rotate
 
-	if not (two_hand_enabled or one_hand_enabled):
+	if not (two_hand_v1_enabled or one_hand_enabled):
 		_end_world_grab()
 		_end_one_hand_grab()
 		return
@@ -452,7 +507,7 @@ func physics_process_world_grab(delta: float) -> void:
 	var left_pressed: bool = left_controller and _is_action_pressed(left_controller, two_hand_left_action)
 	var right_pressed: bool = right_controller and _is_action_pressed(right_controller, two_hand_right_action)
 
-	if two_hand_enabled and left_pressed and right_pressed and left_controller and right_controller:
+	if two_hand_v1_enabled and left_pressed and right_pressed and left_controller and right_controller:
 		_end_one_hand_grab()
 		if not _world_grab_active:
 			_start_world_grab()
@@ -850,6 +905,16 @@ func _snapshot_settings() -> Dictionary:
 		"auto_respawn_enabled": auto_respawn_enabled,
 		"auto_respawn_distance": auto_respawn_distance,
 		"hard_respawn_resets_settings": hard_respawn_resets_settings,
+		# V2 Settings
+		"enable_two_hand_grab_v2": enable_two_hand_grab_v2,
+		"v2_scale_enabled": v2_scale_enabled,
+		"v2_rotation_enabled": v2_rotation_enabled,
+		"v2_world_scale_min": v2_world_scale_min,
+		"v2_world_scale_max": v2_world_scale_max,
+		"v2_left_action": v2_left_action,
+		"v2_right_action": v2_right_action,
+		"v2_show_visual": v2_show_visual,
+		"v2_debug_logs": v2_debug_logs,
 	}
 
 
@@ -896,6 +961,16 @@ func _apply_settings_snapshot(data: Dictionary) -> void:
 	auto_respawn_enabled = data.get("auto_respawn_enabled", auto_respawn_enabled)
 	auto_respawn_distance = data.get("auto_respawn_distance", auto_respawn_distance)
 	hard_respawn_resets_settings = data.get("hard_respawn_resets_settings", hard_respawn_resets_settings)
+	# V2 Settings
+	enable_two_hand_grab_v2 = data.get("enable_two_hand_grab_v2", enable_two_hand_grab_v2)
+	v2_scale_enabled = data.get("v2_scale_enabled", v2_scale_enabled)
+	v2_rotation_enabled = data.get("v2_rotation_enabled", v2_rotation_enabled)
+	v2_world_scale_min = data.get("v2_world_scale_min", v2_world_scale_min)
+	v2_world_scale_max = data.get("v2_world_scale_max", v2_world_scale_max)
+	v2_left_action = data.get("v2_left_action", v2_left_action)
+	v2_right_action = data.get("v2_right_action", v2_right_action)
+	v2_show_visual = data.get("v2_show_visual", v2_show_visual)
+	v2_debug_logs = data.get("v2_debug_logs", v2_debug_logs)
 	_apply_player_gravity()
 	_apply_player_drag()
 
@@ -1093,3 +1168,61 @@ func _reset_physics_hands() -> void:
 		right_hand.angular_velocity = Vector3.ZERO
 		right_hand.global_position = right_controller.global_position
 		right_hand.global_rotation = right_controller.global_rotation
+
+
+# === Two-Hand Grab V2 Helpers ===
+
+func _setup_two_hand_grab_v2() -> void:
+	"""Create and configure the V2 two-hand grab component."""
+	if _two_hand_grab_v2:
+		return  # Already setup
+	
+	_two_hand_grab_v2 = TwoHandGrabV2.new()
+	_two_hand_grab_v2.name = "TwoHandGrabV2"
+	add_child(_two_hand_grab_v2)
+	_two_hand_grab_v2.setup(player_body, left_controller, right_controller, xr_camera)
+	_sync_v2_settings()
+	print("PlayerMovementComponent: Two-Hand Grab V2 component initialized")
+
+
+func _sync_v2_settings() -> void:
+	"""Sync V2 component settings with exported values."""
+	if not _two_hand_grab_v2:
+		return
+	
+	_two_hand_grab_v2.scale_enabled = v2_scale_enabled
+	_two_hand_grab_v2.rotation_enabled = v2_rotation_enabled
+	_two_hand_grab_v2.world_scale_min = v2_world_scale_min
+	_two_hand_grab_v2.world_scale_max = v2_world_scale_max
+	_two_hand_grab_v2.left_action = v2_left_action
+	_two_hand_grab_v2.right_action = v2_right_action
+	_two_hand_grab_v2.show_visual = v2_show_visual
+	_two_hand_grab_v2.debug_logs = v2_debug_logs
+
+
+# === Two-Hand Grab V3 Helpers ===
+
+func _setup_two_hand_grab_v3() -> void:
+	"""Create and configure the V3 two-hand grab component."""
+	if _two_hand_grab_v3:
+		return  # Already setup
+	
+	_two_hand_grab_v3 = TwoHandGrabV3.new()
+	_two_hand_grab_v3.name = "TwoHandGrabV3"
+	add_child(_two_hand_grab_v3)
+	_two_hand_grab_v3.setup(player_body, left_controller, right_controller, xr_camera)
+	_sync_v3_settings()
+	print("PlayerMovementComponent: Two-Hand Grab V3 component initialized")
+
+
+func _sync_v3_settings() -> void:
+	"""Sync V3 component settings with exported values."""
+	if not _two_hand_grab_v3:
+		return
+	
+	_two_hand_grab_v3.world_scale_min = v3_world_scale_min
+	_two_hand_grab_v3.world_scale_max = v3_world_scale_max
+	_two_hand_grab_v3.left_action = v3_left_action
+	_two_hand_grab_v3.right_action = v3_right_action
+	_two_hand_grab_v3.show_visual = v3_show_visual
+	_two_hand_grab_v3.debug_logs = v3_debug_logs
