@@ -94,9 +94,9 @@ enum OneHandGrabMode { RELATIVE, ANCHORED }
 @export var v3_right_action: String = "trigger"
 @export var v3_show_visual: bool = true
 @export var v3_debug_logs: bool = false
-@export_range(0.0, 5.0, 0.1) var v3_scale_sensitivity: float = 1.0
+@export_range(0.0, 5.0, 0.1) var v3_scale_sensitivity: float = 0.0
 @export_range(0.0, 5.0, 0.1) var v3_rotation_sensitivity: float = 1.0
-@export_range(0.0, 5.0, 0.1) var v3_translation_sensitivity: float = 1.0
+@export_range(0.0, 5.0, 0.1) var v3_translation_sensitivity: float = 0.0
 @export_range(0.0, 1.0, 0.05) var v3_smoothing: float = 0.5
 @export var v3_invert_scale: bool = false
 
@@ -572,11 +572,12 @@ func physics_process_world_grab(delta: float) -> void:
 	if enable_two_hand_grab_v3 and _two_hand_grab_v3:
 		_sync_v3_settings()
 		var v3_handled := _two_hand_grab_v3.process_grab(delta)
-		# If V3 is active, skip V1/V2 logic entirely
+		# If V3 is active, normally we skip V1. But if V1 scaling is enabled, we allow fall-through.
 		if _two_hand_grab_v3.is_active():
-			_end_world_grab()  # Ensure V1 state is cleaned up
-			_end_one_hand_grab()
-			return
+			if not enable_two_hand_world_scale:
+				_end_world_grab()
+				_end_one_hand_grab()
+				return
 		# If V3 not grabbing, fall through to one-hand grab if enabled
 	
 	# === V2 Mode: Completely separate implementation ===
@@ -590,8 +591,9 @@ func physics_process_world_grab(delta: float) -> void:
 			return
 		# If V2 not grabbing, fall through to one-hand grab if enabled
 	
-	# === V1 Mode: Original implementation ===
-	var two_hand_v1_enabled := (enable_two_hand_world_scale or enable_two_hand_world_rotation) and not enable_two_hand_grab_v2 and not enable_two_hand_grab_v3
+	# === V1 Mode: Original implementation (Hybrid-capable) ===
+	var v3_active_and_scaling_wanted := enable_two_hand_grab_v3 and _two_hand_grab_v3 and _two_hand_grab_v3.is_active() and enable_two_hand_world_scale
+	var two_hand_v1_enabled := ((enable_two_hand_world_scale or enable_two_hand_world_rotation) and not enable_two_hand_grab_v2 and not enable_two_hand_grab_v3) or v3_active_and_scaling_wanted
 	var one_hand_enabled := enable_one_hand_world_grab or enable_one_hand_world_rotate
 
 	if not (two_hand_v1_enabled or one_hand_enabled):
@@ -724,7 +726,9 @@ func _update_world_grab() -> void:
 		player_body.linear_velocity = lv
 		player_body.angular_velocity = av
 
-	if enable_two_hand_world_rotation:
+	# Prevent V1 rotation if V3 is active (handled there)
+	var v3_rotates := enable_two_hand_grab_v3 and _two_hand_grab_v3 and _two_hand_grab_v3.is_active()
+	if enable_two_hand_world_rotation and not v3_rotates:
 		var init_vec := _world_grab_initial_vector
 		var curr_vec := current_vector
 		if init_vec.length_squared() > 0.0001 and curr_vec.length_squared() > 0.0001:
