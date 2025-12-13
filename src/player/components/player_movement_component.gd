@@ -61,7 +61,7 @@ enum OneHandGrabMode { RELATIVE, ANCHORED }
 @export var invert_one_hand_rotation: bool = false
 @export var invert_one_hand_grab_direction: bool = true
 @export var show_one_hand_grab_visual: bool = true
-@export var auto_respawn_enabled: bool = true
+@export var auto_respawn_enabled: bool = false
 @export_range(1.0, 1000.0, 1.0) var auto_respawn_distance: float = 120.0
 @export var hard_respawn_resets_settings: bool = true
 
@@ -83,16 +83,22 @@ enum OneHandGrabMode { RELATIVE, ANCHORED }
 @export var v2_right_action: String = "trigger"
 @export var v2_show_visual: bool = true
 @export var v2_debug_logs: bool = false
+@export var enable_physics_hands: bool = true
 
 # === Two-Hand Grab V3 Settings ===
 # XRToolsMovementWorldGrab style - exact algorithm from godot-xr-tools
-@export var enable_two_hand_grab_v3: bool = false
+@export var enable_two_hand_grab_v3: bool = true
 @export_range(0.1, 20.0, 0.1) var v3_world_scale_min: float = 0.5
 @export_range(0.5, 100.0, 0.5) var v3_world_scale_max: float = 2.0
 @export var v3_left_action: String = "trigger"
 @export var v3_right_action: String = "trigger"
 @export var v3_show_visual: bool = true
 @export var v3_debug_logs: bool = false
+@export_range(0.0, 5.0, 0.1) var v3_scale_sensitivity: float = 1.0
+@export_range(0.0, 5.0, 0.1) var v3_rotation_sensitivity: float = 1.0
+@export_range(0.0, 5.0, 0.1) var v3_translation_sensitivity: float = 1.0
+@export_range(0.0, 1.0, 0.05) var v3_smoothing: float = 0.5
+@export var v3_invert_scale: bool = false
 
 # Turning state
 var can_snap_turn := true
@@ -160,10 +166,18 @@ var _two_hand_grab_v2: TwoHandGrabV2
 var _two_hand_grab_v3: TwoHandGrabV3
 
 # References
+# References
 var player_body: RigidBody3D
 var left_controller: XRController3D
 var right_controller: XRController3D
 var xr_camera: XRCamera3D
+var physics_hand_left: RigidBody3D
+var physics_hand_right: RigidBody3D
+
+# UI scroll capture state
+var _ui_block_locomotion: bool = false
+var _ui_block_turn: bool = false
+
 var is_vr_mode: bool = false
 
 # Computed controller references (based on hand assignment)
@@ -179,27 +193,63 @@ var turn_controller: XRController3D:
 			return left_controller
 		return right_controller
 
-# UI scroll capture state
-var _ui_block_locomotion: bool = false
-var _ui_block_turn: bool = false
 
-
-func setup(p_player_body: RigidBody3D, p_left_controller: XRController3D, p_right_controller: XRController3D, p_xr_camera: XRCamera3D = null) -> void:
+func setup(p_player_body: RigidBody3D, p_left_controller: XRController3D, p_right_controller: XRController3D, p_xr_camera: XRCamera3D, p_hand_left: RigidBody3D = null, p_hand_right: RigidBody3D = null) -> void:
 	player_body = p_player_body
 	left_controller = p_left_controller
 	right_controller = p_right_controller
 	xr_camera = p_xr_camera
-	_apply_manual_player_scale()
+	physics_hand_left = p_hand_left
+	physics_hand_right = p_hand_right
+	
 	if player_body:
 		_spawn_transform = player_body.global_transform
 	_initial_settings = _snapshot_settings()
+	_apply_manual_player_scale()
 	_apply_player_gravity()
 	_apply_player_drag()
+	_update_physics_hands()
 	_ensure_visuals()
 	_setup_two_hand_grab_v2()
 	_setup_two_hand_grab_v3()
-	print("PlayerMovementComponent: Setup with both controllers")
+	print("PlayerMovementComponent: Setup with hands")
+	print("PlayerMovementComponent: Auto Respawn State: ", auto_respawn_enabled)
 
+
+var _debug_frame_count: int = 0
+var _last_pos_for_debug: Vector3 = Vector3.ZERO
+func _physics_process(delta: float) -> void:
+	_debug_frame_count += 1
+	if _debug_frame_count % 60 == 0 and physics_hand_left and player_body:
+		var hand_layer = physics_hand_left.collision_layer
+		var body_mask = player_body.collision_mask
+		if (hand_layer & body_mask) != 0:
+			print("DEBUG: COLLISION RISK! Hand Layer: %d, Body Mask: %d (Overlap!)" % [hand_layer, body_mask])
+			# Force fix attempt
+			if not enable_physics_hands:
+				physics_hand_left.collision_layer = 0
+				physics_hand_left.collision_mask = 0
+				print("DEBUG: Forced Hand Layer/Mask to 0")
+
+	if player_body:
+		var curr_pos := player_body.global_transform.origin
+		var dist := curr_pos.distance_to(_last_pos_for_debug)
+		
+		# 1. Check for massive jumps (Telemetry)
+		if dist > 3.0 and _last_pos_for_debug != Vector3.ZERO:
+			print("PlayerMovementComponent: LARGE MOVEMENT! %.2fm" % dist)
+			print("  Scale: %.2f | Vel: %s" % [XRServer.world_scale, player_body.linear_velocity])
+			print("  From: %s -> To: %s" % [_last_pos_for_debug, curr_pos])
+		
+		_last_pos_for_debug = curr_pos
+		
+
+		
+	if is_vr_mode:
+		physics_process_turning(delta)
+		physics_process_locomotion(delta)
+		
+	# Head collision is now an Area3D parented to the XRCamera3D; it follows the headset automatically
 
 
 func _ready() -> void:
@@ -213,6 +263,7 @@ func _ready() -> void:
 
 func set_vr_mode(enabled: bool) -> void:
 	is_vr_mode = enabled
+	_update_physics_hands()
 
 
 func swap_hands() -> void:
@@ -360,6 +411,54 @@ func _get_movement_direction(input: Vector2) -> Vector3:
 	# Combine input with directions
 	# Thumbstick: Y positive = forward, Y negative = back, X positive = right, X negative = left
 	return (forward * input.y + right * input.x).normalized()
+
+
+func _update_physics_hands() -> void:
+	# Only enable if VR mode AND setting is enabled
+	var should_enable := is_vr_mode and enable_physics_hands
+	
+	if physics_hand_left:
+		_set_hand_state(physics_hand_left, should_enable)
+		
+	if physics_hand_right:
+		_set_hand_state(physics_hand_right, should_enable)
+		
+	# Ensure exceptions are always present (just in case)
+	if player_body:
+		if physics_hand_left:
+			player_body.add_collision_exception_with(physics_hand_left)
+			physics_hand_left.add_collision_exception_with(player_body)
+		if physics_hand_right:
+			player_body.add_collision_exception_with(physics_hand_right)
+			physics_hand_right.add_collision_exception_with(player_body)
+
+
+func _set_hand_state(hand: RigidBody3D, enabled: bool) -> void:
+	hand.visible = enabled
+	hand.set_physics_process(enabled)
+	
+	if enabled:
+		hand.process_mode = Node.PROCESS_MODE_INHERIT
+		hand.freeze = false
+		# Restore collision (Layer 2, Mask 1 - assuming standard setup)
+		# TODO: Ideally we'd cache the original layers, but for this specific rig:
+		# Hands are typically Layer 2 (Vehicle/PlayerProp) and Mask 1 (World).
+		hand.collision_layer = 2
+		hand.collision_mask = 1
+		
+		# FORCE exception again
+		if player_body:
+			player_body.add_collision_exception_with(hand)
+			hand.add_collision_exception_with(player_body)
+			print("PlayerMovementComponent: Enabled hand %s, restored collision & exceptions." % hand.name)
+	else:
+		hand.freeze = true
+		hand.linear_velocity = Vector3.ZERO
+		hand.angular_velocity = Vector3.ZERO
+		# CRITICAL: Disable collision entirely so it doesn't explode if inside player
+		hand.collision_layer = 0
+		hand.collision_mask = 0
+		print("PlayerMovementComponent: Disabled hand %s, CLEARED collision." % hand.name)
 
 
 func _handle_turning(delta: float) -> void:
@@ -1124,14 +1223,21 @@ func _set_one_hand_visual_style() -> void:
 func _check_auto_respawn() -> void:
 	if not auto_respawn_enabled or not player_body:
 		return
+		
+	# Scale distance check with world scale to prevent false positives when zoomed in
+	var threshold := auto_respawn_distance * XRServer.world_scale
 	var dist := player_body.global_transform.origin.distance_to(_spawn_transform.origin)
-	if dist > auto_respawn_distance:
+	
+	if dist > threshold:
+		print("PlayerMovementComponent: Auto-respawn TRIGGERED! Dist: %.2f, Threshold: %.2f, Enabled: %s" % [dist, threshold, auto_respawn_enabled])
 		respawn(hard_respawn_resets_settings)
 
 
 func respawn(hard: bool = false) -> void:
 	if not player_body:
 		return
+	print("PlayerMovementComponent: RESPAWN CALLED! Stack trace:")
+	print_stack()
 	player_body.global_transform = _spawn_transform
 	player_body.linear_velocity = Vector3.ZERO
 	player_body.angular_velocity = Vector3.ZERO
@@ -1220,6 +1326,11 @@ func _sync_v3_settings() -> void:
 	if not _two_hand_grab_v3:
 		return
 	
+	_two_hand_grab_v3.scale_sensitivity = v3_scale_sensitivity
+	_two_hand_grab_v3.rotation_sensitivity = v3_rotation_sensitivity
+	_two_hand_grab_v3.translation_sensitivity = v3_translation_sensitivity
+	_two_hand_grab_v3.smoothing = v3_smoothing
+	_two_hand_grab_v3.invert_scale = v3_invert_scale
 	_two_hand_grab_v3.world_scale_min = v3_world_scale_min
 	_two_hand_grab_v3.world_scale_max = v3_world_scale_max
 	_two_hand_grab_v3.left_action = v3_left_action

@@ -26,7 +26,7 @@ class SceneChangeResetGuard:
 const PLAYER_SCENE_PATH := "res://src/player/XRPlayer.tscn"
 
 # Safety / recovery guards
-const FALL_Y_THRESHOLD := -25.0
+const FALL_Y_THRESHOLD := -5000.0
 const MAX_POSITION_MAGNITUDE := 5000.0
 const SCENE_CHANGE_TIMEOUT_MS := 8000
 const SAFETY_FLOOR_NAME := "_EmergencySafetyFloor"

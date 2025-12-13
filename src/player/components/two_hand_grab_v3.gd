@@ -25,10 +25,10 @@ signal rotation_changed(angle_rad: float)
 # === Settings ===
 
 ## Smallest world scale
-@export var world_scale_min := 0.5
+@export var world_scale_min := 0.1
 
 ## Largest world scale
-@export var world_scale_max := 2.0
+@export var world_scale_max := 500.0
 
 ## Left hand trigger/grip action
 var left_action: String = "trigger"
@@ -41,6 +41,13 @@ var show_visual: bool = true
 
 ## Print debug logs
 var debug_logs: bool = false
+
+## Sensitivity & Smoothing
+@export var scale_sensitivity: float = 1.0
+@export var rotation_sensitivity: float = 1.0
+@export var translation_sensitivity: float = 1.0
+@export var smoothing: float = 0.5
+@export var invert_scale: bool = false
 
 
 # === References (set via setup()) ===
@@ -173,55 +180,116 @@ func _update_grab() -> bool:
 	if grab_l2r.length_squared() > 0.0001 and pickup_l2r.length_squared() > 0.0001:
 		var angle := grab_l2r.signed_angle_to(pickup_l2r, up_player)
 		if abs(angle) > 0.001:
-			# Rotate player in OPPOSITE direction (-angle) to converge
-			_rotate_player(-angle)
-			rotation_changed.emit(-angle)
+			# Apply sensitivity and smoothing
+			var target_angle := -angle * rotation_sensitivity
+			var step_angle := target_angle * (1.0 - smoothing)
+			
+			_rotate_player(step_angle, pickup_mid)
+			rotation_changed.emit(step_angle)
 			if debug_logs:
-				print("TwoHandGrabV3: Rotation ", rad_to_deg(-angle), "°")
+				print("TwoHandGrabV3: Rotation ", rad_to_deg(step_angle), "°")
 	
 	# === SCALE ===
-	# Use INITIAL scale and INITIAL distance as reference (not current - avoids compounding)
-	# Formula: new_scale = initial_scale * (initial_distance / current_distance)
+	# Use "Real World" distance (normalized by world_scale) to avoid feedback loop
+	# Formula: new_scale = initial_scale * (current_real_dist / initial_real_dist)
 	if _pickup_distance > 0.01 and pickup_distance > 0.01:
-		var scale_ratio := _pickup_distance / pickup_distance
-		var new_world_scale := _initial_world_scale * scale_ratio
+		# Calculate "Real" distances by removing the world scale factor
+		# _pickup_distance was the GAME distance at start
+		# pickup_distance is the GAME distance now
+		# We want how much the HANDS moved physically
+		
+		# Note: We must compare apples to apples.
+		# _pickup_distance was recorded at _initial_world_scale
+		var initial_real_dist := _pickup_distance / _initial_world_scale
+		
+		var current_real_dist := pickup_distance / XRServer.world_scale
+		
+		# Clamp minimum distance to prevent division by zero or explosive scaling
+		initial_real_dist = max(initial_real_dist, 0.01)
+		current_real_dist = max(current_real_dist, 0.01)
+		
+		var raw_ratio := 1.0
+		
+		if invert_scale:
+			# Inverted: Pulling hands apart (current > initial) -> Scale Down (ratio < 1.0)
+			raw_ratio = initial_real_dist / current_real_dist
+		else:
+			# Standard: Pulling hands apart (current > initial) -> Scale Up (ratio > 1.0)
+			# "Stretch the world"
+			raw_ratio = current_real_dist / initial_real_dist
+		
+		# Apply sensitivity: ratio = 1.0 + (raw_ratio - 1.0) * scale_sensitivity
+		var scale_ratio := 1.0 + (raw_ratio - 1.0) * scale_sensitivity
+		
+		# Calculate target scale based on inputs
+		var target_world_scale := _initial_world_scale * scale_ratio
+		
+		# Clamp target scale
+		target_world_scale = clampf(target_world_scale, world_scale_min, world_scale_max)
+
+		# Apply smoothing to the SCALE VALUE itself (Temporal Smoothing)
+		# Interpolate current world scale towards the target
+		var new_world_scale: float = lerp(XRServer.world_scale, target_world_scale, 1.0 - smoothing)
+		
+		# Safety: Encapsulate in finite check
+		if not is_finite(new_world_scale) or new_world_scale < 0.001:
+			if debug_logs:
+				print("TwoHandGrabV3: Invalid scale detected: ", new_world_scale, " defaulting to min")
+			new_world_scale = world_scale_min
+			
 		new_world_scale = clampf(new_world_scale, world_scale_min, world_scale_max)
 		
 		if not is_equal_approx(XRServer.world_scale, new_world_scale):
+			# Calculate prediction before applying scale
+			var old_scale: float = XRServer.world_scale
 			XRServer.world_scale = new_world_scale
 			scale_changed.emit(new_world_scale)
+			
+			# PREDICTION: Adjust pickup_mid to where it WILL be after scale application
+			# This prevents "teleporting" due to the 1-frame lag in controller position updates
+			if xr_origin:
+				var origin_pos: Vector3 = xr_origin.global_position
+				var rel_vec: Vector3 = pickup_mid - origin_pos
+				# Scaling keeps Real World Position constant. P_real = P_game * Scale.
+				# P_game_new = P_real / Scale_new = (P_game_old * Scale_old) / Scale_new
+				var scale_factor: float = old_scale / new_world_scale
+				var predicted_rel_vec: Vector3 = rel_vec * scale_factor
+				pickup_mid = origin_pos + predicted_rel_vec
+			
 			if debug_logs:
 				print("TwoHandGrabV3: Scale -> ", new_world_scale)
 	
 	# === OFFSET / MOVEMENT ===
-	# DISABLED: The offset calculation using fixed handles conflicts with scale changes.
-	# When world_scale changes, the relationship between tracking and world space changes,
-	# but fixed handles don't account for this, causing oscillation.
-	# For now, rotation and scale work correctly - movement can be added back later
-	# using a different approach (tracking midpoint movement, not fixed handles).
-	#var offset := grab_mid - pickup_mid
-	#if offset.length_squared() > 0.000001:
-	#	_move_player(offset)
+	# Move the player so the world midpoint aligns with the pickup midpoint
+	# This effectively keeps the world "attached" to the hands
+	var offset := grab_mid - pickup_mid
 	
+	# Clamp offset to prevent massive jumps (e.g. if tracking glitches)
+	if offset.length() > 5.0: # 5 meters per frame is huge
+		offset = offset.limit_length(0.5)
+	
+	if offset.length_squared() > 0.000001:
+		# Apply sensitivity and smoothing
+		var target_offset := offset * translation_sensitivity
+		var step_offset := target_offset * (1.0 - smoothing)
+		
+		# Limit step size for safety
+		step_offset = step_offset.limit_length(0.5)
+		
+		_move_player(step_offset)
+
 	_update_visuals()
 	return true
 
 
-func _rotate_player(angle_rad: float) -> void:
-	"""Rotate the player around the camera/head position."""
+func _rotate_player(angle_rad: float, pivot: Vector3) -> void:
+	"""Rotate the player around the given pivot point (usually hands midpoint)."""
 	if not player_body:
 		return
 	
 	# Preserve velocities
 	var lv := player_body.linear_velocity
 	var av := player_body.angular_velocity
-	
-	# Pivot point is the camera position (head)
-	var pivot: Vector3
-	if xr_camera:
-		pivot = xr_camera.global_position
-	else:
-		pivot = player_body.global_position
 	
 	# Create rotation around Y axis
 	var rot_basis := Basis(Vector3.UP, angle_rad)

@@ -116,7 +116,7 @@ func _setup_components() -> void:
 	# Movement Component - check if it already exists in scene first
 	movement_component = get_node_or_null("PlayerMovementComponent")
 	if movement_component:
-		movement_component.setup(player_body, left_controller, right_controller, xr_camera)
+		movement_component.setup(player_body, left_controller, right_controller, xr_camera, physics_hand_left, physics_hand_right)
 
 
 func _find_livekit_manager() -> Node:
@@ -243,13 +243,15 @@ func _activate_vr_mode() -> void:
 	if xr_camera:
 		xr_camera.current = true
 	
-	# Enable physics hands
-	if physics_hand_left:
-		physics_hand_left.show()
-		physics_hand_left.set_physics_process(true)
-	if physics_hand_right:
-		physics_hand_right.show()
-		physics_hand_right.set_physics_process(true)
+	# Physics hands are handled by PlayerMovementComponent if present
+	if not movement_component:
+		# Fallback if no movement component
+		if physics_hand_left:
+			physics_hand_left.show()
+			physics_hand_left.set_physics_process(true)
+		if physics_hand_right:
+			physics_hand_right.show()
+			physics_hand_right.set_physics_process(true)
 	
 	# Disable desktop controls
 	if desktop_camera:
@@ -325,6 +327,8 @@ func _activate_desktop_mode() -> void:
 
 func teleport_to(target_position: Vector3) -> void:
 	"""Teleport player to a new position"""
+	print("XRPlayer: teleport_to called! Target: ", target_position)
+	print_stack()
 	if not player_body:
 		return
 
