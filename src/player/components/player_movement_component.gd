@@ -50,7 +50,7 @@ enum TwoHandPivot { MIDPOINT, PLAYER_ORIGIN }
 @export var two_hand_left_action: String = "trigger"
 @export var two_hand_right_action: String = "trigger"
 @export var debug_world_grab_logs: bool = true
-@export var enable_one_hand_world_grab: bool = true
+@export var enable_one_hand_world_grab: bool = false
 @export var enable_one_hand_world_rotate: bool = true
 @export_range(0.0, 2.0, 0.05) var one_hand_world_move_sensitivity: float = 0.25
 @export var apply_one_hand_release_velocity: bool = true
