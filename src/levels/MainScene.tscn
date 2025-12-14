@@ -1,4 +1,4 @@
-[gd_scene load_steps=38 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=39 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -183,5 +183,4 @@ grab_mode = 0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 2.3, 1.3955536)
 
 [node name="WorldGrabSphere" parent="." unique_id=2023121301 instance=ExtResource("38_world_grab_sphere")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.0, 1.5, 1.3955536)
-
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1.5, 1.3955536)

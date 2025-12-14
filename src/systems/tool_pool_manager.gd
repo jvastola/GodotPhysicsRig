@@ -34,12 +34,12 @@ var _pool_root: Node
 
 # Scene spawn tracking (for FileSystemUI spawned scenes)
 var _spawned_scenes: Array[Node] = []
-var _max_spawned_scenes: int = 1  # Conservative for VR performance (VRCS compliance)
+var _max_spawned_scenes: int = 0  # Conservative for VR performance (VRCS compliance)
 
 # World object limits (configurable for VR performance)
-var _max_hulls: int = 10  # Default max hulls in scene
+var _max_hulls: int = 5  # Default max hulls in scene
 var _max_voxels: int = 500  # Default max voxels in scene
-var _max_polys: int = 50  # Default max poly triangles
+var _max_polys: int = 10  # Default max poly triangles
 
 
 func _ready() -> void:
