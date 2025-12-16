@@ -30,6 +30,7 @@ extends Node3D
 var network_component: PlayerNetworkComponent
 var voice_component: PlayerVoiceComponent
 var movement_component: PlayerMovementComponent
+var simple_world_grab: SimpleWorldGrabComponent
 
 # Player settings
 var player_height := 0.0  # Using headset tracking; keep 0 to avoid artificial offset
@@ -117,6 +118,12 @@ func _setup_components() -> void:
 	movement_component = get_node_or_null("PlayerMovementComponent")
 	if movement_component:
 		movement_component.setup(player_body, left_controller, right_controller, xr_camera, physics_hand_left, physics_hand_right)
+	
+	# Simple World Grab Component
+	simple_world_grab = get_node_or_null("SimpleWorldGrabComponent")
+	if simple_world_grab:
+		simple_world_grab.setup(xr_origin, xr_camera, left_controller, right_controller)
+		simple_world_grab.enabled = false  # Disabled by default, enable via UI
 
 
 func _find_livekit_manager() -> Node:

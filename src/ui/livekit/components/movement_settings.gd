@@ -195,6 +195,9 @@ var v3_translation_sensitivity_label: Label
 var v3_smoothing_slider: HSlider
 var v3_smoothing_label: Label
 
+# Simple World Grab UI
+var simple_world_grab_check: CheckBox
+
 # Input mapping UI state
 var input_rows := {}
 var input_listen_action := ""
@@ -1037,6 +1040,17 @@ func _build_ui():
 	v3_smoothing_slider = v3_smooth_block.slider
 	v3_smoothing_slider.value_changed.connect(func(value: float): _on_v3_smoothing_changed(value))
 
+	# === Simple World Grab ===
+	var simple_grab_card = _create_card(main_vbox, "Simple World Grab", "Minimal world grab - grip anywhere to move", "✊")
+	
+	simple_world_grab_check = CheckBox.new()
+	simple_world_grab_check.text = "Enable Simple World Grab"
+	simple_world_grab_check.add_theme_font_size_override("font_size", 12)
+	simple_world_grab_check.tooltip_text = "Grip anywhere to grab the world and move. Works everywhere without Area3D zones."
+	simple_world_grab_check.button_pressed = _get_simple_world_grab_enabled()
+	simple_world_grab_check.toggled.connect(func(pressed: bool): _on_simple_world_grab_toggled(pressed))
+	simple_grab_card.add_child(simple_world_grab_check)
+
 	# === Player ===
 	var player_card = _create_card(main_vbox, "Player", "Gravity and safety preferences", "🧍")
 
@@ -1595,6 +1609,25 @@ func _on_v3_smoothing_changed(value: float):
 	if movement_component:
 		movement_component.v3_smoothing = value
 	v3_smoothing_label.text = "V3 Smoothing: %.2f" % value
+	settings_changed.emit()
+
+
+func _get_simple_world_grab_enabled() -> bool:
+	var player = get_tree().get_first_node_in_group("xr_player")
+	if player:
+		var simple_grab = player.get_node_or_null("SimpleWorldGrabComponent")
+		if simple_grab:
+			return simple_grab.enabled
+	return false
+
+
+func _on_simple_world_grab_toggled(pressed: bool):
+	var player = get_tree().get_first_node_in_group("xr_player")
+	if player:
+		var simple_grab = player.get_node_or_null("SimpleWorldGrabComponent")
+		if simple_grab:
+			simple_grab.enabled = pressed
+			print("SimpleWorldGrab: ", "enabled" if pressed else "disabled")
 	settings_changed.emit()
 
 

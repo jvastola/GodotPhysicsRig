@@ -1,47 +1,44 @@
-# Simple World Grab Demo
+# Simple World Grab
 
-This is a minimal implementation of the world grab functionality with only 5 scripts instead of the original 40+ scripts.
+A minimal world grab implementation that works anywhere without needing Area3D zones.
 
 ## Files
 
-1. **simple_world_grab.tscn** - Main scene file
-2. **simple_xr_setup.gd** - Basic XR initialization
-3. **simple_player_body.gd** - Player physics body that follows the camera
-4. **simple_pickup.gd** - Hand controller pickup functionality
-5. **simple_world_grab.gd** - World grab movement logic
-6. **simple_grab_area.gd** - Grabbable area definition
+### Demo Scene (standalone test)
+- `simple_world_grab.tscn` - Standalone demo scene
+- `simple_pickup.gd` - Creates virtual grab handles
+- `simple_world_grab.gd` - Movement logic for demo
+- `simple_player_body.gd` - Basic player body
+- `simple_grab_area.gd` - (Optional) Area-based grab zones
 
-## Features
+### Main Game Integration
+- `src/player/components/simple_world_grab_component.gd` - Component for XRPlayer
 
-- ✅ Basic XR setup and initialization
-- ✅ Player body with physics and collision
-- ✅ Hand controller grip detection
-- ✅ World grab locomotion (single and dual hand)
-- ✅ Rotation when using both hands
-- ✅ Scaling when using both hands
-- ✅ Zero gravity area for world grab
+## Usage in Main Game
+
+1. The SimpleWorldGrabComponent is already added to XRPlayer.tscn
+2. Open the Movement Settings panel in VR (on your watch)
+3. Find "Simple World Grab" section
+4. Toggle "Enable Simple World Grab"
 
 ## How it Works
 
-1. **XR Setup**: Automatically initializes OpenXR if available
-2. **Player Body**: CharacterBody3D that follows the camera with basic physics
-3. **Hand Pickup**: Detects grip button presses and finds nearby grab areas
-4. **World Grab**: When gripping a grab area, calculates movement offset and applies it to the player
-5. **Dual Hand**: When both hands grab, enables rotation and scaling
+- Grip anywhere with either controller to create a virtual anchor point
+- Move your hand to move through the world (opposite direction)
+- Use both hands for rotation and scaling
+- Release grip to stop
 
-## Usage
+## Features
 
-1. Load the `simple_world_grab.tscn` scene
-2. In VR, use grip buttons to grab the invisible world grab area
-3. Move your hands to move through the world
-4. Use both hands to rotate and scale
+- ✅ Works everywhere - no Area3D zones needed
+- ✅ Single hand grab for movement
+- ✅ Two hand grab for rotation and scaling
+- ✅ Toggle via Movement Settings UI
+- ✅ Integrates with existing XRPlayer
 
-## Differences from Original
+## Differences from V1/V2/V3 World Grab
 
-- Removed complex movement provider system
-- Simplified physics calculations
-- No advanced features like velocity averaging, collision hand, etc.
-- Direct implementation instead of modular system
-- Minimal error checking and edge cases
-
-This version maintains the core world grab functionality while being much easier to understand and modify.
+- Simpler implementation (~150 lines vs 500+)
+- No smoothing or sensitivity options (yet)
+- No visual indicators
+- Works globally instead of in designated areas
