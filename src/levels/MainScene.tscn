@@ -1,4 +1,4 @@
-[gd_scene load_steps=39 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=42 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -35,6 +35,9 @@
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/TwoHandGrabCube.tscn" id="36_two_hand_cube"]
 [ext_resource type="PackedScene" path="res://src/ui/TwoHandGrabSettingsViewport3D.tscn" id="37_two_hand_settings"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/WorldGrabSphere.tscn" id="38_world_grab_sphere"]
+[ext_resource type="Script" path="res://src/ui/ui_panel_manager.gd" id="39_ui_panel_manager"]
+[ext_resource type="Script" path="res://src/ui/ui_panel_scene_setup.gd" id="40_ui_panel_setup"]
+[ext_resource type="Script" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -49,6 +52,22 @@ size = Vector3(50, 5, 50)
 
 [node name="ToolPoolManager" type="Node" parent="." unique_id=2101234567]
 script = ExtResource("34_tool_pool")
+
+[node name="UIPanelManager" type="Node" parent="." unique_id=2103456789]
+script = ExtResource("39_ui_panel_manager")
+max_panels = 3
+max_panel_distance = 5.0
+distance_culling_enabled = true
+
+[node name="UIPanelSceneSetup" type="Node" parent="." unique_id=2104567890]
+script = ExtResource("40_ui_panel_setup")
+remove_preplaced_panels = true
+keep_performance_panel = true
+
+[node name="SceneEnvironmentSetup" type="Node" parent="." unique_id=2105678901]
+script = ExtResource("41_env_setup")
+enable_passthrough = false
+restore_skybox = true
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1403982438]
 environment = SubResource("Environment_main")
@@ -110,7 +129,6 @@ height_noise_scale = 0.0
 
 [node name="VoxelTool" parent="." unique_id=884242549 instance=ExtResource("15_voxel_tool")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1, 1.3955536)
-script = null
 
 [node name="TransformTool" parent="." unique_id=1583429753 instance=ExtResource("33_transform_tool")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.6, 1, 1.3955536)

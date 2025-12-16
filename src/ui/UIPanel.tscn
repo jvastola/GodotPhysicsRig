@@ -45,38 +45,38 @@ grow_horizontal = 2
 grow_vertical = 2
 current_tab = 0
 
-[node name="TurnScroll" type="ScrollContainer" parent="TabContainer"]
+[node name="PanelsScroll" type="ScrollContainer" parent="TabContainer"]
 layout_mode = 2
 follow_focus = true
 vertical_scroll_mode = 2
 horizontal_scroll_mode = 0
 metadata/_tab_index = 0
 
-[node name="TurnVBox" type="VBoxContainer" parent="TabContainer/TurnScroll"]
+[node name="PanelsVBox" type="VBoxContainer" parent="TabContainer/PanelsScroll"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="TestLabel1" type="Label" parent="TabContainer/TurnScroll/TurnVBox"]
+[node name="TestLabel1" type="Label" parent="TabContainer/PanelsScroll/PanelsVBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
 text = "UI IS WORKING!"
 horizontal_alignment = 1
 
-[node name="TestLabel2" type="Label" parent="TabContainer/TurnScroll/TurnVBox"]
+[node name="TestLabel2" type="Label" parent="TabContainer/PanelsScroll/PanelsVBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 14
 text = "If you can read this, the viewport is rendering."
 
-[node name="TestLabel3" type="Label" parent="TabContainer/TurnScroll/TurnVBox"]
+[node name="TestLabel3" type="Label" parent="TabContainer/PanelsScroll/PanelsVBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 14
 text = "Settings will populate when PlayerMovementComponent is found."
 
-[node name="TestButton" type="Button" parent="TabContainer/TurnScroll/TurnVBox"]
+[node name="TestButton" type="Button" parent="TabContainer/PanelsScroll/PanelsVBox"]
 layout_mode = 2
 text = "Test Button - Click Me"
 
-[node name="PlayerScroll" type="ScrollContainer" parent="TabContainer"]
+[node name="GeneralScroll" type="ScrollContainer" parent="TabContainer"]
 visible = false
 layout_mode = 2
 follow_focus = true
@@ -84,11 +84,45 @@ vertical_scroll_mode = 2
 horizontal_scroll_mode = 0
 metadata/_tab_index = 1
 
-[node name="PlayerVBox" type="VBoxContainer" parent="TabContainer/PlayerScroll"]
+[node name="GeneralVBox" type="VBoxContainer" parent="TabContainer/GeneralScroll"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="TestLabel4" type="Label" parent="TabContainer/PlayerScroll/PlayerVBox"]
+[node name="TestLabel4" type="Label" parent="TabContainer/GeneralScroll/GeneralVBox"]
 layout_mode = 2
-text = "Player Settings Tab"
+text = "General Settings Tab"
+horizontal_alignment = 1
+
+[node name="MovementScroll" type="ScrollContainer" parent="TabContainer"]
+visible = false
+layout_mode = 2
+follow_focus = true
+vertical_scroll_mode = 2
+horizontal_scroll_mode = 0
+metadata/_tab_index = 2
+
+[node name="MovementVBox" type="VBoxContainer" parent="TabContainer/MovementScroll"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TestLabel5" type="Label" parent="TabContainer/MovementScroll/MovementVBox"]
+layout_mode = 2
+text = "Movement Settings Tab"
+horizontal_alignment = 1
+
+[node name="MultiplayerScroll" type="ScrollContainer" parent="TabContainer"]
+visible = false
+layout_mode = 2
+follow_focus = true
+vertical_scroll_mode = 2
+horizontal_scroll_mode = 0
+metadata/_tab_index = 3
+
+[node name="MultiplayerVBox" type="VBoxContainer" parent="TabContainer/MultiplayerScroll"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TestLabel6" type="Label" parent="TabContainer/MultiplayerScroll/MultiplayerVBox"]
+layout_mode = 2
+text = "Multiplayer Tab"
 horizontal_alignment = 1

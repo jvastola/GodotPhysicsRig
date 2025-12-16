@@ -1,8 +1,10 @@
 extends Control
 
 @onready var tab = $TabContainer
-@onready var vbox_turn = $TabContainer/TurnScroll/TurnVBox
-@onready var vbox_player = $TabContainer/PlayerScroll/PlayerVBox
+@onready var vbox_panels = $TabContainer/PanelsScroll/PanelsVBox
+@onready var vbox_general = $TabContainer/GeneralScroll/GeneralVBox
+@onready var vbox_movement = $TabContainer/MovementScroll/MovementVBox
+@onready var vbox_multiplayer = $TabContainer/MultiplayerScroll/MultiplayerVBox
 
 var movement_component: PlayerMovementComponent
 var player_body: RigidBody3D
@@ -17,22 +19,7 @@ var _root_viewport: Viewport
 var _viewport_transparent_default: bool = false
 
 const MAIN_SCENE_PATH := "res://src/levels/MainScene.tscn"
-
-const _UI_SCENE_PATHS := {
-	"MovementSettingsViewport3D2": "res://src/ui/MovementSettingsViewport2.tscn",
-	"KeyboardFullViewport3D": "res://src/ui/KeyboardFullViewport3D.tscn",
-	"FileSystemViewport3D": "res://src/ui/FileSystemViewport3D.tscn",
-	"SceneHierarchyViewport3D": "res://src/ui/SceneHierarchyViewport3D.tscn",
-	"DebugConsoleViewport3D": "res://src/ui/DebugConsoleViewport3D.tscn",
-	"GitViewport3D": "res://src/ui/git/GitViewport3D.tscn",
-	"UnifiedRoomViewport3D": "res://src/ui/multiplayer/UnifiedRoomViewport3D.tscn",
-	"LiveKitViewport3D": "res://src/ui/livekit/LiveKitViewport3D.tscn",
-	"NodeInspectorViewport3D": "res://src/ui/NodeInspectorViewport3D.tscn",
-	"ScriptEditorViewport3D": "res://src/ui/ScriptEditorViewport3D.tscn",
-	"LegalViewport3D": "res://src/ui/legal/LegalViewport3D.tscn",
-	"ColorPickerViewport3D": "res://src/ui/ColorPickerViewport3D.tscn",
-	"PolyToolViewport3D": "res://src/ui/PolyToolViewport3D.tscn",
-}
+const UIPanelManager = preload("res://src/ui/ui_panel_manager.gd")
 
 func _ready() -> void:
 	print("UIPanel: _ready() called")
@@ -78,154 +65,96 @@ func _setup_ui() -> void:
 	
 	print("UIPanel: Movement component found, populating UI with settings")
 	
-	# Clear default test children
-	for c in vbox_turn.get_children():
+	# Clear default test children from all tabs
+	for c in vbox_panels.get_children():
 		c.queue_free()
-	for c in vbox_player.get_children():
+	for c in vbox_general.get_children():
 		c.queue_free()
-	# Ensure both tabs are actually visible once populated
-	if vbox_player:
-		vbox_player.visible = true
-		var player_parent := vbox_player.get_parent()
-		if player_parent:
-			player_parent.visible = true
-	# Make a bit denser
-	if vbox_turn:
-		vbox_turn.add_theme_constant_override("separation", 8)
-	if vbox_player:
-		vbox_player.add_theme_constant_override("separation", 8)
+	for c in vbox_movement.get_children():
+		c.queue_free()
+	for c in vbox_multiplayer.get_children():
+		c.queue_free()
 	
-	# === Turn Settings Tab ===
+	# Ensure all tabs are visible once populated
+	var all_vboxes = [vbox_panels, vbox_general, vbox_movement, vbox_multiplayer]
+	for vbox in all_vboxes:
+		if vbox:
+			vbox.visible = true
+			var parent: Node = vbox.get_parent()
+			if parent:
+				parent.visible = true
+			# Make a bit denser
+			vbox.add_theme_constant_override("separation", 8)
 	
-	# Add Turn Mode (Snap/Smooth)
-	var mode_h = HBoxContainer.new()
-	var mode_label = Label.new()
-	mode_label.text = "Turn Mode:"
-	mode_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	mode_label.custom_minimum_size = Vector2(120, 0)
-	mode_h.add_child(mode_label)
+	# === PANELS TAB ===
+	_setup_panels_tab()
+	
+	# === GENERAL SETTINGS TAB ===
+	_setup_general_tab()
+	
+	# === MOVEMENT TAB ===
+	_setup_movement_tab()
+	
+	# === MULTIPLAYER TAB ===
+	_setup_multiplayer_tab()
 
-	var mode_button = OptionButton.new()
-	mode_button.add_item("Snap")
-	mode_button.add_item("Smooth")
-	mode_button.selected = movement_component.turn_mode
-	mode_button.item_selected.connect(_on_mode_selected)
-	mode_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	mode_h.add_child(mode_button)
-	vbox_turn.add_child(mode_h)
-	
-	# Separator
-	_add_separator(vbox_turn)
-	
-	# Section Label: Snap Turn Settings
-	var snap_section = Label.new()
-	snap_section.text = "  Snap Turn Settings"
-	snap_section.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
-	vbox_turn.add_child(snap_section)
-	
-	# Add Snap Angle
-	var snap_container = VBoxContainer.new()
-	var snap_label = Label.new()
-	snap_label.text = "   Snap Angle: %.0f°" % movement_component.snap_turn_angle
-	snap_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	snap_container.add_child(snap_label)
+	# Set tab titles
+	if tab and tab.get_child_count() >= 4:
+		tab.set_tab_title(0, "Panels")
+		tab.set_tab_title(1, "General")
+		tab.set_tab_title(2, "Movement")
+		tab.set_tab_title(3, "Multiplayer")
 
-	var snap_slider = HSlider.new()
-	snap_slider.min_value = 15
-	snap_slider.max_value = 90
-	snap_slider.step = 15
-	snap_slider.value = movement_component.snap_turn_angle
-	snap_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	snap_slider.value_changed.connect(func(val): 
-		_on_snap_angle_changed(val, snap_label)
-	)
-	snap_container.add_child(snap_slider)
-	vbox_turn.add_child(snap_container)
+func _setup_panels_tab() -> void:
+	"""Setup the Panels tab with quick access to all UI panels"""
+	var title_label = Label.new()
+	title_label.text = "Quick Panel Access"
+	title_label.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox_panels.add_child(title_label)
 	
-	# Add Snap Cooldown
-	var cooldown_container = VBoxContainer.new()
-	var cooldown_label = Label.new()
-	cooldown_label.text = "   Cooldown: %.2fs" % movement_component.snap_turn_cooldown
-	cooldown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	cooldown_container.add_child(cooldown_label)
+	_add_separator(vbox_panels)
 
-	var cooldown_slider = HSlider.new()
-	cooldown_slider.min_value = 0.1
-	cooldown_slider.max_value = 1.0
-	cooldown_slider.step = 0.1
-	cooldown_slider.value = movement_component.snap_turn_cooldown
-	cooldown_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	cooldown_slider.value_changed.connect(func(val):
-		_on_cooldown_changed(val, cooldown_label)
-	)
-	cooldown_container.add_child(cooldown_slider)
-	vbox_turn.add_child(cooldown_container)
+	var quick_panels := [
+		{"label": "⚡ Performance Settings", "node": "PerformancePanelViewport3D"},
+		{"label": "Movement Settings", "node": "MovementSettingsViewport3D2"},
+		{"label": "Keyboard", "node": "KeyboardFullViewport3D"},
+		{"label": "File System", "node": "FileSystemViewport3D"},
+		{"label": "Scene Hierarchy", "node": "SceneHierarchyViewport3D"},
+		{"label": "Node Inspector", "node": "NodeInspectorViewport3D"},
+		{"label": "Script Editor", "node": "ScriptEditorViewport3D"},
+		{"label": "Debug Console", "node": "DebugConsoleViewport3D"},
+		{"label": "Git Tracker", "node": "GitViewport3D"},
+		{"label": "Multiplayer Panel", "node": "UnifiedRoomViewport3D"},
+		{"label": "LiveKit Settings", "node": "LiveKitViewport3D"},
+		{"label": "Legal Panel", "node": "LegalViewport3D"},
+		{"label": "Color Picker", "node": "ColorPickerViewport3D"},
+		{"label": "Poly Tool Export", "node": "PolyToolViewport3D"},
+	]
 	
-	# Separator
-	_add_separator(vbox_turn)
-	
-	# Section Label: Smooth Turn Settings
-	var smooth_section = Label.new()
-	smooth_section.text = "  Smooth Turn Settings"
-	smooth_section.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
-	vbox_turn.add_child(smooth_section)
-	
-	# Add Smooth Speed
-	var smooth_container = VBoxContainer.new()
-	var smooth_label = Label.new()
-	smooth_label.text = "   Speed: %.0f°/sec" % movement_component.smooth_turn_speed
-	smooth_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	smooth_container.add_child(smooth_label)
+	for entry in quick_panels:
+		var btn := Button.new()
+		btn.text = "📋 " + entry.get("label", "")
+		btn.custom_minimum_size = Vector2(0, 35)
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var target_node: String = entry.get("node", "")
+		btn.pressed.connect(func(node_name := target_node): _move_ui_node_in_front(node_name))
+		vbox_panels.add_child(btn)
 
-	var smooth_slider = HSlider.new()
-	smooth_slider.min_value = 10
-	smooth_slider.max_value = 360
-	smooth_slider.step = 10
-	smooth_slider.value = movement_component.smooth_turn_speed
-	smooth_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	smooth_slider.value_changed.connect(func(val):
-		_on_smooth_speed_changed(val, smooth_label)
-	)
-	smooth_container.add_child(smooth_slider)
-	vbox_turn.add_child(smooth_container)
+func _setup_general_tab() -> void:
+	"""Setup the General Settings tab with player scale, respawn, passthrough, and scene management"""
+	# Player Scale Section
+	var scale_section = Label.new()
+	scale_section.text = "Player Scale"
+	scale_section.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
+	vbox_general.add_child(scale_section)
 	
-	# Separator
-	_add_separator(vbox_turn)
-	
-	# Section Label: Input Settings
-	var input_section = Label.new()
-	input_section.text = "  Input Settings"
-	input_section.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
-	vbox_turn.add_child(input_section)
-	
-	# Add Deadzone
-	var deadzone_container = VBoxContainer.new()
-	var deadzone_label = Label.new()
-	deadzone_label.text = "   Deadzone: %.2f" % movement_component.turn_deadzone
-	deadzone_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	deadzone_container.add_child(deadzone_label)
-
-	var deadzone_slider = HSlider.new()
-	deadzone_slider.min_value = 0.0
-	deadzone_slider.max_value = 1.0
-	deadzone_slider.step = 0.05
-	deadzone_slider.value = movement_component.turn_deadzone
-	deadzone_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	deadzone_slider.value_changed.connect(func(val):
-		_on_deadzone_changed(val, deadzone_label)
-	)
-	deadzone_container.add_child(deadzone_slider)
-	vbox_turn.add_child(deadzone_container)
-
-	# === Player Settings Tab ===
-	
-	# Add Player Scale
 	var scale_container = VBoxContainer.new()
 	var scale_label = Label.new()
 	var initial_scale = 1.0
 	if player_body:
 		initial_scale = player_body.scale.x
-	scale_label.text = "Player Scale: %.2fx" % initial_scale
+	scale_label.text = "Scale: %.2fx" % initial_scale
 	scale_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	scale_container.add_child(scale_label)
 
@@ -247,7 +176,7 @@ func _setup_ui() -> void:
 	
 	scale_container.add_child(action_hbox)
 	
-	# Step Control: Step: 5% [-] [+]
+	# Step Control
 	var step_hbox = HBoxContainer.new()
 	step_hbox.add_theme_constant_override("separation", 10)
 	
@@ -268,81 +197,252 @@ func _setup_ui() -> void:
 	step_hbox.add_child(step_inc_btn)
 	
 	scale_container.add_child(step_hbox)
-	vbox_player.add_child(scale_container)
+	vbox_general.add_child(scale_container)
 
+	_add_separator(vbox_general)
+
+	# Respawn Section
 	var respawn_btn = Button.new()
-	respawn_btn.text = "Respawn (hard setting)"
+	respawn_btn.text = "🔄 Respawn Player"
 	respawn_btn.custom_minimum_size = Vector2(0, 40)
 	respawn_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	respawn_btn.pressed.connect(_on_respawn_pressed)
-	vbox_player.add_child(respawn_btn)
+	vbox_general.add_child(respawn_btn)
 	
-	# Environment / Passthrough (Quest 3)
-	_add_separator(vbox_player)
+	_add_separator(vbox_general)
+	
+	# Environment / Passthrough Section
 	var env_label = Label.new()
 	env_label.text = "Environment"
 	env_label.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
-	vbox_player.add_child(env_label)
+	vbox_general.add_child(env_label)
 	
 	passthrough_check = CheckBox.new()
-	passthrough_check.text = "Skybox Passthrough (Meta Quest 3)"
+	passthrough_check.text = "Skybox Passthrough (Quest 3)"
 	passthrough_check.tooltip_text = "Uses OpenXR alpha-blend to reveal passthrough video. Only supported on devices like Quest 3."
 	passthrough_check.toggled.connect(func(pressed): _on_passthrough_toggled(pressed))
-	vbox_player.add_child(passthrough_check)
+	vbox_general.add_child(passthrough_check)
 	
 	passthrough_status = Label.new()
 	passthrough_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	passthrough_status.text = "Skybox status pending..."
-	vbox_player.add_child(passthrough_status)
+	vbox_general.add_child(passthrough_status)
 	_update_passthrough_ui_state()
 
-	# Quick panel buttons to bring UI in front of player
-	_add_separator(vbox_player)
-	var quick_label = Label.new()
-	quick_label.text = "Quick Panels"
-	quick_label.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
-	vbox_player.add_child(quick_label)
-
-	var quick_panels := [
-		{"label": "Move Movement Settings in Front", "node": "MovementSettingsViewport3D2"},
-		{"label": "Move Keyboard in Front", "node": "KeyboardFullViewport3D"},
-		{"label": "Move File System in Front", "node": "FileSystemViewport3D"},
-		{"label": "Move Scene Hierarchy in Front", "node": "SceneHierarchyViewport3D"},
-		{"label": "Move Node Inspector in Front", "node": "NodeInspectorViewport3D"},
-		{"label": "Move Script Editor in Front", "node": "ScriptEditorViewport3D"},
-		{"label": "Move Debug Window in Front", "node": "DebugConsoleViewport3D"},
-		{"label": "Move Git Tracker in Front", "node": "GitViewport3D"},
-		{"label": "Move Multiplayer Panel in Front", "node": "UnifiedRoomViewport3D"},
-		{"label": "Move LiveKit Settings in Front", "node": "LiveKitViewport3D"},
-		{"label": "Move Legal Panel in Front", "node": "LegalViewport3D"},
-		{"label": "Move Color Picker in Front", "node": "ColorPickerViewport3D"},
-		{"label": "Move Poly Tool Export in Front", "node": "PolyToolViewport3D"},
-	]
-	for entry in quick_panels:
-		var btn := Button.new()
-		btn.text = entry.get("label", "")
-		var target_node: String = entry.get("node", "")
-		btn.pressed.connect(func(node_name := target_node): _move_ui_node_in_front(node_name))
-		vbox_player.add_child(btn)
+	_add_separator(vbox_general)
 	
-	# Scene management
-	_add_separator(vbox_player)
+	# Scene Management Section
 	var scene_label = Label.new()
 	scene_label.text = "Scene Management"
 	scene_label.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
-	vbox_player.add_child(scene_label)
+	vbox_general.add_child(scene_label)
 
 	var return_main_btn = Button.new()
-	return_main_btn.text = "Return to Main Scene"
+	return_main_btn.text = "🏠 Return to Main Scene"
 	return_main_btn.custom_minimum_size = Vector2(0, 40)
 	return_main_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return_main_btn.pressed.connect(_on_return_to_main_scene_pressed)
-	vbox_player.add_child(return_main_btn)
+	vbox_general.add_child(return_main_btn)
 
-	# Set tab titles if we have a TabContainer (Turn and Player)
-	if tab and tab.get_child_count() >= 2:
-		tab.set_tab_title(0, "Turn")
-		tab.set_tab_title(1, "Player")
+func _setup_movement_tab() -> void:
+	"""Setup the Movement tab with turning settings and world grab toggle"""
+	# Turn Mode Section
+	var turn_section = Label.new()
+	turn_section.text = "Turning"
+	turn_section.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
+	vbox_movement.add_child(turn_section)
+	
+	# Turn Mode (Snap/Smooth)
+	var mode_h = HBoxContainer.new()
+	var mode_label = Label.new()
+	mode_label.text = "Turn Mode:"
+	mode_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	mode_label.custom_minimum_size = Vector2(120, 0)
+	mode_h.add_child(mode_label)
+
+	var mode_button = OptionButton.new()
+	mode_button.add_item("Snap")
+	mode_button.add_item("Smooth")
+	mode_button.selected = movement_component.turn_mode
+	mode_button.item_selected.connect(_on_mode_selected)
+	mode_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mode_h.add_child(mode_button)
+	vbox_movement.add_child(mode_h)
+	
+	_add_separator(vbox_movement)
+	
+	# Snap Turn Settings
+	var snap_section = Label.new()
+	snap_section.text = "Snap Turn Settings"
+	snap_section.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
+	vbox_movement.add_child(snap_section)
+	
+	# Snap Angle
+	var snap_container = VBoxContainer.new()
+	var snap_label = Label.new()
+	snap_label.text = "Angle: %.0f°" % movement_component.snap_turn_angle
+	snap_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	snap_container.add_child(snap_label)
+
+	var snap_slider = HSlider.new()
+	snap_slider.min_value = 15
+	snap_slider.max_value = 90
+	snap_slider.step = 15
+	snap_slider.value = movement_component.snap_turn_angle
+	snap_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	snap_slider.value_changed.connect(func(val): 
+		_on_snap_angle_changed(val, snap_label)
+	)
+	snap_container.add_child(snap_slider)
+	vbox_movement.add_child(snap_container)
+	
+	# Snap Cooldown
+	var cooldown_container = VBoxContainer.new()
+	var cooldown_label = Label.new()
+	cooldown_label.text = "Cooldown: %.2fs" % movement_component.snap_turn_cooldown
+	cooldown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	cooldown_container.add_child(cooldown_label)
+
+	var cooldown_slider = HSlider.new()
+	cooldown_slider.min_value = 0.1
+	cooldown_slider.max_value = 1.0
+	cooldown_slider.step = 0.1
+	cooldown_slider.value = movement_component.snap_turn_cooldown
+	cooldown_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cooldown_slider.value_changed.connect(func(val):
+		_on_cooldown_changed(val, cooldown_label)
+	)
+	cooldown_container.add_child(cooldown_slider)
+	vbox_movement.add_child(cooldown_container)
+	
+	_add_separator(vbox_movement)
+	
+	# Smooth Turn Settings
+	var smooth_section = Label.new()
+	smooth_section.text = "Smooth Turn Settings"
+	smooth_section.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
+	vbox_movement.add_child(smooth_section)
+	
+	# Smooth Speed
+	var smooth_container = VBoxContainer.new()
+	var smooth_label = Label.new()
+	smooth_label.text = "Speed: %.0f°/sec" % movement_component.smooth_turn_speed
+	smooth_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	smooth_container.add_child(smooth_label)
+
+	var smooth_slider = HSlider.new()
+	smooth_slider.min_value = 10
+	smooth_slider.max_value = 360
+	smooth_slider.step = 10
+	smooth_slider.value = movement_component.smooth_turn_speed
+	smooth_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	smooth_slider.value_changed.connect(func(val):
+		_on_smooth_speed_changed(val, smooth_label)
+	)
+	smooth_container.add_child(smooth_slider)
+	vbox_movement.add_child(smooth_container)
+	
+	_add_separator(vbox_movement)
+	
+	# Input Settings
+	var input_section = Label.new()
+	input_section.text = "Input Settings"
+	input_section.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
+	vbox_movement.add_child(input_section)
+	
+	# Deadzone
+	var deadzone_container = VBoxContainer.new()
+	var deadzone_label = Label.new()
+	deadzone_label.text = "Deadzone: %.2f" % movement_component.turn_deadzone
+	deadzone_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	deadzone_container.add_child(deadzone_label)
+
+	var deadzone_slider = HSlider.new()
+	deadzone_slider.min_value = 0.0
+	deadzone_slider.max_value = 1.0
+	deadzone_slider.step = 0.05
+	deadzone_slider.value = movement_component.turn_deadzone
+	deadzone_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	deadzone_slider.value_changed.connect(func(val):
+		_on_deadzone_changed(val, deadzone_label)
+	)
+	deadzone_container.add_child(deadzone_slider)
+	vbox_movement.add_child(deadzone_container)
+
+	_add_separator(vbox_movement)
+	
+	# World Grab Settings
+	var grab_section = Label.new()
+	grab_section.text = "World Interaction"
+	grab_section.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
+	vbox_movement.add_child(grab_section)
+	
+	# Two-Hand World Grab Toggle
+	var world_grab_check = CheckBox.new()
+	world_grab_check.text = "Two-Hand World Grab (V3)"
+	world_grab_check.button_pressed = movement_component.enable_two_hand_grab_v3
+	world_grab_check.tooltip_text = "Enable two-hand world grab using XRTools algorithm. Hold both triggers to grab and manipulate the world."
+	world_grab_check.toggled.connect(_on_world_grab_toggled)
+	vbox_movement.add_child(world_grab_check)
+
+func _setup_multiplayer_tab() -> void:
+	"""Setup the Multiplayer tab for future multiplayer features"""
+	var title_label = Label.new()
+	title_label.text = "Multiplayer Features"
+	title_label.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox_multiplayer.add_child(title_label)
+	
+	_add_separator(vbox_multiplayer)
+	
+	# Placeholder content
+	var info_label = Label.new()
+	info_label.text = "🚧 Multiplayer features are in development"
+	info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	info_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.6))
+	vbox_multiplayer.add_child(info_label)
+	
+	var spacer = Control.new()
+	spacer.custom_minimum_size = Vector2(0, 20)
+	vbox_multiplayer.add_child(spacer)
+	
+	# Quick access to existing multiplayer panels
+	var livekit_btn = Button.new()
+	livekit_btn.text = "🎤 LiveKit Settings"
+	livekit_btn.custom_minimum_size = Vector2(0, 40)
+	livekit_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	livekit_btn.pressed.connect(func(): _move_ui_node_in_front("LiveKitViewport3D"))
+	vbox_multiplayer.add_child(livekit_btn)
+	
+	var room_btn = Button.new()
+	room_btn.text = "🌐 Room Management"
+	room_btn.custom_minimum_size = Vector2(0, 40)
+	room_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	room_btn.pressed.connect(func(): _move_ui_node_in_front("UnifiedRoomViewport3D"))
+	vbox_multiplayer.add_child(room_btn)
+	
+	# Future features (disabled for now)
+	_add_separator(vbox_multiplayer)
+	
+	var future_label = Label.new()
+	future_label.text = "Coming Soon:"
+	future_label.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
+	vbox_multiplayer.add_child(future_label)
+	
+	var features = [
+		"👥 Player List & Management",
+		"🎮 Shared World Controls", 
+		"💬 Voice Chat Settings",
+		"🔒 Room Privacy Controls",
+		"📊 Network Statistics"
+	]
+	
+	for feature in features:
+		var feature_btn = Button.new()
+		feature_btn.text = feature
+		feature_btn.disabled = true
+		feature_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		vbox_multiplayer.add_child(feature_btn)
 
 func _add_separator(parent: VBoxContainer) -> void:
 	"""Add a visual separator line"""
@@ -357,22 +457,26 @@ func _on_mode_selected(index: int) -> void:
 func _on_snap_angle_changed(value: float, label: Label) -> void:
 	if movement_component:
 		movement_component.snap_turn_angle = value
-		label.text = "   Snap Angle: %.0f°" % value
+		label.text = "Angle: %.0f°" % value
 
 func _on_smooth_speed_changed(value: float, label: Label) -> void:
 	if movement_component:
 		movement_component.smooth_turn_speed = value
-		label.text = "   Speed: %.0f°/sec" % value
+		label.text = "Speed: %.0f°/sec" % value
 
 func _on_deadzone_changed(value: float, label: Label) -> void:
 	if movement_component:
 		movement_component.turn_deadzone = value
-		label.text = "   Deadzone: %.2f" % value
+		label.text = "Deadzone: %.2f" % value
 
 func _on_cooldown_changed(value: float, label: Label) -> void:
 	if movement_component:
 		movement_component.snap_turn_cooldown = value
-		label.text = "   Cooldown: %.2fs" % value
+		label.text = "Cooldown: %.2fs" % value
+
+func _on_world_grab_toggled(enabled: bool) -> void:
+	if movement_component:
+		movement_component.enable_two_hand_grab_v3 = enabled
 
 func _on_player_scale_changed(value: float, label: Label) -> void:
 	# Apply uniform scale to the player's rig (body, hands, head)
@@ -409,7 +513,7 @@ func _on_apply_scale_change(delta_sign: int, label: Label) -> void:
 		player_body.scale = Vector3(new_scale, new_scale, new_scale)
 		if movement_component and movement_component.has_method("set_manual_player_scale"):
 			movement_component.set_manual_player_scale(new_scale)
-	label.text = "Player Scale: %.2fx" % new_scale
+	label.text = "Scale: %.2fx" % new_scale
 
 
 func _on_respawn_pressed() -> void:
@@ -542,50 +646,39 @@ func _update_passthrough_ui_state() -> void:
 		_update_passthrough_status("Passthrough OFF (skybox visible)")
 
 
-func _move_ui_node_in_front(node_name: String, distance: float = 1.6, height_offset: float = 0.0) -> void:
-	if not xr_player:
-		print("UIPanel: xr_player not found, cannot move UI")
-		return
-	var camera: XRCamera3D = xr_player.get_node_or_null("PlayerBody/XROrigin3D/XRCamera3D") as XRCamera3D
-	if not camera:
-		print("UIPanel: camera not found, cannot move UI")
-		return
+func _move_ui_node_in_front(node_name: String, _distance: float = 1.6, _height_offset: float = 0.0) -> void:
+	"""Open a UI panel using the UIPanelManager (handles max panels, distance culling, etc.)"""
+	var manager := UIPanelManager.find()
+	if manager:
+		manager.open_panel(node_name, true)
+	else:
+		# Fallback: create manager if it doesn't exist
+		_create_panel_manager_and_open(node_name)
+
+
+func _create_panel_manager_and_open(node_name: String) -> void:
+	"""Create a UIPanelManager if one doesn't exist, then open the panel."""
 	var scene_root: Node = get_tree().current_scene
 	if not scene_root:
 		var gm: Node = get_tree().root.get_node_or_null("GameManager")
 		if gm and gm.has_method("get") and gm.get("current_world"):
 			scene_root = gm.get("current_world")
+	
 	if not scene_root:
-		print("UIPanel: current scene not found, cannot move UI")
+		print("UIPanel: Cannot create UIPanelManager - no scene root")
 		return
-	var ui_node := scene_root.get_node_or_null(node_name)
-	if not ui_node:
-		var packed_path: String = _UI_SCENE_PATHS.get(node_name, "") as String
-		if packed_path != "":
-			var packed := load(packed_path)
-			if packed and packed is PackedScene:
-				ui_node = packed.instantiate()
-				if ui_node:
-					ui_node.name = node_name
-					scene_root.add_child(ui_node)
-					print("UIPanel: instantiated ", node_name, " into current scene")
-	if not ui_node or not (ui_node is Node3D):
-		print("UIPanel: node %s not found or not Node3D" % node_name)
+	
+	# Check if manager already exists
+	var existing := scene_root.get_node_or_null("UIPanelManager")
+	if existing and existing is UIPanelManager:
+		(existing as UIPanelManager).open_panel(node_name, true)
 		return
-	var cam_tf := camera.global_transform
-	var forward := -cam_tf.basis.z.normalized()
-	var target_origin := cam_tf.origin + forward * distance + Vector3(0, height_offset, 0)
-	var xf: Transform3D = ui_node.global_transform
-	var current_scale := xf.basis.get_scale()
-	xf.origin = target_origin
-	# Face the camera with the front (+Z) of the panel while preserving scale.
-	var dir_to_camera := cam_tf.origin - target_origin
-	dir_to_camera.y = 0
-	if dir_to_camera.length_squared() > 0.0001:
-		dir_to_camera = dir_to_camera.normalized()
-		var facing_basis := Basis.looking_at(-dir_to_camera, Vector3.UP)
-		xf.basis = facing_basis.scaled(current_scale)
-	else:
-		# Keep upright even if camera is on top of the target origin
-		xf.basis = Basis.IDENTITY.scaled(current_scale)
-	ui_node.global_transform = xf
+	
+	# Create new manager
+	var manager := UIPanelManager.new()
+	manager.name = "UIPanelManager"
+	scene_root.add_child(manager)
+	print("UIPanel: Created UIPanelManager")
+	
+	# Open the panel
+	manager.open_panel(node_name, true)

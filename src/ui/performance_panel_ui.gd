@@ -2,6 +2,7 @@ class_name PerformancePanelUI
 extends PanelContainer
 
 const ToolPoolManager = preload("res://src/systems/tool_pool_manager.gd")
+const UIPanelManager = preload("res://src/ui/ui_panel_manager.gd")
 
 # Node references for tool pool controls
 @onready var _status_label: Label = $MarginContainer/VBoxContainer/StatusLabel
@@ -15,6 +16,13 @@ var _poly_label: Label
 var _scene_spawn_label: Label
 var _scene_spawn_spin: SpinBox
 var _clear_scenes_button: Button
+
+# UI Panel Manager controls
+var _ui_panel_label: Label
+var _ui_max_panels_spin: SpinBox
+var _ui_max_distance_spin: SpinBox
+var _ui_distance_culling_check: CheckBox
+var _ui_close_all_button: Button
 
 var _rows: Dictionary = {}
 var _update_timer: float = 0.0
@@ -104,6 +112,9 @@ func _create_stats_section(parent: VBoxContainer) -> void:
 	parent.add_child(_stats_container)
 	parent.move_child(_stats_container, 3)
 	
+	# === UI Panel Management Section ===
+	_create_ui_panel_section(_stats_container)
+	
 	# Stats title
 	var stats_title := Label.new()
 	stats_title.text = "World Statistics"
@@ -173,6 +184,160 @@ func _create_stats_section(parent: VBoxContainer) -> void:
 	_clear_scenes_button.text = "Clear All Spawned"
 	_clear_scenes_button.add_theme_color_override("font_color", Color(1, 0.8, 0.8))
 	_stats_container.add_child(_clear_scenes_button)
+
+
+func _create_ui_panel_section(parent: VBoxContainer) -> void:
+	"""Create the UI Panel Management section."""
+	var ui_sep := HSeparator.new()
+	parent.add_child(ui_sep)
+	
+	var ui_title := Label.new()
+	ui_title.text = "UI Panel Management"
+	ui_title.add_theme_color_override("font_color", Color(0.8, 0.95, 1, 1))
+	ui_title.add_theme_font_size_override("font_size", 16)
+	parent.add_child(ui_title)
+	
+	# Active panels label
+	_ui_panel_label = Label.new()
+	_ui_panel_label.name = "UIPanelLabel"
+	_ui_panel_label.text = "Active Panels: 0 / 3"
+	_ui_panel_label.add_theme_font_size_override("font_size", 13)
+	parent.add_child(_ui_panel_label)
+	
+	# Max panels row
+	var max_row := HBoxContainer.new()
+	max_row.name = "MaxPanelsRow"
+	parent.add_child(max_row)
+	
+	var max_label := Label.new()
+	max_label.text = "Max Panels:"
+	max_label.custom_minimum_size = Vector2(100, 0)
+	max_row.add_child(max_label)
+	
+	_ui_max_panels_spin = SpinBox.new()
+	_ui_max_panels_spin.name = "MaxPanelsSpin"
+	_ui_max_panels_spin.min_value = 0
+	_ui_max_panels_spin.max_value = 10
+	_ui_max_panels_spin.step = 1
+	_ui_max_panels_spin.value = 3
+	_ui_max_panels_spin.tooltip_text = "Maximum UI panels allowed (0 = unlimited)"
+	_ui_max_panels_spin.custom_minimum_size = Vector2(80, 0)
+	_ui_max_panels_spin.value_changed.connect(_on_max_panels_changed)
+	max_row.add_child(_ui_max_panels_spin)
+	
+	# Distance culling checkbox
+	_ui_distance_culling_check = CheckBox.new()
+	_ui_distance_culling_check.name = "DistanceCullingCheck"
+	_ui_distance_culling_check.text = "Distance Culling"
+	_ui_distance_culling_check.button_pressed = true
+	_ui_distance_culling_check.tooltip_text = "Hide panels that are too far from player"
+	_ui_distance_culling_check.toggled.connect(_on_distance_culling_toggled)
+	parent.add_child(_ui_distance_culling_check)
+	
+	# Max distance row
+	var dist_row := HBoxContainer.new()
+	dist_row.name = "MaxDistanceRow"
+	parent.add_child(dist_row)
+	
+	var dist_label := Label.new()
+	dist_label.text = "Max Distance:"
+	dist_label.custom_minimum_size = Vector2(100, 0)
+	dist_row.add_child(dist_label)
+	
+	_ui_max_distance_spin = SpinBox.new()
+	_ui_max_distance_spin.name = "MaxDistanceSpin"
+	_ui_max_distance_spin.min_value = 1.0
+	_ui_max_distance_spin.max_value = 20.0
+	_ui_max_distance_spin.step = 0.5
+	_ui_max_distance_spin.value = 5.0
+	_ui_max_distance_spin.suffix = "m"
+	_ui_max_distance_spin.tooltip_text = "Panels beyond this distance are hidden"
+	_ui_max_distance_spin.custom_minimum_size = Vector2(80, 0)
+	_ui_max_distance_spin.value_changed.connect(_on_max_distance_changed)
+	dist_row.add_child(_ui_max_distance_spin)
+	
+	# Close all button
+	_ui_close_all_button = Button.new()
+	_ui_close_all_button.name = "CloseAllPanelsBtn"
+	_ui_close_all_button.text = "Close All UI Panels"
+	_ui_close_all_button.add_theme_color_override("font_color", Color(1, 0.8, 0.8))
+	_ui_close_all_button.pressed.connect(_on_close_all_panels_pressed)
+	parent.add_child(_ui_close_all_button)
+
+
+func _on_max_panels_changed(value: float) -> void:
+	var manager := UIPanelManager.find()
+	if manager:
+		manager.set_max_panels(int(value))
+		_update_ui_panel_stats()
+		_set_status("Max UI panels set to %d" % int(value), false)
+	else:
+		_set_status("UIPanelManager not found", true)
+
+
+func _on_distance_culling_toggled(enabled: bool) -> void:
+	var manager := UIPanelManager.find()
+	if manager:
+		manager.set_distance_culling(enabled)
+		_ui_max_distance_spin.editable = enabled
+		_update_ui_panel_stats()
+		_set_status("Distance culling %s" % ("enabled" if enabled else "disabled"), false)
+	else:
+		_set_status("UIPanelManager not found", true)
+
+
+func _on_max_distance_changed(value: float) -> void:
+	var manager := UIPanelManager.find()
+	if manager:
+		manager.set_max_distance(value)
+		_update_ui_panel_stats()
+		_set_status("Max panel distance set to %.1fm" % value, false)
+	else:
+		_set_status("UIPanelManager not found", true)
+
+
+func _on_close_all_panels_pressed() -> void:
+	var manager := UIPanelManager.find()
+	if manager:
+		manager.close_all_panels()
+		_update_ui_panel_stats()
+		_set_status("Closed all UI panels", false)
+	else:
+		_set_status("UIPanelManager not found", true)
+
+
+func _update_ui_panel_stats() -> void:
+	"""Update the UI panel statistics display."""
+	var manager := UIPanelManager.find()
+	if not manager:
+		if _ui_panel_label:
+			_ui_panel_label.text = "Active Panels: N/A (no manager)"
+		return
+	
+	var stats := manager.get_stats()
+	
+	if _ui_panel_label:
+		var active: int = stats.get("active_panels", 0)
+		var max_p: int = stats.get("max_panels", 0)
+		var hidden: int = stats.get("hidden_by_distance", 0)
+		
+		var max_str := str(max_p) if max_p > 0 else "∞"
+		_ui_panel_label.text = "Active: %d / %s (hidden: %d)" % [active, max_str, hidden]
+		
+		# Color warning if at limit
+		if max_p > 0 and active >= max_p:
+			_ui_panel_label.add_theme_color_override("font_color", Color(1, 0.65, 0.65))
+		else:
+			_ui_panel_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
+	
+	# Sync UI controls with manager state
+	if _ui_max_panels_spin:
+		_ui_max_panels_spin.set_value_no_signal(stats.get("max_panels", 3))
+	if _ui_max_distance_spin:
+		_ui_max_distance_spin.set_value_no_signal(stats.get("max_distance", 5.0))
+	if _ui_distance_culling_check:
+		_ui_distance_culling_check.set_pressed_no_signal(stats.get("distance_culling", true))
+		_ui_max_distance_spin.editable = stats.get("distance_culling", true)
 
 
 func _refresh_from_manager() -> void:
@@ -251,6 +416,9 @@ func _update_counts(tool_type: String) -> void:
 
 func _update_world_stats() -> void:
 	"""Update the world statistics display."""
+	# Update UI panel stats
+	_update_ui_panel_stats()
+	
 	var pool := ToolPoolManager.find()
 	if not pool:
 		return
