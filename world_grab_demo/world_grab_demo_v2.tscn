@@ -1,0 +1,149 @@
+[gd_scene load_steps=14 format=3 uid="uid://ckc8vnckrqs0l"]
+
+[ext_resource type="Script" uid="uid://177gygw2xqqu" path="res://world_grab_demo/scene_base.gd" id="1_scene_base"]
+[ext_resource type="Script" uid="uid://b18kkstg643yw" path="res://world_grab_demo/function_pickup.gd" id="3_pickup"]
+[ext_resource type="Script" uid="uid://ck4yn3hxuobj7" path="res://world_grab_demo/player_body.gd" id="4_player_body"]
+[ext_resource type="Script" uid="uid://bgq1jyvtogcll" path="res://world_grab_demo/movement_world_grab.gd" id="5_world_grab"]
+[ext_resource type="Script" uid="uid://kuxqh057vr5y" path="res://world_grab_demo/movement_turn.gd" id="6_turn"]
+[ext_resource type="Script" uid="uid://curcpmtyhxa1b" path="res://world_grab_demo/world_grab_area.gd" id="7_grab_area"]
+[ext_resource type="Script" uid="uid://ces1j6plojyra" path="res://world_grab_demo/start_xr.gd" id="8_start_xr"]
+[ext_resource type="Material" uid="uid://p0q2df2dmy62" path="res://world_grab_demo/ghost_hand.tres" id="40_ghost"]
+
+[sub_resource type="BoxMesh" id="hand_box_mesh"]
+material = ExtResource("40_ghost")
+
+[sub_resource type="BoxShape3D" id="grab_area_shape"]
+size = Vector3(14, 10, 14)
+
+[sub_resource type="BoxShape3D" id="floor_shape"]
+size = Vector3(4, 0.5, 4)
+
+[sub_resource type="BoxMesh" id="floor_mesh"]
+size = Vector3(4, 0.5, 4)
+
+[sub_resource type="BoxShape3D" id="wall_shape"]
+size = Vector3(2, 0.5, 0.4)
+
+[node name="WorldGrabDemoV12" type="Node3D" unique_id=2034499441]
+script = ExtResource("1_scene_base")
+
+[node name="XROrigin3D" type="XROrigin3D" parent="." unique_id=989794295]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 3)
+
+[node name="XRCamera3D" type="XRCamera3D" parent="XROrigin3D" unique_id=893516620]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)
+far = 300.0
+
+[node name="LeftHand" type="XRController3D" parent="XROrigin3D" unique_id=178343800]
+transform = Transform3D(1, 0, 0, 0, 0.707107, -0.707107, 0, 0.707107, 0.707107, -0.5, 1, -0.5)
+tracker = &"left_hand"
+pose = &"grip"
+show_when_tracked = true
+
+[node name="FunctionPickup" type="Node3D" parent="XROrigin3D/LeftHand" unique_id=1752873372]
+transform = Transform3D(1, 0, 0, 0, 0.70710677, 0.70710677, 0, -0.70710677, 0.70710677, 0, 0, 0)
+script = ExtResource("3_pickup")
+grab_collision_mask = 327684
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="XROrigin3D/LeftHand" unique_id=1732246236]
+transform = Transform3D(0.055, 0, 0, 0, 0.055000003, 0, 0, 0, 0.055000003, 0, 0, 0)
+mesh = SubResource("hand_box_mesh")
+
+[node name="RightHand" type="XRController3D" parent="XROrigin3D" unique_id=531188394]
+transform = Transform3D(1, 0, 0, 0, 0.707107, -0.707107, 0, 0.707107, 0.707107, 0.5, 1, -0.5)
+tracker = &"right_hand"
+pose = &"grip"
+show_when_tracked = true
+
+[node name="MeshInstance3D2" type="MeshInstance3D" parent="XROrigin3D/RightHand" unique_id=1300353871]
+transform = Transform3D(0.055, 0, 0, 0, 0.055000003, 0, 0, 0, 0.055000003, 0, 0, 0)
+mesh = SubResource("hand_box_mesh")
+
+[node name="FunctionPickup" type="Node3D" parent="XROrigin3D/RightHand" unique_id=245184591]
+transform = Transform3D(1, 0, 0, 0, 0.70710677, 0.70710677, 0, -0.70710677, 0.70710677, 0, 0, 0)
+script = ExtResource("3_pickup")
+grab_collision_mask = 327684
+
+[node name="MovementTurn" type="Node3D" parent="XROrigin3D/RightHand" unique_id=356505829 groups=["movement_providers"]]
+script = ExtResource("6_turn")
+
+[node name="PlayerBodySphere" type="CharacterBody3D" parent="XROrigin3D" unique_id=1659684942 groups=["player_body"]]
+process_priority = -100
+process_physics_priority = -100
+top_level = true
+collision_layer = 524288
+collision_mask = 972
+script = ExtResource("4_player_body")
+player_calibrate_height = false
+player_radius = 0.3
+player_head_height = 0.2
+player_height_min = 0.8
+player_height_max = 0.8
+eye_forward_offset = 0.0
+body_forward_mix = 0.0
+
+[node name="MovementWorldGrab" type="Node3D" parent="XROrigin3D" unique_id=594290135 groups=["movement_providers"]]
+script = ExtResource("5_world_grab")
+world_scale_max = 2222.0
+
+[node name="HolodeckMap2" type="Node3D" parent="." unique_id=2044292600]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 43.45778, 0, 0)
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="HolodeckMap2" unique_id=1122423284]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="HolodeckMap2" unique_id=1108908738]
+transform = Transform3D(0.814705, -0.576268, -0.0645869, 0.185005, 0.152748, 0.970794, -0.549572, -0.802859, 0.231057, 0, 5.09148, 0)
+light_energy = 0.8
+
+[node name="WorldGrabAreaZeroG" type="Area3D" parent="." unique_id=713628741]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
+collision_layer = 262144
+collision_mask = 524288
+gravity_space_override = 3
+gravity = 0.0
+linear_damp = 1.0
+script = ExtResource("7_grab_area")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WorldGrabAreaZeroG" unique_id=694027689]
+shape = SubResource("grab_area_shape")
+
+[node name="Arena" type="Node3D" parent="." unique_id=1231456165]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0)
+
+[node name="Floor" type="StaticBody3D" parent="Arena" unique_id=1063054685]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Arena/Floor" unique_id=921429267]
+shape = SubResource("floor_shape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Arena/Floor" unique_id=1858682169]
+mesh = SubResource("floor_mesh")
+
+[node name="Wall1" type="StaticBody3D" parent="Arena" unique_id=140661394]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -1.8)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Arena/Wall1" unique_id=2022364364]
+shape = SubResource("wall_shape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Arena/Wall1" unique_id=602101002]
+
+[node name="StartXR" type="Node" parent="." unique_id=478175653]
+script = ExtResource("8_start_xr")
+
+[node name="EnterWebXR" type="CanvasLayer" parent="StartXR" unique_id=1920603566]
+visible = false
+
+[node name="EnterVRButton" type="Button" parent="StartXR/EnterWebXR" unique_id=1990154969]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -132.0
+offset_top = -52.5
+offset_right = 132.0
+offset_bottom = 52.5
+grow_horizontal = 2
+grow_vertical = 2
+text = "Enter VR"
+
+[connection signal="pressed" from="StartXR/EnterWebXR/EnterVRButton" to="StartXR" method="_on_enter_webxr_button_pressed"]
