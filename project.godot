@@ -30,8 +30,6 @@ NakamaManager="*res://multiplayer/nakama_manager.gd"
 InteractionManager="*res://src/systems/interactions/interaction_manager.gd"
 LiveKitWrapper="*res://src/livekit_wrapper.gd"
 KeyboardManager="*res://src/ui/keyboard_manager.gd"
-XRToolsUserSettings="*res://world_grab_demo/user_settings.gd"
-XRTools="*res://world_grab_demo/xr_tools.gd"
 
 [dotnet]
 

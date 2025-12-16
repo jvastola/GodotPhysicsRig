@@ -11,7 +11,7 @@
 [ext_resource type="PackedScene" uid="uid://cnhqkr7y8k7qb" path="res://src/objects/GridLineDisplay.tscn" id="12_grid_display"]
 [ext_resource type="PackedScene" uid="uid://e58b0q1ewqr7" path="res://src/ui/multiplayer/UnifiedRoomViewport3D.tscn" id="13_unified_ui"]
 [ext_resource type="PackedScene" uid="uid://dak3v2oax4mjy" path="res://src/ui/livekit/LiveKitViewport3D.tscn" id="14_livekit_viewport"]
-[ext_resource type="PackedScene" path="res://src/objects/VoxelTool.tscn" id="15_voxel_tool"]
+[ext_resource type="PackedScene" uid="uid://dtsg0bbusyn0f" path="res://src/objects/VoxelTool.tscn" id="15_voxel_tool"]
 [ext_resource type="PackedScene" path="res://src/ui/SceneHierarchyViewport3D.tscn" id="17_scene_hierarchy"]
 [ext_resource type="PackedScene" path="res://src/ui/NodeInspectorViewport3D.tscn" id="18_node_inspector"]
 [ext_resource type="PackedScene" path="res://src/ui/DebugConsoleViewport3D.tscn" id="19_debug_console"]
@@ -110,6 +110,7 @@ height_noise_scale = 0.0
 
 [node name="VoxelTool" parent="." unique_id=884242549 instance=ExtResource("15_voxel_tool")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1, 1.3955536)
+script = null
 
 [node name="TransformTool" parent="." unique_id=1583429753 instance=ExtResource("33_transform_tool")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.6, 1, 1.3955536)

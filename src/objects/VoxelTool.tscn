@@ -1,7 +1,6 @@
 [gd_scene load_steps=5 format=3 uid="uid://dtsg0bbusyn0f"]
 
-[ext_resource type="Script" path="res://voxel_tool.gd" id="1_voxel_tool"]
-[ext_resource type="Script" uid="uid://exskxheotyxj" path="res://grabbable.gd" id="2_grabbable"]
+[ext_resource type="Script" path="res://src/objects/voxel_tool.gd" id="1_voxel_tool"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_1"]
 size = Vector3(0.08, 0.08, 0.3)
@@ -20,6 +19,3 @@ shape = SubResource("BoxShape3D_1")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
 mesh = SubResource("BoxMesh_1")
-
-[node name="Grabbable" type="Node" parent="."]
-script = ExtResource("2_grabbable")
