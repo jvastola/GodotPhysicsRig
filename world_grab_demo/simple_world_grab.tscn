@@ -1,34 +1,29 @@
-[gd_scene load_steps=11 format=3 uid="uid://womyn1epw24l"]
+[gd_scene load_steps=9 format=3 uid="uid://womyn1epw24l"]
 
 [ext_resource type="Script" uid="uid://ces1j6plojyra" path="res://world_grab_demo/start_xr.gd" id="1_start_xr"]
 [ext_resource type="Material" uid="uid://dt14gsjdqu78t" path="res://world_grab_demo/ghost_hand.tres" id="2_jx6ma"]
 [ext_resource type="Script" uid="uid://b67b6sr1k05wu" path="res://world_grab_demo/simple_player_body.gd" id="2_player"]
 [ext_resource type="Script" uid="uid://1x3tvxyqdn" path="res://world_grab_demo/simple_pickup.gd" id="3_pickup"]
 [ext_resource type="Script" uid="uid://hfmijewsmnnv" path="res://world_grab_demo/simple_world_grab.gd" id="4_world_grab"]
-[ext_resource type="Script" uid="uid://cihwjjkr0fh8p" path="res://world_grab_demo/simple_grab_area.gd" id="5_grab_area"]
 
 [sub_resource type="BoxMesh" id="hand_mesh"]
 material = ExtResource("2_jx6ma")
 size = Vector3(0.08, 0.08, 0.08)
-
-[sub_resource type="BoxShape3D" id="grab_area_shape"]
-size = Vector3(14, 10, 14)
 
 [sub_resource type="BoxShape3D" id="floor_shape"]
 size = Vector3(4, 0.5, 4)
 
 [sub_resource type="BoxMesh" id="BoxMesh_6blhn"]
 
-[node name="SimpleWorldGrab2" type="Node3D" unique_id=6366833]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.56537795, 0)
+[node name="SimpleWorldGrab4" type="Node3D" unique_id=1549071258]
 
-[node name="StartXR" type="Node" parent="." unique_id=1286094742]
+[node name="StartXR" type="Node" parent="." unique_id=1785762201]
 script = ExtResource("1_start_xr")
 
-[node name="EnterWebXR" type="CanvasLayer" parent="StartXR" unique_id=2056370359]
+[node name="EnterWebXR" type="CanvasLayer" parent="StartXR" unique_id=783935552]
 visible = false
 
-[node name="EnterVRButton" type="Button" parent="StartXR/EnterWebXR" unique_id=2036886767]
+[node name="EnterVRButton" type="Button" parent="StartXR/EnterWebXR" unique_id=79328987]
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
@@ -40,70 +35,57 @@ offset_right = 132.0
 offset_bottom = 52.5
 text = "Enter VR"
 
-[node name="XROrigin3D" type="XROrigin3D" parent="." unique_id=1526158068]
+[node name="XROrigin3D" type="XROrigin3D" parent="." unique_id=1390359941]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 3)
 
-[node name="XRCamera3D" type="XRCamera3D" parent="XROrigin3D" unique_id=1868728448]
+[node name="XRCamera3D" type="XRCamera3D" parent="XROrigin3D" unique_id=1401281688]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)
 far = 300.0
 
-[node name="LeftHand" type="XRController3D" parent="XROrigin3D" unique_id=834092586]
+[node name="LeftHand" type="XRController3D" parent="XROrigin3D" unique_id=735324404]
 transform = Transform3D(1, 0, 0, 0, 0.707107, -0.707107, 0, 0.707107, 0.707107, -0.5, 1, -0.5)
 tracker = &"left_hand"
 pose = &"grip"
 show_when_tracked = true
 
-[node name="HandMesh" type="MeshInstance3D" parent="XROrigin3D/LeftHand" unique_id=1173934834]
+[node name="HandMesh" type="MeshInstance3D" parent="XROrigin3D/LeftHand" unique_id=219559853]
 mesh = SubResource("hand_mesh")
 
-[node name="SimplePickup" type="Node3D" parent="XROrigin3D/LeftHand" unique_id=1573577516]
+[node name="SimplePickup" type="Node3D" parent="XROrigin3D/LeftHand" unique_id=1606207004]
 script = ExtResource("3_pickup")
 
-[node name="RightHand" type="XRController3D" parent="XROrigin3D" unique_id=1830665663]
+[node name="RightHand" type="XRController3D" parent="XROrigin3D" unique_id=1146951334]
 transform = Transform3D(1, 0, 0, 0, 0.707107, -0.707107, 0, 0.707107, 0.707107, 0.5, 1, -0.5)
 tracker = &"right_hand"
 pose = &"grip"
 show_when_tracked = true
 
-[node name="HandMesh" type="MeshInstance3D" parent="XROrigin3D/RightHand" unique_id=1564752360]
+[node name="HandMesh" type="MeshInstance3D" parent="XROrigin3D/RightHand" unique_id=2022173550]
 mesh = SubResource("hand_mesh")
 
-[node name="SimplePickup" type="Node3D" parent="XROrigin3D/RightHand" unique_id=1913203648]
+[node name="SimplePickup" type="Node3D" parent="XROrigin3D/RightHand" unique_id=1927887768]
 script = ExtResource("3_pickup")
 
-[node name="PlayerBody" type="CharacterBody3D" parent="XROrigin3D" unique_id=1418279659]
+[node name="PlayerBody" type="CharacterBody3D" parent="XROrigin3D" unique_id=1117642627]
 top_level = true
 collision_layer = 524288
 script = ExtResource("2_player")
 
-[node name="WorldGrabMovement" type="Node3D" parent="XROrigin3D" unique_id=867468895]
+[node name="WorldGrabMovement" type="Node3D" parent="XROrigin3D" unique_id=64575941]
 script = ExtResource("4_world_grab")
 
-[node name="WorldGrabArea" type="Area3D" parent="." unique_id=82003428]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
-collision_layer = 262144
-collision_mask = 524288
-gravity_space_override = 3
-gravity = 0.0
-linear_damp = 1.0
-script = ExtResource("5_grab_area")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="WorldGrabArea" unique_id=328775821]
-shape = SubResource("grab_area_shape")
-
-[node name="Arena" type="Node3D" parent="." unique_id=360291101]
+[node name="Arena" type="Node3D" parent="." unique_id=1262017238]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0)
 
-[node name="Floor" type="StaticBody3D" parent="Arena" unique_id=1997022917]
+[node name="Floor" type="StaticBody3D" parent="Arena" unique_id=2117562365]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Arena/Floor" unique_id=863221474]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Arena/Floor" unique_id=1820731524]
 shape = SubResource("floor_shape")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Arena/Floor" unique_id=362990418]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.112001896, 0)
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Arena/Floor" unique_id=1076497078]
 mesh = SubResource("BoxMesh_6blhn")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=236089835]
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=652450958]
 transform = Transform3D(0.707107, -0.5, 0.5, 0, 0.707107, 0.707107, -0.707107, -0.5, 0.5, 0, 5, 0)
 
 [connection signal="pressed" from="StartXR/EnterWebXR/EnterVRButton" to="StartXR" method="_on_enter_webxr_button_pressed"]

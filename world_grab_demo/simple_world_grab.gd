@@ -14,8 +14,7 @@ var left_handle = null
 var right_handle = null
 var is_grabbing = false
 
-# Debug timer to avoid spam
-var debug_timer = 0.0
+
 
 func _ready():
 	# Connect pickup signals
@@ -26,8 +25,7 @@ func _ready():
 		right_pickup.grabbed.connect(_on_right_grabbed)
 		right_pickup.released.connect(_on_right_released)
 
-func _physics_process(delta):
-	debug_timer += delta
+func _physics_process(_delta):
 	
 	# Check for valid handles
 	if not is_instance_valid(left_handle):
@@ -72,20 +70,10 @@ func _physics_process(delta):
 		var pickup_l2r = (right_pickup_pos - left_pickup_pos).slide(up_vector)
 		var pickup_mid = (left_pickup_pos + right_pickup_pos) * 0.5
 		
-		# Debug output
-		if debug_timer > 0.5:
-			debug_timer = 0.0
-			print("=== Two Hand Grab Debug ===")
-			print("grab_l2r: ", grab_l2r, " len: ", grab_l2r.length())
-			print("pickup_l2r: ", pickup_l2r, " len: ", pickup_l2r.length())
 		
-		# Apply rotation (matching original - uses up_vector for signed_angle_to)
+		# Apply rotation
 		if grab_l2r.length() > 0.01 and pickup_l2r.length() > 0.01:
 			var angle = grab_l2r.signed_angle_to(pickup_l2r, up_vector)
-			
-			if debug_timer < 0.1:
-				print("Rotation angle: ", rad_to_deg(angle), " degrees")
-			
 			_rotate_player(angle)
 		
 		# Apply scale
@@ -117,18 +105,14 @@ func _rotate_player(angle: float):
 	
 	origin_node.transform = (origin_node.transform * t2 * rot * t1).orthonormalized()
 
-func _on_left_grabbed(_what):
+func _on_left_grabbed():
 	left_handle = left_pickup.get_grab_handle()
-	print("Left grabbed, handle: ", left_handle)
 
 func _on_left_released():
 	left_handle = null
-	print("Left released")
 
-func _on_right_grabbed(_what):
+func _on_right_grabbed():
 	right_handle = right_pickup.get_grab_handle()
-	print("Right grabbed, handle: ", right_handle)
 
 func _on_right_released():
 	right_handle = null
-	print("Right released")

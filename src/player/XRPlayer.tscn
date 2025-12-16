@@ -142,12 +142,11 @@ pointer_color = Color(0.568627, 1, 1, 1)
 ray_visibility_mode = "on_hit_or_trigger"
 hit_visibility_mode = "always"
 hit_shape = "sphere"
-hit_min_scale = 0.05
 hit_scale_per_meter = 0.5
+hit_min_scale = 0.05
 hit_max_scale = 1000000000.0
 hit_scale_user_multiplier_min = 0.01
 hit_scale_user_multiplier_max = 10.0
-use_hit_scale_limits = false
 
 [node name="PointerFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer" unique_id=1064310651]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.07)
@@ -184,12 +183,11 @@ ray_length_max = 1000000.0
 ray_visibility_mode = "on_hit_or_trigger"
 hit_visibility_mode = "always"
 hit_shape = "sphere"
-hit_min_scale = 0.05
 hit_scale_per_meter = 0.5
+hit_min_scale = 0.05
 hit_max_scale = 1000000000.0
 hit_scale_user_multiplier_min = 0.01
 hit_scale_user_multiplier_max = 10.0
-use_hit_scale_limits = false
 
 [node name="PointerFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/RightController/HandPointer" unique_id=611834496]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.07)
@@ -286,6 +284,8 @@ mesh = SubResource("BoxMesh_hand")
 [node name="PlayerMovementComponent" type="Node" parent="." unique_id=232556656]
 script = ExtResource("12_movement")
 turn_mode = 1
+enable_two_hand_grab_v3 = false
+v3_show_visual = false
 
 [node name="VoxelChunkManager" type="Node" parent="." unique_id=1325437584 groups=["voxel_manager"]]
 script = ExtResource("11_2d0bc")
