@@ -78,12 +78,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.03717, 0)
 collision_layer = 2
 
 [node name="BodyMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/XRCamera3D/HeadArea" unique_id=596586885]
-transform = Transform3D(0.3, 0, 0, 0, 0.4, 0, 0, 0, 0.2, 0, -0.32911, 0.0061668307)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_xxbg3")
 
 [node name="HeadMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/XRCamera3D/HeadArea" unique_id=396937068]
-transform = Transform3D(-0.23, 3.03201e-05, -0.000230782, -3.05237e-05, -0.23, 0.000202858, -0.000230755, 0.000202888, 0.23, 0, 0, 0)
+transform = Transform3D(-0.9999995, 0.00013182667, -0.0010033988, -0.00013271166, -0.9999996, 0.0008819887, -0.0010032823, 0.00088212144, 0.9999991, 0, 0, 0)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_l588l")
 skeleton = NodePath("../..")
@@ -174,7 +173,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.549018, 0, 0)
 tracker = &"right_hand"
 
 [node name="RightHandMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/RightController" unique_id=911480807]
-transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_hand")
 

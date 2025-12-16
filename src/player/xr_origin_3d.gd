@@ -107,6 +107,40 @@ func _on_openxr_stopping() -> void:
 
 # Handle OpenXR pose recentered signal
 func _on_openxr_pose_recentered() -> void:
-	# User recentered view, we have to react to this by recentering the view.
-	# This is game implementation dependent.
+	# User recentered view (Meta Horizon Home button long-press).
+	# Reset the XROrigin3D rotation to align forward with the headset's current facing direction.
+	print("OpenXR: Pose recenter requested")
+	_recenter_player_orientation()
 	emit_signal("pose_recentered")
+
+
+func _recenter_player_orientation() -> void:
+	"""Reset the player's forward orientation based on the current headset facing direction."""
+	# Get the XRCamera3D (headset) to determine current facing direction
+	var camera := get_node_or_null("XRCamera3D") as XRCamera3D
+	if not camera:
+		push_warning("XROrigin3D: Cannot recenter - XRCamera3D not found")
+		return
+	
+	# Get the headset's current Y rotation (yaw) in the XROrigin's local space
+	# We only care about the horizontal rotation, not pitch/roll
+	var camera_basis := camera.transform.basis
+	var camera_forward := -camera_basis.z
+	camera_forward.y = 0  # Project onto horizontal plane
+	
+	if camera_forward.length_squared() < 0.001:
+		# Camera is looking straight up or down, can't determine forward
+		push_warning("XROrigin3D: Cannot recenter - camera looking vertically")
+		return
+	
+	camera_forward = camera_forward.normalized()
+	
+	# Calculate the angle to rotate the origin so the camera faces world forward (-Z)
+	var target_forward := Vector3(0, 0, -1)
+	var angle := camera_forward.signed_angle_to(target_forward, Vector3.UP)
+	
+	# Apply the rotation to the XROrigin3D
+	# This rotates the entire play space so the headset now faces forward
+	rotate_y(angle)
+	
+	print("OpenXR: Player orientation recentered (rotated ", rad_to_deg(angle), " degrees)")
