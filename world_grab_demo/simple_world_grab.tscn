@@ -1,17 +1,14 @@
 [gd_scene load_steps=11 format=3 uid="uid://womyn1epw24l"]
 
 [ext_resource type="Script" uid="uid://ces1j6plojyra" path="res://world_grab_demo/start_xr.gd" id="1_start_xr"]
+[ext_resource type="Material" uid="uid://dt14gsjdqu78t" path="res://world_grab_demo/ghost_hand.tres" id="2_jx6ma"]
 [ext_resource type="Script" uid="uid://b67b6sr1k05wu" path="res://world_grab_demo/simple_player_body.gd" id="2_player"]
 [ext_resource type="Script" uid="uid://1x3tvxyqdn" path="res://world_grab_demo/simple_pickup.gd" id="3_pickup"]
 [ext_resource type="Script" uid="uid://hfmijewsmnnv" path="res://world_grab_demo/simple_world_grab.gd" id="4_world_grab"]
 [ext_resource type="Script" uid="uid://cihwjjkr0fh8p" path="res://world_grab_demo/simple_grab_area.gd" id="5_grab_area"]
 
-[sub_resource type="StandardMaterial3D" id="hand_material"]
-transparency = 1
-albedo_color = Color(0.2, 0.6, 1, 0.7)
-
 [sub_resource type="BoxMesh" id="hand_mesh"]
-material = SubResource("hand_material")
+material = ExtResource("2_jx6ma")
 size = Vector3(0.08, 0.08, 0.08)
 
 [sub_resource type="BoxShape3D" id="grab_area_shape"]
