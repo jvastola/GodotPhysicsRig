@@ -1,4 +1,4 @@
-[gd_scene load_steps=42 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=31 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -11,33 +11,22 @@
 [ext_resource type="PackedScene" uid="uid://cnhqkr7y8k7qb" path="res://src/objects/GridLineDisplay.tscn" id="12_grid_display"]
 [ext_resource type="PackedScene" uid="uid://e58b0q1ewqr7" path="res://src/ui/multiplayer/UnifiedRoomViewport3D.tscn" id="13_unified_ui"]
 [ext_resource type="PackedScene" uid="uid://dak3v2oax4mjy" path="res://src/ui/livekit/LiveKitViewport3D.tscn" id="14_livekit_viewport"]
-[ext_resource type="PackedScene" uid="uid://dtsg0bbusyn0f" path="res://src/objects/VoxelTool.tscn" id="15_voxel_tool"]
-[ext_resource type="PackedScene" path="res://src/ui/SceneHierarchyViewport3D.tscn" id="17_scene_hierarchy"]
-[ext_resource type="PackedScene" path="res://src/ui/NodeInspectorViewport3D.tscn" id="18_node_inspector"]
-[ext_resource type="PackedScene" path="res://src/ui/DebugConsoleViewport3D.tscn" id="19_debug_console"]
-[ext_resource type="PackedScene" path="res://src/ui/ScriptEditorViewport3D.tscn" id="20_script_editor"]
-[ext_resource type="PackedScene" path="res://src/ui/KeyboardFullViewport3D.tscn" id="21_keyboard"]
-[ext_resource type="PackedScene" path="res://src/ui/FileSystemViewport3D.tscn" id="22_filesystem"]
+[ext_resource type="PackedScene" uid="uid://voxel_tool_new_scene" path="res://src/objects/VoxelToolNew.tscn" id="15_voxel_tool"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/ConvexHullPen.tscn" id="23_convex_hull_pen"]
 [ext_resource type="PackedScene" uid="uid://6v1kg2wa5orb" path="res://src/objects/grabbables/VolumeHullPen.tscn" id="24_volume_hull_pen"]
-[ext_resource type="PackedScene" path="res://src/ui/git/GitViewport3D.tscn" id="25_git_viewport"]
-[ext_resource type="PackedScene" path="res://src/ui/MovementSettingsViewport2.tscn" id="26_movement_settings_v2"]
-[ext_resource type="PackedScene" path="res://src/ui/legal/LegalViewport3D.tscn" id="27_legal_viewport"]
 [ext_resource type="PackedScene" uid="uid://cdgp2jenr70oq" path="res://src/objects/grabbables/TrianglePointTool.tscn" id="28_triangle_tool"]
 [ext_resource type="PackedScene" uid="uid://cqtv3jhgmgsfw" path="res://src/levels/poly_exports/poly_2025-12-09T16-25-02.gltf" id="28_wb7rf"]
 [ext_resource type="PackedScene" uid="uid://wly7in1mfwww" path="res://src/objects/grabbables/PolyTool.tscn" id="29_poly_tool"]
-[ext_resource type="PackedScene" path="res://src/ui/ColorPickerViewport3D.tscn" id="30_color_picker_viewport"]
 [ext_resource type="PackedScene" path="res://src/ui/PolyToolViewport3D.tscn" id="31_poly_tool_viewport"]
-[ext_resource type="PackedScene" path="res://src/ui/ActionMapViewport3D.tscn" id="32_action_map_viewport"]
 [ext_resource type="PackedScene" path="res://src/objects/TransformTool.tscn" id="33_transform_tool"]
 [ext_resource type="Script" uid="uid://df75mfql4rt54" path="res://src/systems/tool_pool_manager.gd" id="34_tool_pool"]
-[ext_resource type="PackedScene" path="res://src/ui/PerformancePanelViewport3D.tscn" id="35_perf_panel"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/TwoHandGrabCube.tscn" id="36_two_hand_cube"]
 [ext_resource type="PackedScene" path="res://src/ui/TwoHandGrabSettingsViewport3D.tscn" id="37_two_hand_settings"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/WorldGrabSphere.tscn" id="38_world_grab_sphere"]
-[ext_resource type="Script" path="res://src/ui/ui_panel_manager.gd" id="39_ui_panel_manager"]
-[ext_resource type="Script" path="res://src/ui/ui_panel_scene_setup.gd" id="40_ui_panel_setup"]
-[ext_resource type="Script" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
+[ext_resource type="Script" uid="uid://om3k532gai8j" path="res://src/ui/ui_panel_manager.gd" id="39_ui_panel_manager"]
+[ext_resource type="Script" uid="uid://bqrnwqkyb00kx" path="res://src/ui/ui_panel_scene_setup.gd" id="40_ui_panel_setup"]
+[ext_resource type="Script" uid="uid://bid6ju5yhq61q" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
+[ext_resource type="PackedScene" uid="uid://cm8nv7v0apls3" path="res://src/objects/grabbables/GrappleHook.tscn" id="42_grapple_hook"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -48,26 +37,19 @@ size = Vector3(50, 5, 50)
 material = ExtResource("2_or5nu")
 size = Vector3(50, 5, 50)
 
-[node name="MainScene18" type="Node3D" unique_id=1547683746]
+[node name="MainScene21" type="Node3D" unique_id=1547683746]
 
 [node name="ToolPoolManager" type="Node" parent="." unique_id=2101234567]
 script = ExtResource("34_tool_pool")
 
 [node name="UIPanelManager" type="Node" parent="." unique_id=2103456789]
 script = ExtResource("39_ui_panel_manager")
-max_panels = 3
-max_panel_distance = 5.0
-distance_culling_enabled = true
 
 [node name="UIPanelSceneSetup" type="Node" parent="." unique_id=2104567890]
 script = ExtResource("40_ui_panel_setup")
-remove_preplaced_panels = true
-keep_performance_panel = true
 
 [node name="SceneEnvironmentSetup" type="Node" parent="." unique_id=2105678901]
 script = ExtResource("41_env_setup")
-enable_passthrough = false
-restore_skybox = true
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1403982438]
 environment = SubResource("Environment_main")
@@ -127,51 +109,14 @@ visible = false
 grid_size = 100
 height_noise_scale = 0.0
 
-[node name="VoxelTool" parent="." unique_id=884242549 instance=ExtResource("15_voxel_tool")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1, 1.3955536)
-
 [node name="TransformTool" parent="." unique_id=1583429753 instance=ExtResource("33_transform_tool")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.6, 1, 1.3955536)
 
-[node name="MovementSettingsViewport3D2" parent="." unique_id=866338396 instance=ExtResource("26_movement_settings_v2")]
-transform = Transform3D(0.42, 0, 0, 0, 0.42, 0, 0, 0, 0.42, -0.1, 1.6099689, 2.5455537)
-
-[node name="SceneHierarchyViewport3D" parent="." unique_id=1482733498 instance=ExtResource("17_scene_hierarchy")]
-transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, -0.92447275, 0.4442712, 2.4095154)
-ui_size = Vector2(1200, 800)
-
-[node name="NodeInspectorViewport3D" parent="." unique_id=1993663670 instance=ExtResource("18_node_inspector")]
-transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0.03408259, 0.6178481, 2.4095154)
-
-[node name="DebugConsoleViewport3D" parent="." unique_id=421789258 instance=ExtResource("19_debug_console")]
-transform = Transform3D(0.3999252, 0, -0.0077348175, 0, 0.4, 0, 0.0077348175, 0, 0.3999252, 2.9336438, 0.46634054, 2.4095154)
-
-[node name="ScriptEditorViewport3D" parent="." unique_id=1076425149 instance=ExtResource("20_script_editor")]
-transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 1.064451, 0.7851808, 2.4095154)
-
-[node name="KeyboardFullViewport3D" parent="." unique_id=1262501057 instance=ExtResource("21_keyboard")]
-transform = Transform3D(0.35, 0, 0, 0, 0.35, 0, 0, 0, 0.35, 1.0585722, 0.2227844, 2.5148935)
-
-[node name="FileSystemViewport3D" parent="." unique_id=1729430813 instance=ExtResource("22_filesystem")]
-transform = Transform3D(0.35, 0, 0, 0, 0.35, 0, 0, 0, 0.35, -1.7811422, 0.526621, 2.3955536)
-
-[node name="GitViewport3D" parent="." unique_id=2045123456 instance=ExtResource("25_git_viewport")]
-transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 2.0526533, 0.75, 2.4155536)
-
-[node name="ActionMapViewport3D" parent="." unique_id=1901234560 instance=ExtResource("32_action_map_viewport")]
-transform = Transform3D(0.38, 0, 0, 0, 0.38, 0, 0, 0, 0.38, 3.35, 0.75, 2.3955536)
-
-[node name="PerformancePanelViewport3D" parent="." unique_id=2102234567 instance=ExtResource("35_perf_panel")]
-transform = Transform3D(0.38, 0, 0, 0, 0.38, 0, 0, 0, 0.38, -3.25, 1.5016168, 2.45)
-
-[node name="LegalViewport3D" parent="." unique_id=1684527312 instance=ExtResource("27_legal_viewport")]
-transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, -2.65, 3.4655159, 2.3955536)
-
-[node name="ColorPickerViewport3D" parent="." unique_id=1187654321 instance=ExtResource("30_color_picker_viewport")]
-transform = Transform3D(0.38, 0, 0, 0, 0.38, 0, 0, 0, 0.38, -2.15, 0.92, 2.5455537)
-
 [node name="ConvexHullPen" parent="." unique_id=438475259 instance=ExtResource("23_convex_hull_pen")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, 1.5, 1.3955536)
+
+[node name="VoxelToolNew" parent="." unique_id=1529691265 instance=ExtResource("15_voxel_tool")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.4867425, 0.9465313, -0.69013023)
 
 [node name="VolumeHullPen" parent="." unique_id=510759392 instance=ExtResource("24_volume_hull_pen")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1.5, 1.3955536)
@@ -203,3 +148,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 2.3, 1.3955536)
 
 [node name="WorldGrabSphere" parent="." unique_id=2023121301 instance=ExtResource("38_world_grab_sphere")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1.5, 1.3955536)
+
+[node name="GrappleHook" parent="." unique_id=2106789012 instance=ExtResource("42_grapple_hook")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 1, 1.3955536)
+rope_sag_factor = 0.005
+rope_sag_max = 0.5

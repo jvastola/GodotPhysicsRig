@@ -616,12 +616,6 @@ func _create_final_hull() -> void:
 	if _hull_points.size() < min_points:
 		return
 	
-	# Check hull limit before creating
-	var pool := ToolPoolManager.find()
-	if pool and not pool.can_create_hull():
-		print("VolumeHullPen: Hull limit reached, cannot create more hulls")
-		return
-	
 	print("VolumeHullPen: Creating final hull from ", _hull_points.size(), " points")
 	
 	# Calculate centroid for positioning
@@ -676,6 +670,11 @@ func _create_final_hull() -> void:
 	# Add to scene at centroid position
 	var current_scene = get_tree().current_scene
 	if current_scene:
+		# Register hull with pool manager (will remove oldest if at limit)
+		var pool := ToolPoolManager.find()
+		if pool:
+			pool.register_hull(hull_body)
+		
 		current_scene.add_child(hull_body)
 		hull_body.global_position = centroid
 		hull_body.add_to_group("grabbable")

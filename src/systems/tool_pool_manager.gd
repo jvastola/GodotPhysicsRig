@@ -37,9 +37,12 @@ var _spawned_scenes: Array[Node] = []
 var _max_spawned_scenes: int = 0  # Conservative for VR performance (VRCS compliance)
 
 # World object limits (configurable for VR performance)
-var _max_hulls: int = 5  # Default max hulls in scene
+var _max_hulls: int = 2  # Default max hulls in scene (queue-style: oldest removed when limit reached)
 var _max_voxels: int = 500  # Default max voxels in scene
 var _max_polys: int = 10  # Default max poly triangles
+
+# Hull tracking for queue-style removal
+var _hull_queue: Array[Node] = []  # Oldest first, newest last
 
 
 func _ready() -> void:
@@ -384,12 +387,58 @@ func set_max_polys(limit: int) -> void:
 
 
 func can_create_hull() -> bool:
-	"""Check if a new hull can be created within limits."""
-	var tree := Engine.get_main_loop() as SceneTree
-	if not tree or not tree.root:
-		return true
-	var current_hulls := _count_hulls_recursive(tree.root)
-	return current_hulls < _max_hulls
+	"""Check if a new hull can be created. Always returns true since we use queue-style removal."""
+	# With queue-style removal, we always allow creation - oldest hull will be removed if needed
+	return true
+
+
+func register_hull(hull_node: Node) -> void:
+	"""Register a new hull. If limit is reached, removes the oldest hull first."""
+	if not hull_node or not is_instance_valid(hull_node):
+		return
+	
+	# Clean up invalid references
+	_cleanup_hull_queue()
+	
+	# Remove oldest hull if at limit
+	while _hull_queue.size() >= _max_hulls and _max_hulls > 0:
+		var oldest: Node = _hull_queue.pop_front()
+		if is_instance_valid(oldest):
+			print("ToolPoolManager: Removing oldest hull to make room: ", oldest.name)
+			oldest.queue_free()
+	
+	# Add new hull to queue
+	if hull_node not in _hull_queue:
+		_hull_queue.append(hull_node)
+		# Connect to tree_exited to auto-remove from queue
+		if not hull_node.tree_exited.is_connected(_on_hull_exited):
+			hull_node.tree_exited.connect(_on_hull_exited.bind(hull_node), CONNECT_ONE_SHOT)
+		print("ToolPoolManager: Registered hull: ", hull_node.name, " (", _hull_queue.size(), "/", _max_hulls, ")")
+
+
+func unregister_hull(hull_node: Node) -> void:
+	"""Unregister a hull from the queue."""
+	_hull_queue.erase(hull_node)
+
+
+func _on_hull_exited(hull_node: Node) -> void:
+	"""Called when a hull exits the tree."""
+	_hull_queue.erase(hull_node)
+
+
+func _cleanup_hull_queue() -> void:
+	"""Remove invalid references from the hull queue."""
+	var valid_hulls: Array[Node] = []
+	for node in _hull_queue:
+		if is_instance_valid(node) and node.is_inside_tree():
+			valid_hulls.append(node)
+	_hull_queue = valid_hulls
+
+
+func get_hull_count() -> int:
+	"""Get current number of tracked hulls."""
+	_cleanup_hull_queue()
+	return _hull_queue.size()
 
 
 func can_place_voxel() -> bool:

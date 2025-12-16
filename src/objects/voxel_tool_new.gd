@@ -1,7 +1,7 @@
-class_name VoxelTool
 extends Grabbable
+class_name VoxelToolNew
 const ToolPoolManager = preload("res://src/systems/tool_pool_manager.gd")
-## Grabbable Voxel Tool - Place and remove voxels with adjustable ray and grid size
+## Grabbable Voxel Tool - Place and remove voxels with adjustable ray and grid size (based on TransformTool)
 
 # === Ray Settings ===
 @export_group("Ray Settings")
@@ -64,12 +64,11 @@ func _ready() -> void:
 	# Apply initial voxel size
 	_apply_voxel_size()
 	
-	print("VoxelTool: Ready with voxel size ", voxel_size)
+	print("VoxelToolNew: Ready with voxel size ", voxel_size)
 
 
 func _exit_tree() -> void:
-	# Don't clean up indicator/hit_marker here - they'll be recreated on demand
-	# in _ensure_visuals_in_tree() after scene transitions
+	# Visuals are recreated on demand in _ensure_visuals_in_tree()
 	pass
 
 
@@ -79,16 +78,16 @@ func _find_voxel_manager() -> void:
 	if managers.size() > 0:
 		_voxel_manager = managers[0] as VoxelChunkManager
 		if _voxel_manager:
-			print("VoxelTool: Found VoxelChunkManager via group")
+			print("VoxelToolNew: Found VoxelChunkManager via group")
 		else:
-			push_warning("VoxelTool: Found node in voxel_manager group but wrong type!")
+			push_warning("VoxelToolNew: Found node in voxel_manager group but wrong type!")
 	else:
 		# Fallback to find_child
 		_voxel_manager = get_tree().root.find_child("VoxelChunkManager", true, false) as VoxelChunkManager
 		if _voxel_manager:
-			print("VoxelTool: Found VoxelChunkManager via find_child")
+			print("VoxelToolNew: Found VoxelChunkManager via find_child")
 		else:
-			push_warning("VoxelTool: VoxelChunkManager not found!")
+			push_warning("VoxelToolNew: VoxelChunkManager not found!")
 
 
 func _create_raycast() -> void:
@@ -130,7 +129,7 @@ func _create_indicator() -> void:
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	indicator_mesh.material_override = mat
 	
-	# Add to scene root (will be done when in tree)
+	# Will be added to scene root in _ensure_visuals_in_tree()
 	indicator_mesh.visible = false
 
 
@@ -149,7 +148,7 @@ func _create_hit_marker() -> void:
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	hit_marker.material_override = mat
 	
-	# Add to scene root (will be done when in tree)
+	# Will be added to scene root in _ensure_visuals_in_tree()
 	hit_marker.visible = false
 
 
@@ -329,24 +328,24 @@ func _snap_to_grid(pos: Vector3) -> Vector3:
 
 
 func _place_voxel() -> void:
-	print("VoxelTool: _place_voxel called, _voxel_manager valid: ", is_instance_valid(_voxel_manager))
+	print("VoxelToolNew: _place_voxel called, _voxel_manager valid: ", is_instance_valid(_voxel_manager))
 	if not _voxel_manager:
-		print("VoxelTool: _voxel_manager null, attempting to find...")
+		print("VoxelToolNew: _voxel_manager null, attempting to find...")
 		_find_voxel_manager()
 		if not _voxel_manager:
-			print("VoxelTool: ERROR - Could not find VoxelChunkManager!")
+			print("VoxelToolNew: ERROR - Could not find VoxelChunkManager!")
 			return
 	
-	print("VoxelTool: indicator_mesh valid: ", is_instance_valid(indicator_mesh), " visible: ", str(indicator_mesh.visible) if is_instance_valid(indicator_mesh) else "N/A")
+	print("VoxelToolNew: indicator_mesh valid: ", is_instance_valid(indicator_mesh), " visible: ", str(indicator_mesh.visible) if is_instance_valid(indicator_mesh) else "N/A")
 	if not indicator_mesh or not indicator_mesh.visible:
-		print("VoxelTool: indicator_mesh not valid or not visible, skipping placement")
+		print("VoxelToolNew: indicator_mesh not valid or not visible, skipping placement")
 		return
 	
 	var pos = indicator_mesh.global_position
 	_voxel_manager.set_voxel_size(voxel_size)
 	_voxel_manager.add_voxel(pos)
 	_voxel_manager.update_dirty_chunks()
-	print("VoxelTool: Placed voxel at ", pos, " size: ", voxel_size)
+	print("VoxelToolNew: Placed voxel at ", pos, " size: ", voxel_size)
 
 
 func _remove_voxel() -> void:
@@ -362,7 +361,7 @@ func _remove_voxel() -> void:
 	if _voxel_manager.has_voxel(pos):
 		_voxel_manager.remove_voxel(pos)
 		_voxel_manager.update_dirty_chunks()
-		print("VoxelTool: Removed voxel at ", pos)
+		print("VoxelToolNew: Removed voxel at ", pos)
 
 
 func _adjust_voxel_size(delta_input: float) -> void:
@@ -416,7 +415,7 @@ func set_voxel_size_preset(index: int) -> void:
 		voxel_size_preset_index = index
 		voxel_size = voxel_size_presets[index]
 		_apply_voxel_size()
-		print("VoxelTool: Voxel size preset ", index, " = ", voxel_size)
+		print("VoxelToolNew: Voxel size preset ", index, " = ", voxel_size)
 
 
 func cycle_voxel_size_preset(forward: bool = true) -> void:
@@ -433,7 +432,7 @@ func toggle_always_visible() -> void:
 	"""Toggle always-visible mode for ray and indicator"""
 	always_show_ray = not always_show_ray
 	always_show_indicator = not always_show_indicator
-	print("VoxelTool: Always visible = ", always_show_ray)
+	print("VoxelToolNew: Always visible = ", always_show_ray)
 
 
 func get_current_voxel_size() -> float:

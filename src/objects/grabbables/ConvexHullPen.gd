@@ -223,12 +223,6 @@ func _generate_convex_hull() -> void:
 		print("ConvexHullPen: Cannot generate hull - not enough points")
 		return
 	
-	# Check hull limit before creating
-	var pool := ToolPoolManager.find()
-	if pool and not pool.can_create_hull():
-		print("ConvexHullPen: Hull limit reached, cannot create more hulls")
-		return
-	
 	print("ConvexHullPen: Generating convex hull from ", _recorded_points.size(), " points")
 	
 	# Create ConvexPolygonShape3D from the points
@@ -270,6 +264,11 @@ func _generate_convex_hull() -> void:
 	# Add to current scene
 	var current_scene = get_tree().current_scene
 	if current_scene:
+		# Register hull with pool manager (will remove oldest if at limit)
+		var pool := ToolPoolManager.find()
+		if pool:
+			pool.register_hull(hull_body)
+		
 		current_scene.add_child(hull_body)
 		# Position at origin of the points (centroid)
 		var centroid = _calculate_centroid(_recorded_points)
