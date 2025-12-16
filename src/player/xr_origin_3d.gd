@@ -63,18 +63,28 @@ func _on_openxr_session_begun() -> void:
 		# Only one available, so use it
 		new_rate = available_rates[0]
 	else:
-		for rate in available_rates:
-			if rate > new_rate and rate <= maximum_refresh_rate:
-				new_rate = rate
+		print("OpenXR: Available refresh rates: ", available_rates)
+		# Prefer 90 Hz if available, otherwise use the highest rate up to maximum
+		var preferred_rate = 90.0
+		if preferred_rate in available_rates and preferred_rate <= maximum_refresh_rate:
+			new_rate = preferred_rate
+			print("OpenXR: Using preferred 90 Hz rate")
+		else:
+			for rate in available_rates:
+				if rate > new_rate and rate <= maximum_refresh_rate:
+					new_rate = rate
 
 	# Did we find a better rate?
 	if current_refresh_rate != new_rate:
 		print("OpenXR: Setting refresh rate to ", str(new_rate))
 		xr_interface.set_display_refresh_rate(new_rate)
 		current_refresh_rate = new_rate
+	else:
+		print("OpenXR: Keeping current refresh rate: ", str(current_refresh_rate))
 
 	# Now match our physics rate
 	Engine.physics_ticks_per_second = current_refresh_rate
+	print("OpenXR: Physics ticks per second set to: ", Engine.physics_ticks_per_second)
 
 # Handle OpenXR visible state
 func _on_openxr_visible_state() -> void:
