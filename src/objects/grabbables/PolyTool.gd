@@ -756,8 +756,19 @@ func get_triangle_count() -> int:
 	return _triangles.size()
 
 
+func _get_android_export_dir() -> String:
+	# Try to use Documents folder which is more accessible
+	var docs_dir := OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS)
+	if docs_dir != "":
+		return docs_dir.path_join("SceneTree/gltf")
+	# Fallback to user:// which always works
+	return "user://poly_exports"
+
+
 func get_default_export_path() -> String:
 	var timestamp := Time.get_datetime_string_from_system().replace(":", "-")
+	if OS.get_name() == "Android":
+		return _get_android_export_dir().path_join("poly_%s.gltf" % timestamp)
 	return "user://poly_exports/poly_%s.gltf" % timestamp
 
 
@@ -782,8 +793,17 @@ func export_to_gltf(path: String) -> int:
 		target_path = get_default_export_path()
 	var base_dir := target_path.get_base_dir()
 	if base_dir != "":
-		var abs_dir := ProjectSettings.globalize_path(base_dir)
-		DirAccess.make_dir_recursive_absolute(abs_dir)
+		# Try to create directory
+		var abs_dir := base_dir if base_dir.begins_with("/") else ProjectSettings.globalize_path(base_dir)
+		var err := DirAccess.make_dir_recursive_absolute(abs_dir)
+		if err != OK and not DirAccess.dir_exists_absolute(abs_dir):
+			# Fall back to user:// if external storage fails
+			print("PolyTool: Could not create %s, falling back to user://" % abs_dir)
+			var timestamp := Time.get_datetime_string_from_system().replace(":", "-")
+			target_path = "user://poly_exports/poly_%s.gltf" % timestamp
+			base_dir = target_path.get_base_dir()
+			abs_dir = ProjectSettings.globalize_path(base_dir)
+			DirAccess.make_dir_recursive_absolute(abs_dir)
 	
 	# Export using GLTFDocument
 	var gltf := GLTFDocument.new()
@@ -798,8 +818,12 @@ func load_from_gltf(path: String) -> int:
 	var target_path := path.strip_edges()
 	if target_path.is_empty():
 		return ERR_FILE_NOT_FOUND
-	if not target_path.begins_with("res://") and not target_path.begins_with("user://"):
-		target_path = "user://poly_exports".path_join(target_path)
+	if not target_path.begins_with("res://") and not target_path.begins_with("user://") and not target_path.begins_with("/"):
+		# Use appropriate directory based on platform
+		if OS.get_name() == "Android":
+			target_path = _get_android_export_dir().path_join(target_path)
+		else:
+			target_path = "user://poly_exports".path_join(target_path)
 	if not FileAccess.file_exists(target_path):
 		return ERR_FILE_NOT_FOUND
 	

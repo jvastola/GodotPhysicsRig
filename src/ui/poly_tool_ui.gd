@@ -12,7 +12,29 @@ extends PanelContainer
 
 static var instance: PolyToolUI = null
 
-const DEFAULT_DIR := "user://poly_exports"
+# Use external storage on Android for easy file access via Quest file browser
+# Falls back to user:// on desktop
+const DEFAULT_DIR_DESKTOP := "user://poly_exports"
+var _cached_android_dir: String = ""
+
+func _get_android_export_dir() -> String:
+	if _cached_android_dir != "":
+		return _cached_android_dir
+	# Try external files dir first (app-specific, no permissions needed)
+	# This is typically /sdcard/Android/data/[package]/files/
+	var external_dir := OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS)
+	if external_dir != "" and DirAccess.dir_exists_absolute(external_dir.get_base_dir()):
+		_cached_android_dir = external_dir.get_base_dir().path_join("SceneTree/gltf")
+		return _cached_android_dir
+	# Fallback to user:// which works but is harder to find
+	_cached_android_dir = "user://poly_exports"
+	return _cached_android_dir
+
+var DEFAULT_DIR: String:
+	get:
+		if OS.get_name() == "Android":
+			return _get_android_export_dir()
+		return DEFAULT_DIR_DESKTOP
 
 
 func _ready() -> void:
@@ -166,9 +188,21 @@ func _populate_file_list() -> void:
 		file_list.add_item("(no gltf files yet)")
 
 
-func _ensure_export_dir() -> void:
-	var abs_dir := ProjectSettings.globalize_path(DEFAULT_DIR)
-	DirAccess.make_dir_recursive_absolute(abs_dir)
+func _ensure_export_dir() -> bool:
+	var target_dir := DEFAULT_DIR
+	# For absolute paths (Android), use directly
+	if target_dir.begins_with("/"):
+		var err := DirAccess.make_dir_recursive_absolute(target_dir)
+		if err == OK or DirAccess.dir_exists_absolute(target_dir):
+			return true
+		# If failed, fall back to user://
+		print("PolyToolUI: Could not create %s, falling back to user://" % target_dir)
+		_cached_android_dir = "user://poly_exports"
+		target_dir = _cached_android_dir
+	# For user:// paths
+	var abs_dir := ProjectSettings.globalize_path(target_dir)
+	var err := DirAccess.make_dir_recursive_absolute(abs_dir)
+	return err == OK or DirAccess.dir_exists_absolute(abs_dir)
 
 
 func _on_file_selected(index: int) -> void:
