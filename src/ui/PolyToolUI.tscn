@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://src/ui/poly_tool_ui.gd" id="1_script"]
 
 [node name="PolyToolUI" type="PanelContainer"]
-custom_minimum_size = Vector2(640, 230)
+custom_minimum_size = Vector2(700, 320)
 script = ExtResource("1_script")
 
 [node name="MarginContainer" type="MarginContainer" parent="."]
@@ -13,7 +13,7 @@ theme_override_constants/margin_right = 12
 theme_override_constants/margin_bottom = 12
 
 [node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
-theme_override_constants/separation = 10
+theme_override_constants/separation = 8
 
 [node name="TitleLabel" type="Label" parent="MarginContainer/VBoxContainer"]
 text = "Poly Tool Export"
@@ -25,13 +25,28 @@ text = "Points: 0   Triangles: 0"
 horizontal_alignment = 1
 autowrap_mode = 2
 
+[node name="LocationRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+theme_override_constants/separation = 8
+
+[node name="LocationLabel" type="Label" parent="MarginContainer/VBoxContainer/LocationRow"]
+text = "Save to:"
+custom_minimum_size = Vector2(60, 0)
+horizontal_alignment = 2
+
+[node name="LocationDropdown" type="OptionButton" parent="MarginContainer/VBoxContainer/LocationRow"]
+size_flags_horizontal = 3
+item_count = 3
+popup/item_0/text = "Documents (Quest accessible)"
+popup/item_1/text = "App Storage (user://)"
+popup/item_2/text = "Project (res://)"
+
 [node name="FilesLabel" type="Label" parent="MarginContainer/VBoxContainer"]
-text = "Saved GLTF (user://poly_exports)"
+text = "Saved GLTF files:"
 horizontal_alignment = 1
 autowrap_mode = 2
 
 [node name="FileList" type="ItemList" parent="MarginContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 120)
+custom_minimum_size = Vector2(0, 100)
 
 [node name="PathRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
 theme_override_constants/separation = 8
@@ -43,30 +58,40 @@ horizontal_alignment = 2
 
 [node name="PathEdit" type="LineEdit" parent="MarginContainer/VBoxContainer/PathRow"]
 size_flags_horizontal = 3
-placeholder_text = "user://poly_exports/poly_export.gltf"
+placeholder_text = "poly_export.gltf"
 
 [node name="TimestampButton" type="Button" parent="MarginContainer/VBoxContainer/PathRow"]
-text = "New name"
-custom_minimum_size = Vector2(120, 0)
+text = "New"
+custom_minimum_size = Vector2(60, 0)
 
 [node name="ButtonRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
-theme_override_constants/separation = 10
+theme_override_constants/separation = 8
 
 [node name="SaveButton" type="Button" parent="MarginContainer/VBoxContainer/ButtonRow"]
 text = "Save GLTF"
-custom_minimum_size = Vector2(0, 40)
+custom_minimum_size = Vector2(0, 36)
 size_flags_horizontal = 3
 
 [node name="LoadButton" type="Button" parent="MarginContainer/VBoxContainer/ButtonRow"]
-text = "Load Selected"
-custom_minimum_size = Vector2(0, 40)
+text = "Load"
+custom_minimum_size = Vector2(0, 36)
 
 [node name="RefreshButton" type="Button" parent="MarginContainer/VBoxContainer/ButtonRow"]
-text = "Refresh Counts"
-custom_minimum_size = Vector2(0, 40)
+text = "Refresh"
+custom_minimum_size = Vector2(0, 36)
+
+[node name="UploadRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+theme_override_constants/separation = 8
+
+[node name="ServerUrlEdit" type="LineEdit" parent="MarginContainer/VBoxContainer/UploadRow"]
+size_flags_horizontal = 3
+placeholder_text = "https://localhost:3000/upload"
+
+[node name="UploadButton" type="Button" parent="MarginContainer/VBoxContainer/UploadRow"]
+text = "Upload"
+custom_minimum_size = Vector2(80, 36)
 
 [node name="StatusLabel" type="Label" parent="MarginContainer/VBoxContainer"]
 text = ""
 horizontal_alignment = 1
 autowrap_mode = 2
-
