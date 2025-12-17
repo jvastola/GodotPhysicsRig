@@ -255,8 +255,10 @@ func _get_cell_from_position(local_pos: Vector3, face_idx: int) -> Vector2i:
 			v = (local_pos.z / h + 1.0) * 0.5
 		3:  # -Y face: looking from -Y up
 			# Vertices: (-h,-h,h), (h,-h,h), (h,-h,-h), (-h,-h,-h)
+			# v0 at z=+h gets v1 (bottom), v2 at z=-h gets v0 (top)
+			# So z=+h -> v=1, z=-h -> v=0, meaning v = (z/h + 1) * 0.5
 			u = (local_pos.x / h + 1.0) * 0.5
-			v = 1.0 - (local_pos.z / h + 1.0) * 0.5
+			v = (local_pos.z / h + 1.0) * 0.5
 		4:  # +Z face: looking from +Z toward origin
 			# Vertices: (h,-h,h), (-h,-h,h), (-h,h,h), (h,h,h)
 			u = 1.0 - (local_pos.x / h + 1.0) * 0.5  # x flipped

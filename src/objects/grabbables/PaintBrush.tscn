@@ -1,0 +1,64 @@
+[gd_scene load_steps=9 format=3 uid="uid://baesap7jjgmfh"]
+
+[ext_resource type="Script" path="res://src/objects/grabbables/PaintBrush.gd" id="1_paint_brush"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_brush"]
+size = Vector3(0.04, 0.04, 0.25)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_handle"]
+albedo_color = Color(0.55, 0.35, 0.15, 1)
+metallic = 0.1
+roughness = 0.8
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_handle"]
+material = SubResource("StandardMaterial3D_handle")
+top_radius = 0.02
+bottom_radius = 0.025
+height = 0.2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ferrule"]
+albedo_color = Color(0.7, 0.7, 0.75, 1)
+metallic = 0.8
+roughness = 0.3
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_ferrule"]
+material = SubResource("StandardMaterial3D_ferrule")
+top_radius = 0.022
+bottom_radius = 0.025
+height = 0.03
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bristles"]
+albedo_color = Color(0.9, 0.85, 0.7, 1)
+roughness = 0.9
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_bristles"]
+material = SubResource("StandardMaterial3D_bristles")
+top_radius = 0.005
+bottom_radius = 0.02
+height = 0.05
+
+[node name="PaintBrush" type="RigidBody3D" unique_id=1868446436 groups=["grabbable"]]
+mass = 0.3
+contact_monitor = true
+max_contacts_reported = 4
+script = ExtResource("1_paint_brush")
+grab_mode = 0
+save_id = "PaintBrush"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1779819781]
+shape = SubResource("BoxShape3D_brush")
+
+[node name="Handle" type="MeshInstance3D" parent="." unique_id=1331876193]
+transform = Transform3D(1, 0, 0, 0, -4.3711385e-08, 0.99999994, 0, -0.99999994, -4.3711385e-08, 0, 0, 0)
+mesh = SubResource("CylinderMesh_handle")
+skeleton = NodePath("../..")
+
+[node name="Ferrule" type="MeshInstance3D" parent="." unique_id=2022873718]
+transform = Transform3D(1, 0, 0, 0, -4.3711385e-08, 0.99999994, 0, -0.99999994, -4.3711385e-08, 0, 0, -0.10928384)
+mesh = SubResource("CylinderMesh_ferrule")
+skeleton = NodePath("../..")
+
+[node name="Bristles" type="MeshInstance3D" parent="." unique_id=628698985]
+transform = Transform3D(1, 0, 0, 0, -4.3711385e-08, 0.99999994, 0, -0.99999994, -4.3711385e-08, 0, 0, -0.14406401)
+mesh = SubResource("CylinderMesh_bristles")
+skeleton = NodePath("../..")

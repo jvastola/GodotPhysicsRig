@@ -29,6 +29,7 @@
 [ext_resource type="PackedScene" uid="uid://cm8nv7v0apls3" path="res://src/objects/grabbables/GrappleHook.tscn" id="42_grapple_hook"]
 [ext_resource type="PackedScene" uid="uid://reference_block_scene" path="res://src/objects/ReferenceBlock.tscn" id="43_reference_block"]
 [ext_resource type="PackedScene" uid="uid://block_library_viewport3d" path="res://src/ui/BlockLibraryViewport3D.tscn" id="44_block_library_viewport"]
+[ext_resource type="PackedScene" uid="uid://paint_brush_scene" path="res://src/objects/grabbables/PaintBrush.tscn" id="45_paint_brush"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -161,3 +162,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.0, 1.2, -0.69013023)
 
 [node name="BlockLibraryViewport3D" parent="." unique_id=2108901234 instance=ExtResource("44_block_library_viewport")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.0, 1.8, -0.69013023)
+
+[node name="PaintBrush" parent="." unique_id=2109012345 instance=ExtResource("45_paint_brush")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.8, 0.95, -0.69013023)
