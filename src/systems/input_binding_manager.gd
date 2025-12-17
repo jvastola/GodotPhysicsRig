@@ -1,5 +1,6 @@
 extends Node
 ## Runtime input binding helper that supports multi-press combos and sequences.
+## Persists custom bindings to SaveManager for Meta VRCS compliance.
 
 const MODE_ANY := "any"
 const MODE_CHORD := "chord"
@@ -22,6 +23,9 @@ static func get_singleton() -> Node:
 
 
 var bindings := {} # action -> {events: Array[InputEvent], mode: String}
+var _save_pending := false
+var _save_timer := 0.0
+const SAVE_DELAY := 1.5  # Debounce saves
 var _sequence_state := {} # action -> {index:int, start:int}
 var _chord_state := {} # action -> {pressed: Dictionary<int, int>}
 var _just_triggered := {} # action -> bool
@@ -47,6 +51,8 @@ func set_binding(action: String, events: Array, mode: String = MODE_ANY) -> void
 			InputMap.action_add_event(action, ev)
 	_sequence_state.erase(action)
 	_chord_state.erase(action)
+	# Queue save for persistence (Meta VRCS compliance)
+	_queue_save()
 
 
 func get_binding(action: String) -> Dictionary:
@@ -143,3 +149,122 @@ func _is_pressed_event(event: InputEvent) -> bool:
 		# Consider motion meaningful when significant
 		return abs(event.axis_value) > 0.5
 	return false
+
+
+# === Persistence (Meta VRCS Compliance) ===
+
+func _ready() -> void:
+	_load_saved_bindings()
+
+
+func _process(delta: float) -> void:
+	if _save_pending:
+		_save_timer += delta
+		if _save_timer >= SAVE_DELAY:
+			_perform_save()
+			_save_pending = false
+			_save_timer = 0.0
+
+
+func _queue_save() -> void:
+	_save_pending = true
+	_save_timer = 0.0
+
+
+func _perform_save() -> void:
+	var save_manager = get_node_or_null("/root/SaveManager")
+	if not save_manager:
+		return
+	
+	# Serialize bindings to a saveable format
+	var serialized := {}
+	for action in bindings.keys():
+		var binding: Dictionary = bindings[action]
+		var events: Array = binding.get("events", [])
+		var mode: String = binding.get("mode", MODE_ANY)
+		var event_data := []
+		for ev in events:
+			event_data.append(_serialize_event(ev))
+		serialized[action] = {"events": event_data, "mode": mode}
+	
+	if save_manager.has_method("save_input_bindings"):
+		save_manager.save_input_bindings(serialized)
+		print("InputBindingManager: Saved custom bindings")
+
+
+func _load_saved_bindings() -> void:
+	var save_manager = get_node_or_null("/root/SaveManager")
+	if not save_manager or not save_manager.has_method("get_input_bindings"):
+		return
+	
+	var saved: Dictionary = save_manager.get_input_bindings()
+	if saved.is_empty():
+		return
+	
+	print("InputBindingManager: Loading saved bindings")
+	for action in saved.keys():
+		var data: Dictionary = saved[action]
+		var event_data: Array = data.get("events", [])
+		var mode: String = data.get("mode", MODE_ANY)
+		var events: Array[InputEvent] = []
+		for ed in event_data:
+			var ev := _deserialize_event(ed)
+			if ev:
+				events.append(ev)
+		if not events.is_empty():
+			set_binding(action, events, mode)
+	print("InputBindingManager: Restored %d bindings" % saved.size())
+
+
+func _serialize_event(event: InputEvent) -> Dictionary:
+	if event is InputEventKey:
+		return {
+			"type": "key",
+			"keycode": event.keycode,
+			"physical_keycode": event.physical_keycode,
+		}
+	elif event is InputEventJoypadButton:
+		return {
+			"type": "joypad_button",
+			"button_index": event.button_index,
+			"device": event.device,
+		}
+	elif event is InputEventJoypadMotion:
+		return {
+			"type": "joypad_motion",
+			"axis": event.axis,
+			"axis_value": event.axis_value,
+			"device": event.device,
+		}
+	elif event is InputEventMouseButton:
+		return {
+			"type": "mouse_button",
+			"button_index": event.button_index,
+		}
+	return {}
+
+
+func _deserialize_event(data: Dictionary) -> InputEvent:
+	var event_type: String = data.get("type", "")
+	match event_type:
+		"key":
+			var ev := InputEventKey.new()
+			ev.keycode = data.get("keycode", 0)
+			ev.physical_keycode = data.get("physical_keycode", 0)
+			return ev
+		"joypad_button":
+			var ev := InputEventJoypadButton.new()
+			ev.button_index = data.get("button_index", 0)
+			ev.device = data.get("device", 0)
+			return ev
+		"joypad_motion":
+			var ev := InputEventJoypadMotion.new()
+			ev.axis = data.get("axis", 0)
+			ev.axis_value = data.get("axis_value", 1.0)
+			ev.device = data.get("device", 0)
+			return ev
+		"mouse_button":
+			var ev := InputEventMouseButton.new()
+			ev.button_index = data.get("button_index", 0)
+			return ev
+	return null

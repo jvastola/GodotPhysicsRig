@@ -346,3 +346,74 @@ func save_inventory(items: Array) -> void:
 	"""Save inventory state"""
 	_save_data["inventory"] = items
 	_save_dirty = true
+
+
+# --- MOVEMENT SETTINGS PERSISTENCE ---
+# Auto-saves movement settings so they persist across app restarts (Meta VRCS requirement)
+
+const MOVEMENT_SETTINGS_KEY := "movement_settings"
+
+func save_movement_settings(settings: Dictionary) -> void:
+	"""Save movement settings to persistent storage"""
+	_save_data[MOVEMENT_SETTINGS_KEY] = settings.duplicate()
+	_save_dirty = true
+	print("SaveManager: Movement settings saved")
+
+
+func get_movement_settings() -> Dictionary:
+	"""Load movement settings from persistent storage. Returns empty dict if none saved."""
+	if not _save_data.has(MOVEMENT_SETTINGS_KEY):
+		return {}
+	return _save_data[MOVEMENT_SETTINGS_KEY].duplicate()
+
+
+func has_movement_settings() -> bool:
+	"""Check if movement settings have been saved previously"""
+	return _save_data.has(MOVEMENT_SETTINGS_KEY) and not _save_data[MOVEMENT_SETTINGS_KEY].is_empty()
+
+
+# --- INPUT BINDINGS PERSISTENCE ---
+# Auto-saves custom input bindings so they persist across app restarts
+
+const INPUT_BINDINGS_KEY := "input_bindings"
+
+func save_input_bindings(bindings: Dictionary) -> void:
+	"""Save custom input bindings to persistent storage"""
+	_save_data[INPUT_BINDINGS_KEY] = bindings.duplicate(true)
+	_save_dirty = true
+	print("SaveManager: Input bindings saved")
+
+
+func get_input_bindings() -> Dictionary:
+	"""Load input bindings from persistent storage. Returns empty dict if none saved."""
+	if not _save_data.has(INPUT_BINDINGS_KEY):
+		return {}
+	return _save_data[INPUT_BINDINGS_KEY].duplicate(true)
+
+
+func has_input_bindings() -> bool:
+	"""Check if input bindings have been saved previously"""
+	return _save_data.has(INPUT_BINDINGS_KEY) and not _save_data[INPUT_BINDINGS_KEY].is_empty()
+
+
+# --- AUDIO SETTINGS PERSISTENCE ---
+# Auto-saves audio settings so they persist across app restarts
+
+const AUDIO_SETTINGS_KEY := "audio_settings"
+
+func save_audio_settings(settings: Dictionary) -> void:
+	"""Save audio settings to persistent storage"""
+	_save_data[AUDIO_SETTINGS_KEY] = settings.duplicate()
+	_save_dirty = true
+
+
+func get_audio_settings() -> Dictionary:
+	"""Load audio settings from persistent storage. Returns empty dict if none saved."""
+	if not _save_data.has(AUDIO_SETTINGS_KEY):
+		return {}
+	return _save_data[AUDIO_SETTINGS_KEY].duplicate()
+
+
+func has_audio_settings() -> bool:
+	"""Check if audio settings have been saved previously"""
+	return _save_data.has(AUDIO_SETTINGS_KEY) and not _save_data[AUDIO_SETTINGS_KEY].is_empty()

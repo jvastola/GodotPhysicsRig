@@ -38,6 +38,8 @@ func _ready():
 	_setup_audio()
 	_setup_ui()
 	_setup_input_device_selector()
+	# Auto-load saved audio settings (Meta VRCS compliance)
+	_load_saved_settings()
 
 
 func _setup_ui():
@@ -152,6 +154,7 @@ func _on_mute_toggle(button_pressed: bool):
 	mic_level_bar.modulate = Color.GRAY if is_muted else Color.WHITE
 	mute_toggled.emit(is_muted)
 	print("🎤 Mute toggled: ", is_muted)
+	_save_settings()
 
 
 func _on_gain_changed(value: float):
@@ -159,12 +162,14 @@ func _on_gain_changed(value: float):
 		amplify_effect.volume_db = value
 		gain_value_label.text = "%.1f dB" % value
 		gain_changed.emit(value)
+		_save_settings()
 
 
 func _on_threshold_changed(value: float):
 	mic_threshold = value
 	threshold_label.text = "%.2f" % mic_threshold
 	threshold_changed.emit(value)
+	_save_settings()
 
 
 func _on_hear_audio_toggled(button_pressed: bool):
@@ -172,6 +177,7 @@ func _on_hear_audio_toggled(button_pressed: bool):
 	if audio_bus_idx != -1:
 		var volume_db = 0.0 if hear_own_audio else -80.0
 		AudioServer.set_bus_volume_db(audio_bus_idx, volume_db)
+	_save_settings()
 
 
 func _on_input_device_selected(index: int):
@@ -199,3 +205,48 @@ func set_muted(muted: bool):
 
 func get_sample_rate() -> int:
 	return int(AudioServer.get_mix_rate())
+
+
+# === Persistence (Meta VRCS Compliance) ===
+
+func _load_saved_settings() -> void:
+	var save_manager = get_node_or_null("/root/SaveManager")
+	if not save_manager or not save_manager.has_method("get_audio_settings"):
+		return
+	
+	var settings: Dictionary = save_manager.get_audio_settings()
+	if settings.is_empty():
+		return
+	
+	print("AudioSettingsPanel: Loading saved settings")
+	
+	# Apply saved settings
+	if settings.has("gain") and gain_slider:
+		gain_slider.value = settings["gain"]
+		_on_gain_changed(settings["gain"])
+	
+	if settings.has("threshold") and threshold_slider:
+		threshold_slider.value = settings["threshold"]
+		_on_threshold_changed(settings["threshold"])
+	
+	if settings.has("muted"):
+		set_muted(settings["muted"])
+	
+	if settings.has("hear_self") and hear_self_check:
+		hear_self_check.button_pressed = settings["hear_self"]
+		_on_hear_audio_toggled(settings["hear_self"])
+
+
+func _save_settings() -> void:
+	var save_manager = get_node_or_null("/root/SaveManager")
+	if not save_manager or not save_manager.has_method("save_audio_settings"):
+		return
+	
+	var settings := {
+		"gain": gain_slider.value if gain_slider else 0.0,
+		"threshold": mic_threshold,
+		"muted": is_muted,
+		"hear_self": hear_own_audio,
+	}
+	save_manager.save_audio_settings(settings)
+	print("AudioSettingsPanel: Settings saved")

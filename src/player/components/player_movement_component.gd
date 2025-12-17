@@ -259,6 +259,8 @@ func _ready() -> void:
 		if InputMap.has_action("jump"):
 			default_events = InputMap.action_get_events("jump")
 		_input_binding_manager.ensure_binding("jump", default_events, InputBindingManager.MODE_ANY)
+	# Auto-load saved movement settings (Meta VRCS requirement: preserve user data)
+	_load_saved_settings()
 
 
 func set_vr_mode(enabled: bool) -> void:
@@ -297,6 +299,78 @@ func set_ui_scroll_capture(active: bool, controller: XRController3D) -> void:
 func _clear_ui_scroll_capture() -> void:
 	_ui_block_locomotion = false
 	_ui_block_turn = false
+
+
+func _load_saved_settings() -> void:
+	"""Load saved movement settings from SaveManager (Meta VRCS compliance)"""
+	var save_manager = get_node_or_null("/root/SaveManager")
+	if not save_manager or not save_manager.has_method("get_movement_settings"):
+		return
+	
+	if not save_manager.has_movement_settings():
+		print("PlayerMovementComponent: No saved settings found, using defaults")
+		return
+	
+	var settings: Dictionary = save_manager.get_movement_settings()
+	if settings.is_empty():
+		return
+	
+	print("PlayerMovementComponent: Loading saved movement settings")
+	
+	# Apply all saved settings
+	locomotion_mode = settings.get("locomotion_mode", locomotion_mode)
+	locomotion_speed = settings.get("locomotion_speed", locomotion_speed)
+	locomotion_deadzone = settings.get("locomotion_deadzone", locomotion_deadzone)
+	invert_locomotion_x = settings.get("invert_locomotion_x", invert_locomotion_x)
+	invert_locomotion_y = settings.get("invert_locomotion_y", invert_locomotion_y)
+	turn_mode = settings.get("turn_mode", turn_mode)
+	snap_turn_angle = settings.get("snap_turn_angle", snap_turn_angle)
+	smooth_turn_speed = settings.get("smooth_turn_speed", smooth_turn_speed)
+	turn_deadzone = settings.get("turn_deadzone", turn_deadzone)
+	snap_turn_cooldown = settings.get("snap_turn_cooldown", snap_turn_cooldown)
+	invert_turn_x = settings.get("invert_turn_x", invert_turn_x)
+	ui_scroll_steals_stick = settings.get("ui_scroll_steals_stick", ui_scroll_steals_stick)
+	hand_assignment = settings.get("hand_assignment", hand_assignment)
+	enable_two_hand_world_scale = settings.get("enable_two_hand_world_scale", enable_two_hand_world_scale)
+	enable_two_hand_world_rotation = settings.get("enable_two_hand_world_rotation", enable_two_hand_world_rotation)
+	world_scale_min = settings.get("world_scale_min", world_scale_min)
+	world_scale_max = settings.get("world_scale_max", world_scale_max)
+	world_scale_sensitivity = settings.get("world_scale_sensitivity", world_scale_sensitivity)
+	world_rotation_sensitivity = settings.get("world_rotation_sensitivity", world_rotation_sensitivity)
+	world_grab_move_factor = settings.get("world_grab_move_factor", world_grab_move_factor)
+	world_grab_smooth_factor = settings.get("world_grab_smooth_factor", world_grab_smooth_factor)
+	invert_two_hand_scale_direction = settings.get("invert_two_hand_scale_direction", invert_two_hand_scale_direction)
+	show_two_hand_rotation_visual = settings.get("show_two_hand_rotation_visual", show_two_hand_rotation_visual)
+	two_hand_left_action = settings.get("two_hand_left_action", two_hand_left_action)
+	two_hand_right_action = settings.get("two_hand_right_action", two_hand_right_action)
+	two_hand_rotation_pivot = settings.get("two_hand_rotation_pivot", two_hand_rotation_pivot)
+	enable_one_hand_world_grab = settings.get("enable_one_hand_world_grab", enable_one_hand_world_grab)
+	one_hand_world_move_sensitivity = settings.get("one_hand_world_move_sensitivity", one_hand_world_move_sensitivity)
+	invert_one_hand_grab_direction = settings.get("invert_one_hand_grab_direction", invert_one_hand_grab_direction)
+	show_one_hand_grab_visual = settings.get("show_one_hand_grab_visual", show_one_hand_grab_visual)
+	one_hand_grab_mode = settings.get("one_hand_grab_mode", one_hand_grab_mode)
+	enable_one_hand_rotation = settings.get("enable_one_hand_rotation", enable_one_hand_rotation)
+	enable_one_hand_world_rotate = settings.get("enable_one_hand_world_rotate", enable_one_hand_world_rotate)
+	invert_one_hand_rotation = settings.get("invert_one_hand_rotation", invert_one_hand_rotation)
+	apply_one_hand_release_velocity = settings.get("apply_one_hand_release_velocity", apply_one_hand_release_velocity)
+	one_hand_rotation_smooth_factor = settings.get("one_hand_rotation_smooth_factor", one_hand_rotation_smooth_factor)
+	auto_respawn_enabled = settings.get("auto_respawn_enabled", auto_respawn_enabled)
+	auto_respawn_distance = settings.get("auto_respawn_distance", auto_respawn_distance)
+	hard_respawn_resets_settings = settings.get("hard_respawn_resets_settings", hard_respawn_resets_settings)
+	jump_enabled = settings.get("jump_enabled", jump_enabled)
+	jump_impulse = settings.get("jump_impulse", jump_impulse)
+	jump_cooldown = settings.get("jump_cooldown", jump_cooldown)
+	player_gravity_enabled = settings.get("player_gravity_enabled", player_gravity_enabled)
+	player_drag_force = settings.get("player_drag_force", player_drag_force)
+	enable_physics_hands = settings.get("enable_physics_hands", enable_physics_hands)
+	# V3 settings
+	v3_scale_sensitivity = settings.get("v3_scale_sensitivity", v3_scale_sensitivity)
+	v3_invert_scale = settings.get("v3_invert_scale", v3_invert_scale)
+	v3_rotation_sensitivity = settings.get("v3_rotation_sensitivity", v3_rotation_sensitivity)
+	v3_translation_sensitivity = settings.get("v3_translation_sensitivity", v3_translation_sensitivity)
+	v3_smoothing = settings.get("v3_smoothing", v3_smoothing)
+	
+	print("PlayerMovementComponent: Settings restored successfully")
 
 
 func process_turning(delta: float) -> void:

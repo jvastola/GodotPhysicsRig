@@ -214,6 +214,10 @@ func _ready():
 	_find_movement_component()
 	_build_ui()
 	_refresh_profiles()
+	# Auto-load saved settings on startup (Meta VRCS requirement: preserve user data)
+	_auto_load_saved_settings()
+	# Connect to settings_changed to trigger auto-save
+	settings_changed.connect(_queue_auto_save)
 
 
 func _apply_fullrect_layout():
@@ -2099,6 +2103,62 @@ func _update_status_label():
 	else:
 		status_label.text = "Waiting for player..."
 		status_label.add_theme_color_override("font_color", Color(0.8, 0.6, 0.4))
+
+
+# === Auto-Save/Load (Meta VRCS Compliance) ===
+# Automatically persist settings across app restarts
+
+var _auto_save_pending := false
+var _auto_save_timer := 0.0
+const AUTO_SAVE_DELAY := 1.0  # Debounce saves to avoid excessive writes
+
+
+func _process(delta: float) -> void:
+	# Debounced auto-save to reduce write frequency
+	if _auto_save_pending:
+		_auto_save_timer += delta
+		if _auto_save_timer >= AUTO_SAVE_DELAY:
+			_perform_auto_save()
+			_auto_save_pending = false
+			_auto_save_timer = 0.0
+
+
+func _queue_auto_save() -> void:
+	"""Queue an auto-save after a short delay (debounced)"""
+	_auto_save_pending = true
+	_auto_save_timer = 0.0
+
+
+func _perform_auto_save() -> void:
+	"""Actually save settings to SaveManager"""
+	var save_manager = get_node_or_null("/root/SaveManager")
+	if save_manager and save_manager.has_method("save_movement_settings"):
+		var data := _collect_settings_data()
+		save_manager.save_movement_settings(data)
+		print("MovementSettingsPanel: Auto-saved settings")
+
+
+func _auto_load_saved_settings() -> void:
+	"""Load previously saved settings on startup"""
+	var save_manager = get_node_or_null("/root/SaveManager")
+	if not save_manager or not save_manager.has_method("get_movement_settings"):
+		print("MovementSettingsPanel: SaveManager not available for auto-load")
+		return
+	
+	if not save_manager.has_movement_settings():
+		print("MovementSettingsPanel: No saved settings found, using defaults")
+		return
+	
+	var saved_data: Dictionary = save_manager.get_movement_settings()
+	if saved_data.is_empty():
+		return
+	
+	print("MovementSettingsPanel: Loading saved settings")
+	_apply_defaults(saved_data)
+	settings_changed.emit()
+	
+	if profile_status_label:
+		profile_status_label.text = "Restored saved settings"
 
 
 # === Profiles ===
