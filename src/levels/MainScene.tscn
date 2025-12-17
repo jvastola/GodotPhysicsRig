@@ -1,4 +1,4 @@
-[gd_scene load_steps=31 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=33 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -27,6 +27,8 @@
 [ext_resource type="Script" uid="uid://bqrnwqkyb00kx" path="res://src/ui/ui_panel_scene_setup.gd" id="40_ui_panel_setup"]
 [ext_resource type="Script" uid="uid://bid6ju5yhq61q" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
 [ext_resource type="PackedScene" uid="uid://cm8nv7v0apls3" path="res://src/objects/grabbables/GrappleHook.tscn" id="42_grapple_hook"]
+[ext_resource type="PackedScene" uid="uid://reference_block_scene" path="res://src/objects/ReferenceBlock.tscn" id="43_reference_block"]
+[ext_resource type="PackedScene" uid="uid://block_library_viewport3d" path="res://src/ui/BlockLibraryViewport3D.tscn" id="44_block_library_viewport"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -153,3 +155,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1.5, 1.3955536)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 1, 1.3955536)
 rope_sag_factor = 0.005
 rope_sag_max = 0.5
+
+[node name="ReferenceBlock" parent="." unique_id=2107890123 instance=ExtResource("43_reference_block")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.0, 1.2, -0.69013023)
+
+[node name="BlockLibraryViewport3D" parent="." unique_id=2108901234 instance=ExtResource("44_block_library_viewport")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.0, 1.8, -0.69013023)

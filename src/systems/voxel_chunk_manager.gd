@@ -50,9 +50,19 @@ signal chunk_updated(chunk_coord: Vector3i)
 signal voxel_placed(world_pos: Vector3, color: Color)
 signal voxel_removed(world_pos: Vector3)
 
+class VoxelData:
+	var color: Color = Color.WHITE
+	var texture: ImageTexture = null
+	var face_colors: Array = []  # Optional: per-face color data for texture generation
+	var grid_subdivisions: int = 1
+	
+	func _init(c: Color = Color.WHITE, tex: ImageTexture = null):
+		color = c
+		texture = tex
+
 class VoxelChunk:
 	var coord: Vector3i  # Chunk coordinate
-	var voxels: Dictionary = {}  # Vector3i (local voxel pos) -> Color
+	var voxels: Dictionary = {}  # Vector3i (local voxel pos) -> VoxelData
 	var mesh_instance: MeshInstance3D = null
 	var static_body: StaticBody3D = null
 	var collision_shape: CollisionShape3D = null
@@ -85,19 +95,23 @@ func _process(delta: float) -> void:
 func set_voxel_size(size: float) -> void:
 	_voxel_size = size
 
-## Add a voxel at world position
-func add_voxel(world_pos: Vector3, color: Color = Color.WHITE, sync_network: bool = true) -> void:
+## Add a voxel at world position with optional texture
+func add_voxel(world_pos: Vector3, color: Color = Color.WHITE, sync_network: bool = true, texture: ImageTexture = null, face_colors: Array = [], grid_subdivisions: int = 1) -> void:
 	var chunk_coord := world_to_chunk(world_pos)
 	var local_pos := world_to_local_voxel(world_pos, chunk_coord)
 	
 	var chunk := _get_or_create_chunk(chunk_coord)
+	var voxel_data := VoxelData.new(color, texture)
+	voxel_data.face_colors = face_colors
+	voxel_data.grid_subdivisions = grid_subdivisions
+	
 	if not chunk.voxels.has(local_pos):
-		chunk.voxels[local_pos] = color
+		chunk.voxels[local_pos] = voxel_data
 		chunk.dirty = true
 		_mark_neighbors_dirty(chunk_coord, local_pos)
 	else:
-		# Update color if voxel already exists
-		chunk.voxels[local_pos] = color
+		# Update if voxel already exists
+		chunk.voxels[local_pos] = voxel_data
 		chunk.dirty = true
 	
 	# Sync to network
@@ -157,7 +171,8 @@ func get_all_voxels() -> Array[Dictionary]:
 		var chunk: VoxelChunk = _chunks[chunk_coord]
 		for local_pos in chunk.voxels.keys():
 			var world_pos = local_to_world_voxel(local_pos, chunk_coord)
-			var stored_color: Color = chunk.voxels.get(local_pos, Color.WHITE)
+			var voxel_data: VoxelData = chunk.voxels.get(local_pos)
+			var stored_color: Color = voxel_data.color if voxel_data else Color.WHITE
 			all_voxels.append({"pos": world_pos, "color": stored_color})
 	return all_voxels
 
@@ -291,28 +306,150 @@ func _rebuild_chunk_mesh(chunk: VoxelChunk) -> void:
 		chunk.collision_shape.shape = null
 		return
 	
-	# Generate optimized mesh with greedy meshing
-	var mesh_data := _generate_chunk_mesh(chunk)
+	# Group voxels by texture for efficient rendering
+	var textured_voxels: Dictionary = {}  # texture_id -> Array of {local_pos, voxel_data}
+	var colored_voxels: Array = []  # Voxels without textures
 	
-	# Create visual mesh
+	for local_pos in chunk.voxels.keys():
+		var voxel_data: VoxelData = chunk.voxels[local_pos]
+		if voxel_data.texture:
+			var tex_id := voxel_data.texture.get_rid().get_id()
+			if not textured_voxels.has(tex_id):
+				textured_voxels[tex_id] = {"texture": voxel_data.texture, "voxels": []}
+			textured_voxels[tex_id]["voxels"].append({"pos": local_pos, "data": voxel_data})
+		else:
+			colored_voxels.append({"pos": local_pos, "data": voxel_data})
+	
 	var array_mesh := ArrayMesh.new()
-	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, mesh_data.visual_arrays)
-	chunk.mesh_instance.mesh = array_mesh
+	var collision_faces: PackedVector3Array = PackedVector3Array()
 	
-	# Apply material if not already set
-	if not chunk.mesh_instance.material_override:
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = Color(0.7, 0.7, 0.7)
-		mat.cull_mode = BaseMaterial3D.CULL_BACK  # Enable backface culling
-		chunk.mesh_instance.material_override = mat
+	# Add surfaces for each texture group
+	for tex_id in textured_voxels.keys():
+		var tex_group: Dictionary = textured_voxels[tex_id]
+		var mesh_data := _generate_textured_mesh(chunk, tex_group["voxels"])
+		if mesh_data.visual_arrays[Mesh.ARRAY_VERTEX].size() > 0:
+			var surface_idx := array_mesh.get_surface_count()
+			array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, mesh_data.visual_arrays)
+			
+			# Create material with texture
+			var mat := StandardMaterial3D.new()
+			mat.albedo_texture = tex_group["texture"]
+			mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+			mat.cull_mode = BaseMaterial3D.CULL_BACK
+			array_mesh.surface_set_material(surface_idx, mat)
+			
+			collision_faces.append_array(mesh_data.collision_faces)
+	
+	# Add surface for colored voxels (no texture)
+	if colored_voxels.size() > 0:
+		var mesh_data := _generate_colored_mesh(chunk, colored_voxels)
+		if mesh_data.visual_arrays[Mesh.ARRAY_VERTEX].size() > 0:
+			var surface_idx := array_mesh.get_surface_count()
+			array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, mesh_data.visual_arrays)
+			
+			var mat := StandardMaterial3D.new()
+			mat.vertex_color_use_as_albedo = true
+			mat.cull_mode = BaseMaterial3D.CULL_BACK
+			array_mesh.surface_set_material(surface_idx, mat)
+			
+			collision_faces.append_array(mesh_data.collision_faces)
+	
+	chunk.mesh_instance.mesh = array_mesh
+	chunk.mesh_instance.material_override = null  # Use per-surface materials
 	
 	# Create collision shape from mesh
-	var collision_mesh := ConcavePolygonShape3D.new()
-	collision_mesh.set_faces(mesh_data.collision_faces)
-	chunk.collision_shape.shape = collision_mesh
+	if collision_faces.size() > 0:
+		var collision_mesh := ConcavePolygonShape3D.new()
+		collision_mesh.set_faces(collision_faces)
+		chunk.collision_shape.shape = collision_mesh
+	else:
+		chunk.collision_shape.shape = null
 
-## Generate mesh data for a chunk with internal face culling
-func _generate_chunk_mesh(chunk: VoxelChunk) -> Dictionary:
+## Generate mesh data for textured voxels with UV coordinates
+## Uses the same atlas layout as ReferenceBlock: 3x2 grid (faces 0-2 on top row, 3-5 on bottom)
+func _generate_textured_mesh(chunk: VoxelChunk, voxel_list: Array) -> Dictionary:
+	var vertices: PackedVector3Array = PackedVector3Array()
+	var normals: PackedVector3Array = PackedVector3Array()
+	var uvs: PackedVector2Array = PackedVector2Array()
+	var indices: PackedInt32Array = PackedInt32Array()
+	var collision_faces: PackedVector3Array = PackedVector3Array()
+	
+	var vertex_offset: int = 0
+	var chunk_world_origin := Vector3(chunk.coord) * CHUNK_SIZE * _voxel_size
+	
+	# UV coordinates for each face in the 3x2 atlas
+	# Face 0 (+X): column 0, row 0
+	# Face 1 (-X): column 1, row 0
+	# Face 2 (+Y): column 2, row 0
+	# Face 3 (-Y): column 0, row 1
+	# Face 4 (+Z): column 1, row 1
+	# Face 5 (-Z): column 2, row 1
+	
+	for voxel_entry in voxel_list:
+		var local_pos: Vector3i = voxel_entry["pos"]
+		var voxel_world_pos := chunk_world_origin + Vector3(local_pos) * _voxel_size
+		var voxel_offset := Vector3(-0.5, -0.5, -0.5) * _voxel_size
+		
+		for face_idx in range(6):
+			var face_dir := VOXEL_FACES[face_idx]
+			var neighbor_pos: Vector3i = local_pos + face_dir
+			
+			if _is_voxel_occupied_with_neighbors(chunk, neighbor_pos):
+				continue
+			
+			var face_verts := FACE_VERTICES[face_idx]
+			var face_normal := Vector3(face_dir)
+			
+			# Calculate UV coordinates for this face in the atlas
+			var atlas_col := face_idx % 3
+			var atlas_row := face_idx / 3
+			var u0 := float(atlas_col) / 3.0
+			var v0 := float(atlas_row) / 2.0
+			var u1 := float(atlas_col + 1) / 3.0
+			var v1 := float(atlas_row + 1) / 2.0
+			
+			# UV corners for the face (matching vertex order)
+			var face_uvs := [
+				Vector2(u0, v1),  # bottom-left
+				Vector2(u1, v1),  # bottom-right
+				Vector2(u1, v0),  # top-right
+				Vector2(u0, v0)   # top-left
+			]
+			
+			for i in range(4):
+				var vert: Vector3 = voxel_world_pos + voxel_offset + face_verts[i] * _voxel_size
+				vertices.append(vert)
+				normals.append(face_normal)
+				uvs.append(face_uvs[i])
+			
+			indices.append(vertex_offset + 0)
+			indices.append(vertex_offset + 1)
+			indices.append(vertex_offset + 2)
+			indices.append(vertex_offset + 0)
+			indices.append(vertex_offset + 2)
+			indices.append(vertex_offset + 3)
+			
+			collision_faces.append(vertices[vertex_offset + 0])
+			collision_faces.append(vertices[vertex_offset + 1])
+			collision_faces.append(vertices[vertex_offset + 2])
+			collision_faces.append(vertices[vertex_offset + 0])
+			collision_faces.append(vertices[vertex_offset + 2])
+			collision_faces.append(vertices[vertex_offset + 3])
+			
+			vertex_offset += 4
+	
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_INDEX] = indices
+	
+	return {"visual_arrays": arrays, "collision_faces": collision_faces}
+
+
+## Generate mesh data for colored voxels (no texture, uses vertex colors)
+func _generate_colored_mesh(chunk: VoxelChunk, voxel_list: Array) -> Dictionary:
 	var vertices: PackedVector3Array = PackedVector3Array()
 	var normals: PackedVector3Array = PackedVector3Array()
 	var colors: PackedColorArray = PackedColorArray()
@@ -322,54 +459,45 @@ func _generate_chunk_mesh(chunk: VoxelChunk) -> Dictionary:
 	var vertex_offset: int = 0
 	var chunk_world_origin := Vector3(chunk.coord) * CHUNK_SIZE * _voxel_size
 	
-	# Iterate through all voxels in chunk
-	for local_pos in chunk.voxels.keys():
-		var voxel_color: Color = chunk.voxels.get(local_pos, Color(0.7, 0.7, 0.7))
-		# Calculate voxel center position (offset by half voxel size to center on grid)
+	for voxel_entry in voxel_list:
+		var local_pos: Vector3i = voxel_entry["pos"]
+		var voxel_data: VoxelData = voxel_entry["data"]
+		var voxel_color: Color = voxel_data.color
 		var voxel_world_pos := chunk_world_origin + Vector3(local_pos) * _voxel_size
-		var voxel_offset := Vector3(-0.5, -0.5, -0.5) * _voxel_size  # Center the cube
+		var voxel_offset := Vector3(-0.5, -0.5, -0.5) * _voxel_size
 		
-		# Check each face direction
 		for face_idx in range(6):
 			var face_dir := VOXEL_FACES[face_idx]
 			var neighbor_pos: Vector3i = local_pos + face_dir
 			
-			# Check if neighbor is occupied (with chunk boundary handling)
 			if _is_voxel_occupied_with_neighbors(chunk, neighbor_pos):
-				continue  # Internal face, skip it
+				continue
 			
-			# Add face geometry
 			var face_verts := FACE_VERTICES[face_idx]
 			var face_normal := Vector3(face_dir)
 			
-			# Add 4 vertices for this face
 			for i in range(4):
 				var vert: Vector3 = voxel_world_pos + voxel_offset + face_verts[i] * _voxel_size
 				vertices.append(vert)
 				normals.append(face_normal)
 				colors.append(voxel_color)
 			
-			# Add 2 triangles (6 indices) for this face
 			indices.append(vertex_offset + 0)
 			indices.append(vertex_offset + 1)
 			indices.append(vertex_offset + 2)
-			
 			indices.append(vertex_offset + 0)
 			indices.append(vertex_offset + 2)
 			indices.append(vertex_offset + 3)
 			
-			# Add collision triangles
 			collision_faces.append(vertices[vertex_offset + 0])
 			collision_faces.append(vertices[vertex_offset + 1])
 			collision_faces.append(vertices[vertex_offset + 2])
-			
 			collision_faces.append(vertices[vertex_offset + 0])
 			collision_faces.append(vertices[vertex_offset + 2])
 			collision_faces.append(vertices[vertex_offset + 3])
 			
 			vertex_offset += 4
 	
-	# Build mesh arrays
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
@@ -377,10 +505,7 @@ func _generate_chunk_mesh(chunk: VoxelChunk) -> Dictionary:
 	arrays[Mesh.ARRAY_COLOR] = colors
 	arrays[Mesh.ARRAY_INDEX] = indices
 	
-	return {
-		"visual_arrays": arrays,
-		"collision_faces": collision_faces
-	}
+	return {"visual_arrays": arrays, "collision_faces": collision_faces}
 
 ## Check if a voxel position is occupied (handles chunk boundaries)
 func _is_voxel_occupied_with_neighbors(chunk: VoxelChunk, local_pos: Vector3i) -> bool:

@@ -38,11 +38,13 @@ var ray_immediate_mesh: ImmediateMesh
 
 # === State ===
 var _voxel_manager: VoxelChunkManager
+var _reference_block: ReferenceBlock
 var _was_trigger_pressed: bool = false
 var _is_remove_mode: bool = false
 var _has_hit: bool = false
 var _hit_point: Vector3 = Vector3.ZERO
 var _hit_normal: Vector3 = Vector3.UP
+var _current_voxel_color: Color = Color.WHITE
 const POOL_TYPE := "voxel_tool"
 
 
@@ -58,8 +60,9 @@ func _ready() -> void:
 	_create_indicator()
 	_create_hit_marker()
 	
-	# Find voxel manager
+	# Find voxel manager and reference block
 	_find_voxel_manager()
+	_find_reference_block()
 	
 	# Apply initial voxel size
 	_apply_voxel_size()
@@ -88,6 +91,42 @@ func _find_voxel_manager() -> void:
 			print("VoxelToolNew: Found VoxelChunkManager via find_child")
 		else:
 			push_warning("VoxelToolNew: VoxelChunkManager not found!")
+
+
+func _find_reference_block() -> void:
+	# Try static instance first
+	if ReferenceBlock.instance:
+		_reference_block = ReferenceBlock.instance
+		_connect_reference_block_signals()
+		print("VoxelToolNew: Found ReferenceBlock via static instance")
+		return
+	
+	# Search by group
+	var blocks = get_tree().get_nodes_in_group("reference_block")
+	if blocks.size() > 0:
+		_reference_block = blocks[0] as ReferenceBlock
+		if _reference_block:
+			_connect_reference_block_signals()
+			print("VoxelToolNew: Found ReferenceBlock via group")
+		return
+	
+	# Fallback to find_child
+	_reference_block = get_tree().root.find_child("ReferenceBlock", true, false) as ReferenceBlock
+	if _reference_block:
+		_connect_reference_block_signals()
+		print("VoxelToolNew: Found ReferenceBlock via find_child")
+
+
+func _connect_reference_block_signals() -> void:
+	if not _reference_block:
+		return
+	if not _reference_block.block_selected.is_connected(_on_block_selected):
+		_reference_block.block_selected.connect(_on_block_selected)
+
+
+func _on_block_selected(block_name: String) -> void:
+	print("VoxelToolNew: Block selected: ", block_name)
+	_update_indicator_color()
 
 
 func _create_raycast() -> void:
@@ -328,24 +367,35 @@ func _snap_to_grid(pos: Vector3) -> Vector3:
 
 
 func _place_voxel() -> void:
-	print("VoxelToolNew: _place_voxel called, _voxel_manager valid: ", is_instance_valid(_voxel_manager))
 	if not _voxel_manager:
-		print("VoxelToolNew: _voxel_manager null, attempting to find...")
 		_find_voxel_manager()
 		if not _voxel_manager:
 			print("VoxelToolNew: ERROR - Could not find VoxelChunkManager!")
 			return
 	
-	print("VoxelToolNew: indicator_mesh valid: ", is_instance_valid(indicator_mesh), " visible: ", str(indicator_mesh.visible) if is_instance_valid(indicator_mesh) else "N/A")
 	if not indicator_mesh or not indicator_mesh.visible:
-		print("VoxelToolNew: indicator_mesh not valid or not visible, skipping placement")
 		return
 	
 	var pos = indicator_mesh.global_position
+	var voxel_data := _get_voxel_data()
 	_voxel_manager.set_voxel_size(voxel_size)
-	_voxel_manager.add_voxel(pos)
+	_voxel_manager.add_voxel(pos, voxel_data.color, true, voxel_data.texture)
 	_voxel_manager.update_dirty_chunks()
-	print("VoxelToolNew: Placed voxel at ", pos, " size: ", voxel_size)
+	print("VoxelToolNew: Placed voxel at ", pos, " with texture: ", voxel_data.texture != null)
+
+
+func _get_voxel_data() -> Dictionary:
+	"""Get voxel data including color and texture from reference block"""
+	if not is_instance_valid(_reference_block):
+		_find_reference_block()
+	
+	if _reference_block:
+		var texture := _reference_block.get_current_texture()
+		var color := _reference_block.get_average_color()
+		print("VoxelToolNew: Using reference block texture and color")
+		return {"color": color, "texture": texture}
+	
+	return {"color": _current_voxel_color, "texture": null}
 
 
 func _remove_voxel() -> void:
@@ -437,3 +487,40 @@ func toggle_always_visible() -> void:
 
 func get_current_voxel_size() -> float:
 	return voxel_size
+
+
+func set_voxel_color(color: Color) -> void:
+	"""Set the color for placed voxels"""
+	_current_voxel_color = color
+	_update_indicator_color()
+	print("VoxelToolNew: Voxel color set to ", color)
+
+
+func get_voxel_color() -> Color:
+	return _current_voxel_color
+
+
+func _update_indicator_color() -> void:
+	"""Update indicator mesh to show current voxel color or texture preview"""
+	if not indicator_mesh:
+		return
+	var mat = indicator_mesh.material_override as StandardMaterial3D
+	if not mat or _is_remove_mode:
+		return
+	
+	# Try to show texture preview from reference block
+	if is_instance_valid(_reference_block):
+		var tex := _reference_block.get_current_texture()
+		if tex:
+			mat.albedo_texture = tex
+			mat.albedo_color = Color.WHITE
+			mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+			return
+	
+	# Fallback to color blend
+	mat.albedo_texture = null
+	var base_color := indicator_color
+	base_color.r = (_current_voxel_color.r + indicator_color.r) * 0.5
+	base_color.g = (_current_voxel_color.g + indicator_color.g) * 0.5
+	base_color.b = (_current_voxel_color.b + indicator_color.b) * 0.5
+	mat.albedo_color = base_color

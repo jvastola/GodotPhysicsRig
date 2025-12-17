@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3 uid="uid://reference_block_scene"]
+
+[ext_resource type="Script" path="res://src/objects/reference_block.gd" id="1_reference_block"]
+
+[node name="ReferenceBlock" type="Node3D" groups=["reference_block"]]
+script = ExtResource("1_reference_block")
+block_size = 0.3
+paint_mode = 0
+grid_subdivisions = 4
