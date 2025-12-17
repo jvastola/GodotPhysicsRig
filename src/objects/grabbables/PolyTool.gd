@@ -18,6 +18,12 @@ enum PointVisibilityMode {
 	HELD_AND_RADIUS
 }
 
+enum EditSelectionType {
+	POINT,
+	EDGE,
+	FACE
+}
+
 # Configuration
 @export var snap_radius: float = 0.04
 @export var selection_radius: float = 0.05
@@ -26,6 +32,10 @@ enum PointVisibilityMode {
 @export var max_points: int = 128
 @export var point_visibility_mode: PointVisibilityMode = PointVisibilityMode.WITHIN_RADIUS
 @export var point_visibility_radius: float = 1.0
+@export var edge_selection_radius: float = 0.03
+@export var face_selection_radius: float = 0.1
+@export var merge_overlapping_points: bool = true
+@export var merge_distance: float = 0.001
 
 # Colors
 @export var color_place: Color = Color(0.2, 1.0, 0.4) # Green
@@ -34,6 +44,8 @@ enum PointVisibilityMode {
 @export var color_connect: Color = Color(0.2, 0.6, 1.0) # Blue
 @export var color_mesh: Color = Color(0.8, 0.8, 0.8, 0.5)
 @export var color_paint_default: Color = Color(1.0, 1.0, 1.0, 1.0)
+@export var color_edge_highlight: Color = Color(1.0, 0.6, 0.0, 1.0) # Orange for edges
+@export var color_face_highlight: Color = Color(1.0, 0.9, 0.2, 0.4) # Semi-transparent yellow for faces
 
 # State
 static var instance: PolyTool
@@ -48,6 +60,17 @@ var _drag_index: int = -1
 # Connect Mode State
 var _connect_sequence: Array[int] = []
 
+# Edit Mode State
+var _edit_selection_type: EditSelectionType = EditSelectionType.POINT
+var _hovered_edge: Array[int] = [] # [point_idx_a, point_idx_b]
+var _hovered_face_idx: int = -1
+var _drag_edge: Array[int] = []
+var _drag_face_idx: int = -1
+var _drag_start_positions: Array[Vector3] = [] # Positions relative to grab point
+var _drag_grab_point: Vector3 = Vector3.ZERO # Where the user initially grabbed
+var _drag_point_indices: Array[int] = [] # All point indices being dragged (including colocated)
+var _drag_start_basis: Basis = Basis.IDENTITY # Tool rotation when drag started
+
 # Visuals
 var _tip: Node3D
 var _orb: MeshInstance3D
@@ -61,6 +84,10 @@ var _connect_line: MeshInstance3D
 var _connect_line_immediate: ImmediateMesh
 var _paint_dot: MeshInstance3D
 var _paint_mat: StandardMaterial3D
+var _edge_highlight: MeshInstance3D
+var _edge_highlight_mesh: ImmediateMesh
+var _face_highlight: MeshInstance3D
+var _face_highlight_mesh: ImmediateMesh
 var _mode_select_nodes: Array[MeshInstance3D] = []
 var _mode_select_modes: Array[ToolMode] = []
 var _is_selecting_mode: bool = false
@@ -126,6 +153,7 @@ func _create_visuals() -> void:
 	_add_to_root(_connect_line)
 
 	_ensure_paint_dot()
+	_create_edit_highlights()
 
 func _exit_tree() -> void:
 	super._exit_tree()
@@ -135,6 +163,8 @@ func _exit_tree() -> void:
 	if is_instance_valid(_mesh_instance): _mesh_instance.queue_free()
 	if is_instance_valid(_preview_dot): _preview_dot.queue_free()
 	if is_instance_valid(_connect_line): _connect_line.queue_free()
+	if is_instance_valid(_edge_highlight): _edge_highlight.queue_free()
+	if is_instance_valid(_face_highlight): _face_highlight.queue_free()
 	_clear_mode_select_nodes()
 
 func _on_grabbed(hand: RigidBody3D) -> void:
@@ -155,11 +185,20 @@ func _on_released() -> void:
 	set_physics_process(false)
 	_controller = null
 	_drag_index = -1
+	_drag_edge.clear()
+	_drag_face_idx = -1
+	_drag_start_positions.clear()
+	_drag_point_indices.clear()
+	_drag_grab_point = Vector3.ZERO
+	_drag_start_basis = Basis.IDENTITY
+	_hovered_edge.clear()
+	_hovered_face_idx = -1
 	_connect_sequence.clear()
 	_orb.visible = false
 	if is_instance_valid(_preview_dot):
 		_preview_dot.visible = false
 	_clear_connect_lines()
+	_clear_edit_highlights()
 	_update_point_visibility()
 	_end_mode_select()
 
@@ -194,6 +233,12 @@ func _physics_process(delta: float) -> void:
 		_update_connect_lines(target)
 	else:
 		_clear_connect_lines()
+	
+	# Edit Mode Highlights
+	if _current_mode == ToolMode.EDIT:
+		_update_edit_mode_highlights(target)
+	else:
+		_clear_edit_highlights()
 
 func _handle_input() -> void:
 	var trigger = _is_trigger_pressed()
@@ -230,14 +275,13 @@ func _handle_input() -> void:
 				_add_point(target)
 				
 		ToolMode.EDIT:
-			if just_pressed and hover.index != -1 and hover.distance < selection_radius:
-				_drag_index = hover.index
+			if just_pressed:
+				_start_edit_drag(target, hover)
 			
-			if _drag_index != -1:
-				if trigger:
-					_move_point(_drag_index, target)
-				else:
-					_drag_index = -1
+			if trigger:
+				_continue_edit_drag(target)
+			else:
+				_end_edit_drag()
 					
 		ToolMode.REMOVE:
 			if just_pressed and hover.index != -1 and hover.distance < selection_radius:
@@ -339,9 +383,7 @@ func _remove_point(index: int) -> void:
 
 func _move_point(index: int, pos: Vector3) -> void:
 	if index < 0 or index >= _points.size(): return
-	_points[index].global_position = pos
-	_rebuild_mesh()
-	_update_point_visibility()
+	_move_point_with_colocated(index, pos)
 
 func _add_triangle(indices: Array) -> void:
 	_triangles.append(indices)
@@ -387,6 +429,339 @@ func _update_connect_lines(current_target: Vector3) -> void:
 
 func _clear_connect_lines() -> void:
 	_connect_line_immediate.clear_surfaces()
+
+
+# Edit Mode Helpers
+func _create_edit_highlights() -> void:
+	# Edge highlight line
+	_edge_highlight = MeshInstance3D.new()
+	_edge_highlight.name = "EdgeHighlight"
+	_edge_highlight_mesh = ImmediateMesh.new()
+	_edge_highlight.mesh = _edge_highlight_mesh
+	var edge_mat = _make_unshaded_material(color_edge_highlight)
+	edge_mat.no_depth_test = true
+	_edge_highlight.material_override = edge_mat
+	_edge_highlight.visible = false
+	_add_to_root(_edge_highlight)
+	
+	# Face highlight
+	_face_highlight = MeshInstance3D.new()
+	_face_highlight.name = "FaceHighlight"
+	_face_highlight_mesh = ImmediateMesh.new()
+	_face_highlight.mesh = _face_highlight_mesh
+	var face_mat = _make_unshaded_material(color_face_highlight)
+	face_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	face_mat.no_depth_test = true
+	_face_highlight.material_override = face_mat
+	_face_highlight.visible = false
+	_add_to_root(_face_highlight)
+
+
+func _update_edit_mode_highlights(target: Vector3) -> void:
+	# Skip if currently dragging
+	if _drag_index != -1 or not _drag_edge.is_empty() or _drag_face_idx != -1:
+		return
+	
+	var origin = _get_visibility_origin()
+	
+	# Find nearest point, edge, and face within visibility radius
+	var nearest_point = _get_nearest_point(target)
+	var nearest_edge = _get_nearest_edge_within_radius(target, origin)
+	var nearest_face = _get_nearest_face_within_radius(target, origin)
+	
+	# Determine what to highlight based on proximity
+	_hovered_edge.clear()
+	_hovered_face_idx = -1
+	_edit_selection_type = EditSelectionType.POINT
+	
+	var point_dist = nearest_point.distance if nearest_point.index != -1 else INF
+	var edge_dist = nearest_edge.distance if not nearest_edge.edge.is_empty() else INF
+	var face_dist = nearest_face.distance if nearest_face.index != -1 else INF
+	
+	# Priority: point < edge < face (closest wins, with type preference for ties)
+	if point_dist < selection_radius and point_dist <= edge_dist and point_dist <= face_dist:
+		_edit_selection_type = EditSelectionType.POINT
+		_clear_edit_highlights()
+	elif edge_dist < edge_selection_radius and edge_dist <= face_dist:
+		_edit_selection_type = EditSelectionType.EDGE
+		_hovered_edge = nearest_edge.edge
+		_draw_edge_highlight(_hovered_edge)
+		_clear_face_highlight()
+	elif face_dist < face_selection_radius:
+		_edit_selection_type = EditSelectionType.FACE
+		_hovered_face_idx = nearest_face.index
+		_draw_face_highlight(_hovered_face_idx)
+		_clear_edge_highlight()
+	else:
+		_clear_edit_highlights()
+
+
+func _get_nearest_edge_within_radius(target: Vector3, origin: Vector3) -> Dictionary:
+	var best_edge: Array[int] = []
+	var best_dist := INF
+	var best_point := Vector3.ZERO
+	
+	# Build unique edges from triangles
+	var edges := _get_unique_edges()
+	
+	for edge in edges:
+		if edge.size() < 2:
+			continue
+		var p0 = _points[edge[0]].global_position
+		var p1 = _points[edge[1]].global_position
+		
+		# Check if edge is within visibility radius
+		var edge_center = (p0 + p1) * 0.5
+		if edge_center.distance_to(origin) > point_visibility_radius:
+			continue
+		
+		# Find closest point on edge to target
+		var closest = _closest_point_on_segment(target, p0, p1)
+		var dist = closest.distance_to(target)
+		
+		if dist < best_dist:
+			best_dist = dist
+			best_edge = edge
+			best_point = closest
+	
+	return {"edge": best_edge, "distance": best_dist, "position": best_point}
+
+
+func _get_nearest_face_within_radius(target: Vector3, origin: Vector3) -> Dictionary:
+	var best_idx := -1
+	var best_dist := INF
+	
+	for i in _triangles.size():
+		var tri = _triangles[i]
+		if tri.size() < 3:
+			continue
+		var p0 = _points[tri[0]].global_position
+		var p1 = _points[tri[1]].global_position
+		var p2 = _points[tri[2]].global_position
+		
+		# Check if face center is within visibility radius
+		var center = (p0 + p1 + p2) / 3.0
+		if center.distance_to(origin) > point_visibility_radius:
+			continue
+		
+		# Project target onto plane and check if inside triangle
+		var plane_normal = (p1 - p0).cross(p2 - p0)
+		if plane_normal.length_squared() < 1e-6:
+			continue
+		var plane = Plane(p0, p1, p2)
+		var projected = plane.project(target)
+		
+		if not _is_point_in_triangle(projected, p0, p1, p2):
+			continue
+		
+		var dist = projected.distance_to(target)
+		if dist < best_dist:
+			best_dist = dist
+			best_idx = i
+	
+	return {"index": best_idx, "distance": best_dist}
+
+
+func _get_unique_edges() -> Array[Array]:
+	var edge_set := {}
+	var edges: Array[Array] = []
+	
+	for tri in _triangles:
+		if tri.size() < 3:
+			continue
+		# Add 3 edges per triangle
+		var tri_edges = [
+			[tri[0], tri[1]],
+			[tri[1], tri[2]],
+			[tri[2], tri[0]]
+		]
+		for e in tri_edges:
+			# Normalize edge order for deduplication
+			var key = [mini(e[0], e[1]), maxi(e[0], e[1])]
+			var key_str = "%d_%d" % [key[0], key[1]]
+			if not edge_set.has(key_str):
+				edge_set[key_str] = true
+				var typed_edge: Array[int] = [key[0], key[1]]
+				edges.append(typed_edge)
+	
+	return edges
+
+
+func _closest_point_on_segment(point: Vector3, seg_start: Vector3, seg_end: Vector3) -> Vector3:
+	var seg = seg_end - seg_start
+	var seg_len_sq = seg.length_squared()
+	if seg_len_sq < 1e-6:
+		return seg_start
+	var t = clampf((point - seg_start).dot(seg) / seg_len_sq, 0.0, 1.0)
+	return seg_start + seg * t
+
+
+func _draw_edge_highlight(edge: Array[int]) -> void:
+	if edge.size() < 2:
+		_clear_edge_highlight()
+		return
+	if edge[0] >= _points.size() or edge[1] >= _points.size():
+		_clear_edge_highlight()
+		return
+	
+	_edge_highlight_mesh.clear_surfaces()
+	_edge_highlight_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
+	_edge_highlight_mesh.surface_add_vertex(_points[edge[0]].global_position)
+	_edge_highlight_mesh.surface_add_vertex(_points[edge[1]].global_position)
+	_edge_highlight_mesh.surface_end()
+	_edge_highlight.visible = true
+
+
+func _draw_face_highlight(face_idx: int) -> void:
+	if face_idx < 0 or face_idx >= _triangles.size():
+		_clear_face_highlight()
+		return
+	
+	var tri = _triangles[face_idx]
+	if tri.size() < 3:
+		_clear_face_highlight()
+		return
+	
+	var p0 = _points[tri[0]].global_position
+	var p1 = _points[tri[1]].global_position
+	var p2 = _points[tri[2]].global_position
+	
+	_face_highlight_mesh.clear_surfaces()
+	_face_highlight_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	_face_highlight_mesh.surface_add_vertex(p0)
+	_face_highlight_mesh.surface_add_vertex(p1)
+	_face_highlight_mesh.surface_add_vertex(p2)
+	_face_highlight_mesh.surface_end()
+	_face_highlight.visible = true
+
+
+func _clear_edge_highlight() -> void:
+	if is_instance_valid(_edge_highlight_mesh):
+		_edge_highlight_mesh.clear_surfaces()
+	if is_instance_valid(_edge_highlight):
+		_edge_highlight.visible = false
+
+
+func _clear_face_highlight() -> void:
+	if is_instance_valid(_face_highlight_mesh):
+		_face_highlight_mesh.clear_surfaces()
+	if is_instance_valid(_face_highlight):
+		_face_highlight.visible = false
+
+
+func _clear_edit_highlights() -> void:
+	_clear_edge_highlight()
+	_clear_face_highlight()
+
+
+func _start_edit_drag(target: Vector3, hover: Dictionary) -> void:
+	_drag_grab_point = target
+	_drag_start_basis = _get_tool_basis()
+	_drag_point_indices.clear()
+	_drag_start_positions.clear()
+	
+	# Check what we're hovering based on current selection type
+	match _edit_selection_type:
+		EditSelectionType.POINT:
+			if hover.index != -1 and hover.distance < selection_radius:
+				_drag_index = hover.index
+				# Collect this point and all colocated points
+				if merge_overlapping_points:
+					_drag_point_indices = _get_colocated_points(hover.index)
+				else:
+					_drag_point_indices = [hover.index]
+				# Store positions relative to grab point
+				for idx in _drag_point_indices:
+					var relative_pos = _points[idx].global_position - _drag_grab_point
+					_drag_start_positions.append(relative_pos)
+		
+		EditSelectionType.EDGE:
+			if not _hovered_edge.is_empty():
+				_drag_edge = _hovered_edge.duplicate()
+				# Collect all points on the edge and their colocated points
+				var indices_set := {}
+				for idx in _drag_edge:
+					if merge_overlapping_points:
+						for colocated_idx in _get_colocated_points(idx):
+							indices_set[colocated_idx] = true
+					else:
+						indices_set[idx] = true
+				for idx in indices_set.keys():
+					_drag_point_indices.append(idx)
+					# Store positions relative to grab point
+					var relative_pos = _points[idx].global_position - _drag_grab_point
+					_drag_start_positions.append(relative_pos)
+		
+		EditSelectionType.FACE:
+			if _hovered_face_idx != -1:
+				_drag_face_idx = _hovered_face_idx
+				var tri = _triangles[_drag_face_idx]
+				# Collect all points on the face and their colocated points
+				var indices_set := {}
+				for idx in tri:
+					if merge_overlapping_points:
+						for colocated_idx in _get_colocated_points(idx):
+							indices_set[colocated_idx] = true
+					else:
+						indices_set[idx] = true
+				for idx in indices_set.keys():
+					_drag_point_indices.append(idx)
+					# Store positions relative to grab point
+					var relative_pos = _points[idx].global_position - _drag_grab_point
+					_drag_start_positions.append(relative_pos)
+
+
+func _continue_edit_drag(target: Vector3) -> void:
+	if _drag_point_indices.is_empty():
+		return
+	
+	# Get current tool basis and calculate rotation delta
+	var current_basis = _get_tool_basis()
+	var rotation_delta = current_basis * _drag_start_basis.inverse()
+	
+	# For points, just translate (no rotation)
+	# For edges and faces, apply rotation around the grab point
+	var apply_rotation = (_drag_index == -1) and (not _drag_edge.is_empty() or _drag_face_idx != -1)
+	
+	# Move all tracked points
+	for i in _drag_point_indices.size():
+		var idx = _drag_point_indices[i]
+		var relative_pos = _drag_start_positions[i]
+		
+		if apply_rotation:
+			# Rotate the relative position, then translate to new grab point
+			relative_pos = rotation_delta * relative_pos
+		
+		var new_pos = target + relative_pos
+		_points[idx].global_position = new_pos
+	
+	_rebuild_mesh()
+	_update_point_visibility()
+	
+	# Update highlights while dragging
+	if not _drag_edge.is_empty():
+		_draw_edge_highlight(_drag_edge)
+	elif _drag_face_idx != -1:
+		_draw_face_highlight(_drag_face_idx)
+
+
+func _end_edit_drag() -> void:
+	_drag_index = -1
+	_drag_edge.clear()
+	_drag_face_idx = -1
+	_drag_start_positions.clear()
+	_drag_point_indices.clear()
+	_drag_grab_point = Vector3.ZERO
+	_drag_start_basis = Basis.IDENTITY
+
+
+func _get_tool_basis() -> Basis:
+	if is_instance_valid(_tip) and _tip.is_inside_tree():
+		return _tip.global_transform.basis
+	if is_inside_tree():
+		return global_transform.basis
+	return Basis.IDENTITY
+
 
 # Utility Inputs
 func _is_trigger_pressed() -> bool:
@@ -756,6 +1131,11 @@ func get_triangle_count() -> int:
 	return _triangles.size()
 
 
+# Manually merge overlapping points
+func merge_points() -> void:
+	_merge_overlapping_points_impl()
+
+
 func _get_android_export_dir() -> String:
 	# Try to use Documents folder which is more accessible
 	var docs_dir := OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS)
@@ -886,6 +1266,10 @@ func load_from_gltf(path: String) -> int:
 	if mesh_instance.material_override:
 		_mesh_instance.material_override = mesh_instance.material_override
 	
+	# Merge overlapping points if enabled
+	if merge_overlapping_points:
+		_merge_overlapping_points_impl()
+	
 	_rebuild_mesh()
 	_update_point_visibility()
 	return OK
@@ -908,8 +1292,17 @@ func on_pooled() -> void:
 	set_physics_process(false)
 	_controller = null
 	_drag_index = -1
+	_drag_edge.clear()
+	_drag_face_idx = -1
+	_drag_start_positions.clear()
+	_drag_point_indices.clear()
+	_drag_grab_point = Vector3.ZERO
+	_drag_start_basis = Basis.IDENTITY
+	_hovered_edge.clear()
+	_hovered_face_idx = -1
 	_connect_sequence.clear()
 	_clear_connect_lines()
+	_clear_edit_highlights()
 	_clear_geometry()
 	_end_mode_select()
 	if is_instance_valid(_preview_dot):
@@ -947,3 +1340,116 @@ func _clear_geometry() -> void:
 	_triangles.clear()
 	if _mesh_params:
 		_mesh_params.clear_surfaces()
+
+
+# Merges points that are within merge_distance of each other
+# Returns a mapping of old indices to new indices
+func _merge_overlapping_points_impl() -> void:
+	if _points.size() < 2:
+		return
+	
+	# Build groups of overlapping points
+	var merge_map: Array[int] = [] # old_index -> new_index
+	merge_map.resize(_points.size())
+	for i in _points.size():
+		merge_map[i] = i
+	
+	# Find overlapping points and mark them for merging
+	for i in _points.size():
+		if merge_map[i] != i:
+			continue # Already merged into another point
+		var pos_i = _points[i].global_position
+		for j in range(i + 1, _points.size()):
+			if merge_map[j] != j:
+				continue # Already merged
+			var pos_j = _points[j].global_position
+			if pos_i.distance_to(pos_j) <= merge_distance:
+				merge_map[j] = i # Merge j into i
+	
+	# Check if any merging is needed
+	var needs_merge := false
+	for i in _points.size():
+		if merge_map[i] != i:
+			needs_merge = true
+			break
+	
+	if not needs_merge:
+		return
+	
+	# Build new point list and index remapping
+	var new_points: Array[Node3D] = []
+	var old_to_new: Array[int] = []
+	old_to_new.resize(_points.size())
+	
+	for i in _points.size():
+		if merge_map[i] == i:
+			# This point is kept
+			old_to_new[i] = new_points.size()
+			new_points.append(_points[i])
+		else:
+			# This point is merged into another - copy its color if needed
+			var target_idx = merge_map[i]
+			old_to_new[i] = old_to_new[target_idx]
+			# Free the duplicate point
+			_points[i].queue_free()
+	
+	# Update triangles with new indices
+	var new_triangles: Array[Array] = []
+	for tri in _triangles:
+		var new_tri: Array[int] = []
+		for idx in tri:
+			new_tri.append(old_to_new[idx])
+		# Check for degenerate triangles (same point used twice)
+		if new_tri[0] != new_tri[1] and new_tri[1] != new_tri[2] and new_tri[0] != new_tri[2]:
+			new_triangles.append(new_tri)
+	
+	_points = new_points
+	_triangles = new_triangles
+	_rebuild_mesh()
+	_update_point_visibility()
+
+
+# Get all point indices that share the same position as the given index
+func _get_colocated_points(index: int) -> Array[int]:
+	var result: Array[int] = [index]
+	if not merge_overlapping_points:
+		return result
+	
+	var pos = _points[index].global_position
+	for i in _points.size():
+		if i == index:
+			continue
+		if _points[i].global_position.distance_to(pos) <= merge_distance:
+			result.append(i)
+	return result
+
+
+# Move a point and all colocated points together
+func _move_point_with_colocated(index: int, pos: Vector3) -> void:
+	if index < 0 or index >= _points.size():
+		return
+	
+	if merge_overlapping_points:
+		var colocated = _get_colocated_points(index)
+		for idx in colocated:
+			_points[idx].global_position = pos
+	else:
+		_points[index].global_position = pos
+	
+	_rebuild_mesh()
+	_update_point_visibility()
+
+
+# Move all points that were at start_pos to new_pos (used during drag for colocated points)
+func _move_points_by_start_position(start_pos: Vector3, new_pos: Vector3) -> void:
+	if not merge_overlapping_points:
+		# Find the point at start_pos and move it
+		for i in _points.size():
+			if _points[i].global_position.distance_to(start_pos) <= merge_distance:
+				_points[i].global_position = new_pos
+				break
+	else:
+		# Move all points that were at start_pos
+		for i in _points.size():
+			if _points[i].global_position.distance_to(start_pos) <= merge_distance:
+				_points[i].global_position = new_pos
