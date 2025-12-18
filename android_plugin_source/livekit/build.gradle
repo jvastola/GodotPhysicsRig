@@ -53,8 +53,12 @@ dependencies {
     // Godot library - provided by the Godot export template
     compileOnly "org.godotengine:godot:${godotVersion}.stable"
     
-    // LiveKit Android SDK
-    implementation "io.livekit:livekit-android:$livekitVersion"
+    // LiveKit Android SDK - exclude Conscrypt for Meta VRC compliance
+    // NOTE: We keep JAIN-SIP because LiveKit needs it for SDP parsing
+    implementation("io.livekit:livekit-android:$livekitVersion") {
+        // Exclude Conscrypt - fixes "Insecure HostnameVerifier" warning
+        exclude group: 'org.conscrypt', module: 'conscrypt-android'
+    }
     
     // Kotlin coroutines for async operations
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'

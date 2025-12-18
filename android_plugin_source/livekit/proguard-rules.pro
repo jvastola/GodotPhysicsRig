@@ -1,5 +1,10 @@
 # Add project specific ProGuard rules here.
 
+# Remove Conscrypt platform to use Android's default TLS/SSL
+# This addresses Meta VRC security warnings about HostnameVerifier
+-dontwarn org.conscrypt.**
+-dontwarn okhttp3.internal.platform.ConscryptPlatform
+
 # Keep LiveKit classes
 -keep class io.livekit.** { *; }
 -keepclassmembers class io.livekit.** { *; }
