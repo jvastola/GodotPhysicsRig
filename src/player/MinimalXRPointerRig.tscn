@@ -66,3 +66,38 @@ cast_shadow = 0
 [node name="PointerRayHit" type="MeshInstance3D" parent="XROrigin3D/RightController/HandPointer"]
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_pointer_hit")
+
+[node name="LeftController" type="XRController3D" parent="XROrigin3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, -0.15, 0)
+tracker = &"left_hand"
+
+[node name="HandPointer" type="Node3D" parent="XROrigin3D/LeftController"]
+script = ExtResource("2_hand_pointer")
+ray_length = 3.0
+ray_visibility_mode = "on_hit_or_trigger"
+hit_min_scale = 0.2
+hit_max_scale = 0.6
+pointer_collision_mask = 32
+hit_selector_collision_mask = 32
+grab_rotation_mask = 32
+
+[node name="PointerFace" type="MeshInstance3D" parent="XROrigin3D/LeftController/HandPointer"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.07)
+material_override = SubResource("StandardMaterial3D_pointer_face")
+cast_shadow = 0
+mesh = SubResource("QuadMesh_pointer_face")
+
+[node name="PointerRayCast" type="RayCast3D" parent="XROrigin3D/LeftController/HandPointer"]
+target_position = Vector3(0, 0, -3.5)
+hit_from_inside = true
+collide_with_areas = true
+collide_with_bodies = true
+collision_mask = 32
+
+[node name="PointerRayVisual" type="MeshInstance3D" parent="XROrigin3D/LeftController/HandPointer"]
+material_override = SubResource("StandardMaterial3D_ray")
+cast_shadow = 0
+
+[node name="PointerRayHit" type="MeshInstance3D" parent="XROrigin3D/LeftController/HandPointer"]
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_pointer_hit")

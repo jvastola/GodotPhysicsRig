@@ -1216,19 +1216,47 @@ func _gather_action_state(controller: XRController3D) -> Dictionary:
 		"strength": 0.0
 	}
 
+	# First try Godot InputMap if the action exists there
 	if interact_action != "" and InputMap.has_action(interact_action):
 		state["pressed"] = Input.is_action_pressed(interact_action)
 		state["just_pressed"] = Input.is_action_just_pressed(interact_action)
 		state["just_released"] = Input.is_action_just_released(interact_action)
 		state["strength"] = Input.get_action_strength(interact_action)
-	else:
-		var value: float = 0.0
-		if controller and controller.has_method("get_float"):
-			value = controller.get_float("trigger")
-		state["strength"] = value
-		state["pressed"] = value >= fallback_trigger_threshold
-		state["just_pressed"] = state["pressed"] and not _prev_action_pressed
-		state["just_released"] = (not state["pressed"]) and _prev_action_pressed
+	
+	# Always also check XR controller directly for VR - this handles OpenXR actions
+	# that aren't mapped to Godot InputMap
+	if controller:
+		var xr_value: float = 0.0
+		
+		# Try analog trigger value first (most reliable on Quest/OpenXR)
+		if controller.has_method("get_float"):
+			xr_value = controller.get_float("trigger")
+			# Debug: Log trigger value on Android
+			if enable_debug_logs and OS.get_name() == "Android" and xr_value > 0.1:
+				print("HandPointer: XR trigger value = ", xr_value)
+		
+		# Fallback to trigger_click boolean if analog returns 0
+		if xr_value < 0.01 and controller.has_method("get_float"):
+			var click_value: float = controller.get_float("trigger_click")
+			if click_value > 0.5:
+				xr_value = 1.0
+		
+		# Additional fallback: check is_button_pressed
+		if xr_value < 0.01 and controller.has_method("is_button_pressed"):
+			if controller.is_button_pressed("trigger_click"):
+				xr_value = 1.0
+			elif controller.is_button_pressed("trigger"):
+				xr_value = 1.0
+		
+		# Use XR value if it's higher than what we got from InputMap
+		if xr_value > state["strength"]:
+			state["strength"] = xr_value
+			var xr_pressed: bool = xr_value >= fallback_trigger_threshold
+			# Only update pressed state if XR shows pressed OR if InputMap didn't detect anything
+			if xr_pressed or not state["pressed"]:
+				state["pressed"] = xr_pressed
+				state["just_pressed"] = xr_pressed and not _prev_action_pressed
+				state["just_released"] = (not xr_pressed) and _prev_action_pressed
 
 	_prev_action_pressed = state["pressed"]
 	return state

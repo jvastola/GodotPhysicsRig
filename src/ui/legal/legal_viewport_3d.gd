@@ -69,15 +69,19 @@ func handle_pointer_event(event: Dictionary) -> void:
 			_send_mouse_motion(viewport_pos)
 			_send_mouse_button(viewport_pos, true, event.get("action_just_pressed", false))
 			_is_pressed = true
+			# Also notify legal_ui directly for more reliable hold detection
+			_notify_legal_ui_press(true)
 		"hold":
 			_send_mouse_motion(viewport_pos)
 			if event.get("action_pressed", false) and not _is_pressed:
 				_send_mouse_button(viewport_pos, true, true)
 				_is_pressed = true
+				_notify_legal_ui_press(true)
 		"release":
 			_send_mouse_motion(viewport_pos)
 			_send_mouse_button(viewport_pos, false, event.get("action_just_released", false))
 			_is_pressed = false
+			_notify_legal_ui_press(false)
 		"secondary_press":
 			_send_mouse_motion(viewport_pos)
 			_send_mouse_button(
@@ -100,7 +104,20 @@ func handle_pointer_event(event: Dictionary) -> void:
 		"exit":
 			_send_mouse_exit()
 			_is_hovering = false
+			if _is_pressed:
+				_notify_legal_ui_press(false)
 			_is_pressed = false
+
+
+func _notify_legal_ui_press(pressed: bool) -> void:
+	if not legal_ui:
+		return
+	if pressed:
+		if legal_ui.has_method("begin_accept_hold"):
+			legal_ui.call("begin_accept_hold")
+	else:
+		if legal_ui.has_method("end_accept_hold"):
+			legal_ui.call("end_accept_hold")
 
 
 func _world_to_uv(local_pos: Vector3) -> Vector2:

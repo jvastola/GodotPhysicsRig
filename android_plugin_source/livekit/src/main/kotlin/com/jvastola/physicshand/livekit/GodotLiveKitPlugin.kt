@@ -46,23 +46,29 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
 
     @UsedByGodot
     fun connectToRoom(url: String, token: String) {
+        android.util.Log.d("GodotLiveKit", "connectToRoom called: $url")
         scope.launch {
             try {
                 val currentActivity = activity
                 if (currentActivity == null) {
+                    android.util.Log.e("GodotLiveKit", "Activity is null")
                     emitSignal("error_occurred", "Activity is null")
                     return@launch
                 }
 
+                android.util.Log.d("GodotLiveKit", "Creating LiveKit room...")
                 // LK 2.x: Create room then connect
                 room = LiveKit.create(currentActivity)
+                android.util.Log.d("GodotLiveKit", "Room created, setting up listeners...")
                 
                 setupRoomListeners()
                 
+                android.util.Log.d("GodotLiveKit", "Connecting to room...")
                 room?.connect(
                     url,
                     token
                 )
+                android.util.Log.d("GodotLiveKit", "Connected successfully!")
                 
                 // Only enable mic if not muted
                 if (!isMuted) {
@@ -74,7 +80,11 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
                 
                 emitSignal("room_connected")
             } catch (e: Exception) {
-                emitSignal("error_occurred", e.message ?: "Connection failed")
+                android.util.Log.e("GodotLiveKit", "Connection error: ${e.javaClass.name}: ${e.message}", e)
+                emitSignal("error_occurred", "${e.javaClass.simpleName}: ${e.message ?: "Connection failed"}")
+            } catch (t: Throwable) {
+                android.util.Log.e("GodotLiveKit", "Connection throwable: ${t.javaClass.name}: ${t.message}", t)
+                emitSignal("error_occurred", "${t.javaClass.simpleName}: ${t.message ?: "Connection failed"}")
             }
         }
     }

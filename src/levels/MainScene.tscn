@@ -1,4 +1,4 @@
-[gd_scene load_steps=33 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=34 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -11,7 +11,7 @@
 [ext_resource type="PackedScene" uid="uid://cnhqkr7y8k7qb" path="res://src/objects/GridLineDisplay.tscn" id="12_grid_display"]
 [ext_resource type="PackedScene" uid="uid://e58b0q1ewqr7" path="res://src/ui/multiplayer/UnifiedRoomViewport3D.tscn" id="13_unified_ui"]
 [ext_resource type="PackedScene" uid="uid://dak3v2oax4mjy" path="res://src/ui/livekit/LiveKitViewport3D.tscn" id="14_livekit_viewport"]
-[ext_resource type="PackedScene" uid="uid://voxel_tool_new_scene" path="res://src/objects/VoxelToolNew.tscn" id="15_voxel_tool"]
+[ext_resource type="PackedScene" path="res://src/objects/VoxelToolNew.tscn" id="15_voxel_tool"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/ConvexHullPen.tscn" id="23_convex_hull_pen"]
 [ext_resource type="PackedScene" uid="uid://6v1kg2wa5orb" path="res://src/objects/grabbables/VolumeHullPen.tscn" id="24_volume_hull_pen"]
 [ext_resource type="PackedScene" uid="uid://cdgp2jenr70oq" path="res://src/objects/grabbables/TrianglePointTool.tscn" id="28_triangle_tool"]
@@ -27,9 +27,9 @@
 [ext_resource type="Script" uid="uid://bqrnwqkyb00kx" path="res://src/ui/ui_panel_scene_setup.gd" id="40_ui_panel_setup"]
 [ext_resource type="Script" uid="uid://bid6ju5yhq61q" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
 [ext_resource type="PackedScene" uid="uid://cm8nv7v0apls3" path="res://src/objects/grabbables/GrappleHook.tscn" id="42_grapple_hook"]
-[ext_resource type="PackedScene" uid="uid://reference_block_scene" path="res://src/objects/ReferenceBlock.tscn" id="43_reference_block"]
-[ext_resource type="PackedScene" uid="uid://block_library_viewport3d" path="res://src/ui/BlockLibraryViewport3D.tscn" id="44_block_library_viewport"]
-[ext_resource type="PackedScene" uid="uid://paint_brush_scene" path="res://src/objects/grabbables/PaintBrush.tscn" id="45_paint_brush"]
+[ext_resource type="PackedScene" path="res://src/objects/ReferenceBlock.tscn" id="43_reference_block"]
+[ext_resource type="PackedScene" path="res://src/ui/BlockLibraryViewport3D.tscn" id="44_block_library_viewport"]
+[ext_resource type="PackedScene" uid="uid://baesap7jjgmfh" path="res://src/objects/grabbables/PaintBrush.tscn" id="45_paint_brush"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -41,6 +41,7 @@ material = ExtResource("2_or5nu")
 size = Vector3(50, 5, 50)
 
 [node name="MainScene21" type="Node3D" unique_id=1547683746]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0012965202, 0, 0)
 
 [node name="ToolPoolManager" type="Node" parent="." unique_id=2101234567]
 script = ExtResource("34_tool_pool")
@@ -50,6 +51,7 @@ script = ExtResource("39_ui_panel_manager")
 
 [node name="UIPanelSceneSetup" type="Node" parent="." unique_id=2104567890]
 script = ExtResource("40_ui_panel_setup")
+remove_preplaced_panels = false
 
 [node name="SceneEnvironmentSetup" type="Node" parent="." unique_id=2105678901]
 script = ExtResource("41_env_setup")
@@ -158,10 +160,10 @@ rope_sag_factor = 0.005
 rope_sag_max = 0.5
 
 [node name="ReferenceBlock" parent="." unique_id=2107890123 instance=ExtResource("43_reference_block")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.0, 1.2, -0.69013023)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.2, -0.69013023)
 
 [node name="BlockLibraryViewport3D" parent="." unique_id=2108901234 instance=ExtResource("44_block_library_viewport")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.0, 1.8, -0.69013023)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.8, -0.69013023)
 
 [node name="PaintBrush" parent="." unique_id=2109012345 instance=ExtResource("45_paint_brush")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.8, 0.95, -0.69013023)

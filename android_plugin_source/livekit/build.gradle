@@ -54,7 +54,7 @@ dependencies {
     compileOnly "org.godotengine:godot:${godotVersion}.stable"
     
     // LiveKit Android SDK - exclude Conscrypt for Meta VRC compliance
-    // NOTE: We keep JAIN-SIP because LiveKit needs it for SDP parsing
+    // Keep OkHttp - we'll handle ConscryptPlatform via ProGuard instead
     implementation("io.livekit:livekit-android:$livekitVersion") {
         // Exclude Conscrypt - fixes "Insecure HostnameVerifier" warning
         exclude group: 'org.conscrypt', module: 'conscrypt-android'

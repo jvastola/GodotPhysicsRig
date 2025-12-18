@@ -118,6 +118,43 @@ func _is_accept_pressed() -> bool:
 		return true
 	if Input.is_joy_button_pressed(1, JOY_BUTTON_A) or Input.is_joy_button_pressed(1, JOY_BUTTON_X):
 		return true
+	# Check XR controller inputs directly via XRServer
+	var right_controller := _get_xr_controller("right_hand")
+	var left_controller := _get_xr_controller("left_hand")
+	if right_controller and _is_controller_accept_pressed(right_controller):
+		return true
+	if left_controller and _is_controller_accept_pressed(left_controller):
+		return true
+	return false
+
+
+func _get_xr_controller(tracker_name: String) -> XRController3D:
+	if not pointer_rig:
+		return null
+	var origin := pointer_rig.get_node_or_null("XROrigin3D")
+	if not origin:
+		return null
+	for child in origin.get_children():
+		if child is XRController3D:
+			var controller := child as XRController3D
+			if controller.tracker == tracker_name:
+				return controller
+	return null
+
+
+func _is_controller_accept_pressed(controller: XRController3D) -> bool:
+	if not controller:
+		return false
+	# Check trigger (primary action for pointing)
+	var trigger_value: float = controller.get_float("trigger")
+	if trigger_value > 0.5:
+		return true
+	# Check A/X buttons (ax_button is common OpenXR action name)
+	if controller.is_button_pressed("ax_button"):
+		return true
+	# Check primary_click (another common action name)
+	if controller.is_button_pressed("primary_click"):
+		return true
 	return false
 
 
