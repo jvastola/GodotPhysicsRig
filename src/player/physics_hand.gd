@@ -31,6 +31,8 @@ extends RigidBody3D
 @export_range(0.01, 0.5, 0.01) var haptic_duration: float = 0.1
 @export var hit_sound_enabled: bool = true
 @export_range(0.1, 5.0, 0.1) var min_impact_velocity: float = 0.5
+@export_range(0.5, 2.0, 0.05) var hit_sound_pitch_min: float = 0.8
+@export_range(0.5, 2.0, 0.05) var hit_sound_pitch_max: float = 1.2
 @export var hit_sound_path: String = "res://assets/audio/hitwood.ogg"
 
 # Release is handled via a single rising-edge check on `release_button` (ax_button)
@@ -41,8 +43,9 @@ var _previous_velocity: Vector3 = Vector3.ZERO
 var _is_colliding: bool = false
 
 # Hit feedback
-var _hit_sound_player: AudioStreamPlayer3D = null
 var _hit_sound_stream: AudioStream = null
+var _last_hit_time: float = 0.0
+const HIT_SOUND_COOLDOWN: float = 0.05  # Minimum time between hit sounds
 
 # Grabbing state
 var held_object: RigidBody3D = null
@@ -391,17 +394,9 @@ func _cleanup_orphaned_grabbed_shapes() -> void:
 # === Hit Feedback ===
 
 func _setup_hit_sound() -> void:
-	"""Setup the AudioStreamPlayer3D for hit sounds"""
-	_hit_sound_player = AudioStreamPlayer3D.new()
-	_hit_sound_player.name = "HitSoundPlayer"
-	_hit_sound_player.max_distance = 10.0
-	_hit_sound_player.unit_size = 2.0
-	add_child(_hit_sound_player)
-	
-	# Try to load the hit sound
+	"""Preload the hit sound stream"""
 	if ResourceLoader.exists(hit_sound_path):
 		_hit_sound_stream = load(hit_sound_path)
-		_hit_sound_player.stream = _hit_sound_stream
 		print("PhysicsHand: Loaded hit sound from ", hit_sound_path)
 	else:
 		push_warning("PhysicsHand: Hit sound not found at ", hit_sound_path)
@@ -416,16 +411,25 @@ func _handle_hit_feedback(body: Node) -> void:
 	if impact_velocity < min_impact_velocity:
 		return
 	
+	# Cooldown to prevent sound spam
+	var current_time := Time.get_ticks_msec() / 1000.0
+	if current_time - _last_hit_time < HIT_SOUND_COOLDOWN:
+		return
+	_last_hit_time = current_time
+	
 	# Normalize impact for feedback scaling (0.0 to 1.0)
 	var impact_strength := clampf((impact_velocity - min_impact_velocity) / 3.0, 0.0, 1.0)
+	
+	# Get collision position (use hand position as approximation)
+	var hit_position := global_position
 	
 	# Trigger haptics
 	if haptic_enabled:
 		_trigger_haptics(impact_strength)
 	
-	# Play hit sound
+	# Play hit sound at collision location
 	if hit_sound_enabled:
-		_play_hit_sound(impact_strength)
+		_play_hit_sound_at_position(hit_position, impact_strength)
 
 
 func _trigger_haptics(impact_strength: float) -> void:
@@ -441,18 +445,36 @@ func _trigger_haptics(impact_strength: float) -> void:
 	controller.trigger_haptic_pulse("haptic", 0.0, amplitude, duration, 0.0)
 
 
-func _play_hit_sound(impact_strength: float) -> void:
-	"""Play hit sound with volume based on impact strength"""
-	if not _hit_sound_player or not _hit_sound_stream:
+func _play_hit_sound_at_position(hit_pos: Vector3, impact_strength: float) -> void:
+	"""Spawn a spatial audio player at the hit location with force-based volume/pitch"""
+	if not _hit_sound_stream:
 		return
 	
-	# Don't overlap sounds too quickly
-	if _hit_sound_player.playing:
-		return
+	# Create a temporary AudioStreamPlayer3D at the hit location
+	var audio_player := AudioStreamPlayer3D.new()
+	audio_player.stream = _hit_sound_stream
 	
-	# Scale volume with impact (-20dB to 0dB range)
-	_hit_sound_player.volume_db = lerp(-20.0, 0.0, impact_strength)
-	_hit_sound_player.play()
+	# Spatial audio settings
+	audio_player.max_distance = 15.0
+	audio_player.unit_size = 3.0
+	audio_player.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+	
+	# Scale volume with impact strength (-24dB to 0dB range)
+	audio_player.volume_db = lerpf(-24.0, 0.0, impact_strength)
+	
+	# Scale pitch with impact strength (lighter hits = higher pitch, harder hits = lower pitch)
+	audio_player.pitch_scale = lerpf(hit_sound_pitch_max, hit_sound_pitch_min, impact_strength)
+	
+	# Add slight random variation to pitch for natural feel
+	audio_player.pitch_scale *= randf_range(0.95, 1.05)
+	
+	# Add to scene tree at hit position
+	get_tree().root.add_child(audio_player)
+	audio_player.global_position = hit_pos
+	
+	# Play and auto-cleanup when finished
+	audio_player.finished.connect(audio_player.queue_free)
+	audio_player.play()
 
 
 func _get_hand_velocity(delta: float) -> Vector3:
