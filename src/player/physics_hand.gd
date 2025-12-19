@@ -31,7 +31,7 @@ extends RigidBody3D
 @export_range(0.01, 0.5, 0.01) var haptic_duration: float = 0.1
 @export var hit_sound_enabled: bool = true
 @export_range(0.1, 5.0, 0.1) var min_impact_velocity: float = 0.5
-@export var hit_sound_path: String = "res://assets/audio/hitwood.m4a"
+@export var hit_sound_path: String = "res://assets/audio/hitwood.ogg"
 
 # Release is handled via a single rising-edge check on `release_button` (ax_button)
 
