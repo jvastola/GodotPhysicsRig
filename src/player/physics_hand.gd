@@ -25,11 +25,24 @@ extends RigidBody3D
 @export var grab_action_grip: String = "grip"  # Grip to grab
 @export var release_button: String = "ax_button"  # Button to release (OpenXR 'ax_button' for A/X)
 
+@export_group("Hit Feedback")
+@export var haptic_enabled: bool = true
+@export_range(0.0, 1.0, 0.05) var haptic_intensity: float = 0.5
+@export_range(0.01, 0.5, 0.01) var haptic_duration: float = 0.1
+@export var hit_sound_enabled: bool = true
+@export_range(0.1, 5.0, 0.1) var min_impact_velocity: float = 0.5
+@export var hit_sound_path: String = "res://assets/audio/hitwood.m4a"
+
 # Release is handled via a single rising-edge check on `release_button` (ax_button)
 
 var _previous_position: Vector3
+var _previous_velocity: Vector3 = Vector3.ZERO
 
 var _is_colliding: bool = false
+
+# Hit feedback
+var _hit_sound_player: AudioStreamPlayer3D = null
+var _hit_sound_stream: AudioStream = null
 
 # Grabbing state
 var held_object: RigidBody3D = null
@@ -61,9 +74,15 @@ func _ready() -> void:
 	grab_action_grip = "grip_click"
 	# Use OpenXR action name for left-hand X/A button (Quest/OpenXR uses ax_button)
 	release_button = "ax_button"
+	
+	# Setup hit sound player
+	_setup_hit_sound()
 
 func _physics_process(delta: float) -> void:
 	if not is_instance_valid(target): return
+	
+	# Track velocity before movement for impact calculation
+	_previous_velocity = _get_hand_velocity(delta)
 	
 	_pid_movement(delta)
 	_pid_rotation(delta)
@@ -179,6 +198,9 @@ func _get_drag(delta: float) -> float:
 
 func _on_body_entered(_body: Node) -> void:
 	_is_colliding = true
+	
+	# Handle hit feedback (haptics + sound)
+	_handle_hit_feedback(_body)
 	
 	# Track grabbable objects
 	if _body.is_in_group("grabbable") and _body is RigidBody3D:
@@ -364,3 +386,76 @@ func _cleanup_orphaned_grabbed_shapes() -> void:
 		for orphan in orphans:
 			remove_child(orphan)
 			orphan.queue_free()
+
+
+# === Hit Feedback ===
+
+func _setup_hit_sound() -> void:
+	"""Setup the AudioStreamPlayer3D for hit sounds"""
+	_hit_sound_player = AudioStreamPlayer3D.new()
+	_hit_sound_player.name = "HitSoundPlayer"
+	_hit_sound_player.max_distance = 10.0
+	_hit_sound_player.unit_size = 2.0
+	add_child(_hit_sound_player)
+	
+	# Try to load the hit sound
+	if ResourceLoader.exists(hit_sound_path):
+		_hit_sound_stream = load(hit_sound_path)
+		_hit_sound_player.stream = _hit_sound_stream
+		print("PhysicsHand: Loaded hit sound from ", hit_sound_path)
+	else:
+		push_warning("PhysicsHand: Hit sound not found at ", hit_sound_path)
+
+
+func _handle_hit_feedback(body: Node) -> void:
+	"""Handle haptic and audio feedback when hitting an object"""
+	# Calculate impact velocity
+	var impact_velocity := _previous_velocity.length()
+	
+	# Skip if impact is too weak
+	if impact_velocity < min_impact_velocity:
+		return
+	
+	# Normalize impact for feedback scaling (0.0 to 1.0)
+	var impact_strength := clampf((impact_velocity - min_impact_velocity) / 3.0, 0.0, 1.0)
+	
+	# Trigger haptics
+	if haptic_enabled:
+		_trigger_haptics(impact_strength)
+	
+	# Play hit sound
+	if hit_sound_enabled:
+		_play_hit_sound(impact_strength)
+
+
+func _trigger_haptics(impact_strength: float) -> void:
+	"""Trigger haptic feedback on the controller"""
+	if not is_instance_valid(target) or not target is XRController3D:
+		return
+	
+	var controller := target as XRController3D
+	var amplitude := haptic_intensity * impact_strength
+	var duration := haptic_duration
+	
+	# XRController3D.trigger_haptic_pulse(action_name, frequency, amplitude, duration_sec, delay_sec)
+	controller.trigger_haptic_pulse("haptic", 0.0, amplitude, duration, 0.0)
+
+
+func _play_hit_sound(impact_strength: float) -> void:
+	"""Play hit sound with volume based on impact strength"""
+	if not _hit_sound_player or not _hit_sound_stream:
+		return
+	
+	# Don't overlap sounds too quickly
+	if _hit_sound_player.playing:
+		return
+	
+	# Scale volume with impact (-20dB to 0dB range)
+	_hit_sound_player.volume_db = lerp(-20.0, 0.0, impact_strength)
+	_hit_sound_player.play()
+
+
+func _get_hand_velocity(delta: float) -> Vector3:
+	"""Calculate hand velocity from position change"""
+	var velocity: Vector3 = (global_position - _previous_position) / max(delta, 0.001)
+	return velocity

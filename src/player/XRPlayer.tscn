@@ -139,7 +139,6 @@ script = ExtResource("6_pointer")
 ray_length = 1.5
 ray_length_min = 0.001
 ray_length_max = 1000000.0
-pointer_collision_mask = 32
 include_pointer_color = true
 pointer_color = Color(0.568627, 1, 1, 1)
 ray_visibility_mode = "on_hit_or_trigger"
@@ -150,8 +149,6 @@ hit_min_scale = 0.05
 hit_max_scale = 1000000000.0
 hit_scale_user_multiplier_min = 0.01
 hit_scale_user_multiplier_max = 10.0
-hit_selector_collision_mask = 32
-grab_rotation_mask = 32
 
 [node name="PointerFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer" unique_id=1064310651]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.07)
@@ -162,10 +159,9 @@ mesh = SubResource("QuadMesh_pointer_face")
 
 [node name="PointerRayCast" type="RayCast3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer" unique_id=1770878347]
 target_position = Vector3(0, 0, -3.5)
+collision_mask = 32
 hit_from_inside = true
 collide_with_areas = true
-collide_with_bodies = true
-collision_mask = 32
 
 [node name="PointerRayVisual" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/HandPointer" unique_id=422145121]
 cast_shadow = 0
@@ -187,7 +183,6 @@ script = ExtResource("6_pointer")
 ray_length = 1.5
 ray_length_min = 0.001
 ray_length_max = 1000000.0
-pointer_collision_mask = 32
 ray_visibility_mode = "on_hit_or_trigger"
 hit_visibility_mode = "always"
 hit_shape = "sphere"
@@ -196,8 +191,6 @@ hit_min_scale = 0.05
 hit_max_scale = 1000000000.0
 hit_scale_user_multiplier_min = 0.01
 hit_scale_user_multiplier_max = 10.0
-hit_selector_collision_mask = 32
-grab_rotation_mask = 32
 
 [node name="PointerFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/RightController/HandPointer" unique_id=611834496]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.07)
@@ -207,10 +200,9 @@ mesh = SubResource("QuadMesh_pointer_face")
 
 [node name="PointerRayCast" type="RayCast3D" parent="PlayerBody/XROrigin3D/RightController/HandPointer" unique_id=42189760]
 target_position = Vector3(0, 0, -3.5)
+collision_mask = 32
 hit_from_inside = true
 collide_with_areas = true
-collide_with_bodies = true
-collision_mask = 32
 
 [node name="PointerRayVisual" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/RightController/HandPointer" unique_id=273281057]
 cast_shadow = 0
@@ -225,9 +217,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.755936, 0)
 [node name="CenterPointer" type="Node3D" parent="PlayerBody/DesktopCamera" unique_id=424202139]
 script = ExtResource("6_pointer")
 ray_length = 3.5
-pointer_collision_mask = 32
-hit_selector_collision_mask = 32
-grab_rotation_mask = 32
 ray_length_min = 0.001
 ray_length_max = 1000000.0
 include_pointer_color = true
@@ -242,10 +231,9 @@ mesh = SubResource("QuadMesh_pointer_face")
 
 [node name="PointerRayCast" type="RayCast3D" parent="PlayerBody/DesktopCamera/CenterPointer" unique_id=399327217]
 target_position = Vector3(0, 0, -3.5)
+collision_mask = 32
 hit_from_inside = true
 collide_with_areas = true
-collide_with_bodies = true
-collision_mask = 32
 
 [node name="PointerRayVisual" type="MeshInstance3D" parent="PlayerBody/DesktopCamera/CenterPointer" unique_id=47473927]
 cast_shadow = 0
@@ -311,6 +299,7 @@ enable_one_hand_rotation = false
 show_one_hand_grab_visual = false
 auto_respawn_enabled = true
 player_gravity_enabled = true
+autojoin_enabled = true
 v2_show_visual = false
 enable_two_hand_grab_v3 = false
 v3_show_visual = false

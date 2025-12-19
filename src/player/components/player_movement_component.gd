@@ -72,6 +72,12 @@ enum OneHandGrabMode { RELATIVE, ANCHORED }
 @export var player_gravity_enabled: bool = false
 @export_range(0.0, 5.0, 0.05) var player_drag_force: float = 0.85
 
+# === Autojoin Settings ===
+@export var autojoin_enabled: bool = false
+@export_range(0.5, 10.0, 0.1) var autojoin_distance_threshold: float = 2.0
+@export var autojoin_room_name: String = "default"
+@export var autojoin_debug_logs: bool = true
+
 # === Two-Hand Grab V2 Settings ===
 # Completely separate from V1 - uses locked world point approach like Horizon Worlds
 @export var enable_two_hand_grab_v2: bool = false
@@ -156,6 +162,10 @@ var _one_hand_initial_body_pos := Vector3.ZERO
 # Jump state
 var _jump_cooldown_timer := 0.0
 
+# Autojoin state
+var _autojoin_triggered := false
+var _initial_spawn_position := Vector3.ZERO
+
 # Input mapping helper
 var _input_binding_manager: InputBindingManager
 
@@ -204,6 +214,12 @@ func setup(p_player_body: RigidBody3D, p_left_controller: XRController3D, p_righ
 	
 	if player_body:
 		_spawn_transform = player_body.global_transform
+		_initial_spawn_position = player_body.global_position
+	
+	# Log autojoin settings on setup
+	print("[Autojoin] Setup - enabled: %s, threshold: %.1fm, room: '%s', spawn_pos: %s" % [
+		autojoin_enabled, autojoin_distance_threshold, autojoin_room_name, _initial_spawn_position
+	])
 	_initial_settings = _snapshot_settings()
 	_apply_manual_player_scale()
 	_apply_player_gravity()
@@ -248,6 +264,9 @@ func _physics_process(delta: float) -> void:
 	if is_vr_mode:
 		physics_process_turning(delta)
 		physics_process_locomotion(delta)
+	
+	# Autojoin check runs regardless of VR mode
+	_check_autojoin()
 		
 	# Head collision is now an Area3D parented to the XRCamera3D; it follows the headset automatically
 
@@ -1309,6 +1328,239 @@ func _check_auto_respawn() -> void:
 	if dist > threshold:
 		print("PlayerMovementComponent: Auto-respawn TRIGGERED! Dist: %.2f, Threshold: %.2f, Enabled: %s" % [dist, threshold, auto_respawn_enabled])
 		respawn(hard_respawn_resets_settings)
+
+
+func _check_autojoin() -> void:
+	# Early exit if disabled or already triggered
+	if not autojoin_enabled:
+		return
+	if _autojoin_triggered:
+		return
+	if not player_body:
+		_autojoin_log("ERROR: player_body is null")
+		return
+	if _initial_spawn_position == Vector3.ZERO:
+		_autojoin_log("ERROR: _initial_spawn_position is Vector3.ZERO - was setup() called?")
+		return
+	
+	# Check if already in a Nakama match
+	var nakama_manager = get_node_or_null("/root/NakamaManager")
+	if nakama_manager and not nakama_manager.current_match_id.is_empty():
+		_autojoin_log("Already in Nakama match: %s - skipping" % nakama_manager.current_match_id)
+		_autojoin_triggered = true
+		return
+	
+	# Check if already connected to LiveKit
+	var livekit_manager = _find_livekit_manager()
+	if livekit_manager and livekit_manager.has_method("is_room_connected") and livekit_manager.is_room_connected():
+		_autojoin_log("Already connected to LiveKit - skipping")
+		_autojoin_triggered = true
+		return
+	
+	# Check distance from spawn
+	var dist := player_body.global_position.distance_to(_initial_spawn_position)
+	if dist >= autojoin_distance_threshold:
+		_autojoin_triggered = true
+		_autojoin_log("========================================")
+		_autojoin_log("TRIGGERED! Distance: %.2fm (threshold: %.2fm)" % [dist, autojoin_distance_threshold])
+		_autojoin_log("Target room: '%s'" % autojoin_room_name)
+		_autojoin_log("========================================")
+		_trigger_autojoin()
+
+
+func _autojoin_log(message: String) -> void:
+	"""Log autojoin messages if debug logging is enabled"""
+	if autojoin_debug_logs:
+		print("[Autojoin] %s" % message)
+
+
+func _trigger_autojoin() -> void:
+	"""Trigger autojoin to Nakama match and LiveKit room"""
+	var nakama_manager = get_node_or_null("/root/NakamaManager")
+	var livekit_manager = _find_livekit_manager()
+	
+	# Validate managers
+	if not nakama_manager:
+		push_warning("[Autojoin] ERROR: NakamaManager not found")
+		return
+	if not livekit_manager:
+		push_warning("[Autojoin] ERROR: LiveKitManager not found")
+		return
+	
+	_autojoin_log("Found NakamaManager: %s" % nakama_manager)
+	_autojoin_log("Found LiveKitManager: %s" % livekit_manager)
+	
+	# Check Nakama connection status
+	if not nakama_manager.is_socket_connected:
+		push_warning("[Autojoin] ERROR: Nakama socket not connected")
+		return
+	
+	var user_id: String = ""
+	if "local_user_id" in nakama_manager:
+		user_id = nakama_manager.local_user_id
+	
+	if user_id.is_empty():
+		push_warning("[Autojoin] ERROR: No Nakama user ID available")
+		return
+	
+	_autojoin_log("User ID: %s" % user_id)
+	
+	# Connect signals for match list response (one-shot)
+	if nakama_manager.has_signal("match_list_received"):
+		if not nakama_manager.match_list_received.is_connected(_on_autojoin_match_list):
+			nakama_manager.match_list_received.connect(_on_autojoin_match_list, CONNECT_ONE_SHOT)
+	
+	if nakama_manager.has_signal("match_joined"):
+		if not nakama_manager.match_joined.is_connected(_on_autojoin_nakama_joined):
+			nakama_manager.match_joined.connect(_on_autojoin_nakama_joined, CONNECT_ONE_SHOT)
+	
+	if nakama_manager.has_signal("match_created"):
+		if not nakama_manager.match_created.is_connected(_on_autojoin_nakama_created):
+			nakama_manager.match_created.connect(_on_autojoin_nakama_created, CONNECT_ONE_SHOT)
+	
+	# Request match list to find existing room or create new one
+	_autojoin_log("Requesting match list from Nakama...")
+	nakama_manager.list_matches()
+
+
+func _on_autojoin_match_list(matches: Array) -> void:
+	"""Handle match list response - join existing or create new"""
+	_autojoin_log("Received %d matches from Nakama" % matches.size())
+	
+	var nakama_manager = get_node_or_null("/root/NakamaManager")
+	if not nakama_manager:
+		return
+	
+	# Look for a match with our target room name
+	var target_match_id: String = ""
+	for match_data in matches:
+		var label: String = match_data.get("label", "")
+		var match_id: String = match_data.get("match_id", "")
+		var size: int = match_data.get("size", 0)
+		_autojoin_log("  - Match: '%s' (ID: %s, players: %d)" % [label, match_id.substr(0, 8) if match_id.length() > 8 else match_id, size])
+		
+		if label == autojoin_room_name or label.begins_with(autojoin_room_name):
+			target_match_id = match_id
+			_autojoin_log("Found matching room: '%s'" % label)
+			break
+	
+	if not target_match_id.is_empty():
+		# Join existing match
+		_autojoin_log("Joining existing Nakama match: %s" % target_match_id)
+		nakama_manager.join_match(target_match_id)
+	else:
+		# Create new match
+		_autojoin_log("No matching room found - creating new match")
+		nakama_manager.create_match()
+
+
+func _on_autojoin_nakama_created(match_id: String, label: String) -> void:
+	"""Handle Nakama match created"""
+	_autojoin_log("Nakama match CREATED: %s (label: %s)" % [match_id, label])
+	_connect_to_livekit_after_nakama(label if not label.is_empty() else autojoin_room_name)
+
+
+func _on_autojoin_nakama_joined(match_id: String) -> void:
+	"""Handle Nakama match joined"""
+	_autojoin_log("Nakama match JOINED: %s" % match_id)
+	_connect_to_livekit_after_nakama(autojoin_room_name)
+
+
+func _connect_to_livekit_after_nakama(room_name: String) -> void:
+	"""Connect to LiveKit after Nakama match is ready"""
+	var livekit_manager = _find_livekit_manager()
+	var nakama_manager = get_node_or_null("/root/NakamaManager")
+	
+	if not livekit_manager:
+		push_warning("[Autojoin] ERROR: Cannot connect to LiveKit - manager not found")
+		return
+	
+	var user_id: String = ""
+	if nakama_manager and "local_user_id" in nakama_manager:
+		user_id = nakama_manager.local_user_id
+	
+	if user_id.is_empty():
+		push_warning("[Autojoin] ERROR: Cannot connect to LiveKit - no user ID")
+		return
+	
+	# Generate token and connect to LiveKit
+	var token = _generate_livekit_token(user_id, room_name)
+	var server_url = "wss://godotkit-mjbmdjse.livekit.cloud"
+	
+	_autojoin_log("Connecting to LiveKit...")
+	_autojoin_log("  Server: %s" % server_url)
+	_autojoin_log("  Room: %s" % room_name)
+	_autojoin_log("  User: %s" % user_id)
+	
+	livekit_manager.connect_to_room(server_url, token)
+	_autojoin_log("✅ Autojoin complete!")
+
+
+func _find_livekit_manager() -> Node:
+	"""Find the LiveKit manager in the scene"""
+	var root = get_tree().root
+	# Look for LiveKitWrapper autoload or in scene
+	var livekit = get_node_or_null("/root/LiveKitWrapper")
+	if livekit:
+		return livekit
+	# Fallback: search scene tree
+	return _find_node_by_script(root, "livekit_wrapper.gd")
+
+
+func _find_node_by_script(node: Node, script_name: String) -> Node:
+	if node.get_script():
+		var script_path = node.get_script().resource_path
+		if script_name in script_path:
+			return node
+	for child in node.get_children():
+		var result = _find_node_by_script(child, script_name)
+		if result:
+			return result
+	return null
+
+
+func _generate_livekit_token(participant_id: String, room_name: String) -> String:
+	"""Generate a LiveKit JWT access token using HS256"""
+	const API_KEY = "APIbSEA2MXzP8Mf"
+	const API_SECRET = "Kqw1FLCX3rq2IWbuWjilBMlgbODqlzxTkgyzKrzuF6I"
+	const TOKEN_VALIDITY_HOURS = 24
+	
+	var now = Time.get_unix_time_from_system()
+	var expire_time = now + (TOKEN_VALIDITY_HOURS * 3600)
+	
+	var header = {"alg": "HS256", "typ": "JWT"}
+	var claims = {
+		"exp": expire_time,
+		"iss": API_KEY,
+		"nbf": now - 60,
+		"sub": participant_id,
+		"video": {
+			"room": room_name,
+			"roomJoin": true,
+			"canPublish": true,
+			"canSubscribe": true
+		}
+	}
+	
+	var header_b64 = _base64url_encode(JSON.stringify(header).to_utf8_buffer())
+	var payload_b64 = _base64url_encode(JSON.stringify(claims).to_utf8_buffer())
+	var signing_input = header_b64 + "." + payload_b64
+	var signature = _hmac_sha256(signing_input.to_utf8_buffer(), API_SECRET.to_utf8_buffer())
+	
+	return signing_input + "." + _base64url_encode(signature)
+
+
+func _base64url_encode(data: PackedByteArray) -> String:
+	var b64 = Marshalls.raw_to_base64(data)
+	b64 = b64.replace("+", "-").replace("/", "_").replace("=", "")
+	return b64
+
+
+func _hmac_sha256(message: PackedByteArray, key: PackedByteArray) -> PackedByteArray:
+	var ctx = HMACContext.new()
+	ctx.start(HashingContext.HASH_SHA256, key)
+	ctx.update(message)
+	return ctx.finish()
 
 
 func respawn(hard: bool = false) -> void:
