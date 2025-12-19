@@ -13,6 +13,7 @@ const SURFACE_BODY := "body"
 @export var load_for_player: bool = true
 @export var link_hands: bool = true
 @export var player_target_name: String = "LeftHandMesh"
+@export var hand_material_base: Material = preload("res://world_grab_demo/ghost_hand.tres")
 
 @export_subgroup("Hands")
 @export_node_path("MeshInstance3D") var left_hand_target: NodePath = NodePath("PlayerBody/XROrigin3D/LeftController/LeftHandMesh")
@@ -395,10 +396,21 @@ func _resolve_surface_node(surface: SurfaceSlot, is_primary: bool, extra_index: 
 func _assign_texture_to_mesh(node: MeshInstance3D, texture: ImageTexture, cube_mesh: ArrayMesh) -> void:
 	if cube_mesh:
 		node.mesh = cube_mesh
-	var mat := StandardMaterial3D.new()
+	var mat: StandardMaterial3D
+	
+	# Check if this node is a hand mesh to apply ghosting effect
+	var is_hand = false
+	if node.is_in_group("physics_hand") or "HandMesh" in node.name:
+		is_hand = true
+		
+	if is_hand and hand_material_base:
+		mat = hand_material_base.duplicate()
+	else:
+		mat = StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		
 	mat.albedo_texture = texture
 	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	if "cull_mode" in mat:
 		mat.cull_mode = BaseMaterial3D.CULL_BACK
 	node.material_override = mat
