@@ -30,6 +30,7 @@
 [ext_resource type="PackedScene" path="res://src/objects/ReferenceBlock.tscn" id="43_reference_block"]
 [ext_resource type="PackedScene" path="res://src/ui/BlockLibraryViewport3D.tscn" id="44_block_library_viewport"]
 [ext_resource type="PackedScene" uid="uid://baesap7jjgmfh" path="res://src/objects/grabbables/PaintBrush.tscn" id="45_paint_brush"]
+[ext_resource type="PackedScene" uid="uid://terminal_viewport3d" path="res://src/ui/TerminalViewport3D.tscn" id="46_terminal"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -167,3 +168,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.8, -0.69013023)
 
 [node name="PaintBrush" parent="." unique_id=2109012345 instance=ExtResource("45_paint_brush")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.8, 0.95, -0.69013023)
+
+[node name="TerminalViewport3D" parent="." instance=ExtResource("46_terminal")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1.5, 2)
