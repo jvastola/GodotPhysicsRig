@@ -248,18 +248,18 @@ const AVAILABLE_TOOLS := [
 		"parameters": {
 			"type": "object",
 			"properties": {
-				"path": {"type": "string", "description": "Path to the file to read"}
+				"path": {"type": "string", "description": "Path to the file to read (user:// or res://)"}
 			},
 			"required": ["path"]
 		}
 	},
 	{
 		"name": "write_file",
-		"description": "Write content to a file, creating it if it doesn't exist",
+		"description": "Write content to a file, creating it if it doesn't exist. Only works in user:// directory.",
 		"parameters": {
 			"type": "object",
 			"properties": {
-				"path": {"type": "string", "description": "Path to the file to write"},
+				"path": {"type": "string", "description": "Path to the file to write (must be user://)"},
 				"content": {"type": "string", "description": "Content to write to the file"}
 			},
 			"required": ["path", "content"]
@@ -286,6 +286,51 @@ const AVAILABLE_TOOLS := [
 				"path": {"type": "string", "description": "Directory to search in"}
 			},
 			"required": ["pattern"]
+		}
+	},
+	{
+		"name": "load_scene",
+		"description": "Load and instantiate a TSCN scene file into the current scene tree. The scene will be added as a child of the current scene.",
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Path to the .tscn scene file to load (user:// or res://)"},
+				"parent_path": {"type": "string", "description": "Optional NodePath to the parent node. If empty, adds to current scene root."}
+			},
+			"required": ["path"]
+		}
+	},
+	{
+		"name": "remove_node",
+		"description": "Remove a node from the scene tree by its path",
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"node_path": {"type": "string", "description": "Path to the node to remove (e.g., '/root/Main/MyNode')"}
+			},
+			"required": ["node_path"]
+		}
+	},
+	{
+		"name": "get_scene_tree",
+		"description": "Get the current scene tree structure showing all nodes",
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"max_depth": {"type": "integer", "description": "Maximum depth to traverse (default 5)"}
+			},
+			"required": []
+		}
+	},
+	{
+		"name": "run_gdscript",
+		"description": "Execute a GDScript code snippet at runtime. Use for quick operations like changing properties, calling methods, etc.",
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"code": {"type": "string", "description": "GDScript code to execute. Has access to 'scene_tree' (SceneTree) and 'current_scene' (Node) variables."}
+			},
+			"required": ["code"]
 		}
 	}
 ]
@@ -1110,6 +1155,14 @@ func _execute_tool(tool_name: String, arguments: Dictionary) -> String:
 			return _tool_list_directory(arguments.get("path", ""))
 		"search_files":
 			return _tool_search_files(arguments.get("pattern", ""), arguments.get("path", "user://"))
+		"load_scene":
+			return _tool_load_scene(arguments.get("path", ""), arguments.get("parent_path", ""))
+		"remove_node":
+			return _tool_remove_node(arguments.get("node_path", ""))
+		"get_scene_tree":
+			return _tool_get_scene_tree(arguments.get("max_depth", 5))
+		"run_gdscript":
+			return _tool_run_gdscript(arguments.get("code", ""))
 	return "Unknown tool: " + tool_name
 
 
@@ -1178,6 +1231,125 @@ func _search_recursive(path: String, pattern: String, results: PackedStringArray
 	dir.list_dir_end()
 
 
+func _tool_load_scene(path: String, parent_path: String) -> String:
+	if path.is_empty():
+		return "Error: No scene path provided"
+	
+	# Check if file exists
+	if not FileAccess.file_exists(path) and not ResourceLoader.exists(path):
+		return "Error: Scene file not found: " + path
+	
+	# Load the scene
+	var scene_resource = load(path)
+	if not scene_resource:
+		return "Error: Failed to load scene: " + path
+	
+	if not scene_resource is PackedScene:
+		return "Error: File is not a valid scene: " + path
+	
+	# Instantiate the scene
+	var scene_instance: Node = scene_resource.instantiate()
+	if not scene_instance:
+		return "Error: Failed to instantiate scene: " + path
+	
+	# Find parent node
+	var parent_node: Node
+	if parent_path.is_empty():
+		parent_node = get_tree().current_scene
+		if not parent_node:
+			parent_node = get_tree().root
+	else:
+		parent_node = get_tree().root.get_node_or_null(parent_path)
+		if not parent_node:
+			scene_instance.queue_free()
+			return "Error: Parent node not found: " + parent_path
+	
+	# Add to scene tree
+	parent_node.add_child(scene_instance)
+	scene_instance.owner = get_tree().current_scene
+	
+	return "Successfully loaded scene '%s' as child of '%s'. Instance name: %s" % [path, parent_node.name, scene_instance.name]
+
+
+func _tool_remove_node(node_path: String) -> String:
+	if node_path.is_empty():
+		return "Error: No node path provided"
+	
+	var node := get_tree().root.get_node_or_null(node_path)
+	if not node:
+		return "Error: Node not found: " + node_path
+	
+	# Safety check - don't remove critical nodes
+	if node == get_tree().root or node == get_tree().current_scene:
+		return "Error: Cannot remove root or current scene node"
+	
+	var node_name := node.name
+	node.queue_free()
+	return "Successfully removed node: %s (%s)" % [node_name, node_path]
+
+
+func _tool_get_scene_tree(max_depth: int) -> String:
+	var lines: PackedStringArray = []
+	var root := get_tree().root
+	lines.append("Scene Tree:")
+	_build_tree_string(root, lines, "", 0, max_depth)
+	return "\n".join(lines)
+
+
+func _build_tree_string(node: Node, lines: PackedStringArray, indent: String, depth: int, max_depth: int) -> void:
+	if depth > max_depth:
+		if node.get_child_count() > 0:
+			lines.append(indent + "  ... (%d more children)" % node.get_child_count())
+		return
+	
+	for i in node.get_child_count():
+		var child := node.get_child(i)
+		var prefix := "├─ " if i < node.get_child_count() - 1 else "└─ "
+		var child_indent := "│  " if i < node.get_child_count() - 1 else "   "
+		var class_name_str := child.get_class()
+		lines.append(indent + prefix + child.name + " [" + class_name_str + "]")
+		_build_tree_string(child, lines, indent + child_indent, depth + 1, max_depth)
+
+
+func _tool_run_gdscript(code: String) -> String:
+	if code.is_empty():
+		return "Error: No code provided"
+	
+	# Create a temporary script to execute
+	var script := GDScript.new()
+	
+	# Wrap the code in a function with access to scene tree
+	var full_code := """
+extends RefCounted
+
+var scene_tree: SceneTree
+var current_scene: Node
+
+func execute() -> String:
+	var result = ""
+	%s
+	return str(result) if result else "Executed successfully"
+""" % [code]
+	
+	script.source_code = full_code
+	var err := script.reload()
+	if err != OK:
+		return "Error: Failed to compile script: " + str(err) + "\nCode:\n" + code
+	
+	# Create instance and execute
+	var executor = script.new()
+	executor.scene_tree = get_tree()
+	executor.current_scene = get_tree().current_scene
+	
+	var result: String
+	if executor.has_method("execute"):
+		result = executor.execute()
+	else:
+		result = "Error: Execute method not found"
+	
+	return result
+
+
 func _update_token_usage(data: Dictionary) -> void:
 	var tokens := 0
 	
@@ -1193,7 +1365,6 @@ func _update_token_usage(data: Dictionary) -> void:
 	
 	_total_tokens_used += tokens
 	_update_token_count()
-
 
 func _update_token_count() -> void:
 	if token_label:
