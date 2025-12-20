@@ -1,4 +1,4 @@
-[gd_scene load_steps=34 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=36 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -18,19 +18,20 @@
 [ext_resource type="PackedScene" uid="uid://cqtv3jhgmgsfw" path="res://src/levels/poly_exports/poly_2025-12-09T16-25-02.gltf" id="28_wb7rf"]
 [ext_resource type="PackedScene" uid="uid://wly7in1mfwww" path="res://src/objects/grabbables/PolyTool.tscn" id="29_poly_tool"]
 [ext_resource type="PackedScene" path="res://src/ui/PolyToolViewport3D.tscn" id="31_poly_tool_viewport"]
+[ext_resource type="PackedScene" path="res://src/ui/LLMChatViewport3D.tscn" id="32_lab7j"]
 [ext_resource type="PackedScene" path="res://src/objects/TransformTool.tscn" id="33_transform_tool"]
 [ext_resource type="Script" uid="uid://df75mfql4rt54" path="res://src/systems/tool_pool_manager.gd" id="34_tool_pool"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/TwoHandGrabCube.tscn" id="36_two_hand_cube"]
 [ext_resource type="PackedScene" path="res://src/ui/TwoHandGrabSettingsViewport3D.tscn" id="37_two_hand_settings"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/WorldGrabSphere.tscn" id="38_world_grab_sphere"]
-[ext_resource type="Script" uid="uid://om3k532gai8j" path="res://src/ui/ui_panel_manager.gd" id="39_ui_panel_manager"]
-[ext_resource type="Script" uid="uid://bqrnwqkyb00kx" path="res://src/ui/ui_panel_scene_setup.gd" id="40_ui_panel_setup"]
-[ext_resource type="Script" uid="uid://bid6ju5yhq61q" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
+[ext_resource type="Script" path="res://src/ui/ui_panel_manager.gd" id="39_ui_panel_manager"]
+[ext_resource type="Script" path="res://src/ui/ui_panel_scene_setup.gd" id="40_ui_panel_setup"]
+[ext_resource type="Script" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
 [ext_resource type="PackedScene" uid="uid://cm8nv7v0apls3" path="res://src/objects/grabbables/GrappleHook.tscn" id="42_grapple_hook"]
 [ext_resource type="PackedScene" path="res://src/objects/ReferenceBlock.tscn" id="43_reference_block"]
 [ext_resource type="PackedScene" path="res://src/ui/BlockLibraryViewport3D.tscn" id="44_block_library_viewport"]
 [ext_resource type="PackedScene" uid="uid://baesap7jjgmfh" path="res://src/objects/grabbables/PaintBrush.tscn" id="45_paint_brush"]
-[ext_resource type="PackedScene" uid="uid://terminal_viewport3d" path="res://src/ui/TerminalViewport3D.tscn" id="46_terminal"]
+[ext_resource type="PackedScene" path="res://src/ui/TerminalViewport3D.tscn" id="46_terminal"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -169,5 +170,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.8, -0.69013023)
 [node name="PaintBrush" parent="." unique_id=2109012345 instance=ExtResource("45_paint_brush")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.8, 0.95, -0.69013023)
 
-[node name="TerminalViewport3D" parent="." instance=ExtResource("46_terminal")]
+[node name="TerminalViewport3D" parent="." unique_id=1892411932 instance=ExtResource("46_terminal")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1.5, 2)
+
+[node name="LLMChatViewport3D" parent="." unique_id=405837670 instance=ExtResource("32_lab7j")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.702578, 1.1824706, 1.6545687)
