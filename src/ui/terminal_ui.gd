@@ -82,6 +82,8 @@ func _ready() -> void:
 	if command_input:
 		command_input.text_submitted.connect(_on_command_submitted)
 		command_input.gui_input.connect(_on_command_input_gui)
+		# Ensure LineEdit can receive focus and keyboard input
+		command_input.focus_mode = Control.FOCUS_ALL
 	
 	if filter_option:
 		filter_option.add_item("All", -1)
@@ -104,6 +106,12 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		if instance == self:
 			instance = null
+
+
+## Focus the command input field
+func focus_input() -> void:
+	if command_input:
+		command_input.grab_focus()
 
 
 func _register_commands() -> void:
@@ -301,15 +309,16 @@ func _on_command_submitted(command: String) -> void:
 
 func _on_command_input_gui(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed:
-		if event.keycode == KEY_UP:
-			_navigate_history(-1)
-			get_viewport().set_input_as_handled()
-		elif event.keycode == KEY_DOWN:
-			_navigate_history(1)
-			get_viewport().set_input_as_handled()
-		elif event.keycode == KEY_TAB:
-			_handle_tab_completion()
-			get_viewport().set_input_as_handled()
+		match event.keycode:
+			KEY_UP:
+				_navigate_history(-1)
+				command_input.accept_event()
+			KEY_DOWN:
+				_navigate_history(1)
+				command_input.accept_event()
+			KEY_TAB:
+				_handle_tab_completion()
+				command_input.accept_event()
 
 
 func _navigate_history(direction: int) -> void:
@@ -908,6 +917,16 @@ func _is_writable(path: String) -> bool:
 	return path.begins_with("user://")
 
 
+## Join a base path with a filename properly
+func _join_path(base: String, filename: String) -> String:
+	if base.ends_with("://"):
+		return base + filename
+	elif base.ends_with("/"):
+		return base + filename
+	else:
+		return base + "/" + filename
+
+
 ## Format file size
 func _format_size(bytes: int) -> String:
 	if bytes < 1024:
@@ -935,7 +954,15 @@ func _cmd_cd(args: Array) -> String:
 	if not DirAccess.dir_exists_absolute(target):
 		return "Error: Directory not found: %s" % target
 	
-	_current_dir = target.rstrip("/") + "/"
+	# Normalize the path - ensure it ends with / but handle protocol correctly
+	if target == "user://" or target == "res://":
+		_current_dir = target
+	else:
+		# Remove trailing slash then add one back
+		while target.ends_with("/") and not target.ends_with("://"):
+			target = target.substr(0, target.length() - 1)
+		_current_dir = target + "/"
+	
 	_update_status(_current_dir)
 	return "Changed to %s" % _current_dir
 
@@ -955,7 +982,12 @@ func _cmd_ls(args: Array) -> String:
 		else:
 			target_path = _resolve_path(arg)
 	
-	var dir := DirAccess.open(target_path)
+	# Normalize target_path for DirAccess
+	var normalized_path := target_path
+	if not normalized_path.ends_with("/") and not normalized_path.ends_with("://"):
+		normalized_path += "/"
+	
+	var dir := DirAccess.open(normalized_path)
 	if not dir:
 		return "Error: Cannot open directory: %s" % target_path
 	
@@ -969,7 +1001,13 @@ func _cmd_ls(args: Array) -> String:
 			file_name = dir.get_next()
 			continue
 		
-		var full_path := target_path.rstrip("/") + "/" + file_name
+		# Build full path properly
+		var full_path: String
+		if normalized_path.ends_with("://"):
+			full_path = normalized_path + file_name
+		else:
+			full_path = normalized_path + file_name
+		
 		var is_dir := dir.current_is_dir()
 		var size := 0
 		var modified := ""

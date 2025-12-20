@@ -16,6 +16,7 @@ var _saved_static_body_layer: int = 0
 var _last_mouse_pos: Vector2 = Vector2(-1, -1)
 var _is_hovering: bool = false
 var _is_pressed: bool = false
+var _has_focus: bool = false
 
 
 func _ready() -> void:
@@ -27,6 +28,9 @@ func _ready() -> void:
 		viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 		viewport.transparent_bg = true
 		viewport.gui_embed_subwindows = true
+		# Enable input handling
+		viewport.handle_input_locally = true
+		viewport.gui_disable_input = false
 	
 	if _static_body:
 		_saved_static_body_layer = _static_body.collision_layer
@@ -34,6 +38,30 @@ func _ready() -> void:
 	if mesh_instance and _static_body:
 		mesh_instance.visible = true
 		_static_body.collision_layer = _saved_static_body_layer
+	
+	# Set process input to forward keyboard events
+	set_process_input(true)
+
+
+## Forward keyboard input to the viewport when focused
+func _input(event: InputEvent) -> void:
+	if not _has_focus or not viewport:
+		return
+	
+	# Forward keyboard events to the SubViewport
+	if event is InputEventKey:
+		viewport.push_input(event)
+		get_viewport().set_input_as_handled()
+
+
+## Set focus state - call this when the panel is clicked
+func set_focus(focused: bool) -> void:
+	_has_focus = focused
+	if focused and viewport:
+		# Try to focus the command input in the terminal
+		var terminal_ui = viewport.get_node_or_null("TerminalUI")
+		if terminal_ui and terminal_ui.has_method("focus_input"):
+			terminal_ui.focus_input()
 
 
 func handle_pointer_event(event: Dictionary) -> void:
@@ -140,6 +168,10 @@ func _send_mouse_button(pos: Vector2, pressed: bool, just_changed: bool, button_
 	button_event.pressed = pressed
 	
 	viewport.push_input(button_event)
+	
+	# Set focus when clicked
+	if pressed and button_index == MOUSE_BUTTON_LEFT:
+		set_focus(true)
 
 
 func _send_scroll(pos: Vector2, amount: float) -> void:
@@ -168,6 +200,7 @@ func _send_mouse_exit() -> void:
 	_last_mouse_pos = Vector2(-1, -1)
 	_is_hovering = false
 	_is_pressed = false
+	# Don't clear focus on exit - keep it until another panel is clicked
 
 
 func set_interactive(enabled: bool) -> void:
