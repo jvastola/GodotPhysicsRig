@@ -307,6 +307,9 @@ func _on_command_input_gui(event: InputEvent) -> void:
 		elif event.keycode == KEY_DOWN:
 			_navigate_history(1)
 			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_TAB:
+			_handle_tab_completion()
+			get_viewport().set_input_as_handled()
 
 
 func _navigate_history(direction: int) -> void:
@@ -323,6 +326,133 @@ func _navigate_history(direction: int) -> void:
 		command_input.caret_column = command_input.text.length()
 	else:
 		command_input.text = ""
+
+
+## Handle tab completion for commands and file paths
+func _handle_tab_completion() -> void:
+	if not command_input:
+		return
+	
+	var text := command_input.text
+	var caret := command_input.caret_column
+	
+	# Get text up to caret
+	var text_to_caret := text.substr(0, caret)
+	var parts := text_to_caret.split(" ", false)
+	
+	if parts.is_empty():
+		return
+	
+	# If we're completing the first word, complete commands
+	if parts.size() == 1 and not text_to_caret.ends_with(" "):
+		var prefix := parts[0].to_lower()
+		var matches: PackedStringArray = []
+		
+		for cmd in _commands.keys():
+			if cmd.begins_with(prefix):
+				matches.append(cmd)
+		
+		if matches.size() == 1:
+			# Single match - complete it
+			command_input.text = matches[0] + " " + text.substr(caret)
+			command_input.caret_column = matches[0].length() + 1
+		elif matches.size() > 1:
+			# Multiple matches - show them and complete common prefix
+			_log(LogLevel.INFO, "  ".join(matches))
+			var common := _find_common_prefix(matches)
+			if common.length() > prefix.length():
+				command_input.text = common + text.substr(caret)
+				command_input.caret_column = common.length()
+	else:
+		# Complete file/directory path
+		var path_part := parts[-1] if not text_to_caret.ends_with(" ") else ""
+		var prefix_text := text_to_caret.substr(0, text_to_caret.length() - path_part.length())
+		
+		_complete_path(path_part, prefix_text, text.substr(caret))
+
+
+## Complete a file or directory path
+func _complete_path(partial: String, prefix_text: String, suffix_text: String) -> void:
+	var dir_path: String
+	var file_prefix: String
+	
+	# Split into directory and file parts
+	var last_slash := partial.rfind("/")
+	if last_slash >= 0:
+		dir_path = _resolve_path(partial.substr(0, last_slash + 1))
+		file_prefix = partial.substr(last_slash + 1)
+	else:
+		dir_path = _current_dir
+		file_prefix = partial
+	
+	# Ensure dir_path ends with /
+	if not dir_path.ends_with("/") and not dir_path.ends_with("://"):
+		dir_path += "/"
+	
+	var dir := DirAccess.open(dir_path)
+	if not dir:
+		return
+	
+	var matches: PackedStringArray = []
+	dir.list_dir_begin()
+	var name := dir.get_next()
+	while name != "":
+		if name.begins_with(file_prefix) or file_prefix.is_empty():
+			if not name.begins_with(".") or file_prefix.begins_with("."):
+				var display_name := name
+				if dir.current_is_dir():
+					display_name += "/"
+				matches.append(display_name)
+		name = dir.get_next()
+	dir.list_dir_end()
+	
+	matches.sort()
+	
+	if matches.is_empty():
+		return
+	
+	if matches.size() == 1:
+		# Single match - complete it
+		var completed: String
+		if last_slash >= 0:
+			completed = partial.substr(0, last_slash + 1) + matches[0]
+		else:
+			completed = matches[0]
+		
+		command_input.text = prefix_text + completed + suffix_text
+		command_input.caret_column = prefix_text.length() + completed.length()
+	else:
+		# Multiple matches - show them and complete common prefix
+		_log(LogLevel.INFO, "  ".join(matches))
+		var common := _find_common_prefix(matches)
+		if common.length() > file_prefix.length():
+			var completed: String
+			if last_slash >= 0:
+				completed = partial.substr(0, last_slash + 1) + common
+			else:
+				completed = common
+			command_input.text = prefix_text + completed + suffix_text
+			command_input.caret_column = prefix_text.length() + completed.length()
+
+
+## Find common prefix among strings
+func _find_common_prefix(strings: PackedStringArray) -> String:
+	if strings.is_empty():
+		return ""
+	if strings.size() == 1:
+		return strings[0]
+	
+	var prefix := strings[0]
+	for i in range(1, strings.size()):
+		var s := strings[i]
+		var j := 0
+		while j < prefix.length() and j < s.length() and prefix[j] == s[j]:
+			j += 1
+		prefix = prefix.substr(0, j)
+		if prefix.is_empty():
+			break
+	
+	return prefix
 
 
 func _on_filter_changed(index: int) -> void:
@@ -727,28 +857,50 @@ func _resolve_path(path: String) -> String:
 		return path
 	
 	# Handle special cases
-	if path == "~" or path == "~/" :
+	if path == "~" or path == "~/":
 		return "user://"
 	
 	if path.begins_with("~/"):
 		return "user://" + path.substr(2)
 	
-	# Handle .. and .
-	var base := _current_dir.rstrip("/")
-	var parts := path.split("/")
+	# For relative paths, ensure current_dir ends properly
+	var base := _current_dir
+	# Ensure base ends with / for proper joining
+	if not base.ends_with("/"):
+		base += "/"
 	
+	# Handle .. and .
+	var parts := path.split("/")
+	var result_parts: PackedStringArray = []
+	
+	# Start with base path parts (excluding the protocol)
+	var protocol := ""
+	if base.begins_with("user://"):
+		protocol = "user://"
+		base = base.substr(7)
+	elif base.begins_with("res://"):
+		protocol = "res://"
+		base = base.substr(6)
+	
+	# Split base into parts
+	for p in base.split("/"):
+		if not p.is_empty():
+			result_parts.append(p)
+	
+	# Process path parts
 	for part in parts:
 		if part == "..":
-			# Go up one directory
-			var last_slash := base.rfind("/")
-			if last_slash > 6:  # Keep at least "user://" or "res://"
-				base = base.substr(0, last_slash)
+			if result_parts.size() > 0:
+				result_parts.remove_at(result_parts.size() - 1)
 		elif part == "." or part.is_empty():
 			continue
 		else:
-			base = base + "/" + part
+			result_parts.append(part)
 	
-	return base
+	# Reconstruct path
+	if result_parts.is_empty():
+		return protocol
+	return protocol + "/".join(result_parts)
 
 
 ## Check if path is writable (only user:// is writable)
