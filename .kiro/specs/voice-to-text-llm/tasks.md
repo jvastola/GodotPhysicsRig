@@ -1,0 +1,130 @@
+# Implementation Plan
+
+- [x] 1. Create LiveKit Agent Server for Transcription
+  - [x] 1.1 Set up Python project structure with requirements.txt
+    - Create `livekit-agent/` directory with `transcriber_agent.py`, `requirements.txt`, `.env.example`
+    - Dependencies: livekit-agents, livekit-plugins-deepgram, livekit-plugins-silero, python-dotenv
+    - _Requirements: 5.1_
+  - [x] 1.2 Implement TranscriberAgent class
+    - Extend livekit Agent class with Deepgram STT
+    - Implement `on_user_turn_completed` to broadcast transcript JSON
+    - Include speaker_identity, text, timestamp, is_final in message
+    - _Requirements: 5.1, 5.2_
+  - [x] 1.3 Implement MultiUserTranscriber session manager
+    - Handle participant_connected and participant_disconnected events
+    - Create/destroy AgentSession per participant
+    - Use Silero VAD for voice activity detection
+    - _Requirements: 5.1_
+  - [x] 1.4 Create agent server entrypoint
+    - Set up AgentServer with rtc_session decorator
+    - Implement prewarm function to load VAD model
+    - Add cleanup callback for graceful shutdown
+    - _Requirements: 5.1_
+  - [x] 1.5 Add Docker deployment configuration
+    - Create Dockerfile for the agent server
+    - Create docker-compose.yml for local development
+    - _Requirements: 5.1_
+
+- [x] 2. Implement TranscriptEntry Data Class
+  - [x] 2.1 Create TranscriptEntry class
+    - Define properties: speaker_identity, speaker_name, text, timestamp, is_local, is_final
+    - Implement format_time() to return HH:MM:SS string
+    - Implement get_display_name() to return speaker_name or identity
+    - Implement to_dict() and static from_dict() methods
+    - _Requirements: 5.2_
+  - [ ] 2.2 Write property test for TranscriptEntry
+    - **Property 1: Transcript entry round-trip**
+    - Test to_dict/from_dict produces equivalent entry
+    - **Validates: Requirements 5.2**
+
+- [x] 3. Implement WorldTranscriptStore
+  - [x] 3.1 Create WorldTranscriptStore class
+    - Define MAX_ENTRIES constant (500)
+    - Implement add_entry() with entry_added signal
+    - Implement _enforce_limit() to remove oldest entries
+    - Implement get_entries(), clear() methods
+    - _Requirements: 5.2, 5.5_
+  - [x] 3.2 Implement export functions
+    - Implement export_to_text() with room name, date, formatted entries
+    - Implement export_to_json() with full metadata
+    - _Requirements: 6.2, 6.3_
+  - [ ] 3.3 Write property test for entry limit enforcement
+    - **Property 3: Transcript entry limit enforcement**
+    - Add random number of entries, verify size <= 500
+    - **Validates: Requirements 5.5**
+  - [ ] 3.4 Write property test for export metadata
+    - **Property 4: Export metadata completeness**
+    - Verify export contains room name, date, all entries
+    - **Validates: Requirements 6.3**
+
+- [x] 4. Implement TranscriptReceiverHandler
+  - [x] 4.1 Create TranscriptReceiverHandler class
+    - Connect to LiveKitWrapper data_received signal
+    - Parse incoming JSON messages with type "transcript"
+    - Create TranscriptEntry from parsed data
+    - Emit transcript_received signal
+    - _Requirements: 5.1, 5.2_
+  - [x] 4.2 Add local user identification
+    - Get local_identity from LiveKitWrapper
+    - Set is_local flag on entries matching local identity
+    - _Requirements: 5.2_
+  - [ ] 4.3 Write property test for message parsing
+    - **Property 1: Transcript message parsing**
+    - Generate random valid JSON, verify entry fields match
+    - **Validates: Requirements 5.1, 5.2**
+  - [ ] 4.4 Write property test for local user identification
+    - **Property 5: Local user identification**
+    - Test entries with matching/non-matching identity
+    - **Validates: Requirements 5.2**
+
+- [ ] 5. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 6. Create WorldTranscriptPanel UI
+  - [x] 6.1 Create WorldTranscriptPanel.tscn scene
+    - PanelContainer with title, RichTextLabel for transcript
+    - Button row: Copy, Export, Clear buttons
+    - Status label for connection state
+    - _Requirements: 5.3, 5.4_
+  - [x] 6.2 Implement WorldTranscriptPanel.gd script
+    - Connect to WorldTranscriptStore signals
+    - Implement _on_entry_added() to append BBCode formatted entry
+    - Color-code local vs remote speakers
+    - Implement auto-scroll behavior
+    - _Requirements: 5.3, 5.4_
+  - [x] 6.3 Implement copy and export functionality
+    - Copy button: copy transcript_store.export_to_text() to clipboard
+    - Export button: save export_to_json() to user://world_transcript.json
+    - Clear button: call transcript_store.clear()
+    - _Requirements: 6.1, 6.2_
+  - [ ] 6.4 Write property test for entry ordering
+    - **Property 2: Transcript entry ordering**
+    - Add entries with random timestamps, verify display order
+    - **Validates: Requirements 5.3**
+
+- [x] 7. Create WorldTranscriptViewport3D for VR
+  - [x] 7.1 Create WorldTranscriptViewport3D.tscn scene
+    - Follow existing ui_viewport_3d.gd pattern
+    - SubViewport containing WorldTranscriptPanel
+    - MeshInstance3D with viewport texture
+    - StaticBody3D with CollisionShape3D for interaction
+    - _Requirements: 7.2_
+  - [ ] 7.2 Add to MainScene
+    - Instance WorldTranscriptViewport3D in MainScene.tscn
+    - Position near other UI panels
+    - _Requirements: 7.2_
+
+- [x] 8. Integrate with LLM Chat Terminal
+  - [x] 8.1 Add "Send to LLM" functionality
+    - Add send_to_llm_requested signal to WorldTranscriptPanel
+    - Allow clicking on local user entries to send to LLM
+    - Connect signal to LLM Chat Terminal message input
+    - _Requirements: 8.1, 8.2_
+  - [x] 8.2 Wire up transcript system in scene
+    - Create TranscriptReceiverHandler node
+    - Create WorldTranscriptStore node
+    - Connect components together
+    - _Requirements: 5.1_
+
+- [ ] 9. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
