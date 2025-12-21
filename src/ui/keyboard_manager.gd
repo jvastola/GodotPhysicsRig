@@ -509,8 +509,22 @@ func _summon_keyboard_to_player() -> void:
 	var scene := get_tree().get_current_scene()
 	if not scene:
 		return
+	
+	# First try to find existing keyboard in scene
 	var keyboard_node: Node3D = scene.get_node_or_null("KeyboardFullViewport3D") as Node3D
+	
+	# If not found, try to spawn it via UIPanelManager
 	if not keyboard_node:
+		var panel_manager := UIPanelManager.find()
+		if panel_manager:
+			keyboard_node = panel_manager.open_panel("KeyboardFullViewport3D", false)
+			print("KeyboardManager: Spawned keyboard via UIPanelManager")
+		else:
+			print("KeyboardManager: No UIPanelManager found, cannot spawn keyboard")
+			return
+	
+	if not keyboard_node:
+		print("KeyboardManager: Failed to get or spawn keyboard")
 		return
 	
 	# Find the XR camera to position keyboard in front of the user

@@ -40,6 +40,8 @@ func _ready():
 	_setup_input_device_selector()
 	# Auto-load saved audio settings (Meta VRCS compliance)
 	_load_saved_settings()
+	# Ensure mic starts after node is fully in tree
+	call_deferred("_ensure_mic_playing")
 
 
 func _setup_ui():
@@ -55,22 +57,53 @@ func _setup_ui():
 
 
 func _setup_audio():
-	# Create dedicated audio bus
-	audio_bus_idx = AudioServer.bus_count
-	AudioServer.add_bus(audio_bus_idx)
-	AudioServer.set_bus_name(audio_bus_idx, audio_bus_name)
+	# Check if our audio bus already exists (from a previous instance)
+	audio_bus_idx = AudioServer.get_bus_index(audio_bus_name)
 	
-	# Add Amplify effect
-	amplify_effect = AudioEffectAmplify.new()
-	amplify_effect.volume_db = 0.0
-	AudioServer.add_bus_effect(audio_bus_idx, amplify_effect)
-	
-	# Add Capture effect
-	capture_effect = AudioEffectCapture.new()
-	AudioServer.add_bus_effect(audio_bus_idx, capture_effect)
-	
-	# Route to Master
-	AudioServer.set_bus_send(audio_bus_idx, "Master")
+	if audio_bus_idx == -1:
+		# Create dedicated audio bus only if it doesn't exist
+		audio_bus_idx = AudioServer.bus_count
+		AudioServer.add_bus(audio_bus_idx)
+		AudioServer.set_bus_name(audio_bus_idx, audio_bus_name)
+		
+		# Add Amplify effect
+		amplify_effect = AudioEffectAmplify.new()
+		amplify_effect.volume_db = 0.0
+		AudioServer.add_bus_effect(audio_bus_idx, amplify_effect)
+		
+		# Add Capture effect
+		capture_effect = AudioEffectCapture.new()
+		AudioServer.add_bus_effect(audio_bus_idx, capture_effect)
+		
+		# Route to Master
+		AudioServer.set_bus_send(audio_bus_idx, "Master")
+		
+		# Default to muted output (capture still works)
+		AudioServer.set_bus_mute(audio_bus_idx, false)
+		AudioServer.set_bus_volume_db(audio_bus_idx, -80.0)
+		
+		print("🎤 AudioSettingsPanel: Created new audio bus '%s'" % audio_bus_name)
+	else:
+		# Bus exists, get references to existing effects
+		print("🎤 AudioSettingsPanel: Reusing existing audio bus '%s' at index %d" % [audio_bus_name, audio_bus_idx])
+		
+		# Find existing effects on the bus
+		for i in range(AudioServer.get_bus_effect_count(audio_bus_idx)):
+			var effect = AudioServer.get_bus_effect(audio_bus_idx, i)
+			if effect is AudioEffectAmplify:
+				amplify_effect = effect
+			elif effect is AudioEffectCapture:
+				capture_effect = effect
+		
+		# If effects weren't found, add them
+		if not amplify_effect:
+			amplify_effect = AudioEffectAmplify.new()
+			amplify_effect.volume_db = 0.0
+			AudioServer.add_bus_effect(audio_bus_idx, amplify_effect)
+		
+		if not capture_effect:
+			capture_effect = AudioEffectCapture.new()
+			AudioServer.add_bus_effect(audio_bus_idx, capture_effect)
 	
 	# Start microphone input
 	var mic_stream = AudioStreamMicrophone.new()
@@ -80,11 +113,7 @@ func _setup_audio():
 	add_child(mic_player)
 	mic_player.play()
 	
-	# Default to muted output (capture still works)
-	AudioServer.set_bus_mute(audio_bus_idx, false)
-	AudioServer.set_bus_volume_db(audio_bus_idx, -80.0)
-	
-	print("🎤 AudioSettingsPanel: Audio initialized on bus '%s'" % audio_bus_name)
+	print("🎤 AudioSettingsPanel: Audio initialized on bus '%s' (idx: %d)" % [audio_bus_name, audio_bus_idx])
 
 
 func _setup_input_device_selector():
@@ -121,6 +150,17 @@ func _process(_delta):
 	# Restart mic if stopped
 	if mic_player and not mic_player.playing:
 		mic_player.play()
+
+
+func _ensure_mic_playing() -> void:
+	"""Called deferred to ensure mic starts after node is fully in tree."""
+	if mic_player and not mic_player.playing:
+		print("🎤 AudioSettingsPanel: Starting mic player (deferred)")
+		mic_player.play()
+	
+	# Verify capture effect is working
+	if capture_effect:
+		print("🎤 AudioSettingsPanel: Capture effect ready, frames available: ", capture_effect.get_frames_available())
 
 
 func _process_mic_audio():
