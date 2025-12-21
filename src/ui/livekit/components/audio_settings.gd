@@ -78,10 +78,7 @@ func _setup_audio():
 		# Route to Master
 		AudioServer.set_bus_send(audio_bus_idx, "Master")
 		
-		# Default to muted output (capture still works)
-		AudioServer.set_bus_mute(audio_bus_idx, false)
-		AudioServer.set_bus_volume_db(audio_bus_idx, -80.0)
-		
+	
 		print("🎤 AudioSettingsPanel: Created new audio bus '%s'" % audio_bus_name)
 	else:
 		# Bus exists, get references to existing effects

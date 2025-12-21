@@ -13,19 +13,19 @@ shading_mode = 0
 albedo_texture = SubResource("1_viewport_texture")
 
 [sub_resource type="QuadMesh" id="3_quad_mesh"]
-size = Vector2(2.4, 1.1)
+size = Vector2(2.4, 1.8)
 
 [sub_resource type="BoxShape3D" id="4_box_shape"]
-size = Vector3(2.4, 1.1, 0.01)
+size = Vector3(2.4, 1.8, 0.01)
 
 [node name="PerformancePanelViewport3D" type="Node3D"]
 script = ExtResource("1_script")
-ui_size = Vector2(950, 420)
-quad_size = Vector2(2.4, 1.1)
+ui_size = Vector2(950, 720)
+quad_size = Vector2(2.4, 1.8)
 
 [node name="SubViewport" type="SubViewport" parent="."]
 transparent_bg = true
-size = Vector2i(950, 420)
+size = Vector2i(950, 720)
 render_target_update_mode = 4
 gui_embed_subwindows = true
 

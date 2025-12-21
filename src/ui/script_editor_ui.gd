@@ -134,14 +134,23 @@ func _connect_to_keyboard() -> void:
 
 
 func _on_keyboard_input(character: String) -> void:
-	if not code_edit or not code_edit.has_focus():
+	if not code_edit or not code_edit.visible:
+		return
+	
+	# In VR, accept input if editor is visible and has a script loaded
+	if _current_script == null:
 		return
 	
 	code_edit.insert_text_at_caret(character)
 
 
 func _on_keyboard_special(key_name: String) -> void:
-	if not code_edit or not code_edit.has_focus():
+	if not code_edit or not code_edit.visible:
+		return
+	
+	# In VR, the CodeEdit may not have strict focus when using virtual keyboard
+	# Accept input if the editor is visible and has a script loaded
+	if _current_script == null:
 		return
 	
 	match key_name:
@@ -157,14 +166,32 @@ func _on_keyboard_special(key_name: String) -> void:
 				code_edit.set_caret_column(col - 1)
 		"arrow_right":
 			var col = code_edit.get_caret_column()
-			code_edit.set_caret_column(col + 1)
+			var line = code_edit.get_caret_line()
+			var line_length = code_edit.get_line(line).length()
+			if col < line_length:
+				code_edit.set_caret_column(col + 1)
 		"arrow_up":
 			var line = code_edit.get_caret_line()
 			if line > 0:
 				code_edit.set_caret_line(line - 1)
 		"arrow_down":
 			var line = code_edit.get_caret_line()
-			code_edit.set_caret_line(line + 1)
+			if line < code_edit.get_line_count() - 1:
+				code_edit.set_caret_line(line + 1)
+		"home":
+			code_edit.set_caret_column(0)
+		"end":
+			var line = code_edit.get_caret_line()
+			var line_length = code_edit.get_line(line).length()
+			code_edit.set_caret_column(line_length)
+		"delete":
+			# Delete character at caret position
+			var line = code_edit.get_caret_line()
+			var col = code_edit.get_caret_column()
+			var line_text = code_edit.get_line(line)
+			if col < line_text.length():
+				code_edit.select(line, col, line, col + 1)
+				code_edit.delete_selection()
 
 
 func _connect_to_keyboard_shortcuts() -> void:

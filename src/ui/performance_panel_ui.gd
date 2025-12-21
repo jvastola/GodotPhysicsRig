@@ -5,8 +5,8 @@ const ToolPoolManager = preload("res://src/systems/tool_pool_manager.gd")
 const UIPanelManager = preload("res://src/ui/ui_panel_manager.gd")
 
 # Node references for tool pool controls
-@onready var _status_label: Label = $MarginContainer/VBoxContainer/StatusLabel
-@onready var _grid: GridContainer = $MarginContainer/VBoxContainer/LimitGrid
+@onready var _status_label: Label = $MarginContainer/ScrollContainer/VBoxContainer/StatusLabel
+@onready var _grid: GridContainer = $MarginContainer/ScrollContainer/VBoxContainer/LimitGrid
 
 # Node references for world stats (will be created dynamically if not in scene)
 var _stats_container: VBoxContainer
@@ -74,7 +74,7 @@ func _init_rows() -> void:
 
 func _init_stats_section() -> void:
 	"""Initialize the world statistics section of the UI."""
-	var vbox = $MarginContainer/VBoxContainer
+	var vbox = $MarginContainer/ScrollContainer/VBoxContainer
 	if not vbox:
 		return
 	
