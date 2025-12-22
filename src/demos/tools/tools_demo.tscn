@@ -11,8 +11,8 @@
 [ext_resource type="Material" uid="uid://7u5tc56wroch" path="res://src/demos/tools/materials/ice.tres" id="9_qopus"]
 [ext_resource type="Material" uid="uid://djms41odck1mn" path="res://src/demos/tools/materials/wet_concrete.tres" id="10_h0mrq"]
 [ext_resource type="Texture2D" uid="uid://bki04eqgf5rla" path="res://src/demos/tools/materials/textures/grass_albedo.tres" id="10_qopus"]
-[ext_resource type="PackedScene" uid="uid://cihf5g1mykew5" path="res://src/demos/tools/texture/water_plane/water_plane.tscn" id="10_water"]
 [ext_resource type="Material" uid="uid://dvm0vbxfuim8a" path="res://src/demos/tools/materials/grass.tres" id="13_cengd"]
+[ext_resource type="Script" uid="uid://b6csn023mq1rj" path="res://src/demos/tools/scripts/csg_mover.gd" id="14_mover"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 
@@ -38,19 +38,19 @@ heightmap_texture = ExtResource("10_qopus")
 heightmap_flip_texture = true
 texture_filter = 5
 
-[sub_resource type="ViewportTexture" id="ViewportTexture_plasma"]
+[sub_resource type="ViewportTexture" id="ViewportTexture_y07qc"]
 viewport_path = NodePath("PlasmaDemos/ShaderPlasma/SubViewport")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_plasma"]
 resource_local_to_scene = true
 shading_mode = 0
-albedo_texture = SubResource("ViewportTexture_plasma")
+albedo_texture = SubResource("ViewportTexture_y07qc")
 heightmap_enabled = true
 heightmap_scale = 9.0
 heightmap_deep_parallax = true
 heightmap_min_layers = 8
 heightmap_max_layers = 32
-heightmap_texture = SubResource("ViewportTexture_plasma")
+heightmap_texture = SubResource("ViewportTexture_y07qc")
 heightmap_flip_texture = true
 texture_filter = 5
 
@@ -105,8 +105,12 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 size = Vector3(2, 1, 2)
 
 [node name="Cylinder" type="CSGCylinder3D" parent="GridCombiner/Box" unique_id=717520657]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.20065154, 0)
 operation = 2
 height = 1.5
+script = ExtResource("14_mover")
+speed = 1.5
+amplitude = Vector3(0, 0.25, 0)
 
 [node name="SphereUnion" type="CSGSphere3D" parent="GridCombiner" unique_id=250942267]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.5, 0)
@@ -139,9 +143,13 @@ operation = 2
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 
 [node name="Sphere" type="CSGSphere3D" parent="LavaCombiner/Box" unique_id=1944425065]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.36339232, 0, 0)
 operation = 2
 radius = 0.6
 material = SubResource("StandardMaterial3D_h0mrq")
+script = ExtResource("14_mover")
+speed = 1.2
+amplitude = Vector3(0.4, 0, 0)
 
 [node name="GlassSphere" type="CSGSphere3D" parent="." unique_id=1547540283]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.75, -5)
@@ -152,16 +160,19 @@ radius = 0.75
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 material_override = ExtResource("10_h0mrq")
 
-[node name="WaterPlane" parent="." unique_id=1062128404 instance=ExtResource("10_water")]
+[node name="WaterPlane" parent="." unique_id=1062128404]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.838057, 0.1, 0)
 
 [node name="PlasmaDemos" type="Node3D" parent="." unique_id=1612272791]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10)
 
 [node name="ShaderPlasma" type="CSGSphere3D" parent="PlasmaDemos" unique_id=171849056]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.75, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.95662344, 0)
 radius = 0.75
 material = SubResource("StandardMaterial3D_plasma")
+script = ExtResource("14_mover")
+speed = 0.8
+amplitude = Vector3(0, 0.3, 0)
 
 [node name="SubViewport" type="SubViewport" parent="PlasmaDemos/ShaderPlasma" unique_id=428939329]
 
@@ -175,9 +186,14 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.75, 0)
 material = SubResource("StandardMaterial3D_plasma")
 
 [node name="Sphere" type="CSGSphere3D" parent="PlasmaDemos/PlasmaBox" unique_id=1886618483]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.36322847)
 operation = 2
 radius = 0.6
 material = SubResource("StandardMaterial3D_h0mrq")
+script = ExtResource("14_mover")
+speed = 1.8
+amplitude = Vector3(0, 0, 0.4)
+offset = 1.0
 
 [node name="CSGExamples" type="Node3D" parent="." unique_id=202512221]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 10)
@@ -191,8 +207,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 size = Vector3(1.5, 1, 1.5)
 
 [node name="Sphere" type="CSGSphere3D" parent="CSGExamples/Union" unique_id=202512224]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1, 0.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9732485, 1, 0.5)
 radius = 0.6
+script = ExtResource("14_mover")
+speed = 2.0
+amplitude = Vector3(-0.5, 0, 0)
 
 [node name="Subtraction" type="CSGCombiner3D" parent="CSGExamples" unique_id=202512225]
 use_collision = true
@@ -203,9 +222,13 @@ material_override = ExtResource("13_cengd")
 size = Vector3(1.5, 1, 1.5)
 
 [node name="Sphere" type="CSGSphere3D" parent="CSGExamples/Subtraction" unique_id=202512227]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1, 0.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.79081434, 0.5)
 operation = 2
 radius = 0.6
+script = ExtResource("14_mover")
+speed = 1.5
+amplitude = Vector3(0, 0.5, 0)
+offset = 0.5
 
 [node name="Intersection" type="CSGCombiner3D" parent="CSGExamples" unique_id=202512228]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 0)
@@ -216,9 +239,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 size = Vector3(1.5, 1, 1.5)
 
 [node name="Sphere" type="CSGSphere3D" parent="CSGExamples/Intersection" unique_id=202512230]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1, 0.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32542074, 0.82542074, 0.32542074)
 operation = 1
 radius = 0.6
+script = ExtResource("14_mover")
+amplitude = Vector3(0.3, 0.3, 0.3)
 
 [node name="Floor" type="CSGBox3D" parent="." unique_id=1984101356]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
