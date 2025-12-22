@@ -1,0 +1,9 @@
+[gd_resource type="ORMMaterial3D" load_steps=3 format=3 uid="uid://djms41odck1mn"]
+
+[ext_resource type="Texture2D" uid="uid://cnlmg6jk0xuun" path="res://src/demos/tools/materials/textures/wet_concrete_albedo.tres" id="1_or44f"]
+[ext_resource type="Texture2D" uid="uid://1cgk82eus80f" path="res://src/demos/tools/materials/textures/wet_concrete_orm.tres" id="2_k25x3"]
+
+[resource]
+albedo_texture = ExtResource("1_or44f")
+orm_texture = ExtResource("2_k25x3")
+ao_enabled = true
