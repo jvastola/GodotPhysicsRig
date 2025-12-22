@@ -1,4 +1,4 @@
-[gd_scene load_steps=27 format=3 uid="uid://b8h2r7k6m0q1p"]
+[gd_scene load_steps=28 format=3 uid="uid://b8h2r7k6m0q1p"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_4ykcd"]
 [ext_resource type="Script" uid="uid://m0r1orgvjxdw" path="res://src/demos/tools/scripts/procedural_grid.gd" id="1_grid"]
@@ -12,6 +12,7 @@
 [ext_resource type="Material" uid="uid://djms41odck1mn" path="res://src/demos/tools/materials/wet_concrete.tres" id="10_h0mrq"]
 [ext_resource type="Texture2D" uid="uid://bki04eqgf5rla" path="res://src/demos/tools/materials/textures/grass_albedo.tres" id="10_qopus"]
 [ext_resource type="Material" uid="uid://dvm0vbxfuim8a" path="res://src/demos/tools/materials/grass.tres" id="13_cengd"]
+[ext_resource type="Material" uid="uid://cyo28qn76a78l" path="res://src/demos/tools/materials/lava.tres" id="14_78nfi"]
 [ext_resource type="Script" uid="uid://b6csn023mq1rj" path="res://src/demos/tools/scripts/csg_mover.gd" id="14_mover"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
@@ -105,7 +106,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 size = Vector3(2, 1, 2)
 
 [node name="Cylinder" type="CSGCylinder3D" parent="GridCombiner/Box" unique_id=717520657]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.20065154, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1068341, 0)
 operation = 2
 height = 1.5
 script = ExtResource("14_mover")
@@ -143,7 +144,7 @@ operation = 2
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 
 [node name="Sphere" type="CSGSphere3D" parent="LavaCombiner/Box" unique_id=1944425065]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.36339232, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.33254483, 0, 0)
 operation = 2
 radius = 0.6
 material = SubResource("StandardMaterial3D_h0mrq")
@@ -167,7 +168,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.838057, 0.1, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10)
 
 [node name="ShaderPlasma" type="CSGSphere3D" parent="PlasmaDemos" unique_id=171849056]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.95662344, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.6351592, 0)
 radius = 0.75
 material = SubResource("StandardMaterial3D_plasma")
 script = ExtResource("14_mover")
@@ -186,10 +187,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.75, 0)
 material = SubResource("StandardMaterial3D_plasma")
 
 [node name="Sphere" type="CSGSphere3D" parent="PlasmaDemos/PlasmaBox" unique_id=1886618483]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.36322847)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.35620403)
 operation = 2
 radius = 0.6
-material = SubResource("StandardMaterial3D_h0mrq")
+material = ExtResource("14_78nfi")
 script = ExtResource("14_mover")
 speed = 1.8
 amplitude = Vector3(0, 0, 0.4)
@@ -207,7 +208,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 size = Vector3(1.5, 1, 1.5)
 
 [node name="Sphere" type="CSGSphere3D" parent="CSGExamples/Union" unique_id=202512224]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9732485, 1, 0.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.777651, 1, 0.5)
 radius = 0.6
 script = ExtResource("14_mover")
 speed = 2.0
@@ -222,7 +223,7 @@ material_override = ExtResource("13_cengd")
 size = Vector3(1.5, 1, 1.5)
 
 [node name="Sphere" type="CSGSphere3D" parent="CSGExamples/Subtraction" unique_id=202512227]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.79081434, 0.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.9707889, 0.5)
 operation = 2
 radius = 0.6
 script = ExtResource("14_mover")
@@ -239,7 +240,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 size = Vector3(1.5, 1, 1.5)
 
 [node name="Sphere" type="CSGSphere3D" parent="CSGExamples/Intersection" unique_id=202512230]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32542074, 0.82542074, 0.32542074)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4129609, 0.9129609, 0.4129609)
 operation = 1
 radius = 0.6
 script = ExtResource("14_mover")

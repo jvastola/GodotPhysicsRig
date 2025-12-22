@@ -1449,9 +1449,15 @@ func _on_autojoin_match_list(matches: Array) -> void:
 		_autojoin_log("Joining existing Nakama match: %s" % target_match_id)
 		nakama_manager.join_match(target_match_id)
 	else:
-		# Create new match
-		_autojoin_log("No matching room found - creating new match")
-		nakama_manager.create_match()
+		# Fallback: if searching for 'default' and we found ANY match, join the first one
+		if autojoin_room_name == "default" and matches.size() > 0:
+			target_match_id = matches[0].get("match_id", "")
+			_autojoin_log("Fallback: Joining first available match (ID: %s) as 'default'" % target_match_id.substr(0, 8))
+			nakama_manager.join_match(target_match_id)
+		else:
+			# Create new match
+			_autojoin_log("No matching room found - creating new match")
+			nakama_manager.create_match()
 
 
 func _on_autojoin_nakama_created(match_id: String, label: String) -> void:
