@@ -20,6 +20,7 @@ editor_data/
 bin/
 logs/
 user://
+.DS_Store
 
 # MCP Server dependencies
 godot-mcp-server/
@@ -28,6 +29,9 @@ godot-livekit
 addons/godotopenxrvendors/
 debug.keystore
 release.keystore
+
+# Sentry
+!addons/sentry/bin/
 
 # Gradle build artifacts (Android plugin)
 .gradle/

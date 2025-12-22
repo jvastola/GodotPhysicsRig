@@ -31,6 +31,10 @@ InteractionManager="*res://src/systems/interactions/interaction_manager.gd"
 LiveKitWrapper="*res://src/livekit_wrapper.gd"
 KeyboardManager="*res://src/ui/keyboard_manager.gd"
 
+[debug]
+
+settings/gdscript/always_track_call_stacks=true
+
 [dotnet]
 
 project/assembly_name="PhysicsHand"
@@ -114,6 +118,11 @@ default_level=1
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
+
+[sentry]
+
+options/dsn="https://6471b489536d879b5d16166aac01fd33@o4510581008564225.ingest.us.sentry.io/4510581012168704"
+options/send_default_pii=true
 
 [xr]
 

@@ -9,7 +9,7 @@ signal accepted
 const DEFAULT_PRIVACY_TEXT := """
 SCENEXR PRIVACY POLICY
 
-Last Updated: September 4, 2025
+Last Updated: December 22, 2025
 
 Welcome to SceneXR! We at ANY Reality LLC ("Company," "we," "us," or "our") respect your privacy and have composed this Privacy Policy to help you understand how we process your Personal Data (defined below) and your choices about the data we process.
 
@@ -91,11 +91,11 @@ Please see the list of key Third-Party Services we may use:
 
     Meta: As the primary platform for SceneXR on Quest devices, Meta collects data according to its policies. For more information visit: https://www.meta.com/legal/privacy-policy/
 
-    Photon: https://www.photonengine.com/en-US/PrivacyPolicy
-
     Nakama: https://heroiclabs.com/privacy-policy/
 
     LiveKit: https://livekit.io/privacy
+
+    Sentry: https://sentry.io/privacy/
 
     Oracle Cloud: https://www.oracle.com/legal/privacy/privacy-policy.html
 
@@ -171,7 +171,7 @@ The usage information we collect helps us to improve our Services and to deliver
 
 We may share the categories of Personal Data described above in the following circumstances, and unless otherwise required by law, without further notice to you:
 
-    Vendors and Service Providers: With third-party vendors and service providers who perform services on our behalf, such as platform providers (Meta), multiplayer service providers [e.g., Photon]. These parties are authorized to use your Personal Data only as necessary to provide these services to us and are under contractual obligations to protect it.
+    Vendors and Service Providers: With third-party vendors and service providers who perform services on our behalf, such as platform providers (Meta) and multiplayer service providers. These parties are authorized to use your Personal Data only as necessary to provide these services to us and are under contractual obligations to protect it.
 
     Other Players: Certain Personal Data, such as your platform username, profile picture, and your User Content (custom builds, etc.), will be visible to other players within the Game as part of the multiplayer and social experience. Your voice in voice chat will be audible to other players in your session.
 
