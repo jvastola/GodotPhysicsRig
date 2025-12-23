@@ -27,13 +27,13 @@ const SURFACE_BODY := "body"
 
 @export_subgroup("Head")
 @export_node_path("MeshInstance3D") var head_target: NodePath = NodePath("PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadMesh")
-@export_node_path("MeshInstance3D") var head_path: NodePath = NodePath("PlayerBody/XROrigin3D/XRCamera3D/Headarea/HeadMesh")
+@export_node_path("MeshInstance3D") var head_path: NodePath = NodePath("PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadMesh")
 @export_node_path("MeshInstance3D") var head_preview_mesh: NodePath = NodePath("")
 @export var head_subdivisions: Vector3i = Vector3i(8, 8, 2)
 
 @export_subgroup("Body")
-@export_node_path("MeshInstance3D") var body_target: NodePath = NodePath("PlayerBody/XROrigin3D/XRCamera3D/BodyMesh")
-@export_node_path("MeshInstance3D") var body_path: NodePath = NodePath("PlayerBody/XROrigin3D/XRCamera3D/BodyMesh")
+@export_node_path("MeshInstance3D") var body_target: NodePath = NodePath("PlayerBody/XROrigin3D/XRCamera3D/HeadArea/BodyMesh")
+@export_node_path("MeshInstance3D") var body_path: NodePath = NodePath("PlayerBody/XROrigin3D/XRCamera3D/HeadArea/BodyMesh")
 @export_node_path("MeshInstance3D") var body_preview_mesh: NodePath = NodePath("")
 @export var body_subdivisions: Vector3i = Vector3i(8, 4, 2)
 
@@ -107,12 +107,19 @@ func _ready() -> void:
 	if load_for_player:
 		print("GridPainter: Loading saved grid data from: ", _save_path)
 		load_grid_data(_save_path)
+	# Defer surface resolution and texture application to ensure player meshes are ready
+	call_deferred("_deferred_init")
+
+
+func _deferred_init() -> void:
+	"""Deferred initialization to ensure player meshes are ready"""
 	print("GridPainter: Resolving surface nodes...")
 	_resolve_all_surface_nodes()
 	_attach_handler_scripts()
 	print("GridPainter: Applying all surface textures, surfaces count: ", _surfaces.size())
 	_apply_all_surface_textures()
 	print("GridPainter: _ready() complete")
+
 
 func _load_handler_script() -> void:
 	if _handler_script:
@@ -276,15 +283,23 @@ func _resolve_all_surface_nodes() -> void:
 func _resolve_surface_paths(surface: SurfaceSlot) -> void:
 	var base := _get_surface_base(surface)
 	if base == null:
+		print("GridPainter: Cannot resolve paths for surface ", surface.id, " - base is null")
 		return
+	print("GridPainter: Resolving surface ", surface.id, " from base: ", base.name)
 	if surface.target_relative != NodePath(""):
 		var target_node := base.get_node_or_null(surface.target_relative)
 		if target_node and target_node is MeshInstance3D:
 			surface.resolved_target_path = target_node.get_path()
+			print("GridPainter:   Target resolved: ", surface.resolved_target_path)
+		else:
+			print("GridPainter:   Target NOT found at: ", surface.target_relative)
 	if surface.paint_relative != NodePath(""):
 		var paint_node := base.get_node_or_null(surface.paint_relative)
 		if paint_node and paint_node is MeshInstance3D:
 			surface.resolved_paint_path = paint_node.get_path()
+			print("GridPainter:   Paint resolved: ", surface.resolved_paint_path)
+		else:
+			print("GridPainter:   Paint NOT found at: ", surface.paint_relative)
 	surface.resolved_extra_paths = []
 	for extra in surface.extra_targets:
 		var extra_node := base.get_node_or_null(extra)
@@ -722,3 +737,23 @@ func debug_print_grid(surface_id: String = "") -> void:
 		for x in range(surface.grid_w()):
 			line += "%s " % [surface.grid_colors[y][x]]
 		print(line)
+
+
+func refresh_all_surfaces() -> void:
+	"""Reload saved data and reapply all surface textures. Call after edits to update player meshes."""
+	print("GridPainter: Refreshing all surfaces...")
+	if load_for_player:
+		load_grid_data(_save_path)
+	_resolve_all_surface_nodes()
+	_apply_all_surface_textures()
+	print("GridPainter: Refresh complete")
+
+
+func get_surface_texture(surface_id: String) -> ImageTexture:
+	"""Get the texture for a specific surface (head, body, left_hand, right_hand)"""
+	var surface := _get_surface(surface_id)
+	if not surface:
+		return null
+	if not surface.texture:
+		surface.texture = _build_texture_from_surface(surface)
+	return surface.texture

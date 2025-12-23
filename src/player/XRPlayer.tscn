@@ -310,7 +310,10 @@ script = ExtResource("11_2d0bc")
 [node name="GridPainter" type="Node3D" parent="." unique_id=1302115314]
 script = ExtResource("13_grid_painter")
 player_root_path = NodePath("..")
+head_target = NodePath("PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadMesh")
 head_path = NodePath("PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadMesh")
+body_target = NodePath("PlayerBody/XROrigin3D/XRCamera3D/HeadArea/BodyMesh")
+body_path = NodePath("PlayerBody/XROrigin3D/XRCamera3D/HeadArea/BodyMesh")
 
 [node name="PlayerNetworkComponent" type="Node" parent="." unique_id=1277471060]
 script = ExtResource("14_network_comp")

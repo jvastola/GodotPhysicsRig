@@ -35,27 +35,33 @@ size_flags_vertical = 3
 theme_override_constants/separation = 10
 
 [node name="TitleLabel" type="Label" parent="MarginContainer/ScrollContainer/VBoxContainer"]
+layout_mode = 2
 text = "Performance / Tool Pool"
 theme_override_colors/font_color = Color(0.8, 0.95, 1, 1)
 theme_override_font_sizes/font_size = 20
 
 [node name="SubtitleLabel" type="Label" parent="MarginContainer/ScrollContainer/VBoxContainer"]
+layout_mode = 2
 text = "Limit active tool spawns; extra instances are pooled automatically."
 theme_override_colors/font_color = Color(0.7, 0.85, 0.95, 1)
 theme_override_font_sizes/font_size = 13
 
 [node name="LimitGrid" type="GridContainer" parent="MarginContainer/ScrollContainer/VBoxContainer"]
+layout_mode = 2
 columns = 1
 theme_override_constants/separation = 6
 
 [node name="PolyRow" type="HBoxContainer" parent="MarginContainer/ScrollContainer/VBoxContainer/LimitGrid"]
+layout_mode = 2
 theme_override_constants/separation = 8
 
 [node name="Label" type="Label" parent="MarginContainer/ScrollContainer/VBoxContainer/LimitGrid/PolyRow"]
+layout_mode = 2
 text = "Poly Tool"
 custom_minimum_size = Vector2(140, 0)
 
 [node name="Spin" type="SpinBox" parent="MarginContainer/ScrollContainer/VBoxContainer/LimitGrid/PolyRow"]
+layout_mode = 2
 min_value = 0.0
 max_value = 8.0
 step = 1.0
@@ -63,17 +69,21 @@ value = 1.0
 custom_minimum_size = Vector2(120, 0)
 
 [node name="Counts" type="Label" parent="MarginContainer/ScrollContainer/VBoxContainer/LimitGrid/PolyRow"]
+layout_mode = 2
 text = "Active 0 / Pooled 0 (Limit 1)"
 size_flags_horizontal = 3
 
 [node name="ConvexRow" type="HBoxContainer" parent="MarginContainer/ScrollContainer/VBoxContainer/LimitGrid"]
+layout_mode = 2
 theme_override_constants/separation = 8
 
 [node name="Label" type="Label" parent="MarginContainer/ScrollContainer/VBoxContainer/LimitGrid/ConvexRow"]
+layout_mode = 2
 text = "Convex Hull Pen"
 custom_minimum_size = Vector2(140, 0)
 
 [node name="Spin" type="SpinBox" parent="MarginContainer/ScrollContainer/VBoxContainer/LimitGrid/ConvexRow"]
+layout_mode = 2
 min_value = 0.0
 max_value = 8.0
 step = 1.0
@@ -81,17 +91,21 @@ value = 1.0
 custom_minimum_size = Vector2(120, 0)
 
 [node name="Counts" type="Label" parent="MarginContainer/ScrollContainer/VBoxContainer/LimitGrid/ConvexRow"]
+layout_mode = 2
 text = "Active 0 / Pooled 0 (Limit 1)"
 size_flags_horizontal = 3
 
 [node name="VolumeRow" type="HBoxContainer" parent="MarginContainer/ScrollContainer/VBoxContainer/LimitGrid"]
+layout_mode = 2
 theme_override_constants/separation = 8
 
 [node name="Label" type="Label" parent="MarginContainer/ScrollContainer/VBoxContainer/LimitGrid/VolumeRow"]
+layout_mode = 2
 text = "Volume Hull Pen"
 custom_minimum_size = Vector2(140, 0)
 
 [node name="Spin" type="SpinBox" parent="MarginContainer/ScrollContainer/VBoxContainer/LimitGrid/VolumeRow"]
+layout_mode = 2
 min_value = 0.0
 max_value = 8.0
 step = 1.0
@@ -99,17 +113,21 @@ value = 1.0
 custom_minimum_size = Vector2(120, 0)
 
 [node name="Counts" type="Label" parent="MarginContainer/ScrollContainer/VBoxContainer/LimitGrid/VolumeRow"]
+layout_mode = 2
 text = "Active 0 / Pooled 0 (Limit 1)"
 size_flags_horizontal = 3
 
 [node name="VoxelRow" type="HBoxContainer" parent="MarginContainer/ScrollContainer/VBoxContainer/LimitGrid"]
+layout_mode = 2
 theme_override_constants/separation = 8
 
 [node name="Label" type="Label" parent="MarginContainer/ScrollContainer/VBoxContainer/LimitGrid/VoxelRow"]
+layout_mode = 2
 text = "Voxel Tool"
 custom_minimum_size = Vector2(140, 0)
 
 [node name="Spin" type="SpinBox" parent="MarginContainer/ScrollContainer/VBoxContainer/LimitGrid/VoxelRow"]
+layout_mode = 2
 min_value = 0.0
 max_value = 8.0
 step = 1.0
@@ -117,9 +135,11 @@ value = 1.0
 custom_minimum_size = Vector2(120, 0)
 
 [node name="Counts" type="Label" parent="MarginContainer/ScrollContainer/VBoxContainer/LimitGrid/VoxelRow"]
+layout_mode = 2
 text = "Active 0 / Pooled 0 (Limit 1)"
 size_flags_horizontal = 3
 
 [node name="StatusLabel" type="Label" parent="MarginContainer/ScrollContainer/VBoxContainer"]
+layout_mode = 2
 text = "Ready"
 theme_override_colors/font_color = Color(0.75, 1, 0.75, 1)

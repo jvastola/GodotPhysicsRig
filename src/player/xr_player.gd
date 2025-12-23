@@ -25,6 +25,7 @@ extends Node3D
 @onready var head_area: Area3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea
 @onready var head_collision_shape: CollisionShape3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadCollisionShape
 @onready var head_mesh: MeshInstance3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadMesh
+@onready var body_mesh: MeshInstance3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea/BodyMesh
 
 # Components
 var network_component: PlayerNetworkComponent
@@ -38,6 +39,7 @@ var is_vr_mode := false
 @export var head_radius: float = 0.18
 var _desktop_trigger_event: InputEventMouseButton = null
 @export var show_head_mesh: bool = true
+@export var show_body_mesh: bool = true
 @export var desktop_extra_collider_enabled: bool = true
 @export var desktop_extra_collider_height: float = 1.2
 @export var desktop_extra_collider_radius: float = 0.2
@@ -81,6 +83,9 @@ func _ready() -> void:
 	
 	if head_mesh:
 		head_mesh.visible = show_head_mesh
+	
+	if body_mesh:
+		body_mesh.visible = show_body_mesh
 	
 	# Ensure physics hands are properly connected
 	call_deferred("_setup_physics_hands")
@@ -506,6 +511,26 @@ func apply_texture_to_head(texture: ImageTexture) -> void:
 	mat.cull_mode = BaseMaterial3D.CULL_BACK  # Show front faces (outside)
 	head_mesh.material_override = mat
 	print("XRPlayer: Applied texture to head mesh, visible: ", head_mesh.visible, ", mesh: ", head_mesh.mesh)
+
+
+func apply_texture_to_body(texture: ImageTexture) -> void:
+	"""Apply a texture to the body mesh"""
+	if not body_mesh:
+		print("XRPlayer: body_mesh is null, cannot apply texture")
+		return
+	
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = texture
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.cull_mode = BaseMaterial3D.CULL_BACK
+	body_mesh.material_override = mat
+	print("XRPlayer: Applied texture to body mesh, visible: ", body_mesh.visible, ", mesh: ", body_mesh.mesh)
+
+
+func get_grid_painter() -> Node:
+	"""Get the GridPainter component"""
+	return get_node_or_null("GridPainter")
 
 
 func toggle_voice_chat(enabled: bool) -> void:
