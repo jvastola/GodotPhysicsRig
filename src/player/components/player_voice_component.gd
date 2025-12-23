@@ -23,6 +23,10 @@ var mic_gain_db: float = 0.0
 var remote_players: Dictionary = {} # identity -> { "player_node": NetworkPlayer, "audio_player": AudioStreamPlayer3D }
 var player_scene_root: Node = null # Reference to find NetworkPlayers in scene
 
+# Log rate limiting
+var _logged_missing_players: Dictionary = {} # peer_id -> last_log_time
+const LOG_COOLDOWN_SEC: float = 10.0 # Only log once per 10 seconds per peer
+
 
 func setup(p_livekit_manager: Node) -> void:
 	"""Initialize voice component with LiveKit manager"""
@@ -165,8 +169,6 @@ func _on_audio_frame(peer_id: String, frame: PackedVector2Array) -> void:
 		player_data["player_node"] = _find_network_player(peer_id)
 		if player_data["player_node"]:
 			print("✅ PlayerVoiceComponent: Found NetworkPlayer for ", peer_id, ": ", player_data["player_node"].name)
-		else:
-			print("❌ PlayerVoiceComponent: NetworkPlayer NOT found for ", peer_id)
 	
 	# Create spatial audio player if needed
 	if not player_data["audio_player"] and player_data["player_node"]:
@@ -180,9 +182,13 @@ func _on_audio_frame(peer_id: String, frame: PackedVector2Array) -> void:
 		if playback:
 			playback.push_buffer(frame)
 	else:
-		# Debug: Log when spatial player is missing
-		if frame.size() > 0:  # Only log when there's actually audio
-			print("⚠️ PlayerVoiceComponent: No spatial audio player for ", peer_id, " (audio dropped)")
+		# Rate-limited logging for missing spatial player
+		if frame.size() > 0:
+			var now = Time.get_ticks_msec() / 1000.0
+			var log_key = peer_id + "_spatial"
+			if not _logged_missing_players.has(log_key) or (now - _logged_missing_players[log_key]) > LOG_COOLDOWN_SEC:
+				_logged_missing_players[log_key] = now
+				print("⚠️ PlayerVoiceComponent: No spatial audio player for ", peer_id, " (audio dropped)")
 
 
 func _find_network_player(peer_id: String) -> Node:
@@ -207,7 +213,12 @@ func _find_network_player(peer_id: String) -> Node:
 		if player_peer_id == peer_id:
 			return player
 	
-	print("PlayerVoiceComponent: Could not find NetworkPlayer for peer_id: ", peer_id)
+	# Rate-limited logging
+	var now = Time.get_ticks_msec() / 1000.0
+	if not _logged_missing_players.has(peer_id) or (now - _logged_missing_players[peer_id]) > LOG_COOLDOWN_SEC:
+		_logged_missing_players[peer_id] = now
+		print("PlayerVoiceComponent: Could not find NetworkPlayer for peer_id: ", peer_id)
+	
 	return null
 
 
