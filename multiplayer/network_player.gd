@@ -112,8 +112,9 @@ func _interpolate_transforms(delta: float) -> void:
 	body_pos.y = target_head_position.y - 0.3 # Chest height (slightly below head)
 	body_visual.global_position = body_visual.global_position.lerp(body_pos, lerp_factor)
 	
-	# Rotate body to match head's full rotation (all axes)
-	body_visual.rotation_degrees = body_visual.rotation_degrees.lerp(target_head_rotation, lerp_factor)
+	# Rotate body to match head's Y rotation only (yaw) to keep it upright
+	var target_body_rotation = Vector3(0, target_head_rotation.y, 0)
+	body_visual.rotation_degrees = body_visual.rotation_degrees.lerp(target_body_rotation, lerp_factor)
 
 
 ## Create simple visual meshes for the player (rectangles like XRPlayer)
