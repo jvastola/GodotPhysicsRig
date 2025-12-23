@@ -114,6 +114,7 @@ MirrorColor = Color(1, 1, 1, 1)
 transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, -4.79658, 0, -3.49806)
 script = ExtResource("10_grid_painter")
 player_root_path = NodePath("../XRPlayer")
+load_for_player = false
 left_hand_preview_mesh = NodePath("GridTargetLeft")
 left_hand_subdivisions = Vector3i(4, 4, 4)
 right_hand_preview_mesh = NodePath("GridTargetRight")

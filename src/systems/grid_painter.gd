@@ -104,6 +104,7 @@ func _ready() -> void:
 	print("GridPainter: _ready() called, load_for_player: ", load_for_player)
 	_rng.randomize()
 	_load_handler_script()
+	print("GridPainter: Registered surfaces: ", _surfaces.keys())
 	if load_for_player:
 		print("GridPainter: Loading saved grid data from: ", _save_path)
 		load_grid_data(_save_path)
@@ -563,29 +564,41 @@ func save_grid_data(path: String = _save_path) -> void:
 			payload[id] = _serialize_surface(surface)
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file:
-		file.store_string(JSON.stringify({"surfaces": payload}))
+		var json_str := JSON.stringify({"surfaces": payload})
+		file.store_string(json_str)
 		file.close()
+		print("GridPainter: Saved ", payload.keys().size(), " surfaces to: ", path)
+	else:
+		push_error("GridPainter: Failed to save grid data to: ", path)
 
 func load_grid_data(path: String = _save_path) -> void:
 	if not FileAccess.file_exists(path):
+		print("GridPainter: No save file found at: ", path)
 		return
 	var file := FileAccess.open(path, FileAccess.READ)
 	if not file:
+		print("GridPainter: Failed to open save file: ", path)
 		return
 	var json := JSON.new()
-	var err := json.parse(file.get_as_text())
+	var file_content := file.get_as_text()
+	var err := json.parse(file_content)
 	file.close()
 	if err != OK:
 		push_warning("GridPainter: Unable to parse surface save file")
 		return
 	var data: Variant = json.get_data()
 	if not data.has("surfaces"):
+		print("GridPainter: Save file has no 'surfaces' key")
 		return
+	print("GridPainter: Loading ", data["surfaces"].keys().size(), " surfaces from save file")
 	for id in data["surfaces"].keys():
 		var surface := _get_surface(id)
 		if surface:
 			_deserialize_surface(surface, data["surfaces"][id])
 			surface.texture = _build_texture_from_surface(surface)
+			print("GridPainter: Loaded surface '", id, "' with grid size ", surface.grid_w(), "x", surface.grid_h())
+		else:
+			print("GridPainter: Surface '", id, "' not found in registered surfaces")
 
 func reset_grid_data(path: String = _save_path, remove_save_file: bool = true) -> void:
 	for surface in _surfaces.values():
@@ -616,18 +629,25 @@ func _serialize_surface(surface: SurfaceSlot) -> Dictionary:
 	}
 
 func _deserialize_surface(surface: SurfaceSlot, payload: Dictionary) -> void:
+	# First, apply subdivisions if they changed (this will reset colors)
 	if payload.has("subdivisions"):
 		var subs: Dictionary = payload.get("subdivisions", {})
 		var axis := Vector3i(int(subs.get("x", surface.subdivisions_axis.x)), int(subs.get("y", surface.subdivisions_axis.y)), int(subs.get("z", surface.subdivisions_axis.z)))
-		surface.subdivisions_axis = axis
-		_apply_subdivisions_to_surface(surface, axis)
+		if axis != surface.subdivisions_axis:
+			surface.subdivisions_axis = axis
+			_apply_subdivisions_to_surface(surface, axis)
+	
+	# Then load the grid colors (after any reset from subdivisions)
 	if payload.has("grid"):
 		var rows = payload["grid"]
+		var loaded_count := 0
 		for y in range(min(rows.size(), surface.grid_h())):
 			var row_data = rows[y]
 			for x in range(min(row_data.size(), surface.grid_w())):
 				var cd = row_data[x]
 				surface.grid_colors[y][x] = Color(cd["r"], cd["g"], cd["b"], cd["a"])
+				loaded_count += 1
+		print("GridPainter: Deserialized ", loaded_count, " color cells for surface")
 
 func _convert_grid_to_face_colors(surface: SurfaceSlot) -> Array:
 	var out: Array = []
