@@ -16,14 +16,16 @@
 [ext_resource type="Script" uid="uid://dwsx0otrybpmd" path="res://src/player/components/simple_world_grab_component.gd" id="16_simple_grab"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_xxbg3"]
+size = Vector3(0.3, 0.4, 0.2)
 
 [sub_resource type="BoxMesh" id="BoxMesh_l588l"]
+size = Vector3(0.22, 0.22, 0.22)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_xxbg3"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_hand"]
 material = ExtResource("3_yb8bw")
-size = Vector3(0.1, 0.1, 0.1)
+size = Vector3(0.1, 0.1, 0.15)
 
 [sub_resource type="BoxMesh" id="BoxMesh_watch_face"]
 size = Vector3(0.04, 0.004, 0.04)
@@ -78,14 +80,13 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.03717, 0)
 collision_layer = 2
 
 [node name="BodyMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/XRCamera3D/HeadArea" unique_id=596586885]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.35, 0)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_xxbg3")
 
 [node name="HeadMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/XRCamera3D/HeadArea" unique_id=396937068]
-transform = Transform3D(-0.9999995, 0.00013182667, -0.0010033988, -0.00013271166, -0.9999996, 0.0008819887, -0.0010032823, 0.00088212144, 0.9999991, 0, 0, 0)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_l588l")
-skeleton = NodePath("../..")
 
 [node name="HeadCollisionShape" type="CollisionShape3D" parent="PlayerBody/XROrigin3D/XRCamera3D/HeadArea" unique_id=346767088]
 transform = Transform3D(0.23, 0, 0, 0, 0.23, 0, 0, 0, 0.23, 0, 0, 0)

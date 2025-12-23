@@ -48,7 +48,21 @@ func _setup_networking() -> void:
 	network_manager.avatar_texture_received.connect(_on_avatar_texture_received)
 	network_manager.send_local_avatar.connect(send_avatar_texture)
 	
+	# Connect to NakamaManager match_joined to send avatar when we join a room
+	var nakama_manager = get_node_or_null("/root/NakamaManager")
+	if nakama_manager and nakama_manager.has_signal("match_joined"):
+		if not nakama_manager.match_joined.is_connected(_on_local_match_joined):
+			nakama_manager.match_joined.connect(_on_local_match_joined)
+	
 	print("PlayerNetworkComponent: Networking initialized")
+
+
+func _on_local_match_joined(_match_id: String) -> void:
+	"""When local player joins a match, send our avatar to everyone"""
+	print("PlayerNetworkComponent: Local player joined match, sending avatar...")
+	# Delay slightly to ensure connection is fully established
+	await get_tree().create_timer(0.5).timeout
+	send_avatar_texture()
 
 func _update_networking(delta: float) -> void:
 	"""Send player transform updates to network and update remote players"""
