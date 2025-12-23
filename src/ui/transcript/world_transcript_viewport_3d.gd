@@ -15,6 +15,7 @@ var transcript_receiver: TranscriptReceiverHandler
 
 func _ready() -> void:
 	super._ready()
+	add_to_group("world_transcript")
 	_setup_transcript_system()
 
 

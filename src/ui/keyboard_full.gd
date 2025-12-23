@@ -44,6 +44,11 @@ var _clear_btn: Button
 # Static instance for global keyboard input
 static var instance: KeyboardFullUI = null
 
+# Voice-to-text state
+var _mic_active: bool = false
+var _mic_btn: Button
+var _transcript_receiver: Node = null
+
 # Key layouts - MacBook style with shortcuts instead of F keys
 const ROW_SHORTCUTS = ["Esc", "Undo", "Redo", "Find", "Replace", "Copy", "Paste", "SelAll", "Save", "🎤", "Home", "End", "Del"]
 const ROW_NUMBERS = ["`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "=", "⌫"]
@@ -77,6 +82,7 @@ const KEY_SPACING = 3
 func _ready() -> void:
 	instance = self
 	_build_keyboard()
+	_setup_voice_to_text()
 	
 	# Connect to KeyboardManager if available
 	if KeyboardManager and KeyboardManager.instance:
@@ -310,6 +316,7 @@ func _create_row(keys: Array, row_name: String) -> HBoxContainer:
 			"⌘": _cmd_left_btn = btn
 			"⌘R": _cmd_right_btn = btn
 			"Caps": _caps_btn = btn
+			"🎤": _mic_btn = btn
 		
 		# Store references to letter and symbol buttons for dynamic updates
 		if key.length() == 1 and key >= "A" and key <= "Z":
@@ -441,6 +448,7 @@ func _on_key_pressed(key: String) -> void:
 		"Save":
 			shortcut_action.emit("save")
 		"🎤":
+			_toggle_mic()
 			shortcut_action.emit("mic_input")
 		
 		# Regular keys
@@ -598,3 +606,100 @@ func clear_pending_text() -> void:
 ## Simulate a key press programmatically
 func simulate_key(key: String) -> void:
 	_on_key_pressed(key)
+
+
+## Setup voice-to-text integration
+func _setup_voice_to_text() -> void:
+	# Find or wait for transcript receiver
+	await get_tree().process_frame
+	_find_transcript_receiver()
+
+
+func _find_transcript_receiver() -> void:
+	# Look for WorldTranscriptViewport3D which has the receiver
+	var viewports := get_tree().get_nodes_in_group("world_transcript")
+	if not viewports.is_empty():
+		var vp = viewports[0]
+		if vp.has_method("get_transcript_receiver"):
+			_transcript_receiver = vp.get_transcript_receiver()
+			if _transcript_receiver:
+				_transcript_receiver.transcript_received.connect(_on_voice_transcript)
+				print("KeyboardFullUI: Connected to transcript receiver")
+				return
+	
+	# Try finding by searching scene tree
+	var root := get_tree().current_scene
+	if root:
+		_transcript_receiver = _find_node_of_class(root, "TranscriptReceiverHandler")
+		if _transcript_receiver:
+			_transcript_receiver.transcript_received.connect(_on_voice_transcript)
+			print("KeyboardFullUI: Connected to transcript receiver")
+
+
+func _find_node_of_class(node: Node, class_name_str: String) -> Node:
+	if node.get_class() == class_name_str or (node.get_script() and node.get_script().get_global_name() == class_name_str):
+		return node
+	for child in node.get_children():
+		var found := _find_node_of_class(child, class_name_str)
+		if found:
+			return found
+	return null
+
+
+## Toggle microphone listening for voice-to-text
+func _toggle_mic() -> void:
+	_mic_active = not _mic_active
+	
+	# Update mic button visual
+	if _mic_btn:
+		if _mic_active:
+			_mic_btn.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))  # Red when active
+			_mic_btn.text = "🔴"
+		else:
+			_mic_btn.add_theme_color_override("font_color", Color(0.9, 0.7, 0.4))  # Orange when inactive
+			_mic_btn.text = "🎤"
+	
+	if _mic_active:
+		print("KeyboardFullUI: Voice input ENABLED - speak to type")
+		# Try to connect if not already
+		if not _transcript_receiver:
+			_find_transcript_receiver()
+	else:
+		print("KeyboardFullUI: Voice input DISABLED")
+
+
+## Handle incoming voice transcript
+func _on_voice_transcript(entry) -> void:
+	if not _mic_active:
+		return
+	
+	# Only process local user's transcripts
+	if entry.has_method("get") or entry is RefCounted:
+		var is_local: bool = entry.is_local if "is_local" in entry else false
+		if not is_local:
+			return
+		
+		var text: String = entry.text if "text" in entry else ""
+		if text.is_empty():
+			return
+		
+		# Add space before if there's existing text
+		if not _pending_text.is_empty() and not _pending_text.ends_with(" "):
+			_pending_text += " "
+		
+		_pending_text += text
+		_update_preview()
+		text_input.emit(text)
+		
+		print("KeyboardFullUI: Voice input: ", text)
+
+
+## Check if mic is active
+func is_mic_active() -> bool:
+	return _mic_active
+
+
+## Set mic state programmatically
+func set_mic_active(active: bool) -> void:
+	if _mic_active != active:
+		_toggle_mic()
