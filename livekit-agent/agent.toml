@@ -1,0 +1,11 @@
+# LiveKit Cloud Agent Configuration
+[agent]
+name = "transcriber-agent"
+entrypoint = "transcriber_agent:entrypoint"
+
+[agent.build]
+python_version = "3.11"
+
+[agent.env]
+# These will be set in LiveKit Cloud dashboard
+DEEPGRAM_API_KEY = "${DEEPGRAM_API_KEY}"

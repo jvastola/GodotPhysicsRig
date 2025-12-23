@@ -464,9 +464,17 @@ func _on_participant_name_changed_rust(identity: String, username: String) -> vo
 	participant_metadata_changed.emit(identity, metadata)
 
 
-func _on_data_received(sender_identity: String, data: String) -> void:
-	_log_debug("Data received", [sender_identity, data])
-	data_received.emit(sender_identity, data)
+func _on_data_received(sender_identity: String, data, topic: String = "") -> void:
+	# Handle both String and PackedByteArray data from different platforms
+	var data_str: String
+	if data is PackedByteArray:
+		data_str = (data as PackedByteArray).get_string_from_utf8()
+	elif data is String:
+		data_str = data
+	else:
+		data_str = str(data)
+	_log_debug("Data received", [sender_identity, data_str.left(100), topic])
+	data_received.emit(sender_identity, data_str)
 
 
 func _on_track_subscribed(participant_identity: String, track_sid: String) -> void:

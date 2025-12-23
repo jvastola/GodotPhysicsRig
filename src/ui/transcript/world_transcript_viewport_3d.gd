@@ -48,7 +48,38 @@ func _setup_transcript_system() -> void:
 	# Connect send to LLM signal
 	transcript_panel.send_to_llm_requested.connect(_on_send_to_llm_requested)
 	
+	# Connect to LiveKit for room status updates
+	var livekit = get_node_or_null("/root/LiveKitWrapper")
+	if livekit:
+		if livekit.has_signal("room_connected"):
+			livekit.room_connected.connect(_on_room_connected)
+		if livekit.has_signal("room_disconnected"):
+			livekit.room_disconnected.connect(_on_room_disconnected)
+		# Check if already connected
+		if livekit.has_method("is_room_connected") and livekit.is_room_connected():
+			_on_room_connected()
+	
 	print("WorldTranscriptViewport3D: Transcript system initialized")
+
+
+## Called when LiveKit room connects
+func _on_room_connected() -> void:
+	if transcript_panel:
+		transcript_panel._update_status("Connected - listening for transcripts")
+	# Update local identity
+	var livekit = get_node_or_null("/root/LiveKitWrapper")
+	if livekit and livekit.has_method("get_local_identity"):
+		var identity = livekit.get_local_identity()
+		if identity and not identity.is_empty():
+			set_local_identity(identity)
+			if transcript_store:
+				transcript_store.room_name = livekit.get_current_room() if livekit.has_method("get_current_room") else ""
+
+
+## Called when LiveKit room disconnects
+func _on_room_disconnected() -> void:
+	if transcript_panel:
+		transcript_panel._update_status("Disconnected")
 
 
 ## Handle request to send text to LLM

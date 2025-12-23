@@ -1,189 +1,192 @@
 """
-LiveKit Agent for Multi-User Voice Transcription
+LiveKit Transcriber Agent for LiveKit Cloud
 
-This agent transcribes audio from all participants in a LiveKit room
-and broadcasts the transcripts to all room participants via data channel.
-
-Based on the LiveKit Agents SDK with Deepgram STT and Silero VAD.
+Transcribes audio from all participants and broadcasts transcripts via data channel.
+Deploy to LiveKit Cloud using: livekit-cli cloud agent deploy
 """
 
 import asyncio
 import json
 import logging
+import os
 import time
 from typing import Dict
 
+# Load environment variables from .env file
 from dotenv import load_dotenv
+load_dotenv()
+
 from livekit import rtc
 from livekit.agents import (
-    Agent,
-    AgentSession,
+    AutoSubscribe,
     JobContext,
     JobProcess,
     WorkerOptions,
     cli,
+    stt,
 )
-# from livekit.agents.voice import AgentTranscriptionOptions  # Removed in 1.x
 from livekit.plugins import deepgram, silero
 
-load_dotenv()
-
-logger = logging.getLogger("transcriber-agent")
+logger = logging.getLogger("transcriber")
 logger.setLevel(logging.INFO)
 
 
-class TranscriberAgent(Agent):
-    """
-    Agent that transcribes a single participant's audio and broadcasts
-    the transcript to all room participants.
-    """
-
-    def __init__(self, *, participant_identity: str, room: rtc.Room):
-        super().__init__(
-            instructions="Transcribe user speech. Do not respond, just transcribe.",
-            stt=deepgram.STT(),
-        )
-        self.participant_identity = participant_identity
+class ParticipantTranscriber:
+    """Handles transcription for a single participant."""
+    
+    def __init__(
+        self,
+        participant: rtc.RemoteParticipant,
+        track: rtc.Track,
+        room: rtc.Room,
+        stt_stream: stt.SpeechStream,
+    ):
+        self.participant = participant
+        self.track = track
         self.room = room
-
-    async def on_user_turn_completed(self, chat_ctx, new_message) -> None:
-        """Called when the user finishes speaking. Broadcast the transcript."""
-        transcript = new_message.text_content
-        if not transcript or not transcript.strip():
+        self.stt_stream = stt_stream
+        self._tasks: list[asyncio.Task] = []
+        self._running = False
+    
+    async def start(self) -> None:
+        if self._running:
             return
-
-        # Build transcript message
+        self._running = True
+        
+        self._tasks = [
+            asyncio.create_task(self._process_audio()),
+            asyncio.create_task(self._process_transcripts()),
+        ]
+        logger.info(f"Started transcription for {self.participant.identity}")
+    
+    async def stop(self) -> None:
+        self._running = False
+        for task in self._tasks:
+            task.cancel()
+        await asyncio.gather(*self._tasks, return_exceptions=True)
+        self._tasks.clear()
+        await self.stt_stream.aclose()
+        logger.info(f"Stopped transcription for {self.participant.identity}")
+    
+    async def _process_audio(self) -> None:
+        try:
+            audio_stream = rtc.AudioStream(self.track)
+            async for event in audio_stream:
+                if not self._running:
+                    break
+                if isinstance(event, rtc.AudioFrameEvent):
+                    self.stt_stream.push_frame(event.frame)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"Audio processing error: {e}")
+    
+    async def _process_transcripts(self) -> None:
+        try:
+            async for event in self.stt_stream:
+                if not self._running:
+                    break
+                if event.type == stt.SpeechEventType.FINAL_TRANSCRIPT:
+                    text = event.alternatives[0].text if event.alternatives else ""
+                    if text.strip():
+                        await self._broadcast(text)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"Transcript processing error: {e}")
+    
+    async def _broadcast(self, text: str) -> None:
         message = {
             "type": "transcript",
-            "speaker_identity": self.participant_identity,
-            "text": transcript.strip(),
+            "speaker_identity": self.participant.identity,
+            "speaker_name": self.participant.name or self.participant.identity,
+            "text": text,
             "timestamp": int(time.time() * 1000),
             "is_final": True,
         }
-
-        # Broadcast to all participants
         try:
             await self.room.local_participant.publish_data(
                 json.dumps(message).encode("utf-8"),
                 reliable=True,
             )
-            logger.info(f"Transcript from {self.participant_identity}: {transcript[:50]}...")
+            logger.info(f"[{self.participant.identity}]: {text[:60]}")
         except Exception as e:
-            logger.error(f"Failed to publish transcript: {e}")
-
-        # Don't generate a response - we're just transcribing
-        from livekit.agents import StopResponse
-        raise StopResponse()
+            logger.error(f"Broadcast error: {e}")
 
 
-class MultiUserTranscriber:
-    """
-    Manages transcription sessions for all participants in a room.
-    Creates a separate AgentSession for each participant to transcribe
-    their audio independently.
-    """
-
-    def __init__(self, ctx: JobContext):
-        self.ctx = ctx
-        self._sessions: Dict[str, AgentSession] = {}
-        self._vad = silero.VAD.load()
-
+class RoomTranscriber:
+    """Manages transcription for all participants in a room."""
+    
+    def __init__(self, room: rtc.Room):
+        self.room = room
+        self._transcribers: Dict[str, ParticipantTranscriber] = {}
+        self._stt = deepgram.STT()
+    
     async def start(self) -> None:
-        """Start listening for participant events."""
-        self.ctx.room.on("participant_connected", self._on_participant_connected)
-        self.ctx.room.on("participant_disconnected", self._on_participant_disconnected)
-
-        # Start sessions for existing participants
-        for participant in self.ctx.room.remote_participants.values():
-            await self._start_session(participant)
-
-        logger.info(f"MultiUserTranscriber started with {len(self._sessions)} participants")
-
-    async def _on_participant_connected(self, participant: rtc.RemoteParticipant) -> None:
-        """Handle new participant joining the room."""
-        logger.info(f"Participant connected: {participant.identity}")
-        await self._start_session(participant)
-
-    async def _on_participant_disconnected(self, participant: rtc.RemoteParticipant) -> None:
-        """Handle participant leaving the room."""
-        logger.info(f"Participant disconnected: {participant.identity}")
-        await self._stop_session(participant.identity)
-
-    async def _start_session(self, participant: rtc.RemoteParticipant) -> None:
-        """Start a transcription session for a participant."""
-        if participant.identity in self._sessions:
-            logger.warning(f"Session already exists for {participant.identity}")
+        self.room.on("track_subscribed", self._on_track_subscribed)
+        self.room.on("track_unsubscribed", self._on_track_unsubscribed)
+        self.room.on("participant_disconnected", self._on_participant_disconnected)
+        
+        # Handle existing participants
+        for participant in self.room.remote_participants.values():
+            for pub in participant.track_publications.values():
+                if pub.track and pub.kind == rtc.TrackKind.KIND_AUDIO:
+                    await self._add_transcriber(participant, pub.track)
+        
+        logger.info(f"RoomTranscriber started with {len(self._transcribers)} participants")
+    
+    def _on_track_subscribed(
+        self, track: rtc.Track, pub: rtc.TrackPublication, participant: rtc.RemoteParticipant
+    ) -> None:
+        if track.kind == rtc.TrackKind.KIND_AUDIO:
+            asyncio.create_task(self._add_transcriber(participant, track))
+    
+    def _on_track_unsubscribed(
+        self, track: rtc.Track, pub: rtc.TrackPublication, participant: rtc.RemoteParticipant
+    ) -> None:
+        if track.kind == rtc.TrackKind.KIND_AUDIO:
+            asyncio.create_task(self._remove_transcriber(participant.identity))
+    
+    def _on_participant_disconnected(self, participant: rtc.RemoteParticipant) -> None:
+        asyncio.create_task(self._remove_transcriber(participant.identity))
+    
+    async def _add_transcriber(self, participant: rtc.RemoteParticipant, track: rtc.Track) -> None:
+        if participant.identity in self._transcribers:
             return
-
-        try:
-            agent = TranscriberAgent(
-                participant_identity=participant.identity,
-                room=self.ctx.room,
-            )
-
-            session = AgentSession(
-                vad=self._vad,
-                # Transcription options are now handled differently in 1.x
-            )
-
-            # Start the session for this specific participant
-            session.start(
-                room=self.ctx.room,
-                agent=agent,
-                participant=participant,
-            )
-
-            self._sessions[participant.identity] = session
-            logger.info(f"Started transcription session for {participant.identity}")
-
-        except Exception as e:
-            logger.error(f"Failed to start session for {participant.identity}: {e}")
-
-    async def _stop_session(self, identity: str) -> None:
-        """Stop a transcription session for a participant."""
-        session = self._sessions.pop(identity, None)
-        if session:
-            try:
-                await session.aclose()
-                logger.info(f"Stopped transcription session for {identity}")
-            except Exception as e:
-                logger.error(f"Error stopping session for {identity}: {e}")
-
+        
+        stt_stream = self._stt.stream()
+        transcriber = ParticipantTranscriber(participant, track, self.room, stt_stream)
+        self._transcribers[participant.identity] = transcriber
+        await transcriber.start()
+    
+    async def _remove_transcriber(self, identity: str) -> None:
+        transcriber = self._transcribers.pop(identity, None)
+        if transcriber:
+            await transcriber.stop()
+    
     async def cleanup(self) -> None:
-        """Clean up all sessions."""
-        for identity in list(self._sessions.keys()):
-            await self._stop_session(identity)
-        logger.info("MultiUserTranscriber cleaned up")
+        for identity in list(self._transcribers.keys()):
+            await self._remove_transcriber(identity)
+        logger.info("RoomTranscriber cleaned up")
 
 
 async def entrypoint(ctx: JobContext) -> None:
-    """
-    Main entrypoint for the transcription agent.
-    Called when a new room job is received.
-    """
-    logger.info(f"Connecting to room: {ctx.room.name}")
-
-    # Wait for connection
-    await ctx.connect()
-    logger.info(f"Connected to room: {ctx.room.name}")
-
-    # Create and start the multi-user transcriber
-    transcriber = MultiUserTranscriber(ctx)
+    """Main agent entrypoint."""
+    logger.info(f"Agent joining room: {ctx.room.name}")
+    
+    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+    logger.info("Connected to room")
+    
+    transcriber = RoomTranscriber(ctx.room)
     await transcriber.start()
-
-    # Register cleanup callback
+    
     ctx.add_shutdown_callback(transcriber.cleanup)
-
-    # Keep the agent running
-    logger.info("Transcriber agent running...")
+    logger.info("Transcriber agent running")
 
 
 def prewarm(proc: JobProcess) -> None:
-    """
-    Prewarm function to load models before accepting jobs.
-    This reduces latency when the first job arrives.
-    """
-    logger.info("Prewarming: Loading VAD model...")
+    """Prewarm models for faster startup."""
+    logger.info("Prewarming...")
     proc.userdata["vad"] = silero.VAD.load()
     logger.info("Prewarm complete")
 

@@ -27,11 +27,23 @@ func _connect_to_livekit() -> void:
 	if _livekit:
 		if _livekit.has_signal("data_received"):
 			_livekit.data_received.connect(_on_data_received)
+		if _livekit.has_signal("room_connected"):
+			_livekit.room_connected.connect(_on_room_connected)
+		# Get identity if already connected
 		if _livekit.has_method("get_local_identity"):
-			local_identity = _livekit.get_local_identity()
-		push_warning("TranscriptReceiverHandler: Connected to LiveKitWrapper")
+			var identity = _livekit.get_local_identity()
+			if identity and not identity.is_empty():
+				local_identity = identity
+		print("TranscriptReceiverHandler: Connected to LiveKitWrapper")
 	else:
 		push_warning("TranscriptReceiverHandler: LiveKitWrapper not found, will retry on room join")
+
+
+## Called when room connects to update local identity
+func _on_room_connected() -> void:
+	if _livekit and _livekit.has_method("get_local_identity"):
+		local_identity = _livekit.get_local_identity()
+		print("TranscriptReceiverHandler: Local identity set to: ", local_identity)
 
 
 ## Set the local user identity (call when joining a room)
@@ -71,9 +83,12 @@ func _on_data_received(sender_identity: String, data) -> void:
 	if msg_type != "transcript":
 		return
 	
+	print("TranscriptReceiverHandler: Received transcript from ", sender_identity)
+	
 	# Create transcript entry
 	var entry := _parse_transcript_message(parsed)
 	if entry:
+		print("TranscriptReceiverHandler: Created entry - ", entry.speaker_identity, ": ", entry.text.left(50))
 		# Add to store if connected
 		if transcript_store:
 			transcript_store.add_entry(entry)
