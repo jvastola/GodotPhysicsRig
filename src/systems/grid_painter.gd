@@ -99,17 +99,36 @@ var _surface_aliases: Dictionary = {}
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _handler_script: Script = null
 var _save_path: String = "user://grid_painter_surfaces.json"
+var _save_pending: bool = false
+var _save_timer: float = 0.0
+const SAVE_DEBOUNCE_TIME: float = 0.5  # Save at most every 0.5 seconds during continuous painting
 
 func _ready() -> void:
 	print("GridPainter: _ready() called, load_for_player: ", load_for_player)
 	_rng.randomize()
 	_load_handler_script()
 	print("GridPainter: Registered surfaces: ", _surfaces.keys())
-	if load_for_player:
-		print("GridPainter: Loading saved grid data from: ", _save_path)
-		load_grid_data(_save_path)
+	# Always load saved grid data so both player and preview grids show the same state
+	print("GridPainter: Loading saved grid data from: ", _save_path)
+	load_grid_data(_save_path)
 	# Defer surface resolution and texture application to ensure player meshes are ready
 	call_deferred("_deferred_init")
+
+
+func _process(delta: float) -> void:
+	# Handle debounced save
+	if _save_pending:
+		_save_timer -= delta
+		if _save_timer <= 0.0:
+			_save_pending = false
+			save_grid_data(_save_path)
+
+
+func _schedule_save() -> void:
+	"""Schedule a debounced save to avoid excessive file writes during continuous painting"""
+	if not _save_pending:
+		_save_pending = true
+		_save_timer = SAVE_DEBOUNCE_TIME
 
 
 func _deferred_init() -> void:
@@ -525,6 +544,8 @@ func set_cell_color(x: int, y: int, color: Color, origin: NodePath = NodePath(""
 		var origin_node := get_node_or_null(origin)
 		if origin_node and origin_node is MeshInstance3D:
 			_assign_texture_to_mesh(origin_node, surface.texture, null)
+	# Save and notify other grid painters (debounced to avoid excessive saves during continuous painting)
+	_schedule_save()
 
 
 func fill_color(color: Color, surface_id: String = "") -> void:
@@ -555,8 +576,6 @@ func paint_at_uv(uv: Vector2, color: Color, origin: NodePath = NodePath(""), sur
 	set_cell_color(gx, gy, color, origin, surface.id)
 
 func save_grid_data(path: String = _save_path) -> void:
-	if not load_for_player:
-		return
 	var payload := {}
 	for id in _surfaces.keys():
 		var surface := _get_surface(id)
@@ -568,8 +587,34 @@ func save_grid_data(path: String = _save_path) -> void:
 		file.store_string(json_str)
 		file.close()
 		print("GridPainter: Saved ", payload.keys().size(), " surfaces to: ", path)
+		# Notify other grid painters to refresh (e.g., player's grid painter)
+		_notify_other_grid_painters()
 	else:
 		push_error("GridPainter: Failed to save grid data to: ", path)
+
+
+func _notify_other_grid_painters() -> void:
+	"""Notify other GridPainter instances to refresh their surfaces from saved data"""
+	var tree := get_tree()
+	if not tree:
+		return
+	# Find all GridPainter nodes in the scene
+	var all_painters: Array[Node] = []
+	_find_grid_painters_recursive(tree.root, all_painters)
+	for painter in all_painters:
+		if painter == self:
+			continue
+		if painter.has_method("refresh_all_surfaces"):
+			painter.call_deferred("refresh_all_surfaces")
+			print("GridPainter: Notified ", painter.name, " to refresh")
+
+
+func _find_grid_painters_recursive(node: Node, result: Array[Node]) -> void:
+	"""Recursively find all GridPainter nodes"""
+	if node is GridPainter:
+		result.append(node)
+	for child in node.get_children():
+		_find_grid_painters_recursive(child, result)
 
 func load_grid_data(path: String = _save_path) -> void:
 	if not FileAccess.file_exists(path):
