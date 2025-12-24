@@ -585,8 +585,12 @@ func _push_next_file(ctx: Dictionary) -> void:
 		# All done
 		var callback: Callable = ctx.callback
 		var errors: Array = ctx.error_messages
+		var skipped: int = ctx.get("skipped_count", 0)
 		if errors.is_empty():
-			callback.call(true, "Pushed %d file(s)" % ctx.success_count)
+			var msg := "Pushed %d file(s)" % ctx.success_count
+			if skipped > 0:
+				msg += " (%d skipped)" % skipped
+			callback.call(true, msg)
 		else:
 			callback.call(false, "Errors: " + ", ".join(errors).substr(0, 100))
 		return
@@ -598,6 +602,9 @@ func _push_next_file(ctx: Dictionary) -> void:
 	# Skip internal state files
 	var file_name := file_path.get_file()
 	if _should_ignore_file(file_name):
+		if not ctx.has("skipped_count"):
+			ctx["skipped_count"] = 0
+		ctx.skipped_count += 1
 		ctx.current_index += 1
 		_push_next_file(ctx)
 		return
@@ -607,6 +614,9 @@ func _push_next_file(ctx: Dictionary) -> void:
 	
 	# Skip files that can't be converted to valid repo paths
 	if repo_path.is_empty() or repo_path.begins_with("/") or repo_path.contains("://"):
+		if not ctx.has("skipped_count"):
+			ctx["skipped_count"] = 0
+		ctx.skipped_count += 1
 		ctx.current_index += 1
 		_push_next_file(ctx)
 		return
@@ -636,28 +646,23 @@ func _should_ignore_file(file_name: String) -> bool:
 
 
 func _to_repo_relative_path(path: String) -> String:
-	## Convert any path format to a repo-relative path for GitHub
-	# Handle res:// paths
+	## Convert user:// path to repo-relative path for GitHub
+	# Handle user:// paths - strip the prefix to get relative path
+	if path.begins_with("user://"):
+		return path.replace("user://", "")
+	
+	# Handle absolute paths from user folder
+	var user_global := ProjectSettings.globalize_path("user://")
+	if path.begins_with(user_global):
+		return path.replace(user_global, "").trim_prefix("/").trim_prefix("\\")
+	
+	# Handle res:// paths (shouldn't happen but just in case)
 	if path.begins_with("res://"):
 		return path.replace("res://", "")
 	
-	# Handle user:// paths - extract just the relative part after pulled_repo/
-	if path.begins_with("user://"):
-		if path.contains("pulled_repo/"):
-			var parts := path.split("pulled_repo/")
-			if parts.size() > 1:
-				return parts[1]
-		# For other user:// files, use just the filename in a "user_data" folder
-		return "user_data/" + path.get_file()
-	
-	# Handle absolute paths - try to extract project-relative portion
-	var res_global := ProjectSettings.globalize_path("res://")
-	if path.begins_with(res_global):
-		return path.replace(res_global, "").trim_prefix("/")
-	
-	var user_global := ProjectSettings.globalize_path("user://")
-	if path.begins_with(user_global):
-		return "user_data/" + path.replace(user_global, "").trim_prefix("/")
+	# Return as-is if already relative
+	if not path.begins_with("/") and not path.contains("://"):
+		return path
 	
 	# Can't determine - return empty to skip
 	return ""
@@ -797,8 +802,8 @@ func _pull_next_file(ctx: Dictionary) -> void:
 	
 	_download_file(parent, file_path, func(success: bool, content: String, msg: String):
 		if success:
-			# Write to user:// for runtime-writable storage
-			var user_path := "user://pulled_repo/" + file_path
+			# Write directly to user:// (not pulled_repo subfolder)
+			var user_path := "user://" + file_path
 			var user_global := ProjectSettings.globalize_path(user_path)
 			
 			# Ensure directory exists
@@ -832,11 +837,14 @@ func _create_baseline_from_pull(contents: Dictionary) -> void:
 	var state := _load_state()
 	var commits: Array = state.get("commits", [])
 	
-	# Build hashes for the pulled files
+	# Build hashes for the pulled files (using user:// paths directly)
 	var hashes: Dictionary = {}
+	var stored_contents: Dictionary = {}
 	for path in contents.keys():
 		var content: String = contents[path]
-		hashes["user://pulled_repo/" + path] = content.md5_text()
+		var user_path := "user://" + path
+		hashes[user_path] = content.md5_text()
+		stored_contents[user_path] = content
 	
 	var commit_id := "pull-" + str(Time.get_unix_time_from_system())
 	var entry := {
@@ -844,12 +852,8 @@ func _create_baseline_from_pull(contents: Dictionary) -> void:
 		"message": "Pulled from remote",
 		"timestamp": Time.get_datetime_string_from_system(),
 		"hashes": hashes,
-		"contents": {}  # Don't store contents again, we have them in user://
+		"contents": stored_contents
 	}
-	
-	# Store contents for future reference
-	for path in contents.keys():
-		entry.contents["user://pulled_repo/" + path] = contents[path]
 	
 	commits.append(entry)
 	state["commits"] = commits
