@@ -48,25 +48,36 @@ func get_status() -> Dictionary:
 	var unstaged: Array = []
 	var untracked: Array = []
 
+	# If no commits exist, all files are untracked
+	var has_baseline := commits.size() > 0
+
 	# Detect added/modified files present now
 	for path in current.keys():
 		var cur_hash: String = current[path]
 		var prev_hash: String = last_snapshot.get(path, "")
 		var is_staged := staged_paths.has(path)
-		if prev_hash == "":
-			# New file
+		
+		if not has_baseline:
+			# No baseline - everything is untracked
+			if is_staged:
+				staged.append({"code": "A ", "path": path})
+			else:
+				untracked.append({"code": "??", "path": path})
+		elif prev_hash == "":
+			# New file (not in last commit)
 			if is_staged:
 				staged.append({"code": "A ", "path": path})
 			else:
 				untracked.append({"code": "??", "path": path})
 		elif prev_hash != cur_hash:
+			# Modified file
 			if is_staged:
 				staged.append({"code": "M ", "path": path})
 			else:
 				unstaged.append({"code": " M", "path": path})
 		else:
+			# Unchanged - only show if staged
 			if is_staged:
-				# Staged but unchanged vs snapshot; leave unstaged to avoid clutter.
 				staged.append({"code": "S ", "path": path})
 
 	# Detect deletions (present in snapshot but missing now)
@@ -84,6 +95,44 @@ func get_status() -> Dictionary:
 		"unstaged": unstaged,
 		"untracked": untracked
 	}
+
+
+func create_initial_baseline() -> Dictionary:
+	## Create an initial commit with all current tracked files as baseline.
+	## Call this once to establish a starting point for change tracking.
+	var state := _load_state()
+	var commits: Array = state.get("commits", [])
+	
+	if commits.size() > 0:
+		return {"code": 1, "output": "Baseline already exists"}
+	
+	var current := _current_snapshot()
+	if current.is_empty():
+		return {"code": 1, "output": "No tracked files found"}
+	
+	# Read all file contents
+	var contents: Dictionary = {}
+	for path in current.keys():
+		var global_path := ProjectSettings.globalize_path(path)
+		var f := FileAccess.open(global_path, FileAccess.READ)
+		if f:
+			contents[path] = f.get_as_text()
+	
+	var commit_id := "baseline-" + str(Time.get_unix_time_from_system())
+	var entry := {
+		"id": commit_id,
+		"message": "Initial baseline",
+		"timestamp": Time.get_datetime_string_from_system(),
+		"hashes": current,
+		"contents": contents
+	}
+	
+	commits.append(entry)
+	state["commits"] = commits
+	state["staged"] = []
+	_save_state(state)
+	
+	return {"code": 0, "output": "Created baseline with %d file(s)" % current.size()}
 
 
 func stage_paths(paths: Array) -> Dictionary:
@@ -673,6 +722,8 @@ func _pull_next_file(ctx: Dictionary) -> void:
 		var callback: Callable = ctx.callback
 		var errors: Array = ctx.error_messages
 		if errors.is_empty():
+			# Create an initial commit from pulled files so they show as baseline
+			_create_baseline_from_pull(ctx.get("pulled_contents", {}))
 			callback.call(true, "Pulled %d file(s)" % ctx.success_count)
 		else:
 			callback.call(false, "Errors: %s" % ", ".join(errors))
@@ -684,18 +735,23 @@ func _pull_next_file(ctx: Dictionary) -> void:
 	
 	_download_file(parent, file_path, func(success: bool, content: String, msg: String):
 		if success:
-			# Write to res:// path
-			var local_path := "res://" + file_path
-			var global_path := ProjectSettings.globalize_path(local_path)
+			# Write to user:// for runtime-writable storage
+			var user_path := "user://pulled_repo/" + file_path
+			var user_global := ProjectSettings.globalize_path(user_path)
 			
 			# Ensure directory exists
-			var dir_path := global_path.get_base_dir()
+			var dir_path := user_global.get_base_dir()
 			DirAccess.make_dir_recursive_absolute(dir_path)
 			
-			var f := FileAccess.open(global_path, FileAccess.WRITE)
+			var f := FileAccess.open(user_global, FileAccess.WRITE)
 			if f:
 				f.store_string(content)
+				f.close()
 				ctx.success_count += 1
+				# Store content for baseline commit
+				if not ctx.has("pulled_contents"):
+					ctx["pulled_contents"] = {}
+				ctx.pulled_contents[file_path] = content
 			else:
 				ctx.error_messages.append("%s: Failed to write" % file_path)
 		else:
@@ -704,6 +760,39 @@ func _pull_next_file(ctx: Dictionary) -> void:
 		ctx.current_index += 1
 		_pull_next_file(ctx)
 	)
+
+
+func _create_baseline_from_pull(contents: Dictionary) -> void:
+	## Create an initial commit from pulled files so future changes are tracked
+	if contents.is_empty():
+		return
+	
+	var state := _load_state()
+	var commits: Array = state.get("commits", [])
+	
+	# Build hashes for the pulled files
+	var hashes: Dictionary = {}
+	for path in contents.keys():
+		var content: String = contents[path]
+		hashes["user://pulled_repo/" + path] = content.md5_text()
+	
+	var commit_id := "pull-" + str(Time.get_unix_time_from_system())
+	var entry := {
+		"id": commit_id,
+		"message": "Pulled from remote",
+		"timestamp": Time.get_datetime_string_from_system(),
+		"hashes": hashes,
+		"contents": {}  # Don't store contents again, we have them in user://
+	}
+	
+	# Store contents for future reference
+	for path in contents.keys():
+		entry.contents["user://pulled_repo/" + path] = contents[path]
+	
+	commits.append(entry)
+	state["commits"] = commits
+	state["staged"] = []
+	_save_state(state)
 
 
 func _download_file(parent: Node, repo_path: String, callback: Callable) -> void:

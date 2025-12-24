@@ -90,6 +90,12 @@ text = "Ready"
 layout_mode = 2
 text = "↻ Refresh"
 
+[node name="BaselineButton" type="Button" parent="MainScroll/ContentContainer/HeaderSection/HeaderVBox/StatusRow"]
+layout_mode = 2
+text = "📌 Set Baseline"
+tooltip_text = "Create initial snapshot of all files as baseline for tracking changes"
+text = "↻ Refresh"
+
 [node name="ChangesSection" type="VBoxContainer" parent="MainScroll/ContentContainer"]
 layout_mode = 2
 theme_override_constants/separation = 4

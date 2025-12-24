@@ -45,6 +45,7 @@ signal remote_push_completed(success: bool, message: String)
 @onready var unstage_selected_button: Button = $MainScroll/ContentContainer/StagedSection/StagedButtons/UnstageSelectedButton
 @onready var unstage_all_button: Button = $MainScroll/ContentContainer/StagedSection/StagedButtons/UnstageAllButton
 @onready var refresh_button: Button = $MainScroll/ContentContainer/HeaderSection/HeaderVBox/StatusRow/RefreshButton
+@onready var baseline_button: Button = $MainScroll/ContentContainer/HeaderSection/HeaderVBox/StatusRow/BaselineButton
 
 var git := GitService.new()
 var _busy: bool = false
@@ -103,6 +104,8 @@ func _connect_signals() -> void:
 		unstage_all_button.pressed.connect(_on_unstage_all_pressed)
 	if refresh_button:
 		refresh_button.pressed.connect(_on_refresh_pressed)
+	if baseline_button:
+		baseline_button.pressed.connect(_on_baseline_pressed)
 	if changes_list:
 		changes_list.item_activated.connect(_on_changes_item_activated)
 	if staged_list:
@@ -266,6 +269,21 @@ func _on_commit_pressed() -> void:
 	_set_busy(false)
 	refresh_status()
 	refresh_history()
+
+
+func _on_baseline_pressed() -> void:
+	if _busy:
+		return
+	_set_busy(true)
+	var res := git.create_initial_baseline()
+	_set_status(res.output)
+	_set_busy(false)
+	if res.code == 0:
+		# Disable baseline button after creating baseline
+		if baseline_button:
+			baseline_button.disabled = true
+		refresh_status()
+		refresh_history()
 
 
 func _on_stage_selected_pressed() -> void:
@@ -498,7 +516,7 @@ func _set_busy(value: bool) -> void:
 	var buttons := [
 		commit_button, stage_selected_button, stage_all_button,
 		unstage_selected_button, unstage_all_button, refresh_button,
-		restore_button, push_button, pull_button
+		restore_button, push_button, pull_button, baseline_button
 	]
 	for btn in buttons:
 		if btn:
