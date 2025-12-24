@@ -43,6 +43,25 @@ theme_override_font_sizes/font_size = 15
 text = "📂 FileSystem"
 horizontal_alignment = 1
 
+[node name="FolderToggleRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ResButton" type="Button" parent="MarginContainer/VBoxContainer/FolderToggleRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+button_pressed = true
+text = "📁 res://"
+tooltip_text = "Browse project files (read-only on Quest)"
+
+[node name="UserButton" type="Button" parent="MarginContainer/VBoxContainer/FolderToggleRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "📂 user://"
+tooltip_text = "Browse user data files (writable on Quest)"
+
 [node name="HSeparator" type="HSeparator" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
 

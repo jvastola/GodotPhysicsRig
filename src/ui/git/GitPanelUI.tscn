@@ -58,6 +58,30 @@ theme_override_font_sizes/font_size = 16
 text = "Git Version Control"
 horizontal_alignment = 1
 
+[node name="FolderToggleRow" type="HBoxContainer" parent="MainScroll/ContentContainer"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="FolderLabel" type="Label" parent="MainScroll/ContentContainer/FolderToggleRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Tracking:"
+
+[node name="ResButton" type="Button" parent="MainScroll/ContentContainer/FolderToggleRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+button_pressed = true
+text = "📁 res://"
+tooltip_text = "Track project files (read-only on Quest)"
+
+[node name="UserButton" type="Button" parent="MainScroll/ContentContainer/FolderToggleRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "📂 user://"
+tooltip_text = "Track user data files (writable on Quest)"
+
 [node name="HeaderSection" type="PanelContainer" parent="MainScroll/ContentContainer"]
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_section")
@@ -92,9 +116,8 @@ text = "↻ Refresh"
 
 [node name="BaselineButton" type="Button" parent="MainScroll/ContentContainer/HeaderSection/HeaderVBox/StatusRow"]
 layout_mode = 2
-text = "📌 Set Baseline"
+text = "📌 Baseline"
 tooltip_text = "Create initial snapshot of all files as baseline for tracking changes"
-text = "↻ Refresh"
 
 [node name="ChangesSection" type="VBoxContainer" parent="MainScroll/ContentContainer"]
 layout_mode = 2

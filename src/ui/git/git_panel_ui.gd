@@ -13,6 +13,10 @@ signal remote_push_completed(success: bool, message: String)
 @onready var main_scroll: ScrollContainer = $MainScroll
 @onready var content_container: VBoxContainer = $MainScroll/ContentContainer
 
+# Folder toggle
+@onready var res_button: Button = $MainScroll/ContentContainer/FolderToggleRow/ResButton
+@onready var user_button: Button = $MainScroll/ContentContainer/FolderToggleRow/UserButton
+
 # Header section
 @onready var path_label: Label = $MainScroll/ContentContainer/HeaderSection/HeaderVBox/PathLabel
 @onready var branch_label: Label = $MainScroll/ContentContainer/HeaderSection/HeaderVBox/BranchLabel
@@ -48,6 +52,9 @@ signal remote_push_completed(success: bool, message: String)
 @onready var baseline_button: Button = $MainScroll/ContentContainer/HeaderSection/HeaderVBox/StatusRow/BaselineButton
 
 var git := GitService.new()
+var git_user := GitService.new(ProjectSettings.globalize_path("user://"))
+var _current_git: GitService  # Points to either git (res://) or git_user (user://)
+var _tracking_user_folder: bool = false
 var _busy: bool = false
 var _last_llm_query: String = ""
 var _use_real_git: bool = false
@@ -60,6 +67,7 @@ const SETTINGS_FILE := "user://git_panel_settings.json"
 func _ready() -> void:
 	instance = self
 	add_to_group("git_panel")
+	_current_git = git  # Default to res://
 	_check_real_git()
 	_setup_lists()
 	_connect_signals()
@@ -106,6 +114,10 @@ func _connect_signals() -> void:
 		refresh_button.pressed.connect(_on_refresh_pressed)
 	if baseline_button:
 		baseline_button.pressed.connect(_on_baseline_pressed)
+	if res_button:
+		res_button.pressed.connect(_on_res_button_pressed)
+	if user_button:
+		user_button.pressed.connect(_on_user_button_pressed)
 	if changes_list:
 		changes_list.item_activated.connect(_on_changes_item_activated)
 	if staged_list:
@@ -155,11 +167,12 @@ func _on_llm_message_sent(message: String) -> void:
 
 
 func _update_header() -> void:
-	var branch := git.get_branch()
-	var root := ProjectSettings.localize_path(git.repo_root)
+	var branch := _current_git.get_branch()
+	var root := ProjectSettings.localize_path(_current_git.repo_root)
+	var folder_type := "user://" if _tracking_user_folder else "res://"
 	
 	if path_label:
-		path_label.text = "Repo: %s" % root
+		path_label.text = "Tracking: %s" % folder_type
 	if branch_label:
 		var git_type := "Real Git" if _use_real_git else "Local Tracker"
 		branch_label.text = "Branch: %s (%s)" % [branch, git_type]
@@ -169,7 +182,7 @@ func refresh_status() -> void:
 	if _busy:
 		return
 	_set_busy(true)
-	var res := git.get_status()
+	var res := _current_git.get_status()
 	if res.has("error"):
 		_set_status("Status error: %s" % res.error)
 		_set_busy(false)
@@ -186,7 +199,7 @@ func refresh_history() -> void:
 	if _busy:
 		return
 	_set_busy(true)
-	var res := git.get_history(history_limit)
+	var res := _current_git.get_history(history_limit)
 	if res.has("error"):
 		_set_status("History error: %s" % res.error)
 		_set_busy(false)
@@ -257,7 +270,7 @@ func _on_commit_pressed() -> void:
 		_set_status("Enter a commit message")
 		return
 	_set_busy(true)
-	var res := git.commit(msg)
+	var res := _current_git.commit(msg)
 	if res.code == 0:
 		if commit_message:
 			commit_message.text = ""
@@ -275,13 +288,39 @@ func _on_baseline_pressed() -> void:
 	if _busy:
 		return
 	_set_busy(true)
-	var res := git.create_initial_baseline()
+	var res := _current_git.create_initial_baseline()
 	_set_status(res.output)
 	_set_busy(false)
 	if res.code == 0:
 		# Disable baseline button after creating baseline
 		if baseline_button:
 			baseline_button.disabled = true
+		refresh_status()
+		refresh_history()
+
+
+func _on_res_button_pressed() -> void:
+	if _tracking_user_folder:
+		_tracking_user_folder = false
+		_current_git = git
+		if res_button:
+			res_button.button_pressed = true
+		if user_button:
+			user_button.button_pressed = false
+		_update_header()
+		refresh_status()
+		refresh_history()
+
+
+func _on_user_button_pressed() -> void:
+	if not _tracking_user_folder:
+		_tracking_user_folder = true
+		_current_git = git_user
+		if res_button:
+			res_button.button_pressed = false
+		if user_button:
+			user_button.button_pressed = true
+		_update_header()
 		refresh_status()
 		refresh_history()
 
@@ -294,7 +333,7 @@ func _on_stage_all_pressed() -> void:
 	if _busy:
 		return
 	_set_busy(true)
-	var res := git.stage_all()
+	var res := _current_git.stage_all()
 	if res.code == 0:
 		_set_status("Staged all changes")
 	else:
@@ -311,7 +350,7 @@ func _on_unstage_all_pressed() -> void:
 	if _busy:
 		return
 	_set_busy(true)
-	var res := git.unstage_all()
+	var res := _current_git.unstage_all()
 	if res.code == 0:
 		_set_status("Unstaged all changes")
 	else:
@@ -364,7 +403,7 @@ func _on_restore_pressed() -> void:
 		_set_status("No commit data")
 		return
 	_set_busy(true)
-	var res := git.restore_commit(entry.hash)
+	var res := _current_git.restore_commit(entry.hash)
 	if res.code == 0:
 		_set_status("Restored commit")
 	else:
@@ -380,7 +419,7 @@ func _stage_paths(paths: Array) -> void:
 			_set_status("No files selected to stage")
 		return
 	_set_busy(true)
-	var res := git.stage_paths(paths)
+	var res := _current_git.stage_paths(paths)
 	if res.code == 0:
 		_set_status("Staged %d item(s)" % paths.size())
 	else:
@@ -395,7 +434,7 @@ func _unstage_paths(paths: Array) -> void:
 			_set_status("No files selected to unstage")
 		return
 	_set_busy(true)
-	var res := git.unstage_paths(paths)
+	var res := _current_git.unstage_paths(paths)
 	if res.code == 0:
 		_set_status("Unstaged %d item(s)" % paths.size())
 	else:
@@ -407,7 +446,7 @@ func _unstage_paths(paths: Array) -> void:
 func stage_paths_and_refresh(paths: Array) -> void:
 	if paths.is_empty():
 		return
-	var res := git.stage_paths(paths)
+	var res := _current_git.stage_paths(paths)
 	if res.code == 0:
 		_set_status("Staged %d item(s)" % paths.size())
 	else:
@@ -435,7 +474,7 @@ func _on_push_pressed() -> void:
 		return
 	
 	# Configure remote in GitService
-	var config_result := git.configure_remote(remote_url, token)
+	var config_result := _current_git.configure_remote(remote_url, token)
 	if config_result.code != 0:
 		_set_status(config_result.output)
 		return
@@ -445,7 +484,7 @@ func _on_push_pressed() -> void:
 	_set_status("Pushing to GitHub...")
 	
 	# Use GitHub API push (works on Quest)
-	git.create_push_request(self, func(success: bool, message: String):
+	_current_git.create_push_request(self, func(success: bool, message: String):
 		_set_busy(false)
 		_set_status(message)
 		remote_push_completed.emit(success, message)
@@ -468,7 +507,7 @@ func _on_pull_pressed() -> void:
 		return
 	
 	# Configure remote if needed
-	var config_result := git.configure_remote(remote_url, token)
+	var config_result := _current_git.configure_remote(remote_url, token)
 	if config_result.code != 0:
 		_set_status(config_result.output)
 		return
@@ -477,7 +516,7 @@ func _on_pull_pressed() -> void:
 	_set_busy(true)
 	_set_status("Pulling from GitHub...")
 	
-	git.create_pull_request(self, func(success: bool, message: String):
+	_current_git.create_pull_request(self, func(success: bool, message: String):
 		_set_busy(false)
 		_set_status(message)
 		if success:
@@ -537,8 +576,8 @@ func _update_restore_button_state(enabled: bool) -> void:
 
 func _load_settings() -> void:
 	# Set defaults from GitService
-	if remote_url_input and git.remote_url:
-		remote_url_input.text = git.remote_url
+	if remote_url_input and _current_git.remote_url:
+		remote_url_input.text = _current_git.remote_url
 	
 	if not FileAccess.file_exists(SETTINGS_FILE):
 		return

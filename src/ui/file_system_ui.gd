@@ -10,11 +10,14 @@ signal folder_selected(path: String)
 signal file_double_clicked(path: String)
 
 @onready var title_label: Label = $MarginContainer/VBoxContainer/TitleLabel
+@onready var folder_toggle_row: HBoxContainer = $MarginContainer/VBoxContainer/FolderToggleRow
+@onready var res_button: Button = $MarginContainer/VBoxContainer/FolderToggleRow/ResButton
+@onready var user_button: Button = $MarginContainer/VBoxContainer/FolderToggleRow/UserButton
 @onready var tree: Tree = $MarginContainer/VBoxContainer/Tree
 @onready var load_button: Button = $MarginContainer/VBoxContainer/ButtonRow/LoadButton
 @onready var spawn_button: Button = $MarginContainer/VBoxContainer/ButtonRow/SpawnButton
 
-# var _root_path: String = "res://"
+var _root_path: String = "res://"
 var _tree_root: TreeItem = null
 var _context_menu: PopupMenu = null
 var _context_target_path: String = ""
@@ -57,6 +60,7 @@ var _processing_selection: bool = false
 
 func _ready() -> void:
 	instance = self
+	_setup_folder_toggle()
 	_setup_tree()
 	_setup_buttons()
 	_setup_context_menu()
@@ -68,6 +72,57 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		if instance == self:
 			instance = null
+
+
+func _setup_folder_toggle() -> void:
+	# Create toggle row if not in scene
+	if not folder_toggle_row:
+		folder_toggle_row = HBoxContainer.new()
+		folder_toggle_row.name = "FolderToggleRow"
+		var vbox = $MarginContainer/VBoxContainer
+		if vbox:
+			vbox.add_child(folder_toggle_row)
+			vbox.move_child(folder_toggle_row, 1)  # After title
+		
+		res_button = Button.new()
+		res_button.name = "ResButton"
+		res_button.text = "📁 res://"
+		res_button.toggle_mode = true
+		res_button.button_pressed = true
+		res_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		folder_toggle_row.add_child(res_button)
+		
+		user_button = Button.new()
+		user_button.name = "UserButton"
+		user_button.text = "📂 user://"
+		user_button.toggle_mode = true
+		user_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		folder_toggle_row.add_child(user_button)
+	
+	if res_button and not res_button.pressed.is_connected(_on_res_button_pressed):
+		res_button.pressed.connect(_on_res_button_pressed)
+	if user_button and not user_button.pressed.is_connected(_on_user_button_pressed):
+		user_button.pressed.connect(_on_user_button_pressed)
+
+
+func _on_res_button_pressed() -> void:
+	if _root_path != "res://":
+		_root_path = "res://"
+		if res_button:
+			res_button.button_pressed = true
+		if user_button:
+			user_button.button_pressed = false
+		_scan_filesystem()
+
+
+func _on_user_button_pressed() -> void:
+	if _root_path != "user://":
+		_root_path = "user://"
+		if res_button:
+			res_button.button_pressed = false
+		if user_button:
+			user_button.button_pressed = true
+		_scan_filesystem()
 
 
 func _setup_tree() -> void:
@@ -113,10 +168,10 @@ func _scan_filesystem() -> void:
 	
 	tree.clear()
 	_tree_root = tree.create_item()
-	_tree_root.set_text(0, "📂 res://")
-	_tree_root.set_metadata(0, "res://")
+	_tree_root.set_text(0, "📂 " + _root_path)
+	_tree_root.set_metadata(0, _root_path)
 	
-	_scan_directory("res://", _tree_root)
+	_scan_directory(_root_path, _tree_root)
 	
 	# Collapse all by default, expand root
 	_tree_root.set_collapsed(false)
