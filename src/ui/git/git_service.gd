@@ -27,6 +27,13 @@ const TRACK_EXTS: Array = [
 ]
 const IGNORE_DIRS: Array = [".git", ".godot", ".import", "addons", "android", "build", "tmp"]
 const IGNORE_SUFFIX := [".import"]
+# Files to never push to remote (internal state files)
+const IGNORE_FILES := [
+	"gitpanel_state.json",
+	"git_remote_settings.json",
+	"git_panel_settings.json",
+	"save_data.json"
+]
 
 
 func _init(repo_path: String = "") -> void:
@@ -402,6 +409,9 @@ func _is_ignored_dir(name: String) -> bool:
 
 
 func _is_ignored_file(name: String) -> bool:
+	for ignored in IGNORE_FILES:
+		if name == ignored:
+			return true
 	for sfx in IGNORE_SUFFIX:
 		if name.ends_with(sfx):
 			return true
@@ -585,12 +595,18 @@ func _push_next_file(ctx: Dictionary) -> void:
 	var content: String = ctx.contents[file_path]
 	var parent: Node = ctx.parent
 	
+	# Skip internal state files
+	var file_name := file_path.get_file()
+	if _should_ignore_file(file_name):
+		ctx.current_index += 1
+		_push_next_file(ctx)
+		return
+	
 	# Convert to repo-relative path (strip res://, user://, or absolute paths)
 	var repo_path := _to_repo_relative_path(file_path)
 	
 	# Skip files that can't be converted to valid repo paths
 	if repo_path.is_empty() or repo_path.begins_with("/") or repo_path.contains("://"):
-		ctx.error_messages.append("%s: Invalid path" % file_path.get_file())
 		ctx.current_index += 1
 		_push_next_file(ctx)
 		return
@@ -606,6 +622,17 @@ func _push_next_file(ctx: Dictionary) -> void:
 			_push_next_file(ctx)
 		)
 	)
+
+
+func _should_ignore_file(file_name: String) -> bool:
+	## Check if a file should be ignored (not pushed to remote)
+	for ignored in IGNORE_FILES:
+		if file_name == ignored:
+			return true
+	for suffix in IGNORE_SUFFIX:
+		if file_name.ends_with(suffix):
+			return true
+	return false
 
 
 func _to_repo_relative_path(path: String) -> String:
