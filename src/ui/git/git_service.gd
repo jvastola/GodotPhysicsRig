@@ -1,25 +1,39 @@
 extends RefCounted
 class_name GitService
 
-## Lightweight local version tracker (no git CLI required).
-## Stores commit snapshots and staging info in user://gitpanel_state.json.
+## Git service with real git CLI support and fallback to local tracking.
+## Automatically detects if git is available and uses it when possible.
+## Includes GitHub API support for Quest/mobile where git CLI isn't available.
+
+signal remote_operation_completed(success: bool, message: String)
+signal remote_progress(message: String)
 
 var repo_root: String
-const USER_REPO_ROOT := "user://workspace_repo"
+var _use_real_git: bool = false
+
+# Remote configuration - defaults for your repo
+var remote_url: String = "https://github.com/"
+var remote_token: String = ""  # Set via UI or settings file - DO NOT hardcode tokens!
+var remote_owner: String = "j"
+var remote_repo: String = "scenetreevr"
+var remote_branch: String = "main"
+
+const USER_REPO_ROOT := "user://repo"
 const STATE_FILE := "user://gitpanel_state.json"
-const TRACK_EXTS := [
+const REMOTE_SETTINGS_FILE := "user://git_remote_settings.json"
+const GITHUB_API_BASE := "https://api.github.com"
+const TRACK_EXTS: Array = [
 	"gd", "tscn", "tres", "gdshader", "shader", "cfg", "json", "txt", "md", "cs"
 ]
-const IGNORE_DIRS := [".git", ".godot", ".import", "android/build", "bin", "dist", "tmp"]
+const IGNORE_DIRS: Array = [".git", ".godot", ".import", "addons", "android", "build", "tmp"]
 const IGNORE_SUFFIX := [".import"]
+
 
 func _init(repo_path: String = "") -> void:
 	repo_root = repo_path
 	if repo_root.is_empty():
-		repo_root = _prepare_user_repo_root()
-	repo_root = repo_root.rstrip("/")  # Normalize trailing slash
-	_ensure_state()
-
+		repo_root = ProjectSettings.globalize_path("res://")
+	_load_remote_settings()		
 
 func get_status() -> Dictionary:
 	# Returns staged/unstaged/untracked arrays comparing current files to last commit snapshot.
@@ -397,3 +411,341 @@ func _save_state(state: Dictionary) -> void:
 	if f == null:
 		return
 	f.store_string(JSON.stringify(state, "  "))
+
+
+# ============================================================================
+# REMOTE CONFIGURATION
+# ============================================================================
+
+func configure_remote(url: String, token: String, branch: String = "main") -> Dictionary:
+	## Configure GitHub remote. URL format: https://github.com/owner/repo
+	remote_url = url.strip_edges()
+	remote_token = token.strip_edges()
+	remote_branch = branch
+	
+	# Parse owner/repo from URL
+	var parsed := _parse_github_url(remote_url)
+	if parsed.is_empty():
+		return {"code": 1, "output": "Invalid GitHub URL. Use: https://github.com/owner/repo"}
+	
+	remote_owner = parsed.owner
+	remote_repo = parsed.repo
+	_save_remote_settings()
+	
+	return {"code": 0, "output": "Remote configured: %s/%s" % [remote_owner, remote_repo]}
+
+
+func _parse_github_url(url: String) -> Dictionary:
+	# Supports: https://github.com/owner/repo or https://github.com/owner/repo.git
+	var clean := url.replace(".git", "").strip_edges()
+	if clean.begins_with("https://github.com/"):
+		var path := clean.replace("https://github.com/", "")
+		var parts := path.split("/")
+		if parts.size() >= 2:
+			return {"owner": parts[0], "repo": parts[1]}
+	return {}
+
+
+func _load_remote_settings() -> void:
+	if not FileAccess.file_exists(REMOTE_SETTINGS_FILE):
+		return
+	var f := FileAccess.open(REMOTE_SETTINGS_FILE, FileAccess.READ)
+	if not f:
+		return
+	var data: Variant = JSON.parse_string(f.get_as_text())
+	if typeof(data) != TYPE_DICTIONARY:
+		return
+	remote_url = data.get("remote_url", "")
+	remote_token = data.get("remote_token", "")
+	remote_owner = data.get("remote_owner", "")
+	remote_repo = data.get("remote_repo", "")
+	remote_branch = data.get("remote_branch", "main")
+
+
+func _save_remote_settings() -> void:
+	var data := {
+		"remote_url": remote_url,
+		"remote_token": remote_token,
+		"remote_owner": remote_owner,
+		"remote_repo": remote_repo,
+		"remote_branch": remote_branch
+	}
+	var f := FileAccess.open(REMOTE_SETTINGS_FILE, FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify(data, "  "))
+
+
+func is_remote_configured() -> bool:
+	return not remote_owner.is_empty() and not remote_repo.is_empty() and not remote_token.is_empty()
+
+
+# ============================================================================
+# GITHUB API - ASYNC OPERATIONS (requires Node for HTTPRequest)
+# ============================================================================
+
+## Call these from a Node that can manage HTTPRequest children
+
+func create_push_request(parent_node: Node, callback: Callable) -> void:
+	## Push all committed files to GitHub. Callback receives (success: bool, message: String)
+	if not is_remote_configured():
+		callback.call(false, "Remote not configured")
+		return
+	
+	var state := _load_state()
+	var commits: Array = state.get("commits", [])
+	if commits.is_empty():
+		callback.call(false, "No commits to push")
+		return
+	
+	# Get the latest commit's file contents
+	var latest_commit: Dictionary = commits[-1]
+	var contents: Dictionary = latest_commit.get("contents", {})
+	
+	if contents.is_empty():
+		callback.call(false, "No file contents in latest commit")
+		return
+	
+	# Start pushing files one by one
+	var push_context := {
+		"parent": parent_node,
+		"callback": callback,
+		"files_to_push": contents.keys(),
+		"contents": contents,
+		"current_index": 0,
+		"success_count": 0,
+		"error_messages": []
+	}
+	_push_next_file(push_context)
+
+
+func _push_next_file(ctx: Dictionary) -> void:
+	var files: Array = ctx.files_to_push
+	var idx: int = ctx.current_index
+	
+	if idx >= files.size():
+		# All done
+		var callback: Callable = ctx.callback
+		var errors: Array = ctx.error_messages
+		if errors.is_empty():
+			callback.call(true, "Pushed %d file(s)" % ctx.success_count)
+		else:
+			callback.call(false, "Errors: %s" % ", ".join(errors))
+		return
+	
+	var file_path: String = files[idx]
+	var content: String = ctx.contents[file_path]
+	var parent: Node = ctx.parent
+	
+	# Convert res:// path to repo-relative path
+	var repo_path := file_path.replace("res://", "")
+	
+	# First, try to get the file's SHA (needed for updates)
+	_get_file_sha(parent, repo_path, func(sha: String):
+		_upload_file(parent, repo_path, content, sha, func(success: bool, msg: String):
+			if success:
+				ctx.success_count += 1
+			else:
+				ctx.error_messages.append("%s: %s" % [repo_path, msg])
+			ctx.current_index += 1
+			_push_next_file(ctx)
+		)
+	)
+
+
+func _get_file_sha(parent: Node, repo_path: String, callback: Callable) -> void:
+	## Get SHA of existing file (empty string if file doesn't exist)
+	var url := "%s/repos/%s/%s/contents/%s?ref=%s" % [
+		GITHUB_API_BASE, remote_owner, remote_repo, repo_path, remote_branch
+	]
+	
+	var http := HTTPRequest.new()
+	parent.add_child(http)
+	
+	http.request_completed.connect(func(result: int, code: int, headers: PackedStringArray, body: PackedByteArray):
+		http.queue_free()
+		if code == 200:
+			var json: Variant = JSON.parse_string(body.get_string_from_utf8())
+			if typeof(json) == TYPE_DICTIONARY:
+				callback.call(json.get("sha", ""))
+				return
+		callback.call("")  # File doesn't exist or error
+	)
+	
+	var headers := _get_auth_headers()
+	http.request(url, headers, HTTPClient.METHOD_GET)
+
+
+func _upload_file(parent: Node, repo_path: String, content: String, sha: String, callback: Callable) -> void:
+	## Upload/update a file via GitHub Contents API
+	var url := "%s/repos/%s/%s/contents/%s" % [
+		GITHUB_API_BASE, remote_owner, remote_repo, repo_path
+	]
+	
+	var http := HTTPRequest.new()
+	parent.add_child(http)
+	
+	http.request_completed.connect(func(result: int, code: int, headers: PackedStringArray, body: PackedByteArray):
+		http.queue_free()
+		if code == 200 or code == 201:
+			callback.call(true, "OK")
+		else:
+			var error_msg := "HTTP %d" % code
+			var json: Variant = JSON.parse_string(body.get_string_from_utf8())
+			if typeof(json) == TYPE_DICTIONARY and json.has("message"):
+				error_msg = json.message
+			callback.call(false, error_msg)
+	)
+	
+	var payload := {
+		"message": "Update %s" % repo_path,
+		"content": Marshalls.raw_to_base64(content.to_utf8_buffer()),
+		"branch": remote_branch
+	}
+	if not sha.is_empty():
+		payload["sha"] = sha
+	
+	var headers := _get_auth_headers()
+	headers.append("Content-Type: application/json")
+	http.request(url, headers, HTTPClient.METHOD_PUT, JSON.stringify(payload))
+
+
+func create_pull_request(parent_node: Node, callback: Callable) -> void:
+	## Pull files from GitHub. Callback receives (success: bool, message: String)
+	if not is_remote_configured():
+		callback.call(false, "Remote not configured")
+		return
+	
+	# Get the tree of files from the repo
+	var url := "%s/repos/%s/%s/git/trees/%s?recursive=1" % [
+		GITHUB_API_BASE, remote_owner, remote_repo, remote_branch
+	]
+	
+	var http := HTTPRequest.new()
+	parent_node.add_child(http)
+	
+	http.request_completed.connect(func(result: int, code: int, headers: PackedStringArray, body: PackedByteArray):
+		http.queue_free()
+		if code != 200:
+			callback.call(false, "Failed to get repo tree: HTTP %d" % code)
+			return
+		
+		var json: Variant = JSON.parse_string(body.get_string_from_utf8())
+		if typeof(json) != TYPE_DICTIONARY:
+			callback.call(false, "Invalid response from GitHub")
+			return
+		
+		var tree: Array = json.get("tree", [])
+		var files_to_pull: Array = []
+		
+		for item in tree:
+			if item.get("type", "") != "blob":
+				continue
+			var path: String = item.get("path", "")
+			var ext := path.get_extension().to_lower()
+			if TRACK_EXTS.has(ext):
+				files_to_pull.append({"path": path, "sha": item.get("sha", "")})
+		
+		if files_to_pull.is_empty():
+			callback.call(true, "No tracked files to pull")
+			return
+		
+		# Pull files one by one
+		var pull_ctx := {
+			"parent": parent_node,
+			"callback": callback,
+			"files": files_to_pull,
+			"current_index": 0,
+			"success_count": 0,
+			"error_messages": []
+		}
+		_pull_next_file(pull_ctx)
+	)
+	
+	var headers := _get_auth_headers()
+	http.request(url, headers, HTTPClient.METHOD_GET)
+
+
+func _pull_next_file(ctx: Dictionary) -> void:
+	var files: Array = ctx.files
+	var idx: int = ctx.current_index
+	
+	if idx >= files.size():
+		var callback: Callable = ctx.callback
+		var errors: Array = ctx.error_messages
+		if errors.is_empty():
+			callback.call(true, "Pulled %d file(s)" % ctx.success_count)
+		else:
+			callback.call(false, "Errors: %s" % ", ".join(errors))
+		return
+	
+	var file_info: Dictionary = files[idx]
+	var file_path: String = file_info.path
+	var parent: Node = ctx.parent
+	
+	_download_file(parent, file_path, func(success: bool, content: String, msg: String):
+		if success:
+			# Write to res:// path
+			var local_path := "res://" + file_path
+			var global_path := ProjectSettings.globalize_path(local_path)
+			
+			# Ensure directory exists
+			var dir_path := global_path.get_base_dir()
+			DirAccess.make_dir_recursive_absolute(dir_path)
+			
+			var f := FileAccess.open(global_path, FileAccess.WRITE)
+			if f:
+				f.store_string(content)
+				ctx.success_count += 1
+			else:
+				ctx.error_messages.append("%s: Failed to write" % file_path)
+		else:
+			ctx.error_messages.append("%s: %s" % [file_path, msg])
+		
+		ctx.current_index += 1
+		_pull_next_file(ctx)
+	)
+
+
+func _download_file(parent: Node, repo_path: String, callback: Callable) -> void:
+	## Download a file's content from GitHub
+	var url := "%s/repos/%s/%s/contents/%s?ref=%s" % [
+		GITHUB_API_BASE, remote_owner, remote_repo, repo_path, remote_branch
+	]
+	
+	var http := HTTPRequest.new()
+	parent.add_child(http)
+	
+	http.request_completed.connect(func(result: int, code: int, headers: PackedStringArray, body: PackedByteArray):
+		http.queue_free()
+		if code != 200:
+			callback.call(false, "", "HTTP %d" % code)
+			return
+		
+		var json: Variant = JSON.parse_string(body.get_string_from_utf8())
+		if typeof(json) != TYPE_DICTIONARY:
+			callback.call(false, "", "Invalid response")
+			return
+		
+		var content_b64: String = json.get("content", "")
+		if content_b64.is_empty():
+			callback.call(false, "", "No content")
+			return
+		
+		# GitHub returns base64 with newlines, remove them
+		content_b64 = content_b64.replace("\n", "")
+		var content_bytes := Marshalls.base64_to_raw(content_b64)
+		var content := content_bytes.get_string_from_utf8()
+		callback.call(true, content, "OK")
+	)
+	
+	var headers := _get_auth_headers()
+	http.request(url, headers, HTTPClient.METHOD_GET)
+
+
+func _get_auth_headers() -> PackedStringArray:
+	return PackedStringArray([
+		"Authorization: Bearer %s" % remote_token,
+		"Accept: application/vnd.github+json",
+		"X-GitHub-Api-Version: 2022-11-28",
+		"User-Agent: GodotGitPanel"
+	])

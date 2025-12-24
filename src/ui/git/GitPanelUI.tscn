@@ -1,4 +1,4 @@
-[gd_scene load_steps=3 format=3 uid="uid://git_panel_ui"]
+[gd_scene load_steps=4 format=3 uid="uid://git_panel_ui"]
 
 [ext_resource type="Script" path="res://src/ui/git/git_panel_ui.gd" id="1_git_panel_ui"]
 
@@ -14,6 +14,22 @@ corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_section"]
+bg_color = Color(0.08, 0.085, 0.1, 0.8)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.15, 0.18, 0.25, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+content_margin_left = 6.0
+content_margin_top = 6.0
+content_margin_right = 6.0
+content_margin_bottom = 6.0
+
 [node name="GitPanelUI" type="PanelContainer"]
 anchors_preset = 15
 anchor_right = 1.0
@@ -23,133 +39,238 @@ grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
 script = ExtResource("1_git_panel_ui")
 
-[node name="MarginContainer" type="MarginContainer" parent="."]
-layout_mode = 2
-theme_override_constants/margin_left = 8
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_right = 8
-theme_override_constants/margin_bottom = 8
-
-[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
+[node name="MainScroll" type="ScrollContainer" parent="."]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-theme_override_constants/separation = 6
+horizontal_scroll_mode = 0
 
-[node name="TitleLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="ContentContainer" type="VBoxContainer" parent="MainScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="TitleLabel" type="Label" parent="MainScroll/ContentContainer"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.75, 0.9, 1)
 theme_override_font_sizes/font_size = 16
 text = "Git Version Control"
 horizontal_alignment = 1
 
-[node name="PathLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="HeaderSection" type="PanelContainer" parent="MainScroll/ContentContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
+theme_override_styles/panel = SubResource("StyleBoxFlat_section")
+
+[node name="HeaderVBox" type="VBoxContainer" parent="MainScroll/ContentContainer/HeaderSection"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="PathLabel" type="Label" parent="MainScroll/ContentContainer/HeaderSection/HeaderVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
 text = "Repo: ..."
 
-[node name="RefreshRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+[node name="BranchLabel" type="Label" parent="MainScroll/ContentContainer/HeaderSection/HeaderVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Branch: local"
+
+[node name="StatusRow" type="HBoxContainer" parent="MainScroll/ContentContainer/HeaderSection/HeaderVBox"]
+layout_mode = 2
+
+[node name="StatusLabel" type="Label" parent="MainScroll/ContentContainer/HeaderSection/HeaderVBox/StatusRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.6, 0.8, 0.6, 1)
+theme_override_font_sizes/font_size = 11
+text = "Ready"
+
+[node name="RefreshButton" type="Button" parent="MainScroll/ContentContainer/HeaderSection/HeaderVBox/StatusRow"]
+layout_mode = 2
+text = "↻ Refresh"
+
+[node name="ChangesSection" type="VBoxContainer" parent="MainScroll/ContentContainer"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ChangesLabel" type="Label" parent="MainScroll/ContentContainer/ChangesSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.7, 0.4, 1)
+theme_override_font_sizes/font_size = 12
+text = "📁 Changes (unstaged/untracked)"
+
+[node name="ChangesList" type="ItemList" parent="MainScroll/ContentContainer/ChangesSection"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 100)
+theme_override_font_sizes/font_size = 11
+allow_reselect = true
+
+[node name="ChangesButtons" type="HBoxContainer" parent="MainScroll/ContentContainer/ChangesSection"]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="RefreshStatusButton" type="Button" parent="MarginContainer/VBoxContainer/RefreshRow"]
-layout_mode = 2
-text = "Refresh Status"
-
-[node name="RefreshHistoryButton" type="Button" parent="MarginContainer/VBoxContainer/RefreshRow"]
-layout_mode = 2
-text = "Refresh History"
-
-[node name="HSeparator" type="HSeparator" parent="MarginContainer/VBoxContainer"]
-layout_mode = 2
-
-[node name="ChangesLabel" type="Label" parent="MarginContainer/VBoxContainer"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "Changes (unstaged / untracked)"
-
-[node name="ChangesList" type="ItemList" parent="MarginContainer/VBoxContainer"]
+[node name="StageSelectedButton" type="Button" parent="MainScroll/ContentContainer/ChangesSection/ChangesButtons"]
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_vertical = 3
-custom_minimum_size = Vector2(0, 150)
-theme_override_font_sizes/font_size = 12
-
-[node name="ChangesButtons" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="StageSelectedButton" type="Button" parent="MarginContainer/VBoxContainer/ChangesButtons"]
-layout_mode = 2
 text = "Stage Selected"
 
-[node name="StageAllButton" type="Button" parent="MarginContainer/VBoxContainer/ChangesButtons"]
+[node name="StageAllButton" type="Button" parent="MainScroll/ContentContainer/ChangesSection/ChangesButtons"]
 layout_mode = 2
+size_flags_horizontal = 3
 text = "Stage All"
 
-[node name="StagedLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="StagedSection" type="VBoxContainer" parent="MainScroll/ContentContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "Staged"
+theme_override_constants/separation = 4
 
-[node name="StagedList" type="ItemList" parent="MarginContainer/VBoxContainer"]
+[node name="StagedLabel" type="Label" parent="MainScroll/ContentContainer/StagedSection"]
 layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-custom_minimum_size = Vector2(0, 120)
+theme_override_colors/font_color = Color(0.4, 0.8, 0.4, 1)
 theme_override_font_sizes/font_size = 12
+text = "✓ Staged"
 
-[node name="StagedButtons" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="UnstageSelectedButton" type="Button" parent="MarginContainer/VBoxContainer/StagedButtons"]
-layout_mode = 2
-text = "Unstage Selected"
-
-[node name="UnstageAllButton" type="Button" parent="MarginContainer/VBoxContainer/StagedButtons"]
-layout_mode = 2
-text = "Unstage All"
-
-[node name="CommitLabel" type="Label" parent="MarginContainer/VBoxContainer"]
-layout_mode = 2
-text = "Commit message"
-
-[node name="CommitMessage" type="TextEdit" parent="MarginContainer/VBoxContainer"]
+[node name="StagedList" type="ItemList" parent="MainScroll/ContentContainer/StagedSection"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 80)
+theme_override_font_sizes/font_size = 11
+allow_reselect = true
+
+[node name="StagedButtons" type="HBoxContainer" parent="MainScroll/ContentContainer/StagedSection"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="UnstageSelectedButton" type="Button" parent="MainScroll/ContentContainer/StagedSection/StagedButtons"]
+layout_mode = 2
 size_flags_horizontal = 3
-size_flags_vertical = 1
+text = "Unstage Selected"
+
+[node name="UnstageAllButton" type="Button" parent="MainScroll/ContentContainer/StagedSection/StagedButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Unstage All"
+
+[node name="CommitSection" type="VBoxContainer" parent="MainScroll/ContentContainer"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="CommitLabel" type="Label" parent="MainScroll/ContentContainer/CommitSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.7, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "💬 Commit Message"
+
+[node name="CommitMessage" type="TextEdit" parent="MainScroll/ContentContainer/CommitSection"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 60)
+theme_override_font_sizes/font_size = 11
+placeholder_text = "Enter commit message or use LLM query..."
 wrap_mode = 1
 
-[node name="CommitButton" type="Button" parent="MarginContainer/VBoxContainer"]
+[node name="CommitButtons" type="HBoxContainer" parent="MainScroll/ContentContainer/CommitSection"]
 layout_mode = 2
-text = "Commit"
+theme_override_constants/separation = 6
 
-[node name="StatusLabel" type="Label" parent="MarginContainer/VBoxContainer"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 12
-text = "Ready"
-
-[node name="HSeparator2" type="HSeparator" parent="MarginContainer/VBoxContainer"]
-layout_mode = 2
-
-[node name="HistoryLabel" type="Label" parent="MarginContainer/VBoxContainer"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "History"
-
-[node name="HistoryList" type="ItemList" parent="MarginContainer/VBoxContainer"]
+[node name="CommitButton" type="Button" parent="MainScroll/ContentContainer/CommitSection/CommitButtons"]
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_vertical = 3
-custom_minimum_size = Vector2(0, 140)
+text = "Commit"
+
+[node name="UseLLMQueryCheck" type="CheckBox" parent="MainScroll/ContentContainer/CommitSection/CommitButtons"]
+layout_mode = 2
+button_pressed = true
+text = "Use LLM Query"
+tooltip_text = "Auto-fill commit message with your last LLM query"
+
+[node name="HSeparator" type="HSeparator" parent="MainScroll/ContentContainer"]
+layout_mode = 2
+
+[node name="HistorySection" type="VBoxContainer" parent="MainScroll/ContentContainer"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="HistoryLabel" type="Label" parent="MainScroll/ContentContainer/HistorySection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.6, 0.9, 1)
 theme_override_font_sizes/font_size = 12
+text = "📜 History"
 
-[node name="HistoryButtons" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+[node name="HistoryList" type="ItemList" parent="MainScroll/ContentContainer/HistorySection"]
 layout_mode = 2
-theme_override_constants/separation = 8
+custom_minimum_size = Vector2(0, 100)
+theme_override_font_sizes/font_size = 11
 
-[node name="RestoreButton" type="Button" parent="MarginContainer/VBoxContainer/HistoryButtons"]
+[node name="HistoryButtons" type="HBoxContainer" parent="MainScroll/ContentContainer/HistorySection"]
 layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="RestoreButton" type="Button" parent="MainScroll/ContentContainer/HistorySection/HistoryButtons"]
+layout_mode = 2
+disabled = true
 text = "Restore Selected"
+
+[node name="HSeparator2" type="HSeparator" parent="MainScroll/ContentContainer"]
+layout_mode = 2
+
+[node name="RemoteSection" type="VBoxContainer" parent="MainScroll/ContentContainer"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="RemoteLabel" type="Label" parent="MainScroll/ContentContainer/RemoteSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.8, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "☁ Remote Repository"
+
+[node name="RemoteUrlRow" type="HBoxContainer" parent="MainScroll/ContentContainer/RemoteSection"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="RemoteUrlLabel" type="Label" parent="MainScroll/ContentContainer/RemoteSection/RemoteUrlRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(50, 0)
+theme_override_font_sizes/font_size = 11
+text = "URL:"
+
+[node name="RemoteUrlInput" type="LineEdit" parent="MainScroll/ContentContainer/RemoteSection/RemoteUrlRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 11
+placeholder_text = "https://github.com/user/repo.git"
+
+[node name="RemoteTokenRow" type="HBoxContainer" parent="MainScroll/ContentContainer/RemoteSection"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="RemoteTokenLabel" type="Label" parent="MainScroll/ContentContainer/RemoteSection/RemoteTokenRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(50, 0)
+theme_override_font_sizes/font_size = 11
+text = "Token:"
+
+[node name="RemoteTokenInput" type="LineEdit" parent="MainScroll/ContentContainer/RemoteSection/RemoteTokenRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 11
+placeholder_text = "Personal access token (ghp_xxx)"
+secret = true
+
+[node name="RemoteButtons" type="HBoxContainer" parent="MainScroll/ContentContainer/RemoteSection"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="PushButton" type="Button" parent="MainScroll/ContentContainer/RemoteSection/RemoteButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "⬆ Push"
+
+[node name="PullButton" type="Button" parent="MainScroll/ContentContainer/RemoteSection/RemoteButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "⬇ Pull"
+
+[node name="ConnectGitHubButton" type="Button" parent="MainScroll/ContentContainer/RemoteSection/RemoteButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "🔗 GitHub"
+tooltip_text = "Show GitHub connection instructions"
