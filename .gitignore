@@ -47,3 +47,4 @@ local.properties
 add_jitpack.py
 create_local_prop.py
 livekit-agent/.env
+livekit-agent/transcripts/

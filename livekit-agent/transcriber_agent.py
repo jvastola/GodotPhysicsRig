@@ -2,6 +2,7 @@
 LiveKit Transcriber Agent for LiveKit Cloud
 
 Transcribes audio from all participants and broadcasts transcripts via data channel.
+Saves all transcripts to persistent storage (text files or SQLite database).
 Deploy to LiveKit Cloud using: livekit-cli cloud agent deploy
 """
 
@@ -9,8 +10,11 @@ import asyncio
 import json
 import logging
 import os
+import sqlite3
 import time
-from typing import Dict
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Optional
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
@@ -29,6 +33,127 @@ from livekit.plugins import deepgram, silero
 
 logger = logging.getLogger("transcriber")
 logger.setLevel(logging.INFO)
+
+
+# ============================================================================
+# TRANSCRIPT PERSISTENCE
+# ============================================================================
+
+class TranscriptStorage:
+    """Handles persistent storage of transcripts to text files and/or SQLite."""
+    
+    def __init__(self, room_name: str, storage_dir: str = "transcripts"):
+        self.room_name = room_name
+        self.storage_dir = Path(storage_dir)
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Text file for this session
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.text_file = self.storage_dir / f"transcript_{room_name}_{timestamp}.txt"
+        self.json_file = self.storage_dir / f"transcript_{room_name}_{timestamp}.json"
+        
+        # SQLite database (shared across all sessions)
+        self.db_path = self.storage_dir / "transcripts.db"
+        self._init_db()
+        
+        # In-memory buffer for JSON export
+        self._entries: list[dict] = []
+        
+        # Write header to text file
+        self._write_text_header()
+        
+        logger.info(f"TranscriptStorage initialized: {self.text_file}")
+    
+    def _init_db(self) -> None:
+        """Initialize SQLite database with transcripts table."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS transcripts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                room_name TEXT NOT NULL,
+                speaker_identity TEXT NOT NULL,
+                speaker_name TEXT,
+                text TEXT NOT NULL,
+                timestamp INTEGER NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_room_timestamp 
+            ON transcripts(room_name, timestamp)
+        """)
+        conn.commit()
+        conn.close()
+    
+    def _write_text_header(self) -> None:
+        """Write header to text file."""
+        with open(self.text_file, "w", encoding="utf-8") as f:
+            f.write(f"# World Transcript - {self.room_name}\n")
+            f.write(f"# Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write("# " + "=" * 60 + "\n\n")
+    
+    def save_entry(self, speaker_identity: str, speaker_name: str, text: str, timestamp_ms: int) -> None:
+        """Save a transcript entry to all storage backends."""
+        # Format timestamp
+        dt = datetime.fromtimestamp(timestamp_ms / 1000)
+        time_str = dt.strftime("%H:%M:%S")
+        display_name = speaker_name or speaker_identity
+        
+        # Save to text file (append)
+        with open(self.text_file, "a", encoding="utf-8") as f:
+            f.write(f"[{time_str}] {display_name}: {text}\n")
+        
+        # Save to SQLite
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO transcripts (room_name, speaker_identity, speaker_name, text, timestamp)
+                VALUES (?, ?, ?, ?, ?)
+            """, (self.room_name, speaker_identity, speaker_name, text, timestamp_ms))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.error(f"Failed to save to database: {e}")
+        
+        # Add to in-memory buffer for JSON export
+        self._entries.append({
+            "speaker_identity": speaker_identity,
+            "speaker_name": speaker_name,
+            "text": text,
+            "timestamp": timestamp_ms,
+            "is_final": True
+        })
+    
+    def save_json(self) -> None:
+        """Save all entries to JSON file."""
+        data = {
+            "room_name": self.room_name,
+            "export_timestamp": int(time.time() * 1000),
+            "export_date": datetime.now().isoformat(),
+            "entry_count": len(self._entries),
+            "entries": self._entries
+        }
+        with open(self.json_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        logger.info(f"Saved JSON transcript: {self.json_file}")
+    
+    def finalize(self) -> None:
+        """Finalize storage - write footer and save JSON."""
+        # Write footer to text file
+        with open(self.text_file, "a", encoding="utf-8") as f:
+            f.write(f"\n# " + "=" * 60 + "\n")
+            f.write(f"# Ended: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"# Total entries: {len(self._entries)}\n")
+        
+        # Save JSON
+        self.save_json()
+        logger.info(f"Transcript finalized: {len(self._entries)} entries")
+
+
+# Global storage instance (set per room)
+_transcript_storage: Optional[TranscriptStorage] = None
 
 
 class ParticipantTranscriber:
@@ -96,14 +221,27 @@ class ParticipantTranscriber:
             logger.error(f"Transcript processing error: {e}")
     
     async def _broadcast(self, text: str) -> None:
+        global _transcript_storage
+        timestamp_ms = int(time.time() * 1000)
+        
         message = {
             "type": "transcript",
             "speaker_identity": self.participant.identity,
             "speaker_name": self.participant.name or self.participant.identity,
             "text": text,
-            "timestamp": int(time.time() * 1000),
+            "timestamp": timestamp_ms,
             "is_final": True,
         }
+        
+        # Save to persistent storage
+        if _transcript_storage:
+            _transcript_storage.save_entry(
+                speaker_identity=self.participant.identity,
+                speaker_name=self.participant.name or self.participant.identity,
+                text=text,
+                timestamp_ms=timestamp_ms
+            )
+        
         try:
             await self.room.local_participant.publish_data(
                 json.dumps(message).encode("utf-8"),
@@ -172,7 +310,13 @@ class RoomTranscriber:
 
 async def entrypoint(ctx: JobContext) -> None:
     """Main agent entrypoint."""
+    global _transcript_storage
+    
     logger.info(f"Agent joining room: {ctx.room.name}")
+    
+    # Initialize transcript storage for this room
+    storage_dir = os.environ.get("TRANSCRIPT_STORAGE_DIR", "transcripts")
+    _transcript_storage = TranscriptStorage(ctx.room.name, storage_dir)
     
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
     logger.info("Connected to room")
@@ -180,7 +324,12 @@ async def entrypoint(ctx: JobContext) -> None:
     transcriber = RoomTranscriber(ctx.room)
     await transcriber.start()
     
-    ctx.add_shutdown_callback(transcriber.cleanup)
+    async def cleanup_with_storage():
+        await transcriber.cleanup()
+        if _transcript_storage:
+            _transcript_storage.finalize()
+    
+    ctx.add_shutdown_callback(cleanup_with_storage)
     logger.info("Transcriber agent running")
 
 
