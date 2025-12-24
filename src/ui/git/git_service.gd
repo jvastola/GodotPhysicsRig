@@ -578,15 +578,22 @@ func _push_next_file(ctx: Dictionary) -> void:
 		if errors.is_empty():
 			callback.call(true, "Pushed %d file(s)" % ctx.success_count)
 		else:
-			callback.call(false, "Errors: %s" % ", ".join(errors))
+			callback.call(false, "Errors: " + ", ".join(errors).substr(0, 100))
 		return
 	
 	var file_path: String = files[idx]
 	var content: String = ctx.contents[file_path]
 	var parent: Node = ctx.parent
 	
-	# Convert res:// path to repo-relative path
-	var repo_path := file_path.replace("res://", "")
+	# Convert to repo-relative path (strip res://, user://, or absolute paths)
+	var repo_path := _to_repo_relative_path(file_path)
+	
+	# Skip files that can't be converted to valid repo paths
+	if repo_path.is_empty() or repo_path.begins_with("/") or repo_path.contains("://"):
+		ctx.error_messages.append("%s: Invalid path" % file_path.get_file())
+		ctx.current_index += 1
+		_push_next_file(ctx)
+		return
 	
 	# First, try to get the file's SHA (needed for updates)
 	_get_file_sha(parent, repo_path, func(sha: String):
@@ -594,11 +601,39 @@ func _push_next_file(ctx: Dictionary) -> void:
 			if success:
 				ctx.success_count += 1
 			else:
-				ctx.error_messages.append("%s: %s" % [repo_path, msg])
+				ctx.error_messages.append("%s: %s" % [repo_path.get_file(), msg.substr(0, 50)])
 			ctx.current_index += 1
 			_push_next_file(ctx)
 		)
 	)
+
+
+func _to_repo_relative_path(path: String) -> String:
+	## Convert any path format to a repo-relative path for GitHub
+	# Handle res:// paths
+	if path.begins_with("res://"):
+		return path.replace("res://", "")
+	
+	# Handle user:// paths - extract just the relative part after pulled_repo/
+	if path.begins_with("user://"):
+		if path.contains("pulled_repo/"):
+			var parts := path.split("pulled_repo/")
+			if parts.size() > 1:
+				return parts[1]
+		# For other user:// files, use just the filename in a "user_data" folder
+		return "user_data/" + path.get_file()
+	
+	# Handle absolute paths - try to extract project-relative portion
+	var res_global := ProjectSettings.globalize_path("res://")
+	if path.begins_with(res_global):
+		return path.replace(res_global, "").trim_prefix("/")
+	
+	var user_global := ProjectSettings.globalize_path("user://")
+	if path.begins_with(user_global):
+		return "user_data/" + path.replace(user_global, "").trim_prefix("/")
+	
+	# Can't determine - return empty to skip
+	return ""
 
 
 func _get_file_sha(parent: Node, repo_path: String, callback: Callable) -> void:

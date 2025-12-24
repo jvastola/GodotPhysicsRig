@@ -107,8 +107,10 @@ layout_mode = 2
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.6, 0.8, 0.6, 1)
-theme_override_font_sizes/font_size = 11
+theme_override_font_sizes/font_size = 10
 text = "Ready"
+autowrap_mode = 2
+custom_minimum_size = Vector2(0, 30)
 
 [node name="RefreshButton" type="Button" parent="MainScroll/ContentContainer/HeaderSection/HeaderVBox/StatusRow"]
 layout_mode = 2
