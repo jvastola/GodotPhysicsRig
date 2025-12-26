@@ -842,7 +842,7 @@ func _create_baseline_from_pull(contents: Dictionary) -> void:
 	var stored_contents: Dictionary = {}
 	for path in contents.keys():
 		var content: String = contents[path]
-		var user_path := "user://" + path
+		var user_path: String = "user://" + path
 		hashes[user_path] = content.md5_text()
 		stored_contents[user_path] = content
 	
