@@ -28,16 +28,16 @@
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/TwoHandGrabCube.tscn" id="36_two_hand_cube"]
 [ext_resource type="PackedScene" path="res://src/ui/TwoHandGrabSettingsViewport3D.tscn" id="37_two_hand_settings"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/WorldGrabSphere.tscn" id="38_world_grab_sphere"]
-[ext_resource type="Script" path="res://src/ui/ui_panel_manager.gd" id="39_ui_panel_manager"]
+[ext_resource type="Script" uid="uid://om3k532gai8j" path="res://src/ui/ui_panel_manager.gd" id="39_ui_panel_manager"]
 [ext_resource type="PackedScene" path="res://src/ui/git/GitViewport3D.tscn" id="39_wh2ee"]
-[ext_resource type="Script" path="res://src/ui/ui_panel_scene_setup.gd" id="40_ui_panel_setup"]
-[ext_resource type="Script" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
+[ext_resource type="Script" uid="uid://bqrnwqkyb00kx" path="res://src/ui/ui_panel_scene_setup.gd" id="40_ui_panel_setup"]
+[ext_resource type="Script" uid="uid://bid6ju5yhq61q" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
 [ext_resource type="PackedScene" uid="uid://cm8nv7v0apls3" path="res://src/objects/grabbables/GrappleHook.tscn" id="42_grapple_hook"]
 [ext_resource type="PackedScene" path="res://src/objects/ReferenceBlock.tscn" id="43_reference_block"]
 [ext_resource type="PackedScene" path="res://src/ui/BlockLibraryViewport3D.tscn" id="44_block_library_viewport"]
 [ext_resource type="PackedScene" uid="uid://baesap7jjgmfh" path="res://src/objects/grabbables/PaintBrush.tscn" id="45_paint_brush"]
 [ext_resource type="PackedScene" path="res://src/ui/TerminalViewport3D.tscn" id="46_terminal"]
-[ext_resource type="Script" uid="uid://dacfvlwh7dwcm" path="res://src/objects/viewport_mirror.gd" id="47_viewport_mirror"]
+[ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://src/objects/viewport_mirror.gd" id="47_viewport_mirror"]
 [ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://src/systems/grid_painter.gd" id="48_grid_painter"]
 
 [sub_resource type="Environment" id="Environment_main"]
@@ -115,7 +115,7 @@ size = Vector3(0.45, 0.45, 0.45)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_body_grid"]
 
-[node name="MainScene21" type="Node3D" unique_id=1547683746]
+[node name="MainScene29" type="Node3D" unique_id=1547683746]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0012965202, 0, 0)
 
 [node name="ToolPoolManager" type="Node" parent="." unique_id=2101234567]
@@ -256,7 +256,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.983923, 0.88246953, 1.516
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10)
 
 [node name="ShaderPlasma" type="CSGSphere3D" parent="PlasmaDemos" unique_id=1217239899]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.5151181, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.28374702, 0)
 radius = 0.75
 material = SubResource("StandardMaterial3D_wvm1w")
 script = ExtResource("35_hr53f")
@@ -275,7 +275,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.75, 0)
 material = SubResource("StandardMaterial3D_wvm1w")
 
 [node name="Sphere" type="CSGSphere3D" parent="PlasmaDemos/PlasmaBox" unique_id=716390065]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.63919914)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.97178966)
 operation = 2
 radius = 0.6
 material = ExtResource("34_s8yin")
@@ -291,6 +291,9 @@ size = Vector2(2, 1.5)
 ResolutionPerUnit = 500
 MainCamPath = NodePath("../XRPlayer/PlayerBody/XROrigin3D/XRCamera3D")
 MirrorColor = Color(1, 1, 1, 1)
+
+[node name="GitViewport3D" parent="ViewportMirror" unique_id=2017342683 instance=ExtResource("39_wh2ee")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.798975, 0, 2.9331493)
 
 [node name="GridPainterTest" type="Node3D" parent="." unique_id=1341686196]
 transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, -8, 0, -3.5)
@@ -348,6 +351,3 @@ collision_mask = 32
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest/GridTargetBody/GridTargetBodyArea" unique_id=1858467520]
 shape = SubResource("BoxShape3D_body_grid")
-
-[node name="GitViewport3D" parent="GridPainterTest/GridTargetBody/GridTargetBodyArea" unique_id=2017342683 instance=ExtResource("39_wh2ee")]
-transform = Transform3D(-0.50777596, -0.07968338, -0.85779613, -0.02276639, 0.9966066, -0.07910122, 0.8611883, -0.02063679, -0.507867, 23.10004, 2.1767008, -16.901163)
