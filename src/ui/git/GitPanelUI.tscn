@@ -51,12 +51,23 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 8
 
-[node name="TitleLabel" type="Label" parent="MainScroll/ContentContainer"]
+[node name="TitleRow" type="HBoxContainer" parent="MainScroll/ContentContainer"]
 layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="MainScroll/ContentContainer/TitleRow"]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.7, 0.75, 0.9, 1)
 theme_override_font_sizes/font_size = 16
 text = "Git Version Control (user://)"
 horizontal_alignment = 1
+
+[node name="CloseButton" type="Button" parent="MainScroll/ContentContainer/TitleRow"]
+custom_minimum_size = Vector2(28, 28)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "✕"
+tooltip_text = "Close panel"
 
 [node name="HeaderSection" type="PanelContainer" parent="MainScroll/ContentContainer"]
 layout_mode = 2

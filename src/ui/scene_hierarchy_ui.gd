@@ -10,6 +10,7 @@ signal node_deleted(node_path: NodePath)
 signal node_duplicated(original_path: NodePath, new_path: NodePath)
 signal node_renamed(old_path: NodePath, new_path: NodePath)
 signal node_reparented(node_path: NodePath, new_parent_path: NodePath)
+signal close_requested
 
 @export var auto_refresh_interval: float = 2.0  # Seconds between auto-refresh (0 to disable)
 @export var show_internal_nodes: bool = false   # Show nodes that start with underscore
@@ -22,6 +23,7 @@ signal node_reparented(node_path: NodePath, new_parent_path: NodePath)
 @onready var actions_button: Button = $MarginContainer/VBoxContainer/HBoxContainer2/ActionsButton
 @onready var search_bar: LineEdit = $MarginContainer/VBoxContainer/SearchBar
 @onready var status_label: Label = $MarginContainer/VBoxContainer/StatusLabel
+@onready var close_button: Button = $MarginContainer/VBoxContainer/TitleRow/CloseButton
 
 var _root_scene: Node = null
 var _refresh_timer: float = 0.0
@@ -72,6 +74,8 @@ func _ready() -> void:
 		expand_button.pressed.connect(_on_expand_pressed)
 	if actions_button:
 		actions_button.pressed.connect(_on_actions_button_pressed)
+	if close_button:
+		close_button.pressed.connect(func(): close_requested.emit())
 	
 	# Configure tree
 	if tree:

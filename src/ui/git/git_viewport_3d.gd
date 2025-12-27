@@ -33,6 +33,18 @@ func _ready() -> void:
 	if mesh_instance and _static_body:
 		mesh_instance.visible = true
 		_static_body.collision_layer = _saved_static_body_layer
+	
+	# Connect close signal from UI
+	if git_ui and git_ui.has_signal("close_requested"):
+		git_ui.close_requested.connect(_on_close_requested)
+
+
+func _on_close_requested() -> void:
+	var panel_manager := UIPanelManager.find()
+	if panel_manager:
+		panel_manager.close_panel(name)
+	else:
+		queue_free()
 
 
 func handle_pointer_event(event: Dictionary) -> void:

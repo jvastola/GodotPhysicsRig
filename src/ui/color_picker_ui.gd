@@ -1,6 +1,8 @@
 class_name ColorPickerUI
 extends PanelContainer
 
+signal close_requested
+
 static var instance: ColorPickerUI = null
 
 @onready var color_picker: ColorPicker = get_node_or_null("MarginContainer/VBoxContainer/ColorPicker") as ColorPicker
@@ -8,6 +10,7 @@ static var instance: ColorPickerUI = null
 @onready var hex_label: Label = get_node_or_null("MarginContainer/VBoxContainer/HBoxContainer/HexLabel") as Label
 @onready var copy_button: Button = get_node_or_null("MarginContainer/VBoxContainer/HBoxContainer/CopyButton") as Button
 @onready var status_label: Label = get_node_or_null("MarginContainer/VBoxContainer/StatusLabel") as Label
+@onready var close_button: Button = get_node_or_null("MarginContainer/VBoxContainer/TitleRow/CloseButton") as Button
 
 
 func _ready() -> void:
@@ -18,6 +21,8 @@ func _ready() -> void:
 		_on_color_changed(color_picker.color)
 	if copy_button:
 		copy_button.pressed.connect(_on_copy_pressed)
+	if close_button:
+		close_button.pressed.connect(func(): close_requested.emit())
 	if status_label and status_label.text == "":
 		status_label.text = "Pick a color to see values"
 

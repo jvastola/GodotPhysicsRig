@@ -5,6 +5,7 @@ extends PanelContainer
 ## Each transcript entry has a "Send to LLM" button for easy interaction.
 
 signal send_to_llm_requested(text: String)
+signal close_requested
 
 @onready var title_label: Label = $MarginContainer/VBoxContainer/TitleRow/TitleLabel
 @onready var status_label: Label = $MarginContainer/VBoxContainer/TitleRow/StatusLabel
@@ -13,6 +14,7 @@ signal send_to_llm_requested(text: String)
 @onready var copy_button: Button = $MarginContainer/VBoxContainer/ButtonRow/CopyButton
 @onready var export_button: Button = $MarginContainer/VBoxContainer/ButtonRow/ExportButton
 @onready var clear_button: Button = $MarginContainer/VBoxContainer/ButtonRow/ClearButton
+@onready var close_button: Button = $MarginContainer/VBoxContainer/TitleRow/CloseButton
 
 var transcript_store: WorldTranscriptStore
 
@@ -36,6 +38,8 @@ func _setup_ui() -> void:
 		export_button.pressed.connect(_on_export_pressed)
 	if clear_button:
 		clear_button.pressed.connect(_on_clear_pressed)
+	if close_button:
+		close_button.pressed.connect(func(): close_requested.emit())
 	
 	_update_status("Not connected")
 

@@ -5,6 +5,7 @@ extends PanelContainer
 const AppLogger = preload("res://src/systems/logger.gd")
 
 signal console_cleared
+signal close_requested
 
 @export var max_lines: int = 100
 @export var auto_scroll: bool = true
@@ -22,6 +23,7 @@ signal console_cleared
 @onready var log_level_option: OptionButton = $MarginContainer/VBoxContainer/HBoxContainer/LogLevelOption
 @onready var command_line: LineEdit = $MarginContainer/VBoxContainer/CommandRow/CommandLine
 @onready var command_run_button: Button = $MarginContainer/VBoxContainer/CommandRow/CommandRunButton
+@onready var close_button: Button = $MarginContainer/VBoxContainer/TitleRow/CloseButton
 
 var _messages: Array[Dictionary] = []
 var _filter: int = 0  # 0=All, 1=Info, 2=Warning, 3=Error
@@ -52,6 +54,9 @@ func _ready() -> void:
 	
 	if clear_button:
 		clear_button.pressed.connect(_on_clear_pressed)
+	
+	if close_button:
+		close_button.pressed.connect(func(): close_requested.emit())
 	
 	if filter_option:
 		filter_option.add_item("All", 0)

@@ -37,8 +37,20 @@ func _ready() -> void:
 		mesh_instance.visible = true
 		_static_body.collision_layer = _saved_static_body_layer
 	
+	# Connect close signal from UI
+	if inspector_ui and inspector_ui.has_signal("close_requested"):
+		inspector_ui.close_requested.connect(_on_close_requested)
+	
 	# Connect to scene hierarchy panels to receive selection events
 	call_deferred("_connect_to_hierarchy_panels")
+
+
+func _on_close_requested() -> void:
+	var panel_manager := UIPanelManager.find()
+	if panel_manager:
+		panel_manager.close_panel(name)
+	else:
+		queue_free()
 
 
 func _connect_to_hierarchy_panels() -> void:

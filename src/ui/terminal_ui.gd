@@ -6,6 +6,7 @@ extends PanelContainer
 
 signal command_executed(command: String, result: String)
 signal log_added(message: String, level: int)
+signal close_requested
 
 enum LogLevel { DEBUG, INFO, WARNING, ERROR, SYSTEM }
 
@@ -24,6 +25,7 @@ enum LogLevel { DEBUG, INFO, WARNING, ERROR, SYSTEM }
 @onready var perf_button: Button = $MarginContainer/VBoxContainer/ButtonRow/PerfButton
 @onready var filter_option: OptionButton = $MarginContainer/VBoxContainer/ButtonRow/FilterOption
 @onready var status_label: Label = $MarginContainer/VBoxContainer/StatusRow/StatusLabel
+@onready var close_button: Button = $MarginContainer/VBoxContainer/TitleRow/CloseButton
 
 var _output_lines: Array[Dictionary] = []  # {text: String, level: LogLevel, timestamp: String}
 var _filter_level: int = -1  # -1 = show all
@@ -78,6 +80,9 @@ func _ready() -> void:
 	
 	if run_button:
 		run_button.pressed.connect(_on_run_pressed)
+	
+	if close_button:
+		close_button.pressed.connect(func(): close_requested.emit())
 	
 	if command_input:
 		command_input.text_submitted.connect(_on_command_submitted)

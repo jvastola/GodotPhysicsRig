@@ -8,8 +8,10 @@ class_name ScriptEditorUI
 signal script_opened(script_path: String)
 signal script_modified(script_path: String)
 signal script_saved(script_path: String)
+signal close_requested
 
 @onready var title_label: Label = $MarginContainer/VBoxContainer/HeaderHBox/TitleLabel
+@onready var close_button: Button = $MarginContainer/VBoxContainer/HeaderHBox/CloseButton
 @onready var save_button: Button = $MarginContainer/VBoxContainer/HeaderHBox/SaveButton
 @onready var path_label: Label = $MarginContainer/VBoxContainer/PathLabel
 @onready var code_edit: CodeEdit = $MarginContainer/VBoxContainer/CodeEdit
@@ -32,6 +34,9 @@ func _ready() -> void:
 	
 	if save_button:
 		save_button.pressed.connect(save_script)
+	
+	if close_button:
+		close_button.pressed.connect(func(): close_requested.emit())
 	
 	# Connect to keyboard if available
 	call_deferred("_connect_to_keyboard")

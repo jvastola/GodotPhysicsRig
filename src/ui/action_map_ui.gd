@@ -1,9 +1,12 @@
 extends Control
 
+signal close_requested
+
 # Use explicit node paths (no unique-name flags set on the scene nodes).
 @onready var action_list: VBoxContainer = $Panel/VBox/ScrollContainer/ActionList
 @onready var summary_label: Label = $Panel/VBox/Header/SummaryLabel
 @onready var refresh_button: Button = $Panel/VBox/Header/RefreshButton
+@onready var close_button: Button = $Panel/VBox/Header/CloseButton
 
 # Map of actions to the places we use them in code.
 # This is hand-authored so the UI can show "where used" information without
@@ -58,6 +61,8 @@ const ACTION_USAGE := {
 func _ready() -> void:
 	if refresh_button:
 		refresh_button.pressed.connect(_populate_action_list)
+	if close_button:
+		close_button.pressed.connect(func(): close_requested.emit())
 	_populate_action_list()
 
 

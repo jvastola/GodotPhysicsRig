@@ -5,7 +5,10 @@ extends PanelContainer
 
 signal property_changed(node_path: NodePath, property_name: String, new_value: Variant)
 signal script_requested(script_path: String)
-@onready var title_label: Label = $MarginContainer/VBoxContainer/TitleLabel
+signal close_requested
+
+@onready var title_label: Label = $MarginContainer/VBoxContainer/TitleRow/TitleLabel
+@onready var close_button: Button = $MarginContainer/VBoxContainer/TitleRow/CloseButton
 @onready var scroll_container: ScrollContainer = $MarginContainer/VBoxContainer/ScrollContainer
 @onready var properties_container: VBoxContainer = $MarginContainer/VBoxContainer/ScrollContainer/PropertiesContainer
 @onready var no_selection_label: Label = $MarginContainer/VBoxContainer/NoSelectionLabel
@@ -21,6 +24,9 @@ const CONTROL_PROPERTIES = ["visible", "size", "position", "rotation", "scale"]
 
 func _ready() -> void:
 	_show_no_selection()
+	
+	if close_button:
+		close_button.pressed.connect(func(): close_requested.emit())
 
 
 func inspect_node(node: Node) -> void:

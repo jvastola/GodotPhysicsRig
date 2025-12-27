@@ -6,12 +6,14 @@ class_name GitPanelUI
 signal commit_created(message: String, hash: String)
 signal changes_detected(staged_count: int, unstaged_count: int)
 signal remote_push_completed(success: bool, message: String)
+signal close_requested
 
 @export_range(5, 50, 1) var history_limit: int = 20
 
 # Main scroll container to prevent cutoff
 @onready var main_scroll: ScrollContainer = $MainScroll
 @onready var content_container: VBoxContainer = $MainScroll/ContentContainer
+@onready var close_button: Button = $MainScroll/ContentContainer/TitleRow/CloseButton
 
 # Header section
 @onready var path_label: Label = $MainScroll/ContentContainer/HeaderSection/HeaderVBox/PathLabel
@@ -67,6 +69,9 @@ func _ready() -> void:
 	refresh_status()
 	refresh_history()
 	_connect_llm_signals()
+	
+	if close_button:
+		close_button.pressed.connect(func(): close_requested.emit())
 
 
 func _notification(what: int) -> void:

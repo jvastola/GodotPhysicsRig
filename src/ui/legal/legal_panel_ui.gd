@@ -1,10 +1,13 @@
 extends PanelContainer
 
 signal accepted
+signal close_requested
 
 @export_file("*.md") var tos_path: String = "res://docs/tos.md"
 @export_file("*.md") var privacy_path: String = "res://docs/privacy.md"
 @export_range(0.5, 5.0, 0.1) var required_hold_time: float = 1.5
+
+@onready var close_button: Button = $MarginContainer/VBoxContainer/TitleRow/CloseButton
 
 const DEFAULT_PRIVACY_TEXT := """
 SCENEXR PRIVACY POLICY
@@ -638,6 +641,8 @@ func _ready() -> void:
 	if accept_button:
 		accept_button.button_down.connect(_on_accept_down)
 		accept_button.button_up.connect(_on_accept_up)
+	if close_button:
+		close_button.pressed.connect(func(): close_requested.emit())
 	_reset_hold()
 	load_documents()
 	_set_ready_status()

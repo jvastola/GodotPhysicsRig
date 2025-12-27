@@ -34,11 +34,22 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 20
 
-[node name="Title" type="Label" parent="Panel/VBoxContainer"]
+[node name="TitleRow" type="HBoxContainer" parent="Panel/VBoxContainer"]
 layout_mode = 2
+
+[node name="Title" type="Label" parent="Panel/VBoxContainer/TitleRow"]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 24
 text = "Two Hand Grab Settings"
 horizontal_alignment = 1
+
+[node name="CloseButton" type="Button" parent="Panel/VBoxContainer/TitleRow"]
+custom_minimum_size = Vector2(28, 28)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "✕"
+tooltip_text = "Close panel"
 
 [node name="StatusLabel" type="Label" parent="Panel/VBoxContainer"]
 layout_mode = 2

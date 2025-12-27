@@ -1,12 +1,15 @@
 class_name PerformancePanelUI
 extends PanelContainer
 
+signal close_requested
+
 const ToolPoolManager = preload("res://src/systems/tool_pool_manager.gd")
 const UIPanelManager = preload("res://src/ui/ui_panel_manager.gd")
 
 # Node references for tool pool controls
 @onready var _status_label: Label = $MarginContainer/ScrollContainer/VBoxContainer/StatusLabel
 @onready var _grid: GridContainer = $MarginContainer/ScrollContainer/VBoxContainer/LimitGrid
+@onready var _close_button: Button = $MarginContainer/ScrollContainer/VBoxContainer/TitleRow/CloseButton
 
 # Node references for world stats (will be created dynamically if not in scene)
 var _stats_container: VBoxContainer
@@ -34,6 +37,9 @@ func _ready() -> void:
 	_init_stats_section()
 	_refresh_from_manager()
 	set_process(true)
+	
+	if _close_button:
+		_close_button.pressed.connect(func(): close_requested.emit())
 
 
 func _process(delta: float) -> void:

@@ -9,6 +9,7 @@ signal stream_chunk_received(chunk: String)
 signal api_error(error: String)
 signal tool_call_requested(tool_name: String, arguments: Dictionary)
 signal tool_call_completed(tool_name: String, result: String)
+signal close_requested
 
 enum Provider { CLAUDE, OPENAI, OPENROUTER, GEMINI, CUSTOM }
 enum MessageRole { USER, ASSISTANT, SYSTEM, TOOL }
@@ -30,6 +31,7 @@ enum SystemPreset { ASSISTANT, CODER, GODOT_DEV, ANALYST, CREATIVE }
 @onready var history_button: Button = $MarginContainer/VBoxContainer/TabContainer/Chat/VBoxContainer/ButtonRow/HistoryButton
 @onready var status_label: Label = $MarginContainer/VBoxContainer/StatusBar/StatusLabel
 @onready var token_label: Label = $MarginContainer/VBoxContainer/StatusBar/TokenLabel
+@onready var close_button: Button = $MarginContainer/VBoxContainer/TitleRow/CloseButton
 
 # UI References - History Tab
 @onready var history_list: ItemList = $MarginContainer/VBoxContainer/TabContainer/History/VBoxContainer/HistoryList
@@ -420,6 +422,9 @@ func _ready() -> void:
 	_setup_ui()
 	_load_settings()
 	_update_status("Ready")
+	
+	if close_button:
+		close_button.pressed.connect(func(): close_requested.emit())
 
 
 func _notification(what: int) -> void:

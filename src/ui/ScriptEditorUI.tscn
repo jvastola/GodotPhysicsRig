@@ -47,6 +47,13 @@ theme_override_font_sizes/font_size = 14
 text = "📝 Script Editor"
 horizontal_alignment = 1
 
+[node name="CloseButton" type="Button" parent="MarginContainer/VBoxContainer/HeaderHBox"]
+custom_minimum_size = Vector2(28, 28)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "✕"
+tooltip_text = "Close panel"
+
 [node name="SaveButton" type="Button" parent="MarginContainer/VBoxContainer/HeaderHBox"]
 custom_minimum_size = Vector2(60, 0)
 layout_mode = 2

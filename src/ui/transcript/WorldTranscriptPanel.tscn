@@ -27,16 +27,23 @@ layout_mode = 2
 
 [node name="TitleLabel" type="Label" parent="MarginContainer/VBoxContainer/TitleRow"]
 layout_mode = 2
+size_flags_horizontal = 3
 text = "World Transcript"
 theme_override_font_sizes/font_size = 16
 
 [node name="StatusLabel" type="Label" parent="MarginContainer/VBoxContainer/TitleRow"]
 layout_mode = 2
-size_flags_horizontal = 10
 theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
 theme_override_font_sizes/font_size = 12
 text = "Not connected"
 horizontal_alignment = 2
+
+[node name="CloseButton" type="Button" parent="MarginContainer/VBoxContainer/TitleRow"]
+custom_minimum_size = Vector2(28, 28)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "✕"
+tooltip_text = "Close panel"
 
 [node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2

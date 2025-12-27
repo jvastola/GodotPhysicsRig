@@ -8,8 +8,10 @@ const ToolPoolManager = preload("res://src/systems/tool_pool_manager.gd")
 signal file_selected(path: String)
 signal folder_selected(path: String)
 signal file_double_clicked(path: String)
+signal close_requested
 
-@onready var title_label: Label = $MarginContainer/VBoxContainer/TitleLabel
+@onready var title_label: Label = $MarginContainer/VBoxContainer/TitleRow/TitleLabel
+@onready var close_button: Button = $MarginContainer/VBoxContainer/TitleRow/CloseButton
 @onready var folder_toggle_row: HBoxContainer = $MarginContainer/VBoxContainer/FolderToggleRow
 @onready var res_button: Button = $MarginContainer/VBoxContainer/FolderToggleRow/ResButton
 @onready var user_button: Button = $MarginContainer/VBoxContainer/FolderToggleRow/UserButton
@@ -66,6 +68,9 @@ func _ready() -> void:
 	_setup_context_menu()
 	# Delay the scan to ensure the tree is ready
 	call_deferred("_scan_filesystem")
+	
+	if close_button:
+		close_button.pressed.connect(func(): close_requested.emit())
 
 
 func _notification(what: int) -> void:

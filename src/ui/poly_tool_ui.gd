@@ -1,6 +1,8 @@
 class_name PolyToolUI
 extends PanelContainer
 
+signal close_requested
+
 @onready var path_edit: LineEdit = $MarginContainer/VBoxContainer/PathRow/PathEdit
 @onready var status_label: Label = $MarginContainer/VBoxContainer/StatusLabel
 @onready var info_label: Label = $MarginContainer/VBoxContainer/InfoLabel
@@ -13,6 +15,7 @@ extends PanelContainer
 @onready var location_dropdown: OptionButton = $MarginContainer/VBoxContainer/LocationRow/LocationDropdown
 @onready var server_url_edit: LineEdit = $MarginContainer/VBoxContainer/UploadRow/ServerUrlEdit
 @onready var upload_button: Button = $MarginContainer/VBoxContainer/UploadRow/UploadButton
+@onready var close_button: Button = $MarginContainer/VBoxContainer/TitleRow/CloseButton
 
 static var instance: PolyToolUI = null
 
@@ -59,6 +62,9 @@ func _ready() -> void:
 	_populate_file_list()
 	_refresh_summary()
 	_update_files_label()
+	
+	if close_button:
+		close_button.pressed.connect(func(): close_requested.emit())
 
 
 func _exit_tree() -> void:

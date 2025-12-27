@@ -1,5 +1,7 @@
 extends Control
 
+signal close_requested
+
 # Two Hand Grab Settings UI
 # Controls settings for the TwoHandGrabCube
 
@@ -11,6 +13,7 @@ extends Control
 @onready var smoothing_value: Label = $Panel/VBoxContainer/Smoothing/Value
 @onready var lock_y_check: CheckBox = $Panel/VBoxContainer/Checks/LockYCheck
 @onready var status_label: Label = $Panel/VBoxContainer/StatusLabel
+@onready var close_button: Button = $Panel/VBoxContainer/TitleRow/CloseButton
 
 var _target_cube: Node = null
 
@@ -18,6 +21,9 @@ func _ready() -> void:
 	# Wait for scene to settle
 	await get_tree().process_frame
 	_find_cube()
+	
+	if close_button:
+		close_button.pressed.connect(func(): close_requested.emit())
 	
 	if _target_cube:
 		scale_slider.value = _target_cube.scale_sensitivity

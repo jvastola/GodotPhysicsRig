@@ -27,6 +27,11 @@ func _ready() -> void:
 		viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 		viewport.transparent_bg = true
 		viewport.gui_embed_subwindows = true
+		
+		# Connect close signal from UI
+		var debug_ui = viewport.get_node_or_null("DebugConsoleUI")
+		if debug_ui and debug_ui.has_signal("close_requested"):
+			debug_ui.close_requested.connect(_on_close_requested)
 	
 	if _static_body:
 		_saved_static_body_layer = _static_body.collision_layer
@@ -34,6 +39,14 @@ func _ready() -> void:
 	if mesh_instance and _static_body:
 		mesh_instance.visible = true
 		_static_body.collision_layer = _saved_static_body_layer
+
+
+func _on_close_requested() -> void:
+	var panel_manager := UIPanelManager.find()
+	if panel_manager:
+		panel_manager.close_panel(name)
+	else:
+		queue_free()
 
 
 func handle_pointer_event(event: Dictionary) -> void:

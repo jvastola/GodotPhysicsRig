@@ -28,6 +28,10 @@ func _setup_transcript_system() -> void:
 		push_warning("WorldTranscriptViewport3D: WorldTranscriptPanel not found in viewport")
 		return
 	
+	# Connect close signal
+	if transcript_panel.has_signal("close_requested"):
+		transcript_panel.close_requested.connect(_on_close_requested)
+	
 	# Create or find the transcript store
 	transcript_store = get_node_or_null("WorldTranscriptStore") as WorldTranscriptStore
 	if not transcript_store:
@@ -81,6 +85,14 @@ func _on_room_connected() -> void:
 func _on_room_disconnected() -> void:
 	if transcript_panel:
 		transcript_panel._update_status("Disconnected")
+
+
+func _on_close_requested() -> void:
+	var panel_manager := UIPanelManager.find()
+	if panel_manager:
+		panel_manager.close_panel(name)
+	else:
+		queue_free()
 
 
 ## Handle request to send text to LLM

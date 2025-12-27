@@ -46,6 +46,12 @@ horizontal_alignment = 2
 [node name="RefreshButton" type="Button" parent="Panel/VBox/Header"]
 text = "Refresh"
 
+[node name="CloseButton" type="Button" parent="Panel/VBox/Header"]
+custom_minimum_size = Vector2(28, 28)
+theme_override_font_sizes/font_size = 14
+text = "✕"
+tooltip_text = "Close panel"
+
 [node name="ScrollContainer" type="ScrollContainer" parent="Panel/VBox"]
 size_flags_horizontal = 3
 size_flags_vertical = 3
