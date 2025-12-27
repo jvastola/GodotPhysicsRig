@@ -65,6 +65,20 @@ theme_override_font_sizes/font_size = 14
 placeholder_text = "🔍 Filter nodes..."
 clear_button_enabled = true
 
+[node name="AddNodeRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="AddNodeButton" type="Button" parent="MarginContainer/VBoxContainer/AddNodeRow"]
+custom_minimum_size = Vector2(140, 32)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 1.0, 0.6, 1.0)
+theme_override_font_sizes/font_size = 14
+text = "➕ Add Node"
+tooltip_text = "Add a new node as child of selected"
+
 [node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
@@ -98,8 +112,24 @@ size_flags_horizontal = 4
 theme_override_constants/separation = 8
 alignment = 1
 
+[node name="UndoButton" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer2"]
+custom_minimum_size = Vector2(70, 32)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.85, 0.6, 1.0)
+theme_override_font_sizes/font_size = 14
+text = "↩ Undo"
+tooltip_text = "Undo last action"
+
+[node name="RedoButton" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer2"]
+custom_minimum_size = Vector2(70, 32)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.85, 0.6, 1.0)
+theme_override_font_sizes/font_size = 14
+text = "↪ Redo"
+tooltip_text = "Redo last undone action"
+
 [node name="ActionsButton" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer2"]
-custom_minimum_size = Vector2(120, 32)
+custom_minimum_size = Vector2(100, 32)
 layout_mode = 2
 theme_override_colors/font_color = Color(1.0, 0.95, 0.8, 1.0)
 theme_override_font_sizes/font_size = 14

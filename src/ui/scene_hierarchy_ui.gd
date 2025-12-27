@@ -21,6 +21,9 @@ signal close_requested
 @onready var collapse_button: Button = $MarginContainer/VBoxContainer/HBoxContainer/CollapseButton
 @onready var expand_button: Button = $MarginContainer/VBoxContainer/HBoxContainer/ExpandButton
 @onready var actions_button: Button = $MarginContainer/VBoxContainer/HBoxContainer2/ActionsButton
+@onready var undo_button: Button = $MarginContainer/VBoxContainer/HBoxContainer2/UndoButton
+@onready var redo_button: Button = $MarginContainer/VBoxContainer/HBoxContainer2/RedoButton
+@onready var add_node_button: Button = $MarginContainer/VBoxContainer/AddNodeRow/AddNodeButton
 @onready var search_bar: LineEdit = $MarginContainer/VBoxContainer/SearchBar
 @onready var status_label: Label = $MarginContainer/VBoxContainer/StatusLabel
 @onready var close_button: Button = $MarginContainer/VBoxContainer/TitleRow/CloseButton
@@ -38,6 +41,22 @@ var _clipboard_node_data: Dictionary = {}
 
 # Search/filter
 var _search_filter: String = ""
+
+# Add Node popup
+var _add_node_popup: PopupPanel = null
+var _add_node_search: LineEdit = null
+var _add_node_list: ItemList = null
+var _node_types: Array[String] = [
+	"Node", "Node2D", "Node3D",
+	"MeshInstance3D", "CSGBox3D", "CSGSphere3D", "CSGCylinder3D",
+	"StaticBody3D", "RigidBody3D", "CharacterBody3D", "AnimatableBody3D",
+	"CollisionShape3D", "Area3D",
+	"Camera3D", "DirectionalLight3D", "OmniLight3D", "SpotLight3D",
+	"Marker3D", "Path3D", "PathFollow3D",
+	"AudioStreamPlayer3D", "GPUParticles3D",
+	"Control", "Label", "Button", "Panel", "Label3D",
+	"Timer", "AnimationPlayer"
+]
 
 # Undo/Redo
 var _undo_redo: UndoRedo = null
@@ -74,6 +93,12 @@ func _ready() -> void:
 		expand_button.pressed.connect(_on_expand_pressed)
 	if actions_button:
 		actions_button.pressed.connect(_on_actions_button_pressed)
+	if undo_button:
+		undo_button.pressed.connect(_on_undo_pressed)
+	if redo_button:
+		redo_button.pressed.connect(_on_redo_pressed)
+	if add_node_button:
+		add_node_button.pressed.connect(_on_add_node_pressed)
 	if close_button:
 		close_button.pressed.connect(func(): close_requested.emit())
 	
@@ -91,6 +116,9 @@ func _ready() -> void:
 	
 	# Set up context menu
 	_setup_context_menu()
+	
+	# Set up add node popup
+	_setup_add_node_popup()
 	
 	# Set up search bar
 	if search_bar:
@@ -859,3 +887,208 @@ func _on_item_selected() -> void:
 			# Emit signal for connected inspector panels
 			node_selected.emit(node_path)
 	_update_status_label()
+
+
+# ============================================================================
+# UNDO / REDO
+# ============================================================================
+
+func _on_undo_pressed() -> void:
+	if _undo_redo and _undo_redo.has_undo():
+		_undo_redo.undo()
+		call_deferred("_populate_tree")
+		print("SceneHierarchy: Undo")
+	else:
+		print("SceneHierarchy: Nothing to undo")
+
+
+func _on_redo_pressed() -> void:
+	if _undo_redo and _undo_redo.has_redo():
+		_undo_redo.redo()
+		call_deferred("_populate_tree")
+		print("SceneHierarchy: Redo")
+	else:
+		print("SceneHierarchy: Nothing to redo")
+
+
+# ============================================================================
+# ADD NODE POPUP
+# ============================================================================
+
+func _setup_add_node_popup() -> void:
+	_add_node_popup = PopupPanel.new()
+	_add_node_popup.name = "AddNodePopup"
+	add_child(_add_node_popup)
+	
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	_add_node_popup.add_child(vbox)
+	
+	# Title
+	var title = Label.new()
+	title.text = "➕ Add New Node"
+	title.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
+	title.add_theme_font_size_override("font_size", 16)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+	
+	# Search filter
+	_add_node_search = LineEdit.new()
+	_add_node_search.placeholder_text = "🔍 Search node types..."
+	_add_node_search.clear_button_enabled = true
+	_add_node_search.custom_minimum_size = Vector2(250, 32)
+	_add_node_search.text_changed.connect(_on_add_node_search_changed)
+	vbox.add_child(_add_node_search)
+	
+	# Node type list
+	_add_node_list = ItemList.new()
+	_add_node_list.custom_minimum_size = Vector2(250, 300)
+	_add_node_list.allow_reselect = true
+	_add_node_list.item_activated.connect(_on_add_node_type_activated)
+	vbox.add_child(_add_node_list)
+	
+	# Populate with node types
+	_populate_add_node_list("")
+	
+	# Cancel button
+	var cancel_btn = Button.new()
+	cancel_btn.text = "Cancel"
+	cancel_btn.pressed.connect(func(): _add_node_popup.hide())
+	vbox.add_child(cancel_btn)
+
+
+func _populate_add_node_list(filter: String) -> void:
+	if not _add_node_list:
+		return
+	
+	_add_node_list.clear()
+	var filter_lower = filter.to_lower()
+	
+	for type_name in _node_types:
+		if filter.is_empty() or type_name.to_lower().contains(filter_lower):
+			_add_node_list.add_item(type_name)
+
+
+func _on_add_node_search_changed(new_text: String) -> void:
+	_populate_add_node_list(new_text)
+
+
+func _on_add_node_pressed() -> void:
+	if not _add_node_popup:
+		return
+	
+	# Clear search and repopulate
+	if _add_node_search:
+		_add_node_search.text = ""
+	_populate_add_node_list("")
+	
+	# Show popup
+	_add_node_popup.popup_centered()
+
+
+func _on_add_node_type_activated(index: int) -> void:
+	if not _add_node_list:
+		return
+	
+	var type_name = _add_node_list.get_item_text(index)
+	_add_new_node(type_name)
+	_add_node_popup.hide()
+
+
+func _add_new_node(type_name: String) -> void:
+	# Determine parent node
+	var parent_node: Node = null
+	var selected = tree.get_selected() if tree else null
+	
+	if selected:
+		var parent_path = selected.get_metadata(0)
+		parent_node = get_node_or_null(parent_path)
+	
+	if not parent_node:
+		parent_node = _root_scene
+	
+	if not parent_node:
+		print("SceneHierarchy: No parent node available")
+		return
+	
+	# Create new node instance
+	var new_node: Node = null
+	match type_name:
+		"Node":
+			new_node = Node.new()
+		"Node2D":
+			new_node = Node2D.new()
+		"Node3D":
+			new_node = Node3D.new()
+		"MeshInstance3D":
+			new_node = MeshInstance3D.new()
+		"CSGBox3D":
+			new_node = CSGBox3D.new()
+		"CSGSphere3D":
+			new_node = CSGSphere3D.new()
+		"CSGCylinder3D":
+			new_node = CSGCylinder3D.new()
+		"StaticBody3D":
+			new_node = StaticBody3D.new()
+		"RigidBody3D":
+			new_node = RigidBody3D.new()
+		"CharacterBody3D":
+			new_node = CharacterBody3D.new()
+		"AnimatableBody3D":
+			new_node = AnimatableBody3D.new()
+		"CollisionShape3D":
+			new_node = CollisionShape3D.new()
+		"Area3D":
+			new_node = Area3D.new()
+		"Camera3D":
+			new_node = Camera3D.new()
+		"DirectionalLight3D":
+			new_node = DirectionalLight3D.new()
+		"OmniLight3D":
+			new_node = OmniLight3D.new()
+		"SpotLight3D":
+			new_node = SpotLight3D.new()
+		"Marker3D":
+			new_node = Marker3D.new()
+		"Path3D":
+			new_node = Path3D.new()
+		"PathFollow3D":
+			new_node = PathFollow3D.new()
+		"AudioStreamPlayer3D":
+			new_node = AudioStreamPlayer3D.new()
+		"GPUParticles3D":
+			new_node = GPUParticles3D.new()
+		"Control":
+			new_node = Control.new()
+		"Label":
+			new_node = Label.new()
+		"Button":
+			new_node = Button.new()
+		"Panel":
+			new_node = Panel.new()
+		"Label3D":
+			new_node = Label3D.new()
+		"Timer":
+			new_node = Timer.new()
+		"AnimationPlayer":
+			new_node = AnimationPlayer.new()
+		_:
+			# Try to create using ClassDB for any valid class
+			if ClassDB.class_exists(type_name) and ClassDB.can_instantiate(type_name):
+				new_node = ClassDB.instantiate(type_name)
+			else:
+				print("SceneHierarchy: Unknown node type - ", type_name)
+				return
+	
+	if not new_node:
+		print("SceneHierarchy: Failed to create node of type - ", type_name)
+		return
+	
+	# Set name and add to parent
+	new_node.name = _generate_unique_name(parent_node, type_name)
+	parent_node.add_child(new_node)
+	new_node.owner = _root_scene
+	
+	print("SceneHierarchy: Added new ", type_name, " named ", new_node.name)
+	call_deferred("_populate_tree")
+
