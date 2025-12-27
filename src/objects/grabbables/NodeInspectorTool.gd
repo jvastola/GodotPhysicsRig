@@ -7,8 +7,11 @@ extends Grabbable
 @export var ray_length: float = 20.0  # Maximum raycast distance
 @export var laser_color: Color = Color(0.2, 0.8, 1.0, 0.8)
 @export var hit_color: Color = Color(1.0, 0.5, 0.0, 1.0)
-@export var panel_spawn_distance: float = 1.0  # Distance from player head
-@export var panel_spawn_offset: Vector3 = Vector3(0.5, 0.0, 0.0)  # Offset for side-by-side panels
+@export var spawn_at_hit_point: bool = true  # If true, spawn panels at hit point; if false, in front of player
+@export var panel_spawn_distance: float = 1.0  # Distance from player head (when spawn_at_hit_point is false)
+@export var panel_spawn_offset: Vector3 = Vector3(0.6, 0.0, 0.0)  # Offset for side-by-side panels
+@export var panel_scale: float = 0.4  # Scale of spawned panels
+@export var panel_height_offset: float = 0.3  # How high above hit point to spawn panels
 
 # Scene references
 @export var inspector_scene: PackedScene = preload("res://src/ui/NodeInspectorViewport3D.tscn")
@@ -283,30 +286,41 @@ func _on_trigger_pressed() -> void:
 
 
 func _spawn_inspector_panels() -> void:
-	"""Spawn or update the inspector panel(s) in front of the player"""
+	"""Spawn or update the inspector panel(s) at hit point or in front of player"""
 	if not _current_hit_object:
 		return
 	
-	# Find player head position
+	# Find player head position for panel orientation
 	var player_head = _find_player_head()
 	if not player_head:
 		print("NodeInspectorTool: Could not find player head")
 		return
 	
-	# Calculate spawn position in front of player
 	var head_pos = player_head.global_position
-	var head_forward = -player_head.global_transform.basis.z.normalized()
-	var spawn_pos = head_pos + head_forward * panel_spawn_distance
+	var spawn_pos: Vector3
+	
+	if spawn_at_hit_point and _current_hit_point != Vector3.ZERO:
+		# Spawn at hit point, offset upward
+		spawn_pos = _current_hit_point + Vector3.UP * panel_height_offset
+	else:
+		# Spawn in front of player
+		var head_forward = -player_head.global_transform.basis.z.normalized()
+		spawn_pos = head_pos + head_forward * panel_spawn_distance
+	
+	# Calculate offset direction (perpendicular to view)
+	var to_head = (head_pos - spawn_pos).normalized()
+	var right_dir = to_head.cross(Vector3.UP).normalized()
 	
 	# Spawn or update inspector panel
 	if not is_instance_valid(_spawned_inspector):
 		_spawned_inspector = inspector_scene.instantiate()
 		get_tree().current_scene.add_child(_spawned_inspector)
 	
-	# Position inspector panel
-	_spawned_inspector.global_position = spawn_pos + panel_spawn_offset
+	# Position and scale inspector panel
+	_spawned_inspector.global_position = spawn_pos + right_dir * panel_spawn_offset.x
 	_spawned_inspector.look_at(head_pos, Vector3.UP)
 	_spawned_inspector.rotate_y(PI)  # Face toward player
+	_spawned_inspector.scale = Vector3.ONE * panel_scale
 	
 	# Tell inspector to inspect the hit object
 	if _spawned_inspector.has_method("inspect_node"):
@@ -322,9 +336,10 @@ func _spawn_inspector_panels() -> void:
 		get_tree().current_scene.add_child(_spawned_hierarchy)
 	
 	# Position hierarchy panel to the left of inspector
-	_spawned_hierarchy.global_position = spawn_pos - panel_spawn_offset
+	_spawned_hierarchy.global_position = spawn_pos - right_dir * panel_spawn_offset.x
 	_spawned_hierarchy.look_at(head_pos, Vector3.UP)
 	_spawned_hierarchy.rotate_y(PI)
+	_spawned_hierarchy.scale = Vector3.ONE * panel_scale
 
 
 func _find_player_head() -> Node3D:
