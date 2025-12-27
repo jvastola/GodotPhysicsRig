@@ -146,6 +146,11 @@ var _grab_offset: Vector3 = Vector3.ZERO  # Offset from grab point to object cen
 var _prev_grip_pressed: bool = false  # For edge detection
 var _grab_should_rotate: bool = false # Whether current grab target allows rotation
 
+# Resize handle state
+var _resize_target_viewport: Node = null  # UI viewport being resized
+var _resize_corner_index: int = -1        # Which corner is being dragged
+var _resize_hover_corner: int = -1        # Which corner is being hovered
+
 
 func get_hit_point() -> Vector3:
 	"""Get the current world-space hit point of the pointer raycast"""
@@ -1140,9 +1145,11 @@ func _physics_process(delta: float) -> void:
 		_process_secondary_actions(handler, base_event, action_state, controller, delta)
 		_process_ui_scroll(handler, base_event, controller, delta)
 		_update_selection_handle_activation(action_state, handler)
+		_update_resize_handle_activation(handler)
 	else:
 		_clear_hover_state()
 		_clear_ui_scroll_capture(controller)
+		_update_resize_handle_activation(null)
 		if action_state.get("just_released", false):
 			_selection_handle_active_axis = Vector3.ZERO
 			_selection_handle_active_handle = null
@@ -1566,14 +1573,20 @@ func _reset_secondary_state() -> void:
 
 func _process_grip_grab_mode(delta: float, controller: XRController3D) -> void:
 	"""Process grip-based grab mode for manipulating objects at a distance."""
-	if not enable_grip_grab or not controller:
+	if not enable_grip_grab:
 		return
 	
 	# Get grip state
 	var grip_value: float = 0.0
-	if controller.has_method("get_float"):
+	if controller and controller.has_method("get_float"):
 		grip_value = controller.get_float(grip_action)
 	var grip_pressed: bool = grip_value >= grip_threshold
+	
+	# Fallback to mouse left click if not pressed via controller
+	if not grip_pressed:
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			grip_pressed = true
+			
 	var grip_just_pressed: bool = grip_pressed and not _prev_grip_pressed
 	var grip_just_released: bool = not grip_pressed and _prev_grip_pressed
 	_prev_grip_pressed = grip_pressed
@@ -1587,16 +1600,24 @@ func _process_grip_grab_mode(delta: float, controller: XRController3D) -> void:
 		_end_grab()
 	
 	# Process grab manipulation if actively grabbing
-	if _grab_target and is_instance_valid(_grab_target) and grip_pressed:
+	if is_grabbing() and grip_pressed:
 		_update_grabbed_object(delta, controller)
-	elif _grab_target and not is_instance_valid(_grab_target):
-		# Target became invalid, clean up
+	
+	# Cleanup invalid targets
+	if _grab_target and not is_instance_valid(_grab_target):
 		_grab_target = null
+	if _resize_target_viewport and not is_instance_valid(_resize_target_viewport):
+		_resize_target_viewport = null
 
 
 func _try_start_grab() -> void:
 	"""Attempt to start grabbing the currently hovered target."""
 	if not _hover_target or not is_instance_valid(_hover_target):
+		return
+	
+	# Check if this is a resize handle
+	if _hover_target.has_meta("is_resize_handle"):
+		_try_start_resize()
 		return
 	
 	# Check if target supports pointer grab
@@ -1648,12 +1669,50 @@ func _try_start_grab() -> void:
 	print("HandPointer: Started grab on ", _grab_target.name, " at distance ", _grab_distance, " offset ", _grab_offset)
 
 
+func _try_start_resize() -> void:
+	"""Start a resize operation on a UI viewport."""
+	if not _hover_target or not _hover_target.has_meta("is_resize_handle"):
+		return
+	
+	# Get parent viewport and corner index
+	var parent_viewport = _hover_target.get_meta("parent_viewport", null)
+	var corner_index: int = _hover_target.get_meta("corner_index", -1)
+	
+	if not parent_viewport or corner_index < 0:
+		return
+	
+	if not parent_viewport.has_method("start_resize"):
+		print("HandPointer: Parent viewport doesn't support resize")
+		return
+	
+	# Get grab position
+	var grab_pos: Vector3 = _pointer_hit_point
+	if _raycast and _raycast.is_colliding():
+		grab_pos = _raycast.get_collision_point()
+	
+	# Store resize state
+	_resize_target_viewport = parent_viewport
+	_resize_corner_index = corner_index
+	
+	# Start the resize
+	parent_viewport.start_resize(corner_index, grab_pos)
+	print("HandPointer: Started resize on corner ", corner_index)
+
+
 func _end_grab() -> void:
 	"""End the current grab."""
+	# End resize if active
+	if _resize_target_viewport and is_instance_valid(_resize_target_viewport):
+		if _resize_target_viewport.has_method("end_resize"):
+			_resize_target_viewport.end_resize()
+		print("HandPointer: Ended resize")
+	_resize_target_viewport = null
+	_resize_corner_index = -1
+	
+	# End normal grab
 	if _grab_target:
 		print("HandPointer: Ended grab on ", String(_grab_target.name) if is_instance_valid(_grab_target) else "invalid")
 	_grab_target = null
-	_grab_distance = 0.0
 	_grab_distance = 0.0
 	_grab_initial_scale = Vector3.ONE
 	_grab_offset = Vector3.ZERO
@@ -1662,6 +1721,11 @@ func _end_grab() -> void:
 
 func _update_grabbed_object(delta: float, controller: XRController3D) -> void:
 	"""Update the grabbed object's position and scale based on joystick input."""
+	# Check if we're in resize mode
+	if _resize_target_viewport and is_instance_valid(_resize_target_viewport):
+		_update_resize_operation()
+		return
+	
 	if not _grab_target or not is_instance_valid(_grab_target):
 		return
 	
@@ -1718,13 +1782,71 @@ func _update_grabbed_object(delta: float, controller: XRController3D) -> void:
 				target_3d.scale = Vector3.ONE * new_scale
 
 
+func _update_resize_operation() -> void:
+	"""Update the current resize operation based on pointer position."""
+	if not _resize_target_viewport or not is_instance_valid(_resize_target_viewport):
+		_end_grab() # Clean up state
+		return
+	
+	# Calculate current grab position
+	var grab_pos: Vector3 = _pointer_hit_point
+	if _raycast and _raycast.is_colliding():
+		grab_pos = _raycast.get_collision_point()
+	
+	# Update the resize
+	if _resize_target_viewport.has_method("update_resize"):
+		_resize_target_viewport.update_resize(grab_pos)
+
+
+func _update_resize_handle_activation(handler: Node) -> void:
+	"""Update visual highlighting of resize handles."""
+	var new_hover_corner: int = -1
+	var viewport: Node = null
+	
+	if handler and handler.has_meta("is_resize_handle"):
+		new_hover_corner = handler.get_meta("corner_index", -1)
+		viewport = handler.get_meta("parent_viewport", null)
+	
+	# If changed, update highlights
+	if new_hover_corner != _resize_hover_corner:
+		# Unhighlight old
+		if _resize_hover_corner != -1 and _resize_target_viewport and is_instance_valid(_resize_target_viewport):
+			if _resize_target_viewport.has_method("set_resize_handle_highlight"):
+				_resize_target_viewport.set_resize_handle_highlight(_resize_hover_corner, false)
+		elif _resize_hover_corner != -1 and viewport and is_instance_valid(viewport):
+			# Try to unhighlight on the new viewport if we switched handles within same viewport
+			if viewport.has_method("set_resize_handle_highlight"):
+				viewport.set_resize_handle_highlight(_resize_hover_corner, false)
+				
+		# Highlight new
+		if new_hover_corner != -1 and viewport and is_instance_valid(viewport):
+			if viewport.has_method("set_resize_handle_highlight"):
+				viewport.set_resize_handle_highlight(new_hover_corner, true)
+		
+		_resize_hover_corner = new_hover_corner
+		# If we're not resizing, track the potential target viewport
+		if not _resize_target_viewport:
+			_resize_target_viewport = viewport # Only temporarily for highlight
+	
+	# If we stopped hovering a handle and aren't resizing, clear the viewport ref
+	if new_hover_corner == -1 and not is_grabbing():
+		_resize_target_viewport = null
+
+
 func is_grabbing() -> bool:
 	"""Returns true if currently grabbing an object."""
-	return _grab_target != null and is_instance_valid(_grab_target)
+	return (_grab_target != null and is_instance_valid(_grab_target)) or is_resizing()
+
+
+func is_resizing() -> bool:
+	"""Returns true if currently resizing a UI panel."""
+	return _resize_target_viewport != null and _resize_corner_index != -1
 
 
 func get_grabbed_object() -> Node:
 	"""Returns the currently grabbed object, or null."""
 	if _grab_target and is_instance_valid(_grab_target):
 		return _grab_target
+	if _resize_target_viewport and is_instance_valid(_resize_target_viewport):
+		return _resize_target_viewport
 	return null

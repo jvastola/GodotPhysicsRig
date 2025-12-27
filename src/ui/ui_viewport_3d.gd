@@ -9,6 +9,16 @@ extends Node3D
 @export var debug_coordinates: bool = false        # Print UV/viewport coordinates for debugging
 @export var flip_v: bool = true                   # Flip V coordinate to match UI top-left origin
 
+@export_group("Resize Handles")
+@export var enable_resize_handles: bool = true
+@export var resize_handle_size: float = 0.06       # Handle sphere radius
+@export var resize_handle_offset: float = 0.08     # Distance outside panel corners
+@export var min_panel_size: Vector2 = Vector2(0.4, 0.3)  # Minimum quad dimensions
+@export var max_panel_size: Vector2 = Vector2(5.0, 4.0)  # Maximum quad dimensions
+@export var resize_handle_color: Color = Color(0.9, 0.95, 1.0, 0.7)
+@export var resize_handle_hover_color: Color = Color(1.0, 1.0, 1.0, 1.0)
+@export_flags_3d_physics var resize_handle_collision_layer: int = 1 << 5
+
 @onready var viewport: SubViewport = get_node_or_null("SubViewport") as SubViewport
 @onready var mesh_instance: MeshInstance3D = get_node_or_null("MeshInstance3D") as MeshInstance3D
 @onready var _static_body: StaticBody3D = get_node_or_null("MeshInstance3D/StaticBody3D") as StaticBody3D
@@ -18,6 +28,21 @@ var _saved_static_body_layer: int = 0
 var _last_mouse_pos: Vector2 = Vector2(-1, -1)
 var _is_hovering: bool = false
 var _is_pressed: bool = false
+
+# Resize handle state
+var _resize_handles: Array[Area3D] = []
+var _resize_handle_materials: Array[StandardMaterial3D] = []
+var _resize_handle_meshes: Array[MeshInstance3D] = []  # To toggle visibility
+var _resize_active_handle: Area3D = null
+var _resize_initial_quad_size: Vector2 = Vector2.ZERO
+var _resize_initial_grab_pos: Vector3 = Vector3.ZERO
+var _resize_anchor_corner: Vector3 = Vector3.ZERO  # Opposite corner in world space
+
+# Visibility state
+var _hovering_panel: bool = false
+var _hovered_handle_index: int = -1
+
+signal panel_resized(new_quad_size: Vector2)
 
 func _ready() -> void:
 	print("UIViewport3D: _ready() called")
@@ -60,6 +85,10 @@ func _ready() -> void:
 		mesh_instance.visible = true
 		_static_body.collision_layer = _saved_static_body_layer
 		print("UIViewport3D: MeshInstance visible, StaticBody enabled")
+	
+	# Setup resize handles
+	if enable_resize_handles:
+		_setup_resize_handles()
 	
 	print("UIViewport3D: _ready() complete")
 
@@ -114,6 +143,9 @@ func handle_pointer_event(event: Dictionary) -> void:
 		"enter", "hover":
 			_send_mouse_motion(viewport_pos)
 			_is_hovering = true
+			if not _hovering_panel:
+				_hovering_panel = true
+				_update_handle_visibility()
 		"press":
 			_send_mouse_motion(viewport_pos)
 			_send_mouse_button(viewport_pos, true, event.get("action_just_pressed", false))
@@ -150,6 +182,9 @@ func handle_pointer_event(event: Dictionary) -> void:
 			_send_mouse_exit()
 			_is_hovering = false
 			_is_pressed = false
+			if _hovering_panel:
+				_hovering_panel = false
+				_update_handle_visibility()
 
 func _world_to_uv(local_pos: Vector3) -> Vector2:
 	# Convert mesh-local position to UV coordinates on the quad.
@@ -313,3 +348,274 @@ func pointer_grab_get_distance(pointer: Node3D) -> float:
 func pointer_grab_get_scale() -> float:
 	"""Get current uniform scale."""
 	return scale.x
+
+
+# ============================================================================
+# RESIZE HANDLES (VisionOS/HorizonOS Style)
+# ============================================================================
+
+func _setup_resize_handles() -> void:
+	"""Create corner resize handles outside the panel bounds."""
+	# Corner indices: 0=TopLeft, 1=TopRight, 2=BottomRight, 3=BottomLeft
+	var corner_names := ["ResizeHandleTL", "ResizeHandleTR", "ResizeHandleBR", "ResizeHandleBL"]
+	
+	for i in range(4):
+		var handle := Area3D.new()
+		handle.name = corner_names[i]
+		handle.collision_layer = resize_handle_collision_layer
+		handle.collision_mask = 0
+		handle.monitorable = false
+		
+		# Add to pointer interactable group
+		if pointer_group != StringName(""):
+			handle.add_to_group(pointer_group)
+		
+		# Store metadata for identification
+		handle.set_meta("is_resize_handle", true)
+		handle.set_meta("corner_index", i)
+		handle.set_meta("parent_viewport", self)
+		
+		# Create visual sphere
+		var handle_mesh := MeshInstance3D.new()
+		handle_mesh.name = "Visual"
+		var sphere := SphereMesh.new()
+		sphere.radius = resize_handle_size
+		sphere.height = resize_handle_size * 2.0
+		sphere.radial_segments = 12
+		sphere.rings = 6
+		handle_mesh.mesh = sphere
+		
+		# Create material
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = resize_handle_color
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.no_depth_test = true
+		mat.render_priority = 5
+		handle_mesh.material_override = mat
+		handle.add_child(handle_mesh)
+		_resize_handle_materials.append(mat)
+		_resize_handle_meshes.append(handle_mesh)
+		
+		# Create collision shape
+		var collision := CollisionShape3D.new()
+		collision.name = "Collision"
+		var sphere_shape := SphereShape3D.new()
+		sphere_shape.radius = resize_handle_size * 1.5  # Slightly larger for easier grabbing
+		collision.shape = sphere_shape
+		handle.add_child(collision)
+		
+		add_child(handle)
+		_resize_handles.append(handle)
+	
+	# Position handles at corners
+	_update_resize_handle_positions()
+	
+	# Initial visibility update
+	_update_handle_visibility()
+
+
+func _update_handle_visibility() -> void:
+	"""Update visibility of resize handles based on hover/interaction state."""
+	# Only show if hovering the specific handle OR if resizing using that handle
+	# We ignore _hovering_panel for visibility now (handles hidden by default unless directly interacted with)
+	
+	var active_handle_index: int = -1
+	if is_resizing():
+		active_handle_index = get_resize_handle_corner_index(_resize_active_handle)
+	
+	for i in range(_resize_handle_meshes.size()):
+		var mesh = _resize_handle_meshes[i]
+		if mesh:
+			# Show if this specific handle is hovered OR if it is the active handle being dragged
+			var should_show: bool = (i == _hovered_handle_index) or (i == active_handle_index)
+			mesh.visible = should_show
+
+
+func _update_resize_handle_positions() -> void:
+	"""Position resize handles at the corners of the panel."""
+	if _resize_handles.size() != 4:
+		return
+	
+	var half_w: float = quad_size.x * 0.5
+	var half_h: float = quad_size.y * 0.5
+	
+	# Corner positions in local space (panel lies on XY plane, facing +Z)
+	# Add offset to push handles outside the panel
+	var offset: float = resize_handle_offset
+	var corners := [
+		Vector3(-half_w - offset, half_h + offset, 0.0),   # Top-Left
+		Vector3(half_w + offset, half_h + offset, 0.0),    # Top-Right
+		Vector3(half_w + offset, -half_h - offset, 0.0),   # Bottom-Right
+		Vector3(-half_w - offset, -half_h - offset, 0.0),  # Bottom-Left
+	]
+	
+	for i in range(4):
+		_resize_handles[i].position = corners[i]
+
+
+func _get_opposite_corner_index(corner_index: int) -> int:
+	"""Get the index of the diagonally opposite corner."""
+	# 0(TL) <-> 2(BR), 1(TR) <-> 3(BL)
+	return (corner_index + 2) % 4
+
+
+func _get_corner_world_position(corner_index: int) -> Vector3:
+	"""Get the world position of a panel corner (not the handle, the actual corner)."""
+	var half_w: float = quad_size.x * 0.5
+	var half_h: float = quad_size.y * 0.5
+	
+	var local_corners := [
+		Vector3(-half_w, half_h, 0.0),   # Top-Left
+		Vector3(half_w, half_h, 0.0),    # Top-Right
+		Vector3(half_w, -half_h, 0.0),   # Bottom-Right
+		Vector3(-half_w, -half_h, 0.0),  # Bottom-Left
+	]
+	
+	return global_transform * local_corners[corner_index]
+
+
+func start_resize(corner_index: int, grab_world_pos: Vector3) -> void:
+	"""Start a resize operation from the specified corner."""
+	if corner_index < 0 or corner_index >= 4:
+		return
+	
+	_resize_active_handle = _resize_handles[corner_index] if corner_index < _resize_handles.size() else null
+	_resize_initial_quad_size = quad_size
+	_resize_initial_grab_pos = grab_world_pos
+	
+	# Get the opposite corner as anchor point
+	var opposite_index: int = _get_opposite_corner_index(corner_index)
+	_resize_anchor_corner = _get_corner_world_position(opposite_index)
+	
+	print("UIViewport3D: Started resize from corner ", corner_index, " anchor at corner ", opposite_index)
+	_update_handle_visibility()
+
+
+func update_resize(current_grab_pos: Vector3) -> void:
+	"""Update panel size based on current grab position."""
+	if not _resize_active_handle:
+		return
+	
+	# Calculate new corner position in panel's local space
+	var local_new_corner: Vector3 = global_transform.affine_inverse() * current_grab_pos
+	var local_anchor: Vector3 = global_transform.affine_inverse() * _resize_anchor_corner
+	
+	# Calculate new size based on distance from anchor to new corner
+	# The anchor stays fixed, new corner determines size
+	var delta: Vector3 = local_new_corner - local_anchor
+	var new_width: float = abs(delta.x)
+	var new_height: float = abs(delta.y)
+	
+	# Clamp to min/max
+	new_width = clamp(new_width, min_panel_size.x, max_panel_size.x)
+	new_height = clamp(new_height, min_panel_size.y, max_panel_size.y)
+	
+	# Apply new size
+	set_panel_size(Vector2(new_width, new_height), _resize_anchor_corner)
+
+
+func end_resize() -> void:
+	"""End the current resize operation."""
+	if _resize_active_handle:
+		print("UIViewport3D: Ended resize, new size: ", quad_size)
+	_resize_active_handle = null
+	_resize_initial_quad_size = Vector2.ZERO
+	_resize_initial_grab_pos = Vector3.ZERO
+	_resize_anchor_corner = Vector3.ZERO
+	_update_handle_visibility()
+
+
+func set_panel_size(new_quad_size: Vector2, anchor_world_pos: Vector3 = Vector3.INF) -> void:
+	"""Set the panel size, optionally keeping a world position fixed as anchor."""
+	var old_quad_size: Vector2 = quad_size
+	quad_size = new_quad_size
+	
+	# Calculate new ui_size maintaining aspect ratio with original resolution
+	# Keep pixels per unit roughly consistent
+	var pixels_per_unit: float = ui_size.x / old_quad_size.x if old_quad_size.x > 0 else 256.0
+	ui_size = new_quad_size * pixels_per_unit
+	# Clamp to reasonable viewport sizes
+	ui_size.x = clamp(ui_size.x, 128, 2048)
+	ui_size.y = clamp(ui_size.y, 128, 2048)
+	
+	# Update viewport
+	if viewport:
+		viewport.size = Vector2i(int(ui_size.x), int(ui_size.y))
+	
+	# Update mesh
+	if mesh_instance and mesh_instance.mesh is QuadMesh:
+		var quad_mesh: QuadMesh = mesh_instance.mesh as QuadMesh
+		quad_mesh.size = new_quad_size
+	
+	# Update collision shape
+	var collision_shape: CollisionShape3D = null
+	if _static_body:
+		collision_shape = _static_body.get_node_or_null("CollisionShape3D") as CollisionShape3D
+	if collision_shape and collision_shape.shape is BoxShape3D:
+		var box: BoxShape3D = collision_shape.shape as BoxShape3D
+		box.size = Vector3(new_quad_size.x, new_quad_size.y, 0.01)
+	
+	# If we have an anchor point, adjust position so anchor stays fixed
+	if anchor_world_pos.is_finite():
+		# Calculate where the anchor should be in the NEW local space
+		var old_local_anchor: Vector3 = global_transform.affine_inverse() * anchor_world_pos
+		# The anchor was at a corner, figure out which quadrant
+		var _half_w_old: float = old_quad_size.x * 0.5
+		var _half_h_old: float = old_quad_size.y * 0.5
+		var half_w_new: float = new_quad_size.x * 0.5
+		var half_h_new: float = new_quad_size.y * 0.5
+		
+		# Determine corner signs
+		var sign_x: float = sign(old_local_anchor.x) if abs(old_local_anchor.x) > 0.01 else -1.0
+		var sign_y: float = sign(old_local_anchor.y) if abs(old_local_anchor.y) > 0.01 else 1.0
+		
+		# New local anchor position
+		var new_local_anchor: Vector3 = Vector3(sign_x * half_w_new, sign_y * half_h_new, 0.0)
+		
+		# Offset needed to keep anchor in same world position
+		var local_offset: Vector3 = old_local_anchor - new_local_anchor
+		global_position += global_transform.basis * local_offset
+	
+	# Update resize handle positions
+	_update_resize_handle_positions()
+	
+	# Emit signal
+	panel_resized.emit(new_quad_size)
+
+
+func set_resize_handle_highlight(corner_index: int, highlighted: bool) -> void:
+	"""Set the visual highlight state of a resize handle."""
+	if corner_index < 0 or corner_index >= _resize_handle_materials.size():
+		return
+	
+	var mat: StandardMaterial3D = _resize_handle_materials[corner_index]
+	if mat:
+		mat.albedo_color = resize_handle_hover_color if highlighted else resize_handle_color
+	
+	# Track if any handle is being hovered
+	if highlighted:
+		_hovered_handle_index = corner_index
+	elif _hovered_handle_index == corner_index:
+		# Only clear if we are unhighlighting the currently hovered one
+		_hovered_handle_index = -1
+	
+	_update_handle_visibility()
+
+
+func is_resizing() -> bool:
+	"""Returns true if currently in a resize operation."""
+	return _resize_active_handle != null
+
+
+func get_resize_handle_corner_index(handle: Node) -> int:
+	"""Get the corner index for a resize handle node, or -1 if not a valid handle."""
+	if not handle:
+		return -1
+	if not handle.has_meta("is_resize_handle"):
+		return -1
+	if not handle.has_meta("parent_viewport"):
+		return -1
+	if handle.get_meta("parent_viewport") != self:
+		return -1
+	return handle.get_meta("corner_index", -1)
