@@ -1,0 +1,84 @@
+[gd_scene load_steps=10 format=3 uid="uid://node_inspector_tool"]
+
+[ext_resource type="Script" path="res://src/objects/grabbables/NodeInspectorTool.gd" id="1_tool_script"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
+radius = 0.025
+height = 0.3
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_body"]
+albedo_color = Color(0.1, 0.12, 0.18, 1)
+metallic = 0.9
+roughness = 0.15
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_body"]
+material = SubResource("StandardMaterial3D_body")
+radius = 0.025
+height = 0.3
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lens"]
+albedo_color = Color(0.2, 0.7, 1.0, 0.9)
+emission_enabled = true
+emission = Color(0.2, 0.7, 1.0, 1)
+emission_energy_multiplier = 1.0
+transparency = 1
+
+[sub_resource type="SphereMesh" id="SphereMesh_lens"]
+material = SubResource("StandardMaterial3D_lens")
+radius = 0.03
+height = 0.06
+radial_segments = 16
+rings = 8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ring"]
+albedo_color = Color(0.8, 0.85, 0.9, 1)
+metallic = 0.95
+roughness = 0.1
+
+[sub_resource type="TorusMesh" id="TorusMesh_ring"]
+material = SubResource("StandardMaterial3D_ring")
+inner_radius = 0.025
+outer_radius = 0.035
+ring_segments = 24
+
+[sub_resource type="TorusMesh" id="TorusMesh_ring2"]
+material = SubResource("StandardMaterial3D_ring")
+inner_radius = 0.023
+outer_radius = 0.032
+ring_segments = 24
+
+[node name="NodeInspectorTool" type="RigidBody3D"]
+mass = 0.15
+gravity_scale = 0.5
+contact_monitor = true
+max_contacts_reported = 4
+script = ExtResource("1_tool_script")
+grab_mode = 0
+tip_offset = Vector3(0, 0, -0.2)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape3D_body")
+
+[node name="BodyMesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("CapsuleMesh_body")
+
+[node name="TipMarker" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.2)
+
+[node name="LensMesh" type="MeshInstance3D" parent="TipMarker"]
+mesh = SubResource("SphereMesh_lens")
+
+[node name="RingMesh" type="MeshInstance3D" parent="TipMarker"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0.02)
+mesh = SubResource("TorusMesh_ring")
+
+[node name="RingMesh2" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0.05)
+mesh = SubResource("TorusMesh_ring2")
+
+[node name="Label3D" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.22, 0)
+text = "Inspector Tool
+Trigger to Scan"
+font_size = 16
+outline_size = 6
