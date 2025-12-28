@@ -217,8 +217,40 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
     }
 
     override fun onMainDestroy() {
-        disconnectFromRoom()
-        scope.cancel()
+        // IMPORTANT: Don't launch coroutines during destruction - ART may already be shutting down
+        // Safely disconnect by canceling scope first, then cleaning up room reference
+        try {
+            // Cancel all pending coroutines first to prevent any callbacks
+            scope.cancel()
+            
+            // Synchronously clean up room reference without launching new coroutines
+            // The LiveKit SDK will handle cleanup when the activity is destroyed
+            val currentRoom = room
+            room = null
+            
+            // Try to disconnect if room is still valid, but don't wait for it
+            // and don't emit signals since Godot may also be shutting down
+            currentRoom?.let { r ->
+                try {
+                    // Use runBlocking with a short timeout to attempt graceful disconnect
+                    // but don't crash if it fails
+                    kotlinx.coroutines.runBlocking {
+                        kotlinx.coroutines.withTimeoutOrNull(500) {
+                            r.disconnect()
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("GodotLiveKit", "Room disconnect during destroy failed (expected): ${e.message}")
+                } catch (t: Throwable) {
+                    android.util.Log.w("GodotLiveKit", "Room disconnect during destroy threw: ${t.message}")
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("GodotLiveKit", "Error during plugin destroy: ${e.message}")
+        } catch (t: Throwable) {
+            android.util.Log.w("GodotLiveKit", "Throwable during plugin destroy: ${t.message}")
+        }
+        
         super.onMainDestroy()
     }
 }

@@ -33,6 +33,7 @@ KeyboardManager="*res://src/ui/keyboard_manager.gd"
 
 [debug]
 
+file_logging/enable_file_logging=true
 settings/gdscript/always_track_call_stacks=true
 
 [dotnet]
@@ -123,6 +124,7 @@ textures/vram_compression/import_etc2_astc=true
 
 options/dsn="https://6471b489536d879b5d16166aac01fd33@o4510581008564225.ingest.us.sentry.io/4510581012168704"
 options/send_default_pii=true
+options/attach_log=false
 
 [xr]
 

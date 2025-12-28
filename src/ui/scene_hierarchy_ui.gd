@@ -1091,4 +1091,3 @@ func _add_new_node(type_name: String) -> void:
 	
 	print("SceneHierarchy: Added new ", type_name, " named ", new_node.name)
 	call_deferred("_populate_tree")
-

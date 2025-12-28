@@ -1,8 +1,9 @@
-[gd_scene load_steps=59 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=60 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
 [ext_resource type="Script" uid="uid://cvqfyaebx04gk" path="res://src/objects/floor_interactable.gd" id="4_floor_script"]
+[ext_resource type="PackedScene" path="res://src/objects/grabbables/NodeInspectorTool.tscn" id="5_pswl6"]
 [ext_resource type="PackedScene" uid="uid://b60rl4dw2d13k" path="res://src/objects/GridSnapMesh.tscn" id="6_hjxlr"]
 [ext_resource type="PackedScene" uid="uid://dve0k8qfhgyma" path="res://src/objects/grabbables/GravityInverter.tscn" id="7_gravity_inverter"]
 [ext_resource type="PackedScene" uid="uid://c4jv0mg3xpn45" path="res://src/objects/grabbables/CameraFlipper.tscn" id="8_camera_flipper"]
@@ -115,8 +116,7 @@ size = Vector3(0.45, 0.45, 0.45)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_body_grid"]
 
-[node name="MainScene29" type="Node3D" unique_id=1547683746]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0012965202, 0, 0)
+[node name="MainScene30" type="Node3D" unique_id=1547683746]
 
 [node name="ToolPoolManager" type="Node" parent="." unique_id=2101234567]
 script = ExtResource("34_tool_pool")
@@ -137,6 +137,9 @@ environment = SubResource("Environment_main")
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=56086482]
 transform = Transform3D(-0.8660238, -0.43301556, 0.2500009, 0.46019384, -0.4947766, 0.7371688, -0.19551094, 0.7534545, 0.6277594, 0, 5, 9.425144)
 shadow_enabled = true
+
+[node name="NodeInspectorTool" parent="." unique_id=1156427494 instance=ExtResource("5_pswl6")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.41976643, -2.2566147)
 
 [node name="Floor" type="StaticBody3D" parent="." unique_id=386014746]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2.51753, 0)
@@ -256,7 +259,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.983923, 0.88246953, 1.516
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10)
 
 [node name="ShaderPlasma" type="CSGSphere3D" parent="PlasmaDemos" unique_id=1217239899]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.28374702, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.31078637, 0)
 radius = 0.75
 material = SubResource("StandardMaterial3D_wvm1w")
 script = ExtResource("35_hr53f")
@@ -275,7 +278,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.75, 0)
 material = SubResource("StandardMaterial3D_wvm1w")
 
 [node name="Sphere" type="CSGSphere3D" parent="PlasmaDemos/PlasmaBox" unique_id=716390065]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.97178966)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.96415555)
 operation = 2
 radius = 0.6
 material = ExtResource("34_s8yin")

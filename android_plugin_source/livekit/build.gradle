@@ -72,7 +72,7 @@ dependencies {
 // Task to copy the AAR to the Godot android plugins folder
 task copyToGodotPlugins(type: Copy) {
     dependsOn ':assembleRelease'
-    from 'build/outputs/aar/livekit-release.aar'
+    from 'build/outputs/aar/GodotLiveKit-release.aar'
     into '../../android/plugins'
     rename { 'GodotLiveKit.aar' }
 }

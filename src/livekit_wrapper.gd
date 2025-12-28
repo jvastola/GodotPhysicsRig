@@ -506,7 +506,15 @@ func _on_chat_message(sender: String, message: String, timestamp: int) -> void:
 	data_received.emit(sender, message)
 	chat_message_received.emit(sender, message, timestamp)
 
-
 func _exit_tree() -> void:
+	# During app shutdown, avoid calling Android plugin methods which can cause
+	# SIGSEGV in art::ArtMethod::Invoke when ART is already shutting down
 	if _is_connected:
-		disconnect_from_room()
+		_is_connected = false
+		_current_room = ""
+		# Only try to disconnect on desktop - Android plugin handles its own cleanup in onMainDestroy
+		if current_platform == Platform.DESKTOP:
+			if _rust_manager and is_instance_valid(_rust_manager):
+				_rust_manager.disconnect_from_room()
+		# Don't call Android plugin methods during tree exit - the plugin's onMainDestroy handles cleanup
+		# Calling it here can cause crashes during app shutdown
