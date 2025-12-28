@@ -979,8 +979,8 @@ func _signed_angle_on_plane(ref: Vector3, cur: Vector3, axis: Vector3) -> float:
 	var dot_ab: float = clamp(a.dot(b), -1.0, 1.0)
 	var cross_ab: Vector3 = a.cross(b)
 	var angle := acos(dot_ab)
-	var sign := 1.0 if cross_ab.dot(axis) >= 0.0 else -1.0
-	return angle * sign
+	var angle_sign := 1.0 if cross_ab.dot(axis) >= 0.0 else -1.0
+	return angle * angle_sign
 
 
 func _any_perpendicular(axis: Vector3) -> Vector3:

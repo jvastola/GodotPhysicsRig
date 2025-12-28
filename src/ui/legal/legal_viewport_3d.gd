@@ -170,7 +170,7 @@ func _send_mouse_button(pos: Vector2, pressed: bool, just_changed: bool, button_
 	var button_event := InputEventMouseButton.new()
 	button_event.position = pos
 	button_event.global_position = pos
-	button_event.button_index = button_index
+	button_event.button_index = button_index as MouseButton
 	button_event.pressed = pressed
 	
 	viewport.push_input(button_event)

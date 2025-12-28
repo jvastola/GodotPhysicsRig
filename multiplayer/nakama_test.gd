@@ -54,11 +54,11 @@ func log_console(text: String):
 
 
 func _update_button_states():
-	var is_connected = NakamaManager.is_socket_connected
+	var is_socket_conn = NakamaManager.is_socket_connected
 	var in_match = not NakamaManager.current_match_id.is_empty()
 	
-	host_button.disabled = not is_connected or in_match
-	join_button.disabled = not is_connected or in_match
+	host_button.disabled = not is_socket_conn or in_match
+	join_button.disabled = not is_socket_conn or in_match
 	leave_button.disabled = not in_match
 	test_button.disabled = not in_match
 

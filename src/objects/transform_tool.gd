@@ -743,13 +743,13 @@ func _position_handles(center: Vector3, half_size: Vector3) -> void:
 			var y := axis.normalized()
 			var x := _any_perpendicular(y)
 			var z := x.cross(y).normalized()
-			var basis := Basis(x, y, z)
-			handle.global_transform = Transform3D(basis, pos)
+			var h_basis := Basis(x, y, z)
+			handle.global_transform = Transform3D(h_basis, pos)
 		else:
 			var up := Vector3.UP if abs(axis.dot(Vector3.UP)) < 0.95 else Vector3.FORWARD
 			# Basis.looking_at aims -Z to target; flip to make +Z point outward
-			var basis := Basis.looking_at(-axis.normalized(), up)
-			handle.global_transform = Transform3D(basis, pos)
+			var h_basis := Basis.looking_at(-axis.normalized(), up)
+			handle.global_transform = Transform3D(h_basis, pos)
 
 
 func _begin_handle_drag(handle: Node) -> void:
@@ -895,8 +895,8 @@ func _signed_angle_on_plane(ref: Vector3, cur: Vector3, axis: Vector3) -> float:
 	var dot_ab: float = clamp(a.dot(b), -1.0, 1.0)
 	var cross_ab: Vector3 = a.cross(b)
 	var angle := acos(dot_ab)
-	var sign := 1.0 if cross_ab.dot(axis) >= 0.0 else -1.0
-	return angle * sign
+	var angle_sign := 1.0 if cross_ab.dot(axis) >= 0.0 else -1.0
+	return angle * angle_sign
 
 
 func _any_perpendicular(axis: Vector3) -> Vector3:

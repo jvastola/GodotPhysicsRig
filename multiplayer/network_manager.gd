@@ -73,7 +73,6 @@ var network_stats: Dictionary = {
 }
 
 var peer_stats: Dictionary = {}  # peer_id -> stats Dictionary
-var _ping_timer: float = 0.0
 var _ping_check_interval: float = 1.0  # Check ping every second
 var _last_bytes_sent: int = 0
 var _last_bytes_received: int = 0

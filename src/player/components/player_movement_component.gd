@@ -664,7 +664,7 @@ func physics_process_world_grab(delta: float) -> void:
 	# === V3 Mode: XRToolsMovementWorldGrab style ===
 	if enable_two_hand_grab_v3 and _two_hand_grab_v3:
 		_sync_v3_settings()
-		var v3_handled := _two_hand_grab_v3.process_grab(delta)
+		var _v3_handled := _two_hand_grab_v3.process_grab(delta)
 		# If V3 is active, normally we skip V1. But if V1 scaling is enabled, we allow fall-through.
 		if _two_hand_grab_v3.is_active():
 			if not enable_two_hand_world_scale:
@@ -1258,7 +1258,7 @@ func _update_two_hand_visual(left_pos: Vector3, right_pos: Vector3, mid: Vector3
 			var up := _get_player_up()
 			if abs(dir.normalized().dot(up)) > 0.98:
 				up = Vector3.UP
-			var basis := Basis.IDENTITY.looking_at(dir.normalized(), up)
+			var basis := Basis.looking_at(dir.normalized(), up)
 			xf.basis = basis.scaled(Vector3.ONE * XRServer.world_scale)
 		else:
 			var basis_src := player_body.global_transform.basis if player_body else Basis.IDENTITY

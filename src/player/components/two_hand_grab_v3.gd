@@ -164,7 +164,7 @@ func _update_grab() -> bool:
 	var right_grab_pos := _right_handle
 	var grab_l2r := (right_grab_pos - left_grab_pos).slide(up_player)
 	var grab_mid := (left_grab_pos + right_grab_pos) * 0.5
-	var grab_distance := grab_l2r.length()
+	var _grab_distance := grab_l2r.length()
 	
 	# === Get pickup positions (current controller positions) ===
 	var left_pickup_pos := left_controller.global_position
