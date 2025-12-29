@@ -2,13 +2,15 @@ class_name PolyTool
 extends Grabbable
 const ToolPoolManager = preload("res://src/systems/tool_pool_manager.gd")
 const ColorPickerUI = preload("res://src/ui/color_picker_ui.gd")
+const MaterialPickerUI = preload("res://src/ui/material_picker_ui.gd")
 
 enum ToolMode {
 	PLACE,
 	EDIT,
 	REMOVE,
 	CONNECT,
-	PAINT
+	PAINT,
+	APPLY_MATERIAL
 }
 
 enum PointVisibilityMode {
@@ -46,6 +48,7 @@ enum EditSelectionType {
 @export var color_paint_default: Color = Color(1.0, 1.0, 1.0, 1.0)
 @export var color_edge_highlight: Color = Color(1.0, 0.6, 0.0, 1.0) # Orange for edges
 @export var color_face_highlight: Color = Color(1.0, 0.9, 0.2, 0.4) # Semi-transparent yellow for faces
+@export var color_apply_material: Color = Color(0.8, 0.2, 0.8) # Purple for apply material mode
 
 # State
 static var instance: PolyTool
@@ -93,9 +96,14 @@ var _mode_select_modes: Array[ToolMode] = []
 var _is_selecting_mode: bool = false
 var _mode_select_radius: float = 0.12
 var _mode_select_height: float = 0.02
-const _MODE_ORDER := [ToolMode.PLACE, ToolMode.EDIT, ToolMode.REMOVE, ToolMode.CONNECT, ToolMode.PAINT]
+const _MODE_ORDER := [ToolMode.PLACE, ToolMode.EDIT, ToolMode.REMOVE, ToolMode.CONNECT, ToolMode.PAINT, ToolMode.APPLY_MATERIAL]
 var _mode_labels: Array[MeshInstance3D] = []
 const POOL_TYPE := "poly_tool"
+
+# Material mode state
+var _applied_material: Material = null
+var _material_preview_dot: MeshInstance3D
+var _material_preview_mat: StandardMaterial3D
 
 func _ready() -> void:
 	instance = self
@@ -322,12 +330,16 @@ func _handle_input() -> void:
 						painted = true
 				if painted:
 					_rebuild_mesh()
+		
+		ToolMode.APPLY_MATERIAL:
+			if just_pressed:
+				_apply_selected_material()
 
 	_prev_trigger_pressed = trigger
 	_prev_grip_pressed = grip
 
 func _cycle_mode() -> void:
-	var next = (_current_mode + 1) % 5
+	var next = (_current_mode + 1) % 6
 	_current_mode = next as ToolMode
 	_update_mode_visuals()
 
@@ -339,6 +351,7 @@ func _update_mode_visuals() -> void:
 	if _preview_mat:
 		_preview_mat.albedo_color = color.lightened(0.5)
 	_update_paint_dot()
+	_update_material_preview_dot()
 
 func _add_point(pos: Vector3) -> void:
 	var node = Node3D.new()
@@ -404,16 +417,46 @@ func _rebuild_mesh() -> void:
 		# Compute normal
 		var normal = (p1 - p0).cross(p2 - p0).normalized()
 		
+		# Generate UVs using planar projection based on dominant axis
+		var uv0 = _calculate_planar_uv(p0, normal)
+		var uv1 = _calculate_planar_uv(p1, normal)
+		var uv2 = _calculate_planar_uv(p2, normal)
+		
 		st.set_normal(normal)
-		# Add vertices in order
+		# Add vertices in order with UVs
 		st.set_color(_get_point_color(_points[tri[0]]))
+		st.set_uv(uv0)
 		st.add_vertex(p0)  
 		st.set_color(_get_point_color(_points[tri[1]]))
+		st.set_uv(uv1)
 		st.add_vertex(p1)
 		st.set_color(_get_point_color(_points[tri[2]]))
+		st.set_uv(uv2)
 		st.add_vertex(p2)
 		
 	st.commit(_mesh_params)
+
+
+## UV scale for texture mapping (units per UV repeat)
+@export var uv_scale: float = 1.0
+
+
+func _calculate_planar_uv(pos: Vector3, normal: Vector3) -> Vector2:
+	# Use planar projection based on the dominant axis of the normal
+	var abs_normal = normal.abs()
+	var uv: Vector2
+	
+	if abs_normal.x >= abs_normal.y and abs_normal.x >= abs_normal.z:
+		# Project onto YZ plane (X is dominant)
+		uv = Vector2(pos.z, pos.y)
+	elif abs_normal.y >= abs_normal.x and abs_normal.y >= abs_normal.z:
+		# Project onto XZ plane (Y is dominant) - typical for floors/ceilings
+		uv = Vector2(pos.x, pos.z)
+	else:
+		# Project onto XY plane (Z is dominant)
+		uv = Vector2(pos.x, pos.y)
+	
+	return uv / uv_scale
 
 # Visualization Helpers
 func _update_connect_lines(current_target: Vector3) -> void:
@@ -914,6 +957,90 @@ func _find_color_picker() -> ColorPickerUI:
 		return node
 	return null
 
+
+# Material picker functions
+func _get_selected_material() -> Material:
+	if MaterialPickerUI and MaterialPickerUI.instance and is_instance_valid(MaterialPickerUI.instance):
+		return MaterialPickerUI.instance.get_current_material()
+	var picker := _find_material_picker()
+	if picker:
+		return picker.get_current_material()
+	return null
+
+
+func _find_material_picker() -> MaterialPickerUI:
+	if not get_tree():
+		return null
+	var node = get_tree().get_first_node_in_group("material_picker_ui")
+	if node and node is MaterialPickerUI:
+		return node
+	return null
+
+
+func _apply_selected_material() -> void:
+	var mat := _get_selected_material()
+	if mat == null:
+		return
+	
+	_applied_material = mat.duplicate()
+	
+	# Configure material for polygon mesh
+	if _applied_material is StandardMaterial3D:
+		var std_mat := _applied_material as StandardMaterial3D
+		std_mat.vertex_color_use_as_albedo = false
+		std_mat.cull_mode = BaseMaterial3D.CULL_BACK
+		# Enable triplanar mapping for better texture projection on arbitrary geometry
+		std_mat.uv1_triplanar = true
+		std_mat.uv1_world_triplanar = true
+		std_mat.uv1_triplanar_sharpness = 1.0
+		# Scale the texture appropriately
+		std_mat.uv1_scale = Vector3(1.0, 1.0, 1.0)
+	
+	if is_instance_valid(_mesh_instance):
+		_mesh_instance.material_override = _applied_material
+	
+	_update_material_preview_dot()
+
+
+func _update_material_preview_dot() -> void:
+	_ensure_material_preview_dot()
+	if not is_instance_valid(_material_preview_dot):
+		return
+	
+	var mat := _get_selected_material()
+	if mat:
+		_material_preview_dot.material_override = mat
+		_material_preview_dot.visible = true
+	else:
+		_material_preview_dot.visible = false
+
+
+func _ensure_material_preview_dot() -> void:
+	if is_instance_valid(_material_preview_dot):
+		return
+	_material_preview_dot = MeshInstance3D.new()
+	_material_preview_dot.name = "MaterialPreviewDot"
+	_material_preview_dot.mesh = _make_sphere_mesh(0.018)
+	_material_preview_dot.visible = false
+	add_child(_material_preview_dot)
+	_material_preview_dot.position = Vector3(0.05, -0.03, 0)
+
+
+func get_applied_material() -> Material:
+	return _applied_material
+
+
+func clear_applied_material() -> void:
+	_applied_material = null
+	if is_instance_valid(_mesh_instance):
+		# Restore default vertex color material
+		var mat = StandardMaterial3D.new()
+		mat.albedo_color = Color(1, 1, 1, 1)
+		mat.cull_mode = BaseMaterial3D.CULL_BACK
+		mat.vertex_color_use_as_albedo = true
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_mesh_instance.material_override = mat
+
 func _make_sphere_mesh(r: float) -> SphereMesh:
 	var m = SphereMesh.new()
 	m.radius = r
@@ -977,6 +1104,8 @@ func _mode_color(mode: ToolMode) -> Color:
 			return color_connect
 		ToolMode.PAINT:
 			return _get_paint_color()
+		ToolMode.APPLY_MATERIAL:
+			return color_apply_material
 	return Color.WHITE
 
 func _add_to_root(node: Node) -> void:
@@ -1103,6 +1232,7 @@ func _mode_name(mode: ToolMode) -> String:
 		ToolMode.REMOVE: return "Remove"
 		ToolMode.CONNECT: return "Connect"
 		ToolMode.PAINT: return "Paint"
+		ToolMode.APPLY_MATERIAL: return "Material"
 	return "Mode"
 
 
@@ -1305,10 +1435,13 @@ func on_pooled() -> void:
 	_clear_edit_highlights()
 	_clear_geometry()
 	_end_mode_select()
+	_applied_material = null
 	if is_instance_valid(_preview_dot):
 		_preview_dot.visible = false
 	if is_instance_valid(_paint_dot):
 		_paint_dot.visible = false
+	if is_instance_valid(_material_preview_dot):
+		_material_preview_dot.visible = false
 	if is_instance_valid(_mesh_instance):
 		_mesh_instance.visible = false
 	if is_instance_valid(_point_container):

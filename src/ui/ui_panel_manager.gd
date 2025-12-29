@@ -69,6 +69,7 @@ const UI_SCENE_PATHS := {
 	"ScriptEditorViewport3D": "res://src/ui/ScriptEditorViewport3D.tscn",
 	"LegalViewport3D": "res://src/ui/legal/LegalViewport3D.tscn",
 	"ColorPickerViewport3D": "res://src/ui/ColorPickerViewport3D.tscn",
+	"MaterialPickerViewport3D": "res://src/ui/MaterialPickerViewport3D.tscn",
 	"PolyToolViewport3D": "res://src/ui/PolyToolViewport3D.tscn",
 	"PerformancePanelViewport3D": "res://src/ui/PerformancePanelViewport3D.tscn",
 	"ActionMapViewport3D": "res://src/ui/ActionMapViewport3D.tscn",
