@@ -1733,9 +1733,11 @@ func _update_grabbed_object(delta: float, controller: XRController3D) -> void:
 	var joystick: Vector2 = _get_pointer_axis_vector(controller)
 
 	# Only allow joystick manipulation if trigger is also held
-	var trigger_val = controller.get_float("trigger")
-	if trigger_val == 0.0:
-		trigger_val = controller.get_float("trigger_click")
+	var trigger_val: float = 0.0
+	if controller and controller.has_method("get_float"):
+		trigger_val = controller.get_float("trigger")
+		if trigger_val == 0.0:
+			trigger_val = controller.get_float("trigger_click")
 	
 	if trigger_val < 0.5:
 		joystick = Vector2.ZERO
