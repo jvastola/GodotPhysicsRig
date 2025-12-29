@@ -353,6 +353,7 @@ func _load_saved_settings() -> void:
 	snap_turn_cooldown = settings.get("snap_turn_cooldown", snap_turn_cooldown)
 	invert_turn_x = settings.get("invert_turn_x", invert_turn_x)
 	ui_scroll_steals_stick = settings.get("ui_scroll_steals_stick", ui_scroll_steals_stick)
+	ui_scroll_wheel_factor = settings.get("ui_scroll_wheel_factor", ui_scroll_wheel_factor)
 	disable_joystick_on_grip = settings.get("disable_joystick_on_grip", disable_joystick_on_grip)
 	hand_assignment = settings.get("hand_assignment", hand_assignment)
 	enable_two_hand_world_scale = settings.get("enable_two_hand_world_scale", enable_two_hand_world_scale)
@@ -451,9 +452,7 @@ func physics_process_locomotion(_delta: float) -> void:
 	
 	# Disable locomotion when grip is held (if setting enabled)
 	if disable_joystick_on_grip:
-		var left_grip_held = _is_action_pressed(left_controller, "grip")
-		var right_grip_held = _is_action_pressed(right_controller, "grip")
-		if left_grip_held or right_grip_held:
+		if _is_action_pressed(locomotion_controller, "grip"):
 			return
 	
 	# Get thumbstick input
@@ -570,6 +569,11 @@ func _handle_turning(delta: float) -> void:
 	"""Handle VR turning input from turn controller thumbstick"""
 	if not turn_controller:
 		return
+	
+	# Disable turning when grip is held (if setting enabled)
+	if disable_joystick_on_grip:
+		if _is_action_pressed(turn_controller, "grip"):
+			return
 	
 	# Update snap turn cooldown
 	if snap_turn_timer > 0:
