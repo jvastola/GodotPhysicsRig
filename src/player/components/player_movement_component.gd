@@ -33,6 +33,10 @@ enum HandAssignment { DEFAULT, SWAPPED }
 @export_range(0.0, 1.0, 0.01) var ui_scroll_deadzone: float = 0.25
 @export_range(10.0, 720.0, 10.0) var ui_scroll_wheel_factor: float = 240.0
 
+# === Grip Behavior ===
+## When enabled, joystick locomotion is disabled while either grip button is held
+@export var disable_joystick_on_grip: bool = false
+
 # === World Grab / Utility Settings ===
 @export var enable_two_hand_world_scale: bool = false
 @export var enable_two_hand_world_rotation: bool = false
@@ -349,6 +353,7 @@ func _load_saved_settings() -> void:
 	snap_turn_cooldown = settings.get("snap_turn_cooldown", snap_turn_cooldown)
 	invert_turn_x = settings.get("invert_turn_x", invert_turn_x)
 	ui_scroll_steals_stick = settings.get("ui_scroll_steals_stick", ui_scroll_steals_stick)
+	disable_joystick_on_grip = settings.get("disable_joystick_on_grip", disable_joystick_on_grip)
 	hand_assignment = settings.get("hand_assignment", hand_assignment)
 	enable_two_hand_world_scale = settings.get("enable_two_hand_world_scale", enable_two_hand_world_scale)
 	enable_two_hand_world_rotation = settings.get("enable_two_hand_world_rotation", enable_two_hand_world_rotation)
@@ -443,6 +448,13 @@ func physics_process_locomotion(_delta: float) -> void:
 		return
 	if ui_scroll_steals_stick and _ui_block_locomotion:
 		return
+	
+	# Disable locomotion when grip is held (if setting enabled)
+	if disable_joystick_on_grip:
+		var left_grip_held = _is_action_pressed(left_controller, "grip")
+		var right_grip_held = _is_action_pressed(right_controller, "grip")
+		if left_grip_held or right_grip_held:
+			return
 	
 	# Get thumbstick input
 	var input = locomotion_controller.get_vector2("primary")

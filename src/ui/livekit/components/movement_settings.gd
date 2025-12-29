@@ -27,6 +27,7 @@ const DEFAULTS := {
 	"snap_turn_cooldown": 0.3,
 	"invert_turn_x": false,
 	"ui_scroll_steals_stick": false,
+	"disable_joystick_on_grip": false,
 	"hand_assignment": PlayerMovementComponent.HandAssignment.DEFAULT,
 	"enable_two_hand_world_scale": false,
 	"enable_two_hand_world_rotation": false,
@@ -113,6 +114,7 @@ var snap_cooldown_label: Label
 var turn_invert_check: CheckBox
 var hand_swap_check: CheckBox
 var ui_scroll_override_check: CheckBox
+var disable_joystick_grip_check: CheckBox
 var world_scale_check: CheckBox
 var world_rotation_check: CheckBox
 var invert_two_hand_scale_check: CheckBox
@@ -538,6 +540,18 @@ func _build_ui():
 		ui_scroll_override_check.button_pressed = defaults_snapshot["ui_scroll_steals_stick"]
 	ui_scroll_override_check.toggled.connect(func(pressed: bool): _on_ui_scroll_override_toggled(pressed))
 	ui_scroll_row.add_child(ui_scroll_override_check)
+
+	var grip_joystick_row = _create_row(controls_card, "Grip Behavior")
+	disable_joystick_grip_check = CheckBox.new()
+	disable_joystick_grip_check.text = "Disable Joystick While Gripping"
+	disable_joystick_grip_check.add_theme_font_size_override("font_size", 12)
+	disable_joystick_grip_check.tooltip_text = "When enabled, joystick locomotion is disabled while either grip button is held. Useful when using grip for world manipulation."
+	if movement_component:
+		disable_joystick_grip_check.button_pressed = movement_component.disable_joystick_on_grip
+	else:
+		disable_joystick_grip_check.button_pressed = defaults_snapshot["disable_joystick_on_grip"]
+	disable_joystick_grip_check.toggled.connect(func(pressed: bool): _on_disable_joystick_grip_toggled(pressed))
+	grip_joystick_row.add_child(disable_joystick_grip_check)
 
 	# === World Manipulation ===
 	var world_card = _create_card(main_vbox, "World Manipulation", "Two-hand gestures for scaling and rotating the world", "🌍")
@@ -1309,6 +1323,12 @@ func _on_ui_scroll_override_toggled(pressed: bool):
 	settings_changed.emit()
 
 
+func _on_disable_joystick_grip_toggled(pressed: bool):
+	if movement_component:
+		movement_component.disable_joystick_on_grip = pressed
+	settings_changed.emit()
+
+
 func _on_world_scale_toggled(pressed: bool):
 	if movement_component:
 		movement_component.enable_two_hand_world_scale = pressed
@@ -1785,6 +1805,8 @@ func refresh():
 			hand_swap_check.button_pressed = movement_component.hand_assignment == PlayerMovementComponent.HandAssignment.SWAPPED
 		if ui_scroll_override_check:
 			ui_scroll_override_check.button_pressed = movement_component.ui_scroll_steals_stick
+		if disable_joystick_grip_check:
+			disable_joystick_grip_check.button_pressed = movement_component.disable_joystick_on_grip
 		if world_scale_check:
 			world_scale_check.button_pressed = movement_component.enable_two_hand_world_scale
 		if world_rotation_check:
@@ -1925,6 +1947,7 @@ func _snapshot_defaults():
 		"snap_turn_cooldown": movement_component.snap_turn_cooldown,
 		"invert_turn_x": movement_component.invert_turn_x,
 		"ui_scroll_steals_stick": movement_component.ui_scroll_steals_stick,
+		"disable_joystick_on_grip": movement_component.disable_joystick_on_grip,
 		"hand_assignment": movement_component.hand_assignment,
 		"enable_two_hand_world_scale": movement_component.enable_two_hand_world_scale,
 		"enable_two_hand_world_rotation": movement_component.enable_two_hand_world_rotation,
@@ -1992,6 +2015,8 @@ func _apply_defaults(source: Dictionary):
 		hand_swap_check.button_pressed = source.get("hand_assignment", DEFAULTS["hand_assignment"]) == PlayerMovementComponent.HandAssignment.SWAPPED
 	if ui_scroll_override_check:
 		ui_scroll_override_check.button_pressed = source.get("ui_scroll_steals_stick", DEFAULTS["ui_scroll_steals_stick"])
+	if disable_joystick_grip_check:
+		disable_joystick_grip_check.button_pressed = source.get("disable_joystick_on_grip", DEFAULTS["disable_joystick_on_grip"])
 	if world_scale_check:
 		world_scale_check.button_pressed = source.get("enable_two_hand_world_scale", DEFAULTS["enable_two_hand_world_scale"])
 	if world_rotation_check:
@@ -2181,6 +2206,7 @@ func _collect_settings_data() -> Dictionary:
 		"smooth_turn_speed": smooth_speed_slider.value if smooth_speed_slider else DEFAULTS["smooth_turn_speed"],
 		"invert_turn_x": turn_invert_check.button_pressed if turn_invert_check else DEFAULTS["invert_turn_x"],
 		"ui_scroll_steals_stick": ui_scroll_override_check.button_pressed if ui_scroll_override_check else DEFAULTS["ui_scroll_steals_stick"],
+		"disable_joystick_on_grip": disable_joystick_grip_check.button_pressed if disable_joystick_grip_check else DEFAULTS["disable_joystick_on_grip"],
 		"hand_assignment": PlayerMovementComponent.HandAssignment.SWAPPED if hand_swap_check and hand_swap_check.button_pressed else PlayerMovementComponent.HandAssignment.DEFAULT,
 		"enable_two_hand_world_scale": world_scale_check.button_pressed if world_scale_check else DEFAULTS["enable_two_hand_world_scale"],
 		"enable_two_hand_world_rotation": world_rotation_check.button_pressed if world_rotation_check else DEFAULTS["enable_two_hand_world_rotation"],
