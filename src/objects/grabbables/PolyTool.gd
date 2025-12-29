@@ -977,9 +977,20 @@ func _find_material_picker() -> MaterialPickerUI:
 	return null
 
 
+# Viewport for rendering shader materials to texture
+var _shader_viewport: SubViewport = null
+var _shader_color_rect: ColorRect = null
+var _shader_viewport_texture: ViewportTexture = null
+
+
 func _apply_selected_material() -> void:
 	var mat := _get_selected_material()
 	if mat == null:
+		return
+	
+	# Check if it's a shader material (like plasma) - needs special handling
+	if mat is ShaderMaterial:
+		_apply_shader_material(mat as ShaderMaterial)
 		return
 	
 	_applied_material = mat.duplicate()
@@ -1002,6 +1013,56 @@ func _apply_selected_material() -> void:
 	_update_material_preview_dot()
 
 
+func _apply_shader_material(shader_mat: ShaderMaterial) -> void:
+	# Create a viewport to render the shader to a texture
+	_ensure_shader_viewport()
+	
+	# Apply the shader material to the color rect in the viewport
+	_shader_color_rect.material = shader_mat.duplicate()
+	
+	# Create a StandardMaterial3D that uses the viewport texture
+	var std_mat := StandardMaterial3D.new()
+	std_mat.albedo_texture = _shader_viewport_texture
+	std_mat.vertex_color_use_as_albedo = false
+	std_mat.cull_mode = BaseMaterial3D.CULL_BACK
+	std_mat.uv1_triplanar = true
+	std_mat.uv1_world_triplanar = true
+	std_mat.uv1_triplanar_sharpness = 1.0
+	std_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	
+	_applied_material = std_mat
+	
+	if is_instance_valid(_mesh_instance):
+		_mesh_instance.material_override = _applied_material
+	
+	_update_material_preview_dot()
+
+
+func _ensure_shader_viewport() -> void:
+	if is_instance_valid(_shader_viewport):
+		return
+	
+	# Create viewport for rendering shader materials
+	_shader_viewport = SubViewport.new()
+	_shader_viewport.name = "ShaderMaterialViewport"
+	_shader_viewport.size = Vector2i(512, 512)
+	_shader_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	_shader_viewport.transparent_bg = false
+	
+	# Create color rect to render the shader
+	_shader_color_rect = ColorRect.new()
+	_shader_color_rect.name = "ShaderRect"
+	_shader_color_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_shader_color_rect.size = Vector2(512, 512)
+	_shader_viewport.add_child(_shader_color_rect)
+	
+	# Add viewport to scene
+	_add_to_root(_shader_viewport)
+	
+	# Get the viewport texture
+	_shader_viewport_texture = _shader_viewport.get_texture()
+
+
 func _update_material_preview_dot() -> void:
 	_ensure_material_preview_dot()
 	if not is_instance_valid(_material_preview_dot):
@@ -1009,7 +1070,25 @@ func _update_material_preview_dot() -> void:
 	
 	var mat := _get_selected_material()
 	if mat:
-		_material_preview_dot.material_override = mat
+		if mat is ShaderMaterial:
+			# For shader materials, use the converted material if available
+			if _applied_material:
+				_material_preview_dot.material_override = _applied_material
+			else:
+				# Create a quick preview material
+				_ensure_shader_viewport()
+				_shader_color_rect.material = mat.duplicate()
+				var preview_mat := StandardMaterial3D.new()
+				preview_mat.albedo_texture = _shader_viewport_texture
+				preview_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+				_material_preview_dot.material_override = preview_mat
+		else:
+			# For standard materials, apply with triplanar for the sphere
+			var preview_mat = mat.duplicate()
+			if preview_mat is StandardMaterial3D:
+				preview_mat.uv1_triplanar = true
+				preview_mat.uv1_world_triplanar = true
+			_material_preview_dot.material_override = preview_mat
 		_material_preview_dot.visible = true
 	else:
 		_material_preview_dot.visible = false
@@ -1436,6 +1515,12 @@ func on_pooled() -> void:
 	_clear_geometry()
 	_end_mode_select()
 	_applied_material = null
+	# Clean up shader viewport
+	if is_instance_valid(_shader_viewport):
+		_shader_viewport.queue_free()
+		_shader_viewport = null
+		_shader_color_rect = null
+		_shader_viewport_texture = null
 	if is_instance_valid(_preview_dot):
 		_preview_dot.visible = false
 	if is_instance_valid(_paint_dot):
