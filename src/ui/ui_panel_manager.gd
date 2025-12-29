@@ -73,6 +73,7 @@ const UI_SCENE_PATHS := {
 	"PerformancePanelViewport3D": "res://src/ui/PerformancePanelViewport3D.tscn",
 	"ActionMapViewport3D": "res://src/ui/ActionMapViewport3D.tscn",
 	"TwoHandGrabSettingsViewport3D": "res://src/ui/TwoHandGrabSettingsViewport3D.tscn",
+	"AddNodeViewport3D": "res://src/ui/AddNodeViewport3D.tscn",
 }
 
 

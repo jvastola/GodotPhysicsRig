@@ -42,22 +42,6 @@ var _clipboard_node_data: Dictionary = {}
 # Search/filter
 var _search_filter: String = ""
 
-# Add Node popup
-var _add_node_popup: PopupPanel = null
-var _add_node_search: LineEdit = null
-var _add_node_list: ItemList = null
-var _node_types: Array[String] = [
-	"Node", "Node2D", "Node3D",
-	"MeshInstance3D", "CSGBox3D", "CSGSphere3D", "CSGCylinder3D",
-	"StaticBody3D", "RigidBody3D", "CharacterBody3D", "AnimatableBody3D",
-	"CollisionShape3D", "Area3D",
-	"Camera3D", "DirectionalLight3D", "OmniLight3D", "SpotLight3D",
-	"Marker3D", "Path3D", "PathFollow3D",
-	"AudioStreamPlayer3D", "GPUParticles3D",
-	"Control", "Label", "Button", "Panel", "Label3D",
-	"Timer", "AnimationPlayer"
-]
-
 # Undo/Redo
 var _undo_redo: UndoRedo = null
 
@@ -116,9 +100,6 @@ func _ready() -> void:
 	
 	# Set up context menu
 	_setup_context_menu()
-	
-	# Set up add node popup
-	_setup_add_node_popup()
 	
 	# Set up search bar
 	if search_bar:
@@ -915,87 +896,23 @@ func _on_redo_pressed() -> void:
 # ADD NODE POPUP
 # ============================================================================
 
-func _setup_add_node_popup() -> void:
-	_add_node_popup = PopupPanel.new()
-	_add_node_popup.name = "AddNodePopup"
-	add_child(_add_node_popup)
-	
-	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
-	_add_node_popup.add_child(vbox)
-	
-	# Title
-	var title = Label.new()
-	title.text = "➕ Add New Node"
-	title.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
-	title.add_theme_font_size_override("font_size", 16)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(title)
-	
-	# Search filter
-	_add_node_search = LineEdit.new()
-	_add_node_search.placeholder_text = "🔍 Search node types..."
-	_add_node_search.clear_button_enabled = true
-	_add_node_search.custom_minimum_size = Vector2(250, 32)
-	_add_node_search.text_changed.connect(_on_add_node_search_changed)
-	vbox.add_child(_add_node_search)
-	
-	# Node type list
-	_add_node_list = ItemList.new()
-	_add_node_list.custom_minimum_size = Vector2(250, 300)
-	_add_node_list.allow_reselect = true
-	_add_node_list.item_activated.connect(_on_add_node_type_activated)
-	vbox.add_child(_add_node_list)
-	
-	# Populate with node types
-	_populate_add_node_list("")
-	
-	# Cancel button
-	var cancel_btn = Button.new()
-	cancel_btn.text = "Cancel"
-	cancel_btn.pressed.connect(func(): _add_node_popup.hide())
-	vbox.add_child(cancel_btn)
-
-
-func _populate_add_node_list(filter: String) -> void:
-	if not _add_node_list:
-		return
-	
-	_add_node_list.clear()
-	var filter_lower = filter.to_lower()
-	
-	for type_name in _node_types:
-		if filter.is_empty() or type_name.to_lower().contains(filter_lower):
-			_add_node_list.add_item(type_name)
-
-
-func _on_add_node_search_changed(new_text: String) -> void:
-	_populate_add_node_list(new_text)
-
-
 func _on_add_node_pressed() -> void:
-	if not _add_node_popup:
-		return
-	
-	# Clear search and repopulate
-	if _add_node_search:
-		_add_node_search.text = ""
-	_populate_add_node_list("")
-	
-	# Show popup
-	_add_node_popup.popup_centered()
+	var panel_manager := UIPanelManager.find()
+	if panel_manager:
+		var panel = panel_manager.open_panel("AddNodeViewport3D")
+		if panel:
+			# Connect selection signal from the new panel
+			var viewport = panel.get_node_or_null("SubViewport")
+			if viewport:
+				var add_node_ui = viewport.get_node_or_null("AddNodeUI")
+				if add_node_ui and add_node_ui.has_signal("node_type_selected"):
+					if not add_node_ui.node_type_selected.is_connected(self.add_new_node):
+						add_node_ui.node_type_selected.connect(self.add_new_node)
+	else:
+		print("SceneHierarchy: UIPanelManager not found")
 
 
-func _on_add_node_type_activated(index: int) -> void:
-	if not _add_node_list:
-		return
-	
-	var type_name = _add_node_list.get_item_text(index)
-	_add_new_node(type_name)
-	_add_node_popup.hide()
-
-
-func _add_new_node(type_name: String) -> void:
+func add_new_node(type_name: String) -> void:
 	# Determine parent node
 	var parent_node: Node = null
 	var selected = tree.get_selected() if tree else null
