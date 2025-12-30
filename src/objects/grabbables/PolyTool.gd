@@ -147,7 +147,9 @@ func _create_visuals() -> void:
 	mat.cull_mode = BaseMaterial3D.CULL_BACK 
 	mat.vertex_color_use_as_albedo = true
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_mesh_instance.material_override = mat
+	_mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_add_to_root(_mesh_instance)
 
 	_orb = MeshInstance3D.new()
@@ -251,8 +253,8 @@ func _physics_process(delta: float) -> void:
 	else:
 		_clear_connect_lines()
 	
-	# Edit Mode Highlights
-	if _current_mode == ToolMode.EDIT:
+	# Edit/Remove Mode Highlights
+	if _current_mode == ToolMode.EDIT or _current_mode == ToolMode.REMOVE:
 		_update_edit_mode_highlights(target)
 	else:
 		_clear_edit_highlights()
@@ -301,8 +303,13 @@ func _handle_input() -> void:
 				_end_edit_drag()
 					
 		ToolMode.REMOVE:
-			if just_pressed and hover.index != -1 and hover.distance < selection_radius:
-				_remove_point(hover.index)
+			if just_pressed:
+				if hover.index != -1 and hover.distance < selection_radius:
+					_remove_point(hover.index)
+				else:
+					var h_face = _get_nearest_face_within_radius(target, _get_visibility_origin())
+					if h_face.index != -1 and h_face.distance < face_selection_radius:
+						_remove_face(h_face.index)
 				
 		ToolMode.CONNECT:
 			if trigger:
@@ -417,6 +424,12 @@ func _remove_point(index: int) -> void:
 	_rebuild_mesh()
 	_update_point_visibility()
 
+func _remove_face(index: int) -> void:
+	if index < 0 or index >= _triangles.size(): return
+	
+	_triangles.remove_at(index)
+	_rebuild_mesh()
+
 func _move_point(index: int, pos: Vector3) -> void:
 	if index < 0 or index >= _points.size(): return
 	_move_point_with_colocated(index, pos)
@@ -529,6 +542,20 @@ func _update_edit_mode_highlights(target: Vector3) -> void:
 		return
 	
 	var origin = _get_visibility_origin()
+	
+	# Update highlight colors based on mode
+	if _current_mode == ToolMode.REMOVE:
+		var edge_mat = _edge_highlight.material_override as StandardMaterial3D
+		if edge_mat: edge_mat.albedo_color = color_remove
+		var face_mat = _face_highlight.material_override as StandardMaterial3D
+		if face_mat: face_mat.albedo_color = color_remove.lightened(0.2)
+		face_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		face_mat.albedo_color.a = 0.4
+	else:
+		var edge_mat = _edge_highlight.material_override as StandardMaterial3D
+		if edge_mat: edge_mat.albedo_color = color_edge_highlight
+		var face_mat = _face_highlight.material_override as StandardMaterial3D
+		if face_mat: face_mat.albedo_color = color_face_highlight
 	
 	# Find nearest point, edge, and face within visibility radius
 	var nearest_point = _get_nearest_point(target)
