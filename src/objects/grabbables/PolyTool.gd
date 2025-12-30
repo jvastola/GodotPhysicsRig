@@ -10,7 +10,8 @@ enum ToolMode {
 	REMOVE,
 	CONNECT,
 	PAINT,
-	APPLY_MATERIAL
+	APPLY_MATERIAL,
+	EXTRUDE
 }
 
 enum PointVisibilityMode {
@@ -49,6 +50,7 @@ enum EditSelectionType {
 @export var color_edge_highlight: Color = Color(1.0, 0.6, 0.0, 1.0) # Orange for edges
 @export var color_face_highlight: Color = Color(1.0, 0.9, 0.2, 0.4) # Semi-transparent yellow for faces
 @export var color_apply_material: Color = Color(0.8, 0.2, 0.8) # Purple for apply material mode
+@export var color_extrude: Color = Color(1.0, 0.0, 1.0) # Magenta for extrude
 
 # State
 static var instance: PolyTool
@@ -96,7 +98,7 @@ var _mode_select_modes: Array[ToolMode] = []
 var _is_selecting_mode: bool = false
 var _mode_select_radius: float = 0.12
 var _mode_select_height: float = 0.02
-const _MODE_ORDER := [ToolMode.PLACE, ToolMode.EDIT, ToolMode.REMOVE, ToolMode.CONNECT, ToolMode.PAINT, ToolMode.APPLY_MATERIAL]
+const _MODE_ORDER := [ToolMode.PLACE, ToolMode.EDIT, ToolMode.EXTRUDE, ToolMode.REMOVE, ToolMode.CONNECT, ToolMode.PAINT, ToolMode.APPLY_MATERIAL]
 var _mode_labels: Array[MeshInstance3D] = []
 const POOL_TYPE := "poly_tool"
 
@@ -104,6 +106,13 @@ const POOL_TYPE := "poly_tool"
 var _applied_material: Material = null
 var _material_preview_dot: MeshInstance3D
 var _material_preview_mat: StandardMaterial3D
+
+# Extrude Mode State
+var _extrude_drag_face_index: int = -1
+var _extrude_new_point_indices: Array[int] = [] 
+var _extrude_initial_cap_positions: Array[Vector3] = [] 
+var _extrude_drag_start_pos: Vector3 = Vector3.ZERO
+var _extrude_normal: Vector3 = Vector3.UP
 
 func _ready() -> void:
 	instance = self
@@ -334,12 +343,26 @@ func _handle_input() -> void:
 		ToolMode.APPLY_MATERIAL:
 			if just_pressed:
 				_apply_selected_material()
+		
+		ToolMode.EXTRUDE:
+			if not _hovered_face_idx == -1 and not _drag_face_idx == -1:
+				pass # Just ensure highlights work
+			
+			if just_pressed:
+				var h_face = _get_nearest_face_within_radius(target, _get_visibility_origin())
+				if h_face.index != -1 and h_face.distance < face_selection_radius:
+					_start_extrude_drag(h_face.index, target)
+			
+			if trigger:
+				_continue_extrude_drag(target)
+			else:
+				_end_extrude_drag()
 
 	_prev_trigger_pressed = trigger
 	_prev_grip_pressed = grip
 
 func _cycle_mode() -> void:
-	var next = (_current_mode + 1) % 6
+	var next = (_current_mode + 1) % 7
 	_current_mode = next as ToolMode
 	_update_mode_visuals()
 
@@ -798,6 +821,96 @@ func _end_edit_drag() -> void:
 	_drag_start_basis = Basis.IDENTITY
 
 
+# Extrude Mode Logic
+func _start_extrude_drag(face_idx: int, grab_pos: Vector3) -> void:
+	if face_idx < 0 or face_idx >= _triangles.size(): return
+	
+	_extrude_drag_face_index = face_idx
+	_extrude_drag_start_pos = grab_pos
+	
+	# Get the face points
+	var tri = _triangles[face_idx]
+	if tri.size() < 3: return
+	
+	var p0_idx = tri[0]
+	var p1_idx = tri[1]
+	var p2_idx = tri[2]
+	
+	var p0 = _points[p0_idx].global_position
+	var p1 = _points[p1_idx].global_position
+	var p2 = _points[p2_idx].global_position
+	
+	# Calculate normal
+	_extrude_normal = (p1 - p0).cross(p2 - p0).normalized()
+	
+	# Extrude topology: create new points and faces
+	_extrude_new_point_indices = _extrude_face_topology(face_idx)
+	
+	# Store initial positions (which are currently same as base)
+	_extrude_initial_cap_positions.clear()
+	for idx in _extrude_new_point_indices:
+		_extrude_initial_cap_positions.append(_points[idx].global_position)
+	
+	_rebuild_mesh()
+
+func _extrude_face_topology(face_idx: int) -> Array[int]:
+	# Returns the indices of the new cap points [n0, n1, n2]
+	var old_tri = _triangles[face_idx]
+	var p0_idx = old_tri[0]
+	var p1_idx = old_tri[1]
+	var p2_idx = old_tri[2]
+	
+	# Create 3 new points at the same positions
+	var n0 = _create_point_at(_points[p0_idx].global_position)
+	var n1 = _create_point_at(_points[p1_idx].global_position)
+	var n2 = _create_point_at(_points[p2_idx].global_position)
+	
+	# Update the original triangle to be the "cap" (using new points)
+	_triangles[face_idx] = [n0.index, n1.index, n2.index]
+	
+	# Add side faces (Quads -> 2 Tris each)
+	# Base: p0, p1, p2 (CCW)
+	# Cap: n0, n1, n2 (CCW)
+	# Side 0: Edge p0->p1. Side Quad: p0, p1, n1, n0.
+	_add_quad_tris(p0_idx, p1_idx, n1.index, n0.index)
+	_add_quad_tris(p1_idx, p2_idx, n2.index, n1.index)
+	_add_quad_tris(p2_idx, p0_idx, n0.index, n2.index)
+	
+	return [n0.index, n1.index, n2.index]
+
+func _create_point_at(pos: Vector3) -> Dictionary:
+	_add_point(pos)
+	var idx = _points.size() - 1
+	return {"node": _points[idx], "index": idx}
+
+func _add_quad_tris(i0: int, i1: int, i2: int, i3: int) -> void:
+	_add_triangle([i0, i1, i2])
+	_add_triangle([i0, i2, i3])
+
+func _continue_extrude_drag(target_pos: Vector3) -> void:
+	if _extrude_drag_face_index == -1: return
+	
+	var drag_vec = target_pos - _extrude_drag_start_pos
+	# Project drag onto normal for constrained movement
+	var offset_dist = drag_vec.dot(_extrude_normal)
+	var offset = _extrude_normal * offset_dist
+	
+	for i in _extrude_new_point_indices.size():
+		var idx = _extrude_new_point_indices[i]
+		if idx < _points.size():
+			var initial = _extrude_initial_cap_positions[i]
+			_points[idx].global_position = initial + offset
+	
+	_rebuild_mesh()
+	_update_point_visibility()
+
+func _end_extrude_drag() -> void:
+	_extrude_drag_face_index = -1
+	_extrude_new_point_indices.clear()
+	_extrude_initial_cap_positions.clear()
+	_extrude_drag_start_pos = Vector3.ZERO
+
+
 func _get_tool_basis() -> Basis:
 	if is_instance_valid(_tip) and _tip.is_inside_tree():
 		return _tip.global_transform.basis
@@ -1185,6 +1298,8 @@ func _mode_color(mode: ToolMode) -> Color:
 			return _get_paint_color()
 		ToolMode.APPLY_MATERIAL:
 			return color_apply_material
+		ToolMode.EXTRUDE:
+			return color_extrude
 	return Color.WHITE
 
 func _add_to_root(node: Node) -> void:
@@ -1312,6 +1427,7 @@ func _mode_name(mode: ToolMode) -> String:
 		ToolMode.CONNECT: return "Connect"
 		ToolMode.PAINT: return "Paint"
 		ToolMode.APPLY_MATERIAL: return "Material"
+		ToolMode.EXTRUDE: return "Extrude"
 	return "Mode"
 
 
