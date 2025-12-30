@@ -144,7 +144,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.41976643, -2.2566147)
 
 [node name="Floor" type="StaticBody3D" parent="." unique_id=386014746]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2.51753, 0)
-collision_layer = 33
 collision_mask = 0
 script = ExtResource("4_floor_script")
 
@@ -263,7 +262,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.983923, 0.88246953, 1.516
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10)
 
 [node name="ShaderPlasma" type="CSGSphere3D" parent="PlasmaDemos" unique_id=1217239899]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -0.03904532, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -0.24835506, 0)
 radius = 0.75
 material = SubResource("StandardMaterial3D_wvm1w")
 script = ExtResource("35_hr53f")
@@ -282,7 +281,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.75, 0)
 material = SubResource("StandardMaterial3D_wvm1w")
 
 [node name="Sphere" type="CSGSphere3D" parent="PlasmaDemos/PlasmaBox" unique_id=716390065]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.5834384)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.7982364)
 operation = 2
 radius = 0.6
 material = ExtResource("34_s8yin")

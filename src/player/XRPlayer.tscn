@@ -123,7 +123,7 @@ mesh = SubResource("BoxMesh_watch_needle")
 
 [node name="RayCast" type="RayCast3D" parent="PlayerBody/XROrigin3D/LeftController/Watch" unique_id=2108499496]
 target_position = Vector3(0, 1, 0)
-collision_mask = 2
+collision_mask = 6
 hit_from_inside = true
 collide_with_areas = true
 
@@ -137,14 +137,13 @@ mesh = SubResource("SphereMesh_watch_hit")
 
 [node name="HandPointer" type="Node3D" parent="PlayerBody/XROrigin3D/LeftController" unique_id=1391630202]
 script = ExtResource("6_pointer")
-ray_length = 1.5
-ray_length_min = 0.001
-ray_length_max = 1000000.0
+ray_length = 7.5
+ray_length_min = 7.0
 include_pointer_color = true
 pointer_color = Color(0.568627, 1, 1, 1)
 ray_visibility_mode = "on_hit_or_trigger"
 hit_visibility_mode = "always"
-hit_shape = "sphere"
+hit_color = Color(0.6784314, 0.69411767, 1, 1)
 hit_scale_per_meter = 0.5
 hit_min_scale = 0.05
 hit_max_scale = 1000000000.0
@@ -181,12 +180,12 @@ mesh = SubResource("BoxMesh_hand")
 
 [node name="HandPointer" type="Node3D" parent="PlayerBody/XROrigin3D/RightController" unique_id=492218641]
 script = ExtResource("6_pointer")
-ray_length = 1.5
-ray_length_min = 0.001
+ray_length = 7.0
+ray_length_min = 7.0
 ray_length_max = 1000000.0
 ray_visibility_mode = "on_hit_or_trigger"
 hit_visibility_mode = "always"
-hit_shape = "sphere"
+hit_color = Color(0.73333335, 0.7372549, 1, 0.8862745)
 hit_scale_per_meter = 0.5
 hit_min_scale = 0.05
 hit_max_scale = 1000000000.0
@@ -311,10 +310,6 @@ script = ExtResource("11_2d0bc")
 [node name="GridPainter" type="Node3D" parent="." unique_id=1302115314]
 script = ExtResource("13_grid_painter")
 player_root_path = NodePath("..")
-head_target = NodePath("PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadMesh")
-head_path = NodePath("PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadMesh")
-body_target = NodePath("PlayerBody/XROrigin3D/XRCamera3D/HeadArea/BodyMesh")
-body_path = NodePath("PlayerBody/XROrigin3D/XRCamera3D/HeadArea/BodyMesh")
 
 [node name="PlayerNetworkComponent" type="Node" parent="." unique_id=1277471060]
 script = ExtResource("14_network_comp")

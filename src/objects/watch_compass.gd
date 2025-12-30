@@ -134,7 +134,7 @@ func _update_ray_visual(axis_world: Vector3) -> void:
 			hit_distance = start_global.distance_to(hit_point)
 			var collider := _raycast.get_collider()
 			if collider is Node:
-				hit_player = (collider as Node).is_in_group(player_group)
+				hit_player = (collider as Node).is_in_group(player_group) or (collider as Node).is_in_group("physics_hand")
 
 	if _ray_hit_indicator:
 		_ray_hit_indicator.visible = has_hit and show_hitpoint
