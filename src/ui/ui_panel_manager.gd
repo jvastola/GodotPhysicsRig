@@ -249,20 +249,28 @@ func _spawn_panel(panel_name: String) -> Node3D:
 
 
 func _position_panel_in_front(panel: Node3D, distance: float = -1.0) -> void:
-	"""Position a panel in front of the player camera."""
+	"""Position a panel in front of the player camera, scaled to match world scale."""
 	if not _xr_camera:
 		_find_camera()
 	if not _xr_camera:
 		return
 	
-	var spawn_dist := distance if distance > 0 else default_spawn_distance
+	# Get the current world scale from XRServer
+	var world_scale: float = XRServer.world_scale if XRServer.world_scale > 0.0 else 1.0
+	
+	# Scale spawn distance by world scale so panel appears at consistent perceived distance
+	var base_dist := distance if distance > 0 else default_spawn_distance
+	var spawn_dist := base_dist * world_scale
+	
 	var cam_tf := _xr_camera.global_transform
 	var forward := -cam_tf.basis.z.normalized()
 	var target_origin := cam_tf.origin + forward * spawn_dist
 	
 	var xf: Transform3D = panel.global_transform
-	var current_scale := xf.basis.get_scale()
 	xf.origin = target_origin
+	
+	# Scale panel to match world scale so it appears the same size to the player
+	var panel_scale := Vector3.ONE * world_scale
 	
 	# Face the camera
 	var dir_to_camera := cam_tf.origin - target_origin
@@ -270,9 +278,9 @@ func _position_panel_in_front(panel: Node3D, distance: float = -1.0) -> void:
 	if dir_to_camera.length_squared() > 0.0001:
 		dir_to_camera = dir_to_camera.normalized()
 		var facing_basis := Basis.looking_at(-dir_to_camera, Vector3.UP)
-		xf.basis = facing_basis.scaled(current_scale)
+		xf.basis = facing_basis.scaled(panel_scale)
 	else:
-		xf.basis = Basis.IDENTITY.scaled(current_scale)
+		xf.basis = Basis.IDENTITY.scaled(panel_scale)
 	
 	panel.global_transform = xf
 
@@ -286,6 +294,10 @@ func _check_panel_distances() -> void:
 	
 	var camera_pos := _xr_camera.global_position
 	
+	# Scale the distance threshold by world scale so panels stay visible at the same perceived distance
+	var world_scale: float = XRServer.world_scale if XRServer.world_scale > 0.0 else 1.0
+	var scaled_max_distance := max_panel_distance * world_scale
+	
 	for panel_name in _active_panels:
 		if not _panel_nodes.has(panel_name):
 			continue
@@ -297,9 +309,9 @@ func _check_panel_distances() -> void:
 		var distance := camera_pos.distance_to(panel.global_position)
 		var is_hidden := panel_name in _distance_hidden_panels
 		
-		if distance > max_panel_distance and not is_hidden:
+		if distance > scaled_max_distance and not is_hidden:
 			_hide_panel(panel_name)
-		elif distance <= max_panel_distance and is_hidden:
+		elif distance <= scaled_max_distance and is_hidden:
 			_show_panel(panel_name)
 
 
