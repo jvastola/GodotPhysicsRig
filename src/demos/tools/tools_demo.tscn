@@ -1,11 +1,11 @@
-[gd_scene load_steps=28 format=3 uid="uid://b8h2r7k6m0q1p"]
+[gd_scene load_steps=41 format=3 uid="uid://b8h2r7k6m0q1p"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_4ykcd"]
 [ext_resource type="Script" uid="uid://m0r1orgvjxdw" path="res://src/demos/tools/scripts/procedural_grid.gd" id="1_grid"]
 [ext_resource type="Shader" uid="uid://dmtpwwlxwmxxb" path="res://src/demos/tools/shaders/plasma.gdshader" id="1_plasma_shader"]
 [ext_resource type="Material" uid="uid://dv7r3ukd8fnu2" path="res://src/demos/tools/materials/sand.tres" id="3_y07qc"]
 [ext_resource type="Material" uid="uid://be0c2w18tbd7c" path="res://src/demos/tools/materials/marble.tres" id="4_hg4ri"]
-[ext_resource type="Material" uid="uid://dlh8tkog5px0p" path="res://src/demos/tools/materials/pixel_art.tres" id="5_78nfi"]
+[ext_resource type="Material" uid="uid://ck32qu1fhkf17" path="res://src/demos/tools/materials/pixel_art.tres" id="5_78nfi"]
 [ext_resource type="Texture2D" uid="uid://0lo4xy4ebdep" path="res://src/demos/tools/materials/textures/glass_refraction.tres" id="8_hg4ri"]
 [ext_resource type="Texture2D" uid="uid://1cgk82eus80f" path="res://src/demos/tools/materials/textures/wet_concrete_orm.tres" id="9_78nfi"]
 [ext_resource type="Material" uid="uid://7u5tc56wroch" path="res://src/demos/tools/materials/ice.tres" id="9_qopus"]
@@ -14,6 +14,7 @@
 [ext_resource type="Material" uid="uid://dvm0vbxfuim8a" path="res://src/demos/tools/materials/grass.tres" id="13_cengd"]
 [ext_resource type="Material" uid="uid://cyo28qn76a78l" path="res://src/demos/tools/materials/lava.tres" id="14_78nfi"]
 [ext_resource type="Script" uid="uid://b6csn023mq1rj" path="res://src/demos/tools/scripts/csg_mover.gd" id="14_mover"]
+[ext_resource type="Material" uid="uid://bvat0s2xfmxhc" path="res://src/demos/tools/materials/noise2d.tres" id="15_78nfi"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 
@@ -85,8 +86,85 @@ shader = ExtResource("1_plasma_shader")
 shader_parameter/noise1 = SubResource("NoiseTexture2D_plasma1")
 shader_parameter/noise2 = SubResource("NoiseTexture2D_plasma2")
 
+[sub_resource type="SphereMesh" id="SphereMesh_qopus"]
+radius = 0.75
+height = 1.5
+
 [sub_resource type="BoxShape3D" id="BoxShape3D_4ykcd"]
 size = Vector3(10, 1, 10)
+
+[sub_resource type="SphereMesh" id="SphereMesh_h0mrq"]
+radius = 0.75
+height = 1.5
+
+[sub_resource type="Gradient" id="Gradient_cengd"]
+offsets = PackedFloat32Array(0, 0.0211082, 0.0435356, 0.0633245, 1)
+colors = PackedColorArray(0, 0, 0, 1, 0.733005, 0.733005, 0.733005, 1, 0.0461741, 0.0461741, 0.0461741, 1, 0.72, 0.69192, 0.6264, 1, 1, 1, 1, 1)
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_jb0t7"]
+noise_type = 2
+frequency = 0.042
+fractal_type = 0
+fractal_octaves = 3
+fractal_gain = 1.596
+fractal_weighted_strength = 0.44
+cellular_jitter = 0.03
+cellular_return_type = 4
+domain_warp_enabled = true
+domain_warp_type = 2
+domain_warp_amplitude = 2.0
+domain_warp_fractal_type = 2
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_e1o5w"]
+width = 1024
+height = 1024
+noise = SubResource("FastNoiseLite_jb0t7")
+color_ramp = SubResource("Gradient_cengd")
+seamless = true
+seamless_blend_skirt = 0.0
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_71qgk"]
+width = 1024
+height = 1024
+noise = SubResource("FastNoiseLite_jb0t7")
+color_ramp = SubResource("Gradient_cengd")
+seamless = true
+as_normal_map = true
+seamless_blend_skirt = 0.065
+bump_strength = 2.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8dw5h"]
+albedo_texture = SubResource("NoiseTexture2D_e1o5w")
+roughness = 0.5
+roughness_texture = SubResource("NoiseTexture2D_e1o5w")
+normal_enabled = true
+normal_texture = SubResource("NoiseTexture2D_71qgk")
+texture_filter = 5
+
+[sub_resource type="SphereMesh" id="SphereMesh_66k03"]
+radius = 0.75
+height = 1.5
+
+[sub_resource type="Gradient" id="Gradient_q2ed2"]
+interpolation_mode = 2
+offsets = PackedFloat32Array(0, 0.135884, 0.329815, 0.341689, 0.544855, 0.581794, 0.770449, 0.943272)
+colors = PackedColorArray(0, 0, 0, 1, 0.111922, 0.139008, 0.140144, 1, 0.398808, 0.12884, 0.147843, 1, 0.421438, 0.289437, 0.227878, 1, 0.65045, 0.360142, 0.181692, 1, 0.739192, 0.503788, 0.301212, 1, 1, 0.672262, 0.366251, 1, 1, 1, 1, 1)
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_k44md"]
+frequency = 0.05
+fractal_weighted_strength = 1.0
+domain_warp_enabled = true
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_e0bku"]
+width = 64
+height = 64
+noise = SubResource("FastNoiseLite_k44md")
+color_ramp = SubResource("Gradient_q2ed2")
+seamless = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sm0ay"]
+albedo_texture = SubResource("NoiseTexture2D_e0bku")
+texture_filter = 4
 
 [node name="ToolsDemo3" type="Node3D" unique_id=992800475]
 
@@ -106,7 +184,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 size = Vector3(2, 1, 2)
 
 [node name="Cylinder" type="CSGCylinder3D" parent="GridCombiner/Box" unique_id=717520657]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1068341, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5439882, 0)
 operation = 2
 height = 1.5
 script = ExtResource("14_mover")
@@ -127,10 +205,11 @@ material_override = ExtResource("4_hg4ri")
 
 [node name="ConcreteSphere" type="CSGSphere3D" parent="." unique_id=1486599420]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0.5, 5)
+material_override = ExtResource("5_78nfi")
 radius = 0.75
 
 [node name="MarbleBox" type="CSGBox3D" parent="." unique_id=1948626680]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.5, 5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5563536, 0.44449264, 4.8804746)
 material_override = ExtResource("5_78nfi")
 
 [node name="IceTorus" type="CSGTorus3D" parent="." unique_id=1917764304]
@@ -144,7 +223,7 @@ operation = 2
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 
 [node name="Sphere" type="CSGSphere3D" parent="LavaCombiner/Box" unique_id=1944425065]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.33254483, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.58325064, 0, 0)
 operation = 2
 radius = 0.6
 material = SubResource("StandardMaterial3D_h0mrq")
@@ -161,14 +240,11 @@ radius = 0.75
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 material_override = ExtResource("10_h0mrq")
 
-[node name="WaterPlane" parent="." unique_id=1062128404]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.838057, 0.1, 0)
-
 [node name="PlasmaDemos" type="Node3D" parent="." unique_id=1612272791]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10)
 
 [node name="ShaderPlasma" type="CSGSphere3D" parent="PlasmaDemos" unique_id=171849056]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.6351592, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.50339544, 0)
 radius = 0.75
 material = SubResource("StandardMaterial3D_plasma")
 script = ExtResource("14_mover")
@@ -187,7 +263,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.75, 0)
 material = SubResource("StandardMaterial3D_plasma")
 
 [node name="Sphere" type="CSGSphere3D" parent="PlasmaDemos/PlasmaBox" unique_id=1886618483]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.35620403)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.46610266)
 operation = 2
 radius = 0.6
 material = ExtResource("14_78nfi")
@@ -208,11 +284,17 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 size = Vector3(1.5, 1, 1.5)
 
 [node name="Sphere" type="CSGSphere3D" parent="CSGExamples/Union" unique_id=202512224]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.777651, 1, 0.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.46493226, 1, 0.5)
 radius = 0.6
 script = ExtResource("14_mover")
 speed = 2.0
 amplitude = Vector3(-0.5, 0, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="CSGExamples/Union/Sphere" unique_id=1815016106]
+transform = Transform3D(0.9316912, -0.3632512, 0, 0.35349965, 0.90667975, 0.23015165, -0.08360287, -0.21443027, 0.9731548, 0.370883, -0.25, 2.0964565)
+mesh = SubResource("SphereMesh_qopus")
+skeleton = NodePath("../../..")
+surface_material_override/0 = ExtResource("14_78nfi")
 
 [node name="Subtraction" type="CSGCombiner3D" parent="CSGExamples" unique_id=202512225]
 use_collision = true
@@ -223,7 +305,7 @@ material_override = ExtResource("13_cengd")
 size = Vector3(1.5, 1, 1.5)
 
 [node name="Sphere" type="CSGSphere3D" parent="CSGExamples/Subtraction" unique_id=202512227]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.9707889, 0.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1.5483023, 0.5)
 operation = 2
 radius = 0.6
 script = ExtResource("14_mover")
@@ -240,14 +322,15 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 size = Vector3(1.5, 1, 1.5)
 
 [node name="Sphere" type="CSGSphere3D" parent="CSGExamples/Intersection" unique_id=202512230]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4129609, 0.9129609, 0.4129609)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.21874861, 0.7187486, 0.21874861)
+material_override = ExtResource("15_78nfi")
 operation = 1
 radius = 0.6
 script = ExtResource("14_mover")
 amplitude = Vector3(0.3, 0.3, 0.3)
 
 [node name="Floor" type="CSGBox3D" parent="." unique_id=1984101356]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0027809143, -0.060013104, 0.006641388)
 use_collision = true
 size = Vector3(30, 0.1, 30)
 script = ExtResource("1_grid")
@@ -255,3 +338,15 @@ grid_color = Color(0.2, 0.2, 0.2, 1)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Floor" unique_id=551985450]
 shape = SubResource("BoxShape3D_4ykcd")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor" unique_id=198612712]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.888817, 1.1935515, 0)
+mesh = SubResource("SphereMesh_h0mrq")
+skeleton = NodePath("../../..")
+surface_material_override/0 = SubResource("StandardMaterial3D_8dw5h")
+
+[node name="MeshInstance3D2" type="MeshInstance3D" parent="Floor" unique_id=983959632]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.660771, 1.4674594, -0.00010108901)
+mesh = SubResource("SphereMesh_66k03")
+skeleton = NodePath("../../..")
+surface_material_override/0 = SubResource("StandardMaterial3D_sm0ay")
