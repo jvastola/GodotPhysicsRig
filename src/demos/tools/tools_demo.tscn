@@ -1,4 +1,4 @@
-[gd_scene load_steps=41 format=3 uid="uid://b8h2r7k6m0q1p"]
+[gd_scene load_steps=45 format=3 uid="uid://b8h2r7k6m0q1p"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_4ykcd"]
 [ext_resource type="Script" uid="uid://m0r1orgvjxdw" path="res://src/demos/tools/scripts/procedural_grid.gd" id="1_grid"]
@@ -14,7 +14,7 @@
 [ext_resource type="Material" uid="uid://dvm0vbxfuim8a" path="res://src/demos/tools/materials/grass.tres" id="13_cengd"]
 [ext_resource type="Material" uid="uid://cyo28qn76a78l" path="res://src/demos/tools/materials/lava.tres" id="14_78nfi"]
 [ext_resource type="Script" uid="uid://b6csn023mq1rj" path="res://src/demos/tools/scripts/csg_mover.gd" id="14_mover"]
-[ext_resource type="Material" uid="uid://bvat0s2xfmxhc" path="res://src/demos/tools/materials/noise2d.tres" id="15_78nfi"]
+[ext_resource type="Material" path="res://src/demos/tools/materials/stone_pixel.tres" id="15_78nfi"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 
@@ -90,6 +90,27 @@ shader_parameter/noise2 = SubResource("NoiseTexture2D_plasma2")
 radius = 0.75
 height = 1.5
 
+[sub_resource type="Gradient" id="Gradient_dnwpq"]
+interpolation_mode = 2
+offsets = PackedFloat32Array(0.056728005, 0.22955102, 0.41820598, 0.455145, 0.658311, 0.67018497, 0.864116, 1)
+colors = PackedColorArray(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0.111922, 0.139008, 0.140144, 1, 0, 0, 0, 1)
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_kw6so"]
+frequency = 0.05
+fractal_weighted_strength = 1.0
+domain_warp_enabled = true
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_e0bku"]
+width = 64
+height = 64
+noise = SubResource("FastNoiseLite_kw6so")
+color_ramp = SubResource("Gradient_dnwpq")
+seamless = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_qopus"]
+albedo_texture = SubResource("NoiseTexture2D_e0bku")
+texture_filter = 4
+
 [sub_resource type="BoxShape3D" id="BoxShape3D_4ykcd"]
 size = Vector3(10, 1, 10)
 
@@ -155,7 +176,7 @@ frequency = 0.05
 fractal_weighted_strength = 1.0
 domain_warp_enabled = true
 
-[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_e0bku"]
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_h0mrq"]
 width = 64
 height = 64
 noise = SubResource("FastNoiseLite_k44md")
@@ -163,7 +184,7 @@ color_ramp = SubResource("Gradient_q2ed2")
 seamless = true
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sm0ay"]
-albedo_texture = SubResource("NoiseTexture2D_e0bku")
+albedo_texture = SubResource("NoiseTexture2D_h0mrq")
 texture_filter = 4
 
 [node name="ToolsDemo3" type="Node3D" unique_id=992800475]
@@ -184,7 +205,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 size = Vector3(2, 1, 2)
 
 [node name="Cylinder" type="CSGCylinder3D" parent="GridCombiner/Box" unique_id=717520657]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5439882, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5937257, 0)
 operation = 2
 height = 1.5
 script = ExtResource("14_mover")
@@ -223,7 +244,7 @@ operation = 2
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 
 [node name="Sphere" type="CSGSphere3D" parent="LavaCombiner/Box" unique_id=1944425065]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.58325064, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.60216576, 0, 0)
 operation = 2
 radius = 0.6
 material = SubResource("StandardMaterial3D_h0mrq")
@@ -244,7 +265,7 @@ material_override = ExtResource("10_h0mrq")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10)
 
 [node name="ShaderPlasma" type="CSGSphere3D" parent="PlasmaDemos" unique_id=171849056]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.50339544, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.4475256, 0)
 radius = 0.75
 material = SubResource("StandardMaterial3D_plasma")
 script = ExtResource("14_mover")
@@ -263,7 +284,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.75, 0)
 material = SubResource("StandardMaterial3D_plasma")
 
 [node name="Sphere" type="CSGSphere3D" parent="PlasmaDemos/PlasmaBox" unique_id=1886618483]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.46610266)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.47270328)
 operation = 2
 radius = 0.6
 material = ExtResource("14_78nfi")
@@ -284,7 +305,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 size = Vector3(1.5, 1, 1.5)
 
 [node name="Sphere" type="CSGSphere3D" parent="CSGExamples/Union" unique_id=202512224]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.46493226, 1, 0.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5296699, 1, 0.5)
 radius = 0.6
 script = ExtResource("14_mover")
 speed = 2.0
@@ -305,7 +326,7 @@ material_override = ExtResource("13_cengd")
 size = Vector3(1.5, 1, 1.5)
 
 [node name="Sphere" type="CSGSphere3D" parent="CSGExamples/Subtraction" unique_id=202512227]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1.5483023, 0.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1.5665364, 0.5)
 operation = 2
 radius = 0.6
 script = ExtResource("14_mover")
@@ -322,8 +343,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 size = Vector3(1.5, 1, 1.5)
 
 [node name="Sphere" type="CSGSphere3D" parent="CSGExamples/Intersection" unique_id=202512230]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.21874861, 0.7187486, 0.21874861)
-material_override = ExtResource("15_78nfi")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.27489614, 0.77489614, 0.27489614)
+material_override = SubResource("StandardMaterial3D_qopus")
 operation = 1
 radius = 0.6
 script = ExtResource("14_mover")
@@ -331,6 +352,7 @@ amplitude = Vector3(0.3, 0.3, 0.3)
 
 [node name="Floor" type="CSGBox3D" parent="." unique_id=1984101356]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0027809143, -0.060013104, 0.006641388)
+material_override = ExtResource("15_78nfi")
 use_collision = true
 size = Vector3(30, 0.1, 30)
 script = ExtResource("1_grid")

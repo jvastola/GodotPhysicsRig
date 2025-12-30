@@ -20,6 +20,14 @@ const MATERIAL_PATHS := {
 	"Ice": "res://src/demos/tools/materials/ice.tres",
 	"Wet Concrete": "res://src/demos/tools/materials/wet_concrete.tres",
 	"Pixel Art": "res://src/demos/tools/materials/pixel_art.tres",
+	"Wood Pixel": "res://src/demos/tools/materials/wood_pixel.tres",
+	"Grass Pixel": "res://src/demos/tools/materials/grass_pixel.tres",
+	"Stone Pixel": "res://src/demos/tools/materials/stone_pixel.tres",
+	"Dirt Pixel": "res://src/demos/tools/materials/dirt_pixel.tres",
+	"Sand Pixel": "res://src/demos/tools/materials/sand_pixel.tres",
+	"Snow Pixel": "res://src/demos/tools/materials/snow_pixel.tres",
+	"Brick Pixel": "res://src/demos/tools/materials/brick_pixel.tres",
+	"Metal Pixel": "res://src/demos/tools/materials/metal_pixel.tres",
 	"Glass": "res://src/demos/tools/materials/glass.tres",
 }
 
