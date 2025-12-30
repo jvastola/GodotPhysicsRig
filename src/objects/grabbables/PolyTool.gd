@@ -1145,7 +1145,10 @@ func _apply_selected_material() -> void:
 		std_mat.uv1_world_triplanar = true
 		std_mat.uv1_triplanar_sharpness = 1.0
 		# Scale the texture appropriately
+		std_mat.uv1_triplanar_sharpness = 1.0
+		# Scale the texture appropriately
 		std_mat.uv1_scale = Vector3(1.0, 1.0, 1.0)
+		std_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	
 	if is_instance_valid(_mesh_instance):
 		_mesh_instance.material_override = _applied_material
@@ -1257,7 +1260,9 @@ func clear_applied_material() -> void:
 		mat.albedo_color = Color(1, 1, 1, 1)
 		mat.cull_mode = BaseMaterial3D.CULL_BACK
 		mat.vertex_color_use_as_albedo = true
+		mat.vertex_color_use_as_albedo = true
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		_mesh_instance.material_override = mat
 
 func _make_sphere_mesh(r: float) -> SphereMesh:
