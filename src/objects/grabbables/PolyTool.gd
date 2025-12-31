@@ -2,7 +2,6 @@ class_name PolyTool
 extends Grabbable
 const ToolPoolManager = preload("res://src/systems/tool_pool_manager.gd")
 const ColorPickerUI = preload("res://src/ui/color_picker_ui.gd")
-const MaterialPickerUI = preload("res://src/ui/material_picker_ui.gd")
 
 enum ToolMode {
 	PLACE,
@@ -11,7 +10,9 @@ enum ToolMode {
 	CONNECT,
 	PAINT,
 	APPLY_MATERIAL,
-	EXTRUDE
+	EXTRUDE,
+	LAYER,
+	SELECT
 }
 
 enum PointVisibilityMode {
@@ -39,6 +40,7 @@ enum EditSelectionType {
 @export var face_selection_radius: float = 0.1
 @export var merge_overlapping_points: bool = true
 @export var merge_distance: float = 0.001
+@export var selection_volume_radius: float = 0.5
 
 # Colors
 @export var color_place: Color = Color(0.2, 1.0, 0.4) # Green
@@ -54,13 +56,53 @@ enum EditSelectionType {
 
 # State
 static var instance: PolyTool
-var _current_mode: ToolMode = ToolMode.PLACE
-var _points: Array[Node3D] = []
-var _triangles: Array[Array] = [] # Array of [i0, i1, i2]
-var _controller: Node = null
-var _prev_trigger_pressed: bool = false
-var _prev_grip_pressed: bool = false
+var _current_mode: ToolMode = ToolMode.PLACE:
+	set(val):
+		_current_mode = val
+		_update_mode_visuals()
+	get:
+		return _current_mode
+
+var current_mode: ToolMode:
+	set(val): _current_mode = val
+	get: return _current_mode
 var _drag_index: int = -1
+
+# Layer System
+class PolyLayer:
+	var name: String = ""
+	var points: Array[Node3D] = []
+	var triangles: Array[Array] = []
+	var material: Material = null
+	var mesh_instance: MeshInstance3D = null
+	var mesh_params: ArrayMesh = null
+	var point_container: Node3D = null
+	var visible: bool = true
+
+var _layers: Array[PolyLayer] = []
+var _active_layer_idx: int = 0:
+	set(val):
+		_active_layer_idx = val
+		_update_point_visibility()
+		_update_layer_label()
+	get:
+		return _active_layer_idx
+
+var active_layer_idx: int:
+	set(val): _active_layer_idx = val
+	get: return _active_layer_idx
+
+# Convenience accessors for active layer
+var _points: Array[Node3D]:
+	get: return _layers[_active_layer_idx].points if _active_layer_idx < _layers.size() else []
+var _triangles: Array[Array]:
+	get: return _layers[_active_layer_idx].triangles if _active_layer_idx < _layers.size() else []
+var _mesh_instance: MeshInstance3D:
+	get: return _layers[_active_layer_idx].mesh_instance if _active_layer_idx < _layers.size() else null
+var _mesh_params: ArrayMesh:
+	get: return _layers[_active_layer_idx].mesh_params if _active_layer_idx < _layers.size() else null
+var _point_container: Node3D:
+	get: return _layers[_active_layer_idx].point_container if _active_layer_idx < _layers.size() else null
 
 # Connect Mode State
 var _connect_sequence: Array[int] = []
@@ -82,9 +124,8 @@ var _orb: MeshInstance3D
 var _orb_material: StandardMaterial3D
 var _preview_dot: MeshInstance3D
 var _preview_mat: StandardMaterial3D
-var _point_container: Node3D
-var _mesh_instance: MeshInstance3D
-var _mesh_params: ArrayMesh
+var _selection_sphere: MeshInstance3D
+var _selection_sphere_mat: StandardMaterial3D
 var _connect_line: MeshInstance3D
 var _connect_line_immediate: ImmediateMesh
 var _paint_dot: MeshInstance3D
@@ -98,9 +139,14 @@ var _mode_select_modes: Array[ToolMode] = []
 var _is_selecting_mode: bool = false
 var _mode_select_radius: float = 0.12
 var _mode_select_height: float = 0.02
-const _MODE_ORDER := [ToolMode.PLACE, ToolMode.EDIT, ToolMode.EXTRUDE, ToolMode.REMOVE, ToolMode.CONNECT, ToolMode.PAINT, ToolMode.APPLY_MATERIAL]
+const _MODE_ORDER := [ToolMode.PLACE, ToolMode.EDIT, ToolMode.EXTRUDE, ToolMode.REMOVE, ToolMode.CONNECT, ToolMode.PAINT, ToolMode.APPLY_MATERIAL, ToolMode.LAYER, ToolMode.SELECT]
 var _mode_labels: Array[MeshInstance3D] = []
 const POOL_TYPE := "poly_tool"
+
+# Input state (kept outside Layer)
+var _controller: Node = null
+var _prev_trigger_pressed: bool = false
+var _prev_grip_pressed: bool = false
 
 # Material mode state
 var _applied_material: Material = null
@@ -114,43 +160,65 @@ var _extrude_initial_cap_positions: Array[Vector3] = []
 var _extrude_drag_start_pos: Vector3 = Vector3.ZERO
 var _extrude_normal: Vector3 = Vector3.UP
 
+func add_new_layer(layer_name: String = "") -> void:
+	_add_new_layer()
+
+func remove_active_layer() -> void:
+	_remove_active_layer()
+
+func get_layers() -> Array[PolyLayer]:
+	return _layers
+
 func _ready() -> void:
 	instance = self
 	var pool := ToolPoolManager.find()
 	if pool:
 		pool.register_instance(POOL_TYPE, self)
 	super._ready()
-	_create_visuals()
+	
+	_create_initial_layer()
+	_create_non_layer_visuals()
+	
 	grabbed.connect(_on_grabbed)
 	released.connect(_on_released)
 	set_physics_process(false)
 	_update_point_visibility()
 
-func _create_visuals() -> void:
-	_tip = get_node_or_null("Tip")
+func _create_initial_layer() -> void:
+	var layer = _add_layer("Layer 1")
+	_active_layer_idx = 0
+
+func _add_layer(layer_name: String = "") -> PolyLayer:
+	var layer = PolyLayer.new()
+	if layer_name == "":
+		layer.name = "Layer %d" % (_layers.size() + 1)
+	else:
+		layer.name = layer_name
 	
-	_point_container = Node3D.new()
-	_point_container.name = "PolyToolPoints"
-	_add_to_root(_point_container)
+	layer.point_container = Node3D.new()
+	layer.point_container.name = "Points_%s" % layer.name
+	_add_to_root(layer.point_container)
 	
-	_mesh_instance = MeshInstance3D.new()
-	_mesh_instance.name = "PolyToolMesh"
-	_mesh_params = ArrayMesh.new()
-	_mesh_instance.mesh = _mesh_params
+	layer.mesh_instance = MeshInstance3D.new()
+	layer.mesh_instance.name = "Mesh_%s" % layer.name
+	layer.mesh_params = ArrayMesh.new()
+	layer.mesh_instance.mesh = layer.mesh_params
+	
 	var mat = StandardMaterial3D.new()
-	# Let vertex colors (including alpha) drive appearance
 	mat.albedo_color = Color(1, 1, 1, 1)
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED # Show both sides? User wanted winding to matter, so maybe enabled.
-	# Actually, user said "clockwise... front face... counter clockwise... other side".
-	# If cull is disabled, they see both always. If cull is BACK (default), they only see front.
-	# Let's keep default culling so the winding matters visually.
 	mat.cull_mode = BaseMaterial3D.CULL_BACK 
 	mat.vertex_color_use_as_albedo = true
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_mesh_instance.material_override = mat
-	_mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_add_to_root(_mesh_instance)
+	layer.mesh_instance.material_override = mat
+	layer.mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_add_to_root(layer.mesh_instance)
+	
+	_layers.append(layer)
+	return layer
+
+func _create_non_layer_visuals() -> void:
+	_tip = get_node_or_null("Tip")
 
 	_orb = MeshInstance3D.new()
 	_orb.name = "ModeOrb"
@@ -158,6 +226,7 @@ func _create_visuals() -> void:
 	_orb_material = _make_unshaded_material(color_place)
 	_orb.material_override = _orb_material
 	_orb.visible = false
+	_ensure_selection_sphere()
 	add_child(_orb)
 	_orb.position = Vector3(0.05, 0, 0) # Offset relative to tool
 
@@ -178,8 +247,11 @@ func _exit_tree() -> void:
 	super._exit_tree()
 	if instance == self:
 		instance = null
-	if is_instance_valid(_point_container): _point_container.queue_free()
-	if is_instance_valid(_mesh_instance): _mesh_instance.queue_free()
+	for layer in _layers:
+		if is_instance_valid(layer.point_container): layer.point_container.queue_free()
+		if is_instance_valid(layer.mesh_instance): layer.mesh_instance.queue_free()
+	_layers.clear()
+	
 	if is_instance_valid(_preview_dot): _preview_dot.queue_free()
 	if is_instance_valid(_connect_line): _connect_line.queue_free()
 	if is_instance_valid(_edge_highlight): _edge_highlight.queue_free()
@@ -220,6 +292,7 @@ func _on_released() -> void:
 	_clear_edit_highlights()
 	_update_point_visibility()
 	_end_mode_select()
+	_update_selection_visuals()
 
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
@@ -258,6 +331,9 @@ func _physics_process(delta: float) -> void:
 		_update_edit_mode_highlights(target)
 	else:
 		_clear_edit_highlights()
+	
+	# Selection Visuals
+	_update_selection_visuals()
 
 func _handle_input() -> void:
 	var trigger = _is_trigger_pressed()
@@ -268,11 +344,18 @@ func _handle_input() -> void:
 		_prev_grip_pressed = grip
 		return
 	
-	# Grip: enter/exit radial mode select
+	# Grip: Move PolyToolUI in front of player
 	if grip and not _prev_grip_pressed:
-		_begin_mode_select()
-	elif not grip and _prev_grip_pressed and _is_selecting_mode:
-		_commit_mode_select()
+		var manager = UIPanelManager.find()
+		if manager:
+			manager.open_panel("PolyToolViewport3D")
+	
+	# Grip holds (menu mode)
+	if grip:
+		# Suppression of tool input while grip is held
+		_prev_trigger_pressed = trigger
+		_prev_grip_pressed = grip
+		return
 	
 	# If selecting mode, don't perform other actions
 	if _is_selecting_mode:
@@ -351,6 +434,14 @@ func _handle_input() -> void:
 			if just_pressed:
 				_apply_selected_material()
 		
+		ToolMode.LAYER:
+			if just_pressed:
+				_cycle_layers()
+			if grip and not _prev_grip_pressed:
+				# Alternative: long press or something to add?
+				# For now, let's keep it simple.
+				pass
+		
 		ToolMode.EXTRUDE:
 			if not _hovered_face_idx == -1 and not _drag_face_idx == -1:
 				pass # Just ensure highlights work
@@ -382,6 +473,8 @@ func _update_mode_visuals() -> void:
 		_preview_mat.albedo_color = color.lightened(0.5)
 	_update_paint_dot()
 	_update_material_preview_dot()
+	_update_layer_label()
+	_update_selection_visuals()
 
 func _add_point(pos: Vector3) -> void:
 	var node = Node3D.new()
@@ -1024,14 +1117,53 @@ func _is_point_in_triangle(p: Vector3, a: Vector3, b: Vector3, c: Vector3) -> bo
 	return u >= -0.0001 and v >= -0.0001 and (u + v) <= 1.0001
 
 func _update_point_visibility() -> void:
-	if not is_instance_valid(_point_container):
-		return
+	if _layers.is_empty(): return
+	
 	var origin = _get_visibility_origin()
-	for point in _points:
-		var mesh = _get_point_mesh(point)
-		if mesh == null:
-			continue
-		mesh.visible = _is_point_visible(point.global_position, origin)
+	for i in _layers.size():
+		var layer = _layers[i]
+		if not is_instance_valid(layer.point_container): continue
+		
+		# Only points of the ACTIVE layer are visible to avoid clutter
+		layer.point_container.visible = (i == _active_layer_idx)
+		
+		if i == _active_layer_idx:
+			for point in layer.points:
+				var mesh = _get_point_mesh(point)
+				if mesh:
+					mesh.visible = _is_point_visible(point.global_position, origin)
+
+func _cycle_layers() -> void:
+	if _layers.is_empty(): return
+	_active_layer_idx = (_active_layer_idx + 1) % _layers.size()
+	_update_point_visibility()
+	_update_layer_label()
+
+func _add_new_layer() -> void:
+	var layer = _add_layer()
+	_active_layer_idx = _layers.size() - 1
+	_update_point_visibility()
+	_update_layer_label()
+
+func _remove_active_layer() -> void:
+	if _layers.size() <= 1: return # Keep at least one
+	var layer = _layers[_active_layer_idx]
+	if is_instance_valid(layer.point_container): layer.point_container.queue_free()
+	if is_instance_valid(layer.mesh_instance): layer.mesh_instance.queue_free()
+	_layers.remove_at(_active_layer_idx)
+	_active_layer_idx = clampi(_active_layer_idx, 0, _layers.size() - 1)
+	_update_point_visibility()
+	_update_layer_label()
+
+func _update_layer_label() -> void:
+	var label = get_node_or_null("Label3D")
+	if label and label is Label3D:
+		label.text = "Poly Tool\nLayer: %s (%d/%d)\nMode: %s" % [
+			_layers[_active_layer_idx].name, 
+			_active_layer_idx + 1, 
+			_layers.size(),
+			_mode_name(_current_mode)
+		]
 
 func _is_point_visible(point_pos: Vector3, origin: Vector3) -> bool:
 	match point_visibility_mode:
@@ -1100,21 +1232,22 @@ func _find_color_picker() -> ColorPickerUI:
 
 # Material picker functions
 func _get_selected_material() -> Material:
-	if MaterialPickerUI and MaterialPickerUI.instance and is_instance_valid(MaterialPickerUI.instance):
-		return MaterialPickerUI.instance.get_current_material()
-	var picker := _find_material_picker()
-	if picker:
+	var picker = _find_material_picker()
+	if picker and picker.has_method("get_current_material"):
 		return picker.get_current_material()
 	return null
 
 
-func _find_material_picker() -> MaterialPickerUI:
+func _find_material_picker() -> Node:
 	if not get_tree():
 		return null
+	
+	# Favor PolyToolUI if active
+	if PolyToolUI and PolyToolUI.instance and is_instance_valid(PolyToolUI.instance):
+		return PolyToolUI.instance
+		
 	var node = get_tree().get_first_node_in_group("material_picker_ui")
-	if node and node is MaterialPickerUI:
-		return node
-	return null
+	return node
 
 
 # Viewport for rendering shader materials to texture
@@ -1152,6 +1285,15 @@ func _apply_selected_material() -> void:
 	
 	if is_instance_valid(_mesh_instance):
 		_mesh_instance.material_override = _applied_material
+	
+	if mat:
+		var mat_name = mat.resource_name
+		if mat_name == "" and mat.resource_path != "":
+			mat_name = mat.resource_path.get_file().get_basename()
+		
+		if mat_name != "" and _active_layer_idx < _layers.size():
+			_layers[_active_layer_idx].name = mat_name
+			_update_layer_label()
 	
 	_update_material_preview_dot()
 
@@ -1206,6 +1348,9 @@ func _ensure_shader_viewport() -> void:
 	_shader_viewport_texture = _shader_viewport.get_texture()
 
 
+func refresh_material_visuals() -> void:
+	_update_material_preview_dot()
+
 func _update_material_preview_dot() -> void:
 	_ensure_material_preview_dot()
 	if not is_instance_valid(_material_preview_dot):
@@ -1222,7 +1367,7 @@ func _update_material_preview_dot() -> void:
 				_ensure_shader_viewport()
 				_shader_color_rect.material = mat.duplicate()
 				var preview_mat := StandardMaterial3D.new()
-				preview_mat.albedo_texture = _shader_viewport_texture
+				preview_mat.albedo_texture = _shader_viewport.get_texture()
 				preview_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 				_material_preview_dot.material_override = preview_mat
 		else:
@@ -1343,25 +1488,19 @@ func _add_to_root(node: Node) -> void:
 func _begin_mode_select() -> void:
 	if not is_inside_tree():
 		return
-	# Guard against missing root
 	if get_tree() == null:
 		return
 	_clear_mode_select_nodes()
 	_is_selecting_mode = true
-	# Extra safety: require a valid transform
-	if get_tree().root == null:
-		return
-	if not is_inside_tree():
-		return
-	var xf := global_transform
+	
 	var anchor := _get_visibility_origin()
-	var basis := xf.basis
-	# Arrange in a forward-facing arc to avoid side dots
-	var count := _MODE_ORDER.size()
+	var basis := global_transform.basis
+	
+	var modes_to_show = _MODE_ORDER
+	var count := modes_to_show.size()
 	for i in count:
-		var mode: ToolMode = _MODE_ORDER[i]
-		# Spread across -60..60 degrees
-		var angle = deg_to_rad(-60.0 + (120.0 * float(i) / max(1.0, float(count - 1))))
+		var mode: ToolMode = modes_to_show[i]
+		var angle = deg_to_rad(-80.0 + (160.0 * float(i) / max(1.0, float(count - 1))))
 		var offset_local = Vector3(sin(angle), 0, -cos(angle)) * _mode_select_radius + Vector3(0, _mode_select_height, 0)
 		var pos = anchor + basis * offset_local
 		var m := MeshInstance3D.new()
@@ -1373,8 +1512,50 @@ func _begin_mode_select() -> void:
 		_mode_select_modes.append(mode)
 		_add_to_root(m)
 		m.global_position = pos
-		_add_mode_label(mode, pos)
+		_add_mode_label(_mode_name(mode), pos)
+	
+	if _current_mode == ToolMode.LAYER:
+		_add_layer_actions(anchor, basis)
+	elif _current_mode == ToolMode.SELECT:
+		_add_select_actions(anchor, basis)
+		
 	_update_mode_select_visuals()
+
+func _add_layer_actions(anchor: Vector3, basis: Basis) -> void:
+	var actions = ["Add Layer", "Remove Layer"]
+	for i in actions.size():
+		var angle = deg_to_rad(-30.0 + (60.0 * i))
+		var offset_local = Vector3(sin(angle), 0, -cos(angle)) * (_mode_select_radius * 1.5) + Vector3(0, _mode_select_height * 2, 0)
+		var pos = anchor + basis * offset_local
+		var m := MeshInstance3D.new()
+		m.mesh = _make_sphere_mesh(0.012)
+		var color = Color.GREEN if i == 0 else Color.RED
+		var mat := _make_unshaded_material(color)
+		mat.emission = color
+		m.material_override = mat
+		_mode_select_nodes.append(m)
+		_mode_select_modes.append(-1 - i) 
+		_add_to_root(m)
+		m.global_position = pos
+		_add_mode_label(actions[i], pos)
+
+func _add_select_actions(anchor: Vector3, basis: Basis) -> void:
+	var actions = ["Export Selection", "Clear Selection"]
+	for i in actions.size():
+		var angle = deg_to_rad(-30.0 + (60.0 * i))
+		var offset_local = Vector3(sin(angle), 0, -cos(angle)) * (_mode_select_radius * 1.5) + Vector3(0, _mode_select_height * 2, 0)
+		var pos = anchor + basis * offset_local
+		var m := MeshInstance3D.new()
+		m.mesh = _make_sphere_mesh(0.012)
+		var color = Color.CYAN if i == 0 else Color.GRAY
+		var mat := _make_unshaded_material(color)
+		mat.emission = color
+		m.material_override = mat
+		_mode_select_nodes.append(m)
+		_mode_select_modes.append(-10 - i) # SELECT actions
+		_add_to_root(m)
+		m.global_position = pos
+		_add_mode_label(actions[i], pos)
 
 
 func _update_mode_select_visuals() -> void:
@@ -1406,7 +1587,15 @@ func _update_mode_select_visuals() -> void:
 func _commit_mode_select() -> void:
 	var idx := _nearest_mode_index()
 	if idx != -1 and idx < _mode_select_modes.size():
-		_current_mode = _mode_select_modes[idx]
+		var val = _mode_select_modes[idx]
+		if val >= 0:
+			_current_mode = val as ToolMode
+		else:
+			# Handle layer/select actions
+			if val == -1: _add_new_layer()
+			elif val == -2: _remove_active_layer()
+			elif val == -10: export_selection_to_gltf("")
+			elif val == -11: pass # Clear selection could reset something
 	_update_mode_visuals()
 	_end_mode_select()
 
@@ -1425,9 +1614,9 @@ func _clear_mode_select_nodes() -> void:
 	_clear_mode_labels()
 
 
-func _add_mode_label(mode: ToolMode, pos: Vector3) -> void:
+func _add_mode_label(label_text: String, pos: Vector3) -> void:
 	var text_mesh := TextMesh.new()
-	text_mesh.text = _mode_name(mode)
+	text_mesh.text = label_text
 	text_mesh.font_size = 48
 	text_mesh.pixel_size = 0.0008
 	text_mesh.depth = 0.001
@@ -1460,6 +1649,8 @@ func _mode_name(mode: ToolMode) -> String:
 		ToolMode.PAINT: return "Paint"
 		ToolMode.APPLY_MATERIAL: return "Material"
 		ToolMode.EXTRUDE: return "Extrude"
+		ToolMode.LAYER: return "Layer"
+		ToolMode.SELECT: return "Select"
 	return "Mode"
 
 
@@ -1511,44 +1702,111 @@ func get_default_export_path() -> String:
 
 func export_to_gltf(path: String) -> int:
 	# Ensure we have geometry to export
-	if not _mesh_params or _mesh_params.get_surface_count() == 0:
+	var has_geo := false
+	for layer in _layers:
+		if layer.mesh_params and layer.mesh_params.get_surface_count() > 0:
+			has_geo = true
+			break
+	
+	if not has_geo:
 		return ERR_CANT_CREATE
 	
-	# Build a minimal scene with the mesh
+	# Build a scene with all layers
 	var root := Node3D.new()
 	root.name = "PolyToolExport"
-	var mesh_instance := MeshInstance3D.new()
-	mesh_instance.name = "PolyMesh"
-	mesh_instance.mesh = _mesh_params.duplicate()
-	if is_instance_valid(_mesh_instance) and _mesh_instance.material_override:
-		mesh_instance.material_override = _mesh_instance.material_override
-	root.add_child(mesh_instance)
 	
-	# Prepare target path
-	var target_path := path.strip_edges()
-	if target_path.is_empty():
-		target_path = get_default_export_path()
-	var base_dir := target_path.get_base_dir()
-	if base_dir != "":
-		# Try to create directory
-		var abs_dir := base_dir if base_dir.begins_with("/") else ProjectSettings.globalize_path(base_dir)
-		var err := DirAccess.make_dir_recursive_absolute(abs_dir)
-		if err != OK and not DirAccess.dir_exists_absolute(abs_dir):
-			# Fall back to user:// if external storage fails
-			print("PolyTool: Could not create %s, falling back to user://" % abs_dir)
-			var timestamp := Time.get_datetime_string_from_system().replace(":", "-")
-			target_path = "user://poly_exports/poly_%s.gltf" % timestamp
-			base_dir = target_path.get_base_dir()
-			abs_dir = ProjectSettings.globalize_path(base_dir)
-			DirAccess.make_dir_recursive_absolute(abs_dir)
+	for layer in _layers:
+		if layer.mesh_params.get_surface_count() == 0: continue
+		var mesh_instance := MeshInstance3D.new()
+		mesh_instance.name = layer.name.validate_node_name()
+		mesh_instance.mesh = layer.mesh_params.duplicate()
+		if is_instance_valid(layer.mesh_instance) and layer.mesh_instance.material_override:
+			mesh_instance.material_override = layer.mesh_instance.material_override
+		root.add_child(mesh_instance)
 	
-	# Export using GLTFDocument
+	return _export_scene_to_gltf(root, path)
+
+
+func export_selection_to_gltf(path: String) -> int:
+	var target_pos = _get_target_point()
+	var radius = selection_volume_radius
+	
+	# Create a new document for selection
+	var root := Node3D.new()
+	root.name = "PolySelectionExport"
+	
+	var has_geo := false
+	for layer in _layers:
+		var st = SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var layer_has_geo := false
+		
+		for tri in layer.triangles:
+			var p0 = layer.points[tri[0]].global_position
+			var p1 = layer.points[tri[1]].global_position
+			var p2 = layer.points[tri[2]].global_position
+			
+			# If any point is within radius, include triangle? 
+			# Or if all? Let's go with "any" for now.
+			if p0.distance_to(target_pos) < radius or p1.distance_to(target_pos) < radius or p2.distance_to(target_pos) < radius:
+				var normal = (p1 - p0).cross(p2 - p0).normalized()
+				st.set_normal(normal)
+				st.set_color(_get_point_color(layer.points[tri[0]]))
+				st.add_vertex(p0)
+				st.set_color(_get_point_color(layer.points[tri[1]]))
+				st.add_vertex(p1)
+				st.set_color(_get_point_color(layer.points[tri[2]]))
+				st.add_vertex(p2)
+				layer_has_geo = true
+				has_geo = true
+		
+		if layer_has_geo:
+			var mesh_instance := MeshInstance3D.new()
+			mesh_instance.name = ("Sel_" + layer.name).validate_node_name()
+			mesh_instance.mesh = st.commit()
+			if is_instance_valid(layer.mesh_instance) and layer.mesh_instance.material_override:
+				mesh_instance.material_override = layer.mesh_instance.material_override
+			root.add_child(mesh_instance)
+	
+	if not has_geo:
+		return ERR_CANT_CREATE
+		
+	# Export using standard path logic
+	return _export_scene_to_gltf(root, path)
+
+func _export_scene_to_gltf(root: Node3D, path: String) -> int:
+	var target_path = path
+	if target_path.strip_edges().is_empty():
+		target_path = get_default_export_path().replace(".gltf", "_selected.gltf")
+	
 	var gltf := GLTFDocument.new()
 	var state := GLTFState.new()
 	var append_err := gltf.append_from_scene(root, state)
 	if append_err != OK:
 		return append_err
 	return gltf.write_to_filesystem(state, target_path)
+
+func _ensure_selection_sphere() -> void:
+	if is_instance_valid(_selection_sphere): return
+	_selection_sphere = MeshInstance3D.new()
+	_selection_sphere.name = "SelectionSphere"
+	_selection_sphere.mesh = _make_sphere_mesh(selection_volume_radius)
+	_selection_sphere_mat = _make_unshaded_material(Color(0.2, 0.8, 1.0, 0.2))
+	_selection_sphere_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_selection_sphere.material_override = _selection_sphere_mat
+	_selection_sphere.visible = false
+	_add_to_root(_selection_sphere)
+
+func _update_selection_visuals() -> void:
+	if not is_instance_valid(_selection_sphere): return
+	if _current_mode == ToolMode.SELECT:
+		_selection_sphere.global_position = _get_target_point()
+		_selection_sphere.scale = Vector3.ONE * (selection_volume_radius / 0.5) # Based on default radius? No, Mesh creation uses radius.
+		# Wait, if _make_sphere_mesh(r) is used, then scale should be 1.0 if radius is same.
+		# Better update mesh if radius changes? Or just scale.
+		_selection_sphere.visible = true
+	else:
+		_selection_sphere.visible = false
 
 
 func load_from_gltf(path: String) -> int:
@@ -1675,21 +1933,20 @@ func on_pooled() -> void:
 		_paint_dot.visible = false
 	if is_instance_valid(_material_preview_dot):
 		_material_preview_dot.visible = false
-	if is_instance_valid(_mesh_instance):
-		_mesh_instance.visible = false
-	if is_instance_valid(_point_container):
-		_point_container.visible = false
+	for layer in _layers:
+		if is_instance_valid(layer.mesh_instance): layer.mesh_instance.visible = false
+		if is_instance_valid(layer.point_container): layer.point_container.visible = false
 	visible = false
 
 
 func on_unpooled() -> void:
 	visible = true
-	if not is_instance_valid(_point_container) or not is_instance_valid(_mesh_instance):
-		_create_visuals()
-	if is_instance_valid(_mesh_instance):
-		_mesh_instance.visible = true
-	if is_instance_valid(_point_container):
-		_point_container.visible = true
+	if not _layers.is_empty():
+		for layer in _layers:
+			if is_instance_valid(layer.mesh_instance): layer.mesh_instance.visible = true
+			if is_instance_valid(layer.point_container): layer.point_container.visible = true
+	else:
+		_create_initial_layer()
 	if is_instance_valid(_preview_dot):
 		_preview_dot.visible = false
 	_update_point_visibility()
