@@ -41,6 +41,7 @@ var _last_mouse_pos: Vector2 = Vector2(-1, -1)
 var _is_hovering: bool = false
 var _is_pressed: bool = false
 var _has_focus: bool = false
+var _last_backend_press_pos: Vector2 = Vector2(-1, -1)  # Track where we sent touchDown to backend
 
 # Backend reference
 var _backend: WebViewBackend = null
@@ -427,6 +428,7 @@ func handle_pointer_event(event: Dictionary) -> void:
 			if not is_on_url_bar and _backend_available:
 				var backend_pos := _viewport_to_backend_pos(viewport_pos)
 				_backend.send_mouse_down(int(backend_pos.x), int(backend_pos.y), 0)
+				_last_backend_press_pos = backend_pos
 			set_focus(true)
 		"hold":
 			_send_mouse_motion(viewport_pos)
@@ -436,12 +438,15 @@ func handle_pointer_event(event: Dictionary) -> void:
 				if not is_on_url_bar and _backend_available:
 					var backend_pos := _viewport_to_backend_pos(viewport_pos)
 					_backend.send_mouse_down(int(backend_pos.x), int(backend_pos.y), 0)
+					_last_backend_press_pos = backend_pos
 		"release":
 			_send_mouse_motion(viewport_pos)
 			_send_mouse_button(viewport_pos, false, event.get("action_just_released", true))
-			if not is_on_url_bar and _backend_available:
+			# Always send touchUp to backend if we had sent a touchDown
+			if _backend_available and _last_backend_press_pos.x >= 0:
 				var backend_pos := _viewport_to_backend_pos(viewport_pos)
 				_backend.send_mouse_up(int(backend_pos.x), int(backend_pos.y), 0)
+				_last_backend_press_pos = Vector2(-1, -1)
 			_is_pressed = false
 		"scroll":
 			_send_mouse_motion(viewport_pos)
@@ -454,6 +459,10 @@ func handle_pointer_event(event: Dictionary) -> void:
 		"exit":
 			_send_mouse_exit()
 			_is_hovering = false
+			# If we exit while pressed, send touchUp to backend to release the touch state
+			if _is_pressed and _backend_available and _last_backend_press_pos.x >= 0:
+				_backend.send_mouse_up(int(_last_backend_press_pos.x), int(_last_backend_press_pos.y), 0)
+				_last_backend_press_pos = Vector2(-1, -1)
 			_is_pressed = false
 
 
