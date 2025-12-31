@@ -13,13 +13,14 @@ func initialize(settings: Dictionary) -> bool:
 	if platform == "Android":
 		_message = """WebView not available.
 
-To enable web browsing on Android/Quest:
-1. Download TLabWebView from GitHub
-2. Extract to addons/tlab_webview/
-3. Enable the plugin in Project Settings
-4. Rebuild the Android export template
+The GodotAndroidWebView plugin is not loaded.
 
-GitHub: github.com/nicemicro/nicemolecules"""
+To fix:
+1. Build the plugin: cd addons/godot_android_webview/android_plugin && ./build_plugin.sh
+2. Copy GodotAndroidWebView.aar to android/plugins/
+3. Copy GodotAndroidWebView.gdap to android/plugins/
+4. Enable plugin in Android export settings
+5. Re-export to Quest"""
 	else:
 		_message = """WebView not available.
 

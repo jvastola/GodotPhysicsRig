@@ -49,7 +49,7 @@ fi
 echo ""
 echo "Copying AAR to android/plugins..."
 mkdir -p ../../../android/plugins
-cp build/outputs/aar/android_plugin-release.aar ../../../android/plugins/GodotAndroidWebView.aar
+cp build/outputs/aar/GodotAndroidWebView-release.aar ../../../android/plugins/GodotAndroidWebView.aar
 
 echo ""
 echo "========================================"

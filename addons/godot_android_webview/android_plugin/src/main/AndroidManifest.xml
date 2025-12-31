@@ -7,6 +7,11 @@
 
     <application>
         <uses-library android:name="org.apache.http.legacy" android:required="false"/>
+        
+        <!-- Godot v2 Android Plugin registration -->
+        <meta-data
+            android:name="org.godotengine.plugin.v2.GodotAndroidWebView"
+            android:value="com.godot.webview.GodotAndroidWebView" />
     </application>
 
 </manifest>

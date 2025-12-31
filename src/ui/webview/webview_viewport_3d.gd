@@ -94,9 +94,9 @@ func _initialize_backend() -> void:
 
 
 func _try_android_backend(settings: Dictionary) -> WebViewBackend:
-	# Check if TLabWebView is available
-	if not Engine.has_singleton("TLabWebView"):
-		print("WebviewViewport3D: TLabWebView not available")
+	# Check if GodotAndroidWebView is available
+	if not Engine.has_singleton("GodotAndroidWebView"):
+		print("WebviewViewport3D: GodotAndroidWebView not available")
 		return null
 	
 	var backend := AndroidWebViewBackend.new()

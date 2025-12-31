@@ -2,25 +2,49 @@
 
 ## Overview
 
-This design describes the implementation of a webview panel for the VR scene using the gdCEF plugin (Chromium Embedded Framework). The panel will render web content to a 3D quad mesh that users can interact with using VR controllers, following the existing UI panel patterns in the project.
+This design describes the implementation of a cross-platform webview panel for VR scenes. The panel renders web content to a 3D quad mesh that users can interact with using VR controllers, following the existing UI panel patterns in the project.
+
+The system uses a platform abstraction layer to provide a unified API regardless of the underlying backend:
+- **Desktop**: gdCEF (Chromium Embedded Framework)
+- **Android/Quest**: Native Android WebView via Godot plugin
 
 ## Architecture
 
-The webview panel follows the established pattern of other UI panels in the project:
+### High-Level Design
+
+```
+┌──────────────────────────────────────┐
+│         Godot Application            │
+│  ┌────────────────────────────────┐  │
+│  │   WebviewViewport3D (GDScript) │  │
+│  └──────────────┬─────────────────┘  │
+│                 │                     │
+│  ┌──────────────┴─────────────────┐  │
+│  │  Platform Abstraction Layer    │  │
+│  │     (WebViewBackend)           │  │
+│  └──────────────┬─────────────────┘  │
+│                 │                     │
+│     ┌───────────┴───────────┐        │
+│     │                       │        │
+│  ┌──▼───────┐        ┌──────▼────┐  │
+│  │ CEF      │        │ Android   │  │
+│  │ Backend  │        │ WebView   │  │
+│  │(Desktop) │        │ Backend   │  │
+│  └──────────┘        └───────────┘  │
+└──────────────────────────────────────┘
+```
+
+### Scene Structure
 
 ```
 WebviewViewport3D (Node3D)
-├── GDCef (CEF Manager Node)
 ├── SubViewport
-│   └── TextureRect (receives browser texture)
+│   ├── TextureRect (receives browser texture)
+│   └── PlaceholderLabel (shown when no backend)
 ├── MeshInstance3D (quad with viewport texture)
 │   └── StaticBody3D
 │       └── CollisionShape3D
 ```
-
-The gdCEF plugin provides:
-- `GDCef` node: Manages CEF initialization and browser lifecycle
-- `GDBrowserView`: Individual browser instance that renders to a texture
 
 ## Components and Interfaces
 
@@ -43,6 +67,7 @@ extends Node3D
 # Signals
 signal page_loaded(url: String)
 signal page_loading(url: String)
+signal close_requested
 
 # Public Methods
 func load_url(url: String) -> void
@@ -52,6 +77,9 @@ func go_back() -> void
 func go_forward() -> void
 func can_go_back() -> bool
 func can_go_forward() -> bool
+func stop_loading() -> void
+func is_backend_available() -> bool
+func get_backend_name() -> String
 
 # Pointer Interface (matches existing panels)
 func handle_pointer_event(event: Dictionary) -> void
@@ -63,63 +91,62 @@ func pointer_grab_get_scale() -> float
 func set_interactive(enabled: bool) -> void
 ```
 
-### GDCef Integration
-
-The gdCEF plugin exposes these key methods:
+### WebViewBackend (Abstract Base Class)
 
 ```gdscript
-# GDCef node methods
-func initialize(settings: Dictionary) -> bool
-func create_browser(url: String, texture_rect: TextureRect, settings: Dictionary) -> GDBrowserView
-func shutdown() -> void
+class_name WebViewBackend
+extends RefCounted
 
-# GDBrowserView methods  
+# Signals
+signal page_loaded(url: String)
+signal page_loading(url: String)
+signal load_progress(progress: float)
+signal page_title_changed(title: String)
+signal error_occurred(error_code: int, description: String)
+signal texture_updated()
+
+# Abstract Methods
+func initialize(settings: Dictionary) -> bool
+func shutdown() -> void
 func load_url(url: String) -> void
 func get_url() -> String
 func is_loaded() -> bool
+func reload() -> void
+func go_back() -> void
+func go_forward() -> void
+func can_go_back() -> bool
+func can_go_forward() -> bool
+func stop_loading() -> void
 func resize(width: int, height: int) -> void
-func on_mouse_moved(x: int, y: int) -> void
-func on_mouse_left_down() -> void
-func on_mouse_left_up() -> void
-func on_mouse_wheel(delta: int) -> void
-func on_key_pressed(key: int, pressed: bool, shift: bool, alt: bool, ctrl: bool) -> void
-func get_texture() -> ImageTexture
+func send_mouse_move(x: int, y: int) -> void
+func send_mouse_down(x: int, y: int, button: int = 0) -> void
+func send_mouse_up(x: int, y: int, button: int = 0) -> void
+func send_scroll(x: int, y: int, delta: float) -> void
+func send_key(keycode: int, pressed: bool, shift: bool, alt: bool, ctrl: bool) -> void
+func send_text(text: String) -> void
+func get_texture() -> Texture2D
+static func is_available() -> bool
+func get_backend_name() -> String
 ```
 
-### Pointer Event Translation
+### DesktopCEFBackend
 
-The panel translates VR pointer events to browser input:
-
-| VR Event | Browser Action |
-|----------|----------------|
-| hover | on_mouse_moved(x, y) |
-| press | on_mouse_left_down() |
-| release | on_mouse_left_up() |
-| scroll | on_mouse_wheel(delta) |
-
-Coordinate translation from 3D hit position to browser coordinates:
-1. Transform hit position to mesh local space
-2. Convert to UV coordinates (0-1 range)
-3. Scale to browser resolution (ui_size)
-
-## Data Models
-
-### CEF Initialization Settings
+Wraps gdCEF for desktop platforms (Windows, macOS, Linux).
 
 ```gdscript
-var cef_settings := {
+class_name DesktopCEFBackend
+extends WebViewBackend
+
+# CEF Settings
+var _cef_settings := {
     "artifacts": "res://cef_artifacts/",
     "locale": "en-US",
-    "remote_debugging_port": 0,  # Disabled by default
+    "remote_debugging_port": 0,
     "enable_media_stream": false,
     "cache_path": "user://cef_cache/"
 }
-```
 
-### Browser Settings
-
-```gdscript
-var browser_settings := {
+var _browser_settings := {
     "javascript": true,
     "javascript_close_windows": false,
     "javascript_access_clipboard": false,
@@ -127,6 +154,62 @@ var browser_settings := {
     "image_loading": true,
     "databases": false,
     "webgl": true
+}
+```
+
+### AndroidWebViewBackend
+
+Uses native Android WebView via Godot plugin.
+
+```gdscript
+class_name AndroidWebViewBackend
+extends WebViewBackend
+
+# Update rate limiting (~30 FPS)
+var _update_interval: float = 0.033
+
+# Requires GodotAndroidWebView plugin singleton
+# Texture updates via getPixelData() -> PackedByteArray
+```
+
+### Android Plugin (Java)
+
+The `GodotAndroidWebView` Java class provides:
+- WebView initialization and lifecycle management
+- Bitmap rendering to ByteBuffer
+- Touch event forwarding (touchDown, touchMove, touchUp, scroll)
+- JavaScript execution
+- Navigation (back, forward, reload)
+- Signals: page_loaded, page_started, progress_changed, title_changed
+
+### Pointer Event Translation
+
+The panel translates VR pointer events to browser input:
+
+| VR Event | Browser Action |
+|----------|----------------|
+| enter/hover | send_mouse_move(x, y) |
+| press | send_mouse_down(x, y) |
+| release | send_mouse_up(x, y) |
+| scroll | send_scroll(x, y, delta) |
+
+Coordinate translation from 3D hit position to browser coordinates:
+1. Transform hit position to mesh local space
+2. Convert to UV coordinates (0-1 range)
+3. Scale to browser resolution (ui_size)
+4. Apply flip_v if needed
+
+## Data Models
+
+### Backend Initialization Settings
+
+```gdscript
+var settings := {
+    "width": int(ui_size.x),
+    "height": int(ui_size.y),
+    "url": default_url,
+    "parent_node": self,
+    "texture_rect": _texture_rect,
 }
 ```
 
@@ -144,86 +227,135 @@ var browser_settings := {
 
 *For any* pointer hit position within the panel bounds, the translated browser coordinates should be within the range [0, ui_size.x] for X and [0, ui_size.y] for Y.
 
-**Validates: Requirements 3.1, 3.2, 3.3**
+**Validates: Requirements 3.1, 3.2, 3.5**
 
 ### Property 3: Panel Interactivity Toggle
 
 *For any* panel state, calling `set_interactive(false)` should disable collision detection, and calling `set_interactive(true)` should restore it.
 
-**Validates: Requirements 3.4, 4.1**
+**Validates: Requirements 3.4, 4.4**
+
+### Property 4: Platform Detection Consistency
+
+*For any* platform, the system should select exactly one backend (Android, Desktop, or Placeholder) and that backend should remain consistent for the lifetime of the panel.
+
+**Validates: Requirements 6.1, 6.2, 6.3, 6.4**
 
 ## Error Handling
 
-### CEF Initialization Failures
+### Backend Initialization Failures
 
 ```gdscript
-func _initialize_cef() -> bool:
-    if not _cef_node:
-        push_error("WebviewViewport3D: GDCef node not found")
-        return false
+func _initialize_backend() -> void:
+    var platform := OS.get_name()
     
-    if not _cef_node.initialize(cef_settings):
-        push_error("WebviewViewport3D: Failed to initialize CEF")
-        _show_error_placeholder("CEF initialization failed")
-        return false
+    if platform == "Android":
+        _backend = _try_android_backend(settings)
+    else:
+        _backend = _try_desktop_backend(settings)
     
-    return true
+    # Fallback to placeholder if no backend available
+    if not _backend:
+        _backend = _create_placeholder_backend(settings)
 ```
 
-### Missing CEF Artifacts
+### Missing Dependencies
 
-If the gdCEF addon is not installed, the panel should:
-1. Display a placeholder message
-2. Log an error with installation instructions
-3. Remain interactive but non-functional
-
-### Browser Creation Failures
-
-```gdscript
-func _create_browser() -> bool:
-    _browser = _cef_node.create_browser(default_url, _texture_rect, browser_settings)
-    if not _browser:
-        push_error("WebviewViewport3D: Failed to create browser")
-        _show_error_placeholder("Browser creation failed")
-        return false
-    return true
-```
+If the required addon/plugin is not installed:
+1. Display a placeholder message with installation instructions
+2. Log an error with details
+3. Panel remains interactive but non-functional
+4. `is_backend_available()` returns false
 
 ## Testing Strategy
 
 ### Unit Tests
 
 Unit tests should verify:
-- Panel initialization with valid/invalid CEF installation
+- Panel initialization with valid/invalid backend availability
 - URL loading and retrieval
-- Coordinate translation accuracy
-- Event forwarding to browser
+- Coordinate translation accuracy (UV to pixel)
+- Event forwarding to backend
+- Platform detection logic
 
 ### Property-Based Tests
 
-Property tests should use a property-based testing library (e.g., GUT with custom generators) to verify:
+Property tests should use GUT with custom generators to verify:
 - **Property 1**: Generate random valid URLs and verify round-trip consistency
 - **Property 2**: Generate random hit positions and verify coordinate bounds
 - **Property 3**: Generate random sequences of interactive state changes
+- **Property 4**: Verify backend selection is deterministic
 
 ### Integration Tests
 
-- Verify panel appears in MainScene at correct position
-- Verify panel is accessible via UIPanelManager
+- Verify panel appears via UIPanelManager
+- Verify panel is accessible via quick access menu
 - Verify pointer interaction works end-to-end
+- Test on both desktop and Quest 3
+
+### Performance Tests
+
+- Frame rate benchmarks (Quest 3 target: 72+ fps maintained)
+- Texture update latency measurements
+- Memory profiling (target: <200MB on Quest)
 
 ## File Structure
 
 ```
 src/ui/webview/
-├── webview_viewport_3d.gd       # Main panel script
-├── webview_viewport_3d.gd.uid
+├── webview_viewport_3d.gd       # Main panel script (platform-agnostic)
 ├── WebviewViewport3D.tscn       # Panel scene
-└── webview_ui.gd                # Optional: URL bar UI (future)
+├── NEXT_STEPS.md                # Implementation notes
+└── backends/
+    ├── webview_backend.gd       # Abstract base class
+    ├── android_webview_backend.gd
+    ├── desktop_cef_backend.gd
+    └── placeholder_backend.gd
+
+addons/godot_android_webview/
+├── plugin.cfg
+├── godot_android_webview.gd
+├── README.md
+└── android_plugin/
+    ├── build_plugin.sh
+    ├── build.gradle
+    ├── settings.gradle
+    ├── libs/                    # godot-lib.release.aar
+    └── src/main/java/com/godot/webview/
+        └── GodotAndroidWebView.java
+
+android/plugins/
+├── GodotAndroidWebView.gdap     # Plugin descriptor
+└── GodotAndroidWebView.aar      # Built plugin
+
+addons/gdcef/                    # Desktop CEF (external dependency)
+cef_artifacts/                   # CEF binaries (external dependency)
 ```
 
 ## Dependencies
 
-- **gdCEF addon**: Must be installed in `addons/gdcef/` with artifacts in `cef_artifacts/`
-- **Existing UI infrastructure**: Uses patterns from `ui_viewport_3d.gd`
-- **UIPanelManager**: For panel lifecycle management
+- **Android**: GodotAndroidWebView plugin (included in project)
+- **Desktop**: gdCEF addon (must be installed separately)
+- **Both**: Existing UI infrastructure (UIPanelManager, pointer system)
+
+## Performance Considerations
+
+### Quest 3 Optimization
+
+- Texture updates rate-limited to ~30 FPS
+- Default resolution: 1280x720 (configurable)
+- ByteBuffer capture mode (stable, compatible)
+- Memory target: <200MB
+
+### Desktop Optimization
+
+- CEF handles rendering efficiently
+- Texture updates at 60 FPS
+- Higher resolution supported (1920x1080)
+
+## Security Considerations
+
+- JavaScript enabled by default (required for most sites)
+- No clipboard access
+- No file system access beyond cache
+- Sandboxed WebView processes (both CEF and Android provide this)

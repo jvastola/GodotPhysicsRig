@@ -1397,10 +1397,10 @@ func _trigger_autojoin() -> void:
 	
 	# Validate managers
 	if not nakama_manager:
-		push_warning("[Autojoin] ERROR: NakamaManager not found")
+		_autojoin_log("ERROR: NakamaManager not found")
 		return
 	if not livekit_manager:
-		push_warning("[Autojoin] ERROR: LiveKitManager not found")
+		_autojoin_log("ERROR: LiveKitManager not found")
 		return
 	
 	_autojoin_log("Found NakamaManager: %s" % nakama_manager)
@@ -1408,7 +1408,7 @@ func _trigger_autojoin() -> void:
 	
 	# Check Nakama connection status
 	if not nakama_manager.is_socket_connected:
-		push_warning("[Autojoin] ERROR: Nakama socket not connected")
+		_autojoin_log("ERROR: Nakama socket not connected")
 		return
 	
 	var user_id: String = ""
@@ -1416,7 +1416,7 @@ func _trigger_autojoin() -> void:
 		user_id = nakama_manager.local_user_id
 	
 	if user_id.is_empty():
-		push_warning("[Autojoin] ERROR: No Nakama user ID available")
+		_autojoin_log("ERROR: No Nakama user ID available")
 		return
 	
 	_autojoin_log("User ID: %s" % user_id)
@@ -1494,7 +1494,7 @@ func _connect_to_livekit_after_nakama(room_name: String) -> void:
 	var nakama_manager = get_node_or_null("/root/NakamaManager")
 	
 	if not livekit_manager:
-		push_warning("[Autojoin] ERROR: Cannot connect to LiveKit - manager not found")
+		_autojoin_log("ERROR: Cannot connect to LiveKit - manager not found")
 		return
 	
 	var user_id: String = ""
@@ -1502,7 +1502,7 @@ func _connect_to_livekit_after_nakama(room_name: String) -> void:
 		user_id = nakama_manager.local_user_id
 	
 	if user_id.is_empty():
-		push_warning("[Autojoin] ERROR: Cannot connect to LiveKit - no user ID")
+		_autojoin_log("ERROR: Cannot connect to LiveKit - no user ID")
 		return
 	
 	# Generate token and connect to LiveKit

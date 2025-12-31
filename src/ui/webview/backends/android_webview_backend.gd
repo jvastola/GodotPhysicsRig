@@ -3,6 +3,9 @@ extends WebViewBackend
 
 ## Android WebView backend using native Android WebView via Godot plugin
 ## Works on Quest 3 and other Android devices
+##
+## NOTE: has_method() doesn't work reliably with Android plugins,
+## so we call methods directly and catch errors if they fail.
 
 var _plugin: Object = null
 var _texture: ImageTexture = null
@@ -36,14 +39,14 @@ func initialize(settings: Dictionary) -> bool:
 	_height = settings.get("height", 720)
 	var initial_url: String = settings.get("url", "about:blank")
 	
-	# Initialize the plugin
-	if _plugin.has_method("initialize"):
-		var result = _plugin.initialize(_width, _height, initial_url)
-		if not result:
-			push_error("AndroidWebViewBackend: Plugin initialization failed")
-			return false
-	else:
-		push_error("AndroidWebViewBackend: Plugin missing initialize method")
+	# Store the texture rect reference
+	_texture_rect = settings.get("texture_rect", null)
+	
+	# Initialize the plugin - call directly without has_method check
+	# (has_method doesn't work reliably with Android plugins)
+	var result = _plugin.initialize(_width, _height, initial_url)
+	if not result:
+		push_error("AndroidWebViewBackend: Plugin initialization failed")
 		return false
 	
 	# Create texture for rendering
@@ -52,7 +55,12 @@ func initialize(settings: Dictionary) -> bool:
 	img.fill(Color.WHITE)
 	_texture.set_image(img)
 	
-	# Connect signals
+	# Apply texture to TextureRect immediately
+	if _texture_rect:
+		_texture_rect.texture = _texture
+		print("AndroidWebViewBackend: Texture applied to TextureRect")
+	
+	# Connect signals (has_signal works fine)
 	if _plugin.has_signal("page_loaded"):
 		_plugin.page_loaded.connect(_on_page_loaded)
 	if _plugin.has_signal("page_started"):
@@ -66,12 +74,13 @@ func initialize(settings: Dictionary) -> bool:
 	
 	_current_url = initial_url
 	_is_initialized = true
+	print("AndroidWebViewBackend: Initialized successfully, URL: ", initial_url)
 	
 	return true
 
 
 func shutdown() -> void:
-	if _plugin and _plugin.has_method("destroy"):
+	if _plugin:
 		_plugin.destroy()
 	_plugin = null
 	_texture = null
@@ -81,53 +90,51 @@ func shutdown() -> void:
 func load_url(url: String) -> void:
 	if not _is_initialized or not _plugin:
 		return
-	
 	_current_url = url
-	if _plugin.has_method("loadUrl"):
-		_plugin.loadUrl(url)
+	_plugin.loadUrl(url)
 
 
 func get_url() -> String:
-	if _plugin and _plugin.has_method("getUrl"):
+	if _plugin:
 		return _plugin.getUrl()
 	return _current_url
 
 
 func is_loaded() -> bool:
-	if _plugin and _plugin.has_method("getProgress"):
+	if _plugin:
 		return _plugin.getProgress() >= 100
 	return false
 
 
 func reload() -> void:
-	if _plugin and _plugin.has_method("reload"):
+	if _plugin:
 		_plugin.reload()
 
 
 func go_back() -> void:
-	if _plugin and _plugin.has_method("goBack"):
+	if _plugin:
 		_plugin.goBack()
 
 
 func go_forward() -> void:
-	if _plugin and _plugin.has_method("goForward"):
+	if _plugin:
 		_plugin.goForward()
 
 
 func can_go_back() -> bool:
-	if _plugin and _plugin.has_method("canGoBack"):
+	if _plugin:
 		return _plugin.canGoBack()
 	return false
 
 
 func can_go_forward() -> bool:
-	if _plugin and _plugin.has_method("canGoForward"):
+	if _plugin:
 		return _plugin.canGoForward()
 	return false
 
 
 func stop_loading() -> void:
-	if _plugin and _plugin.has_method("stopLoading"):
+	if _plugin:
 		_plugin.stopLoading()
 
 
@@ -137,9 +144,7 @@ func resize(width: int, height: int) -> void:
 	
 	_width = width
 	_height = height
-	
-	if _plugin.has_method("resize"):
-		_plugin.resize(width, height)
+	_plugin.resize(width, height)
 	
 	# Recreate texture
 	_texture = ImageTexture.new()
@@ -149,22 +154,22 @@ func resize(width: int, height: int) -> void:
 
 
 func send_mouse_move(x: int, y: int) -> void:
-	if _plugin and _plugin.has_method("touchMove"):
+	if _plugin:
 		_plugin.touchMove(x, y)
 
 
 func send_mouse_down(x: int, y: int, button: int = 0) -> void:
-	if _plugin and _plugin.has_method("touchDown"):
+	if _plugin:
 		_plugin.touchDown(x, y)
 
 
 func send_mouse_up(x: int, y: int, button: int = 0) -> void:
-	if _plugin and _plugin.has_method("touchUp"):
+	if _plugin:
 		_plugin.touchUp(x, y)
 
 
 func send_scroll(x: int, y: int, delta: float) -> void:
-	if _plugin and _plugin.has_method("scroll"):
+	if _plugin:
 		_plugin.scroll(x, y, int(delta * 50))
 
 
@@ -174,7 +179,7 @@ func send_key(keycode: int, pressed: bool, shift: bool = false, alt: bool = fals
 
 
 func send_text(text: String) -> void:
-	if _plugin and _plugin.has_method("inputText"):
+	if _plugin:
 		_plugin.inputText(text)
 
 
@@ -203,14 +208,15 @@ func update(delta: float) -> void:
 	_update_timer = 0.0
 	
 	# Get pixel data from plugin
-	if _plugin.has_method("getPixelData"):
-		var pixel_data: PackedByteArray = _plugin.getPixelData()
-		if pixel_data.size() > 0:
-			_update_texture_from_data(pixel_data)
+	var pixel_data: PackedByteArray = _plugin.getPixelData()
+	if pixel_data.size() > 0:
+		_update_texture_from_data(pixel_data)
 
 
 func _update_texture_from_data(data: PackedByteArray) -> void:
-	if data.size() != _width * _height * 4:
+	var expected_size := _width * _height * 4
+	if data.size() != expected_size:
+		print("AndroidWebViewBackend: Unexpected data size: ", data.size(), " expected: ", expected_size)
 		return
 	
 	var img := Image.create_from_data(_width, _height, false, Image.FORMAT_RGBA8, data)

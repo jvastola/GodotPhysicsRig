@@ -51,7 +51,9 @@ public class GodotAndroidWebView extends GodotPlugin {
     
     // Update rate limiting
     private long lastUpdateTime = 0;
+    private long lastForceUpdateTime = 0;
     private static final long MIN_UPDATE_INTERVAL_MS = 33; // ~30 FPS max
+    private static final long FORCE_UPDATE_INTERVAL_MS = 500; // Force update every 500ms
     
     public GodotAndroidWebView(Godot godot) {
         super(godot);
@@ -184,6 +186,11 @@ public class GodotAndroidWebView extends GodotPlugin {
             }
             
             isInitialized.set(true);
+            
+            // Force initial render after a short delay to ensure WebView is ready
+            mainHandler.postDelayed(() -> {
+                needsUpdate.set(true);
+            }, 500);
         });
         
         return true;
@@ -369,14 +376,25 @@ public class GodotAndroidWebView extends GodotPlugin {
     @UsedByGodot
     public byte[] getPixelData() {
         if (!isInitialized.get() || webView == null || bitmap == null) {
+            android.util.Log.d(TAG, "getPixelData: not ready - initialized=" + isInitialized.get() + " webView=" + (webView != null) + " bitmap=" + (bitmap != null));
             return new byte[0];
         }
         
-        // Rate limit updates
+        // Rate limit updates, but force update periodically
         long now = System.currentTimeMillis();
-        if (now - lastUpdateTime < MIN_UPDATE_INTERVAL_MS && !needsUpdate.get()) {
+        boolean forceUpdate = (now - lastForceUpdateTime) >= FORCE_UPDATE_INTERVAL_MS;
+        
+        if (!forceUpdate && (now - lastUpdateTime < MIN_UPDATE_INTERVAL_MS) && !needsUpdate.get()) {
+            // Still return empty but don't log (too noisy)
             return new byte[0];
         }
+        
+        if (forceUpdate) {
+            lastForceUpdateTime = now;
+            android.util.Log.d(TAG, "getPixelData: force update triggered");
+        }
+        
+        android.util.Log.d(TAG, "getPixelData: rendering frame, needsUpdate=" + needsUpdate.get());
         lastUpdateTime = now;
         needsUpdate.set(false);
         
