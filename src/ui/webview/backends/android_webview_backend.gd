@@ -71,6 +71,8 @@ func initialize(settings: Dictionary) -> bool:
 		_plugin.title_changed.connect(_on_title_changed)
 	if _plugin.has_signal("texture_updated"):
 		_plugin.texture_updated.connect(_on_texture_updated)
+	if _plugin.has_signal("scroll_info_received"):
+		_plugin.scroll_info_received.connect(_on_scroll_info_received)
 	
 	_current_url = initial_url
 	_is_initialized = true
@@ -169,23 +171,26 @@ func send_mouse_up(x: int, y: int, button: int = 0) -> void:
 
 
 func send_scroll(x: int, y: int, delta: float) -> void:
+	# Native scrolling disabled - use scroll_by_amount instead
+	pass
+
+
+## Scroll by a delta amount using JavaScript (more reliable than native scrolling)
+func scroll_by_amount(delta_y: int) -> void:
 	if _plugin:
-		# delta is typically -1 to 1 range from scroll wheel
-		# Scale it appropriately for the WebView
-		var scroll_amount := int(delta * 100)
-		_plugin.scroll(x, y, scroll_amount)
+		_plugin.scrollByAmount(delta_y)
 
 
-## Start a drag-based scroll gesture (for touch/VR controllers)
-func send_scroll_drag(x: int, start_y: int, current_y: int) -> void:
+## Scroll to a specific position using JavaScript
+func scroll_to_position(scroll_y: int) -> void:
 	if _plugin:
-		_plugin.scrollDrag(x, start_y, current_y)
+		_plugin.scrollToPosition(scroll_y)
 
 
-## End a drag-based scroll gesture
-func send_scroll_end(x: int, y: int) -> void:
+## Request scroll info from the page (emits scroll_info_received signal)
+func request_scroll_info() -> void:
 	if _plugin:
-		_plugin.scrollEnd(x, y)
+		_plugin.getScrollInfo()
 
 
 func send_key(keycode: int, pressed: bool, shift: bool = false, alt: bool = false, ctrl: bool = false) -> void:
@@ -269,3 +274,16 @@ func _on_title_changed(title: String) -> void:
 func _on_texture_updated() -> void:
 	# Texture was updated on the Java side
 	pass
+
+
+func _on_scroll_info_received(json_str: String) -> void:
+	var json := JSON.new()
+	var error := json.parse(json_str)
+	if error == OK:
+		var data: Dictionary = json.data
+		var scroll_y: int = int(data.get("scrollY", 0))
+		var scroll_height: int = int(data.get("scrollHeight", 0))
+		var client_height: int = int(data.get("clientHeight", 0))
+		scroll_info_received.emit(scroll_y, scroll_height, client_height)
+	else:
+		push_warning("AndroidWebViewBackend: Failed to parse scroll info: ", json_str)

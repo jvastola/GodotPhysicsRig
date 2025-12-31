@@ -77,14 +77,24 @@ text = "Go"
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="TextureRect" type="TextureRect" parent="SubViewport/BrowserUI/WebContent"]
+[node name="ContentContainer" type="HBoxContainer" parent="SubViewport/BrowserUI/WebContent"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+
+[node name="TextureRect" type="TextureRect" parent="SubViewport/BrowserUI/WebContent/ContentContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
 stretch_mode = 5
+
+[node name="ScrollBar" type="VScrollBar" parent="SubViewport/BrowserUI/WebContent/ContentContainer"]
+custom_minimum_size = Vector2(24, 0)
+layout_mode = 2
+max_value = 1000.0
+page = 100.0
 
 [node name="PlaceholderLabel" type="Label" parent="SubViewport/BrowserUI/WebContent"]
 layout_mode = 1

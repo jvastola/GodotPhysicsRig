@@ -55,10 +55,6 @@ public class GodotAndroidWebView extends GodotPlugin {
     private static final long MIN_UPDATE_INTERVAL_MS = 33; // ~30 FPS max
     private static final long FORCE_UPDATE_INTERVAL_MS = 500; // Force update every 500ms
     
-    // Scroll gesture tracking
-    private long scrollStartTime = 0;
-    private float lastScrollY = 0;
-    
     public GodotAndroidWebView(Godot godot) {
         super(godot);
         mainHandler = new Handler(Looper.getMainLooper());
@@ -79,6 +75,7 @@ public class GodotAndroidWebView extends GodotPlugin {
         signals.add(new SignalInfo("progress_changed", Integer.class));
         signals.add(new SignalInfo("title_changed", String.class));
         signals.add(new SignalInfo("texture_updated"));
+        signals.add(new SignalInfo("scroll_info_received", String.class));
         return signals;
     }
     
@@ -340,73 +337,85 @@ public class GodotAndroidWebView extends GodotPlugin {
     
     @UsedByGodot
     public void scroll(int x, int y, int deltaY) {
-        if (!isInitialized.get() || webView == null) return;
-        
-        mainHandler.post(() -> {
-            // Use fling for smoother scrolling behavior
-            // deltaY is positive for scroll down, negative for scroll up
-            // WebView.flingScroll expects velocity: positive = scroll content up (finger moves up)
-            int velocity = deltaY * 20; // Scale factor for reasonable scroll speed
-            webView.flingScroll(0, velocity);
-            requestRender();
-        });
+        // Native scrolling disabled - use scrollToPosition() with JavaScript instead
+        // This avoids rendering artifacts with native WebView scrolling
     }
     
     @UsedByGodot
     public void scrollDrag(int x, int startY, int currentY) {
-        if (!isInitialized.get() || webView == null) return;
-        
-        mainHandler.post(() -> {
-            long now = android.os.SystemClock.uptimeMillis();
-            
-            if (scrollStartTime == 0) {
-                // Start of scroll gesture
-                scrollStartTime = now;
-                lastScrollY = startY;
-                
-                android.view.MotionEvent downEvent = android.view.MotionEvent.obtain(
-                    now, now,
-                    android.view.MotionEvent.ACTION_DOWN,
-                    x, startY, 0
-                );
-                webView.dispatchTouchEvent(downEvent);
-                downEvent.recycle();
-            }
-            
-            // Continue scroll gesture
-            android.view.MotionEvent moveEvent = android.view.MotionEvent.obtain(
-                scrollStartTime, now,
-                android.view.MotionEvent.ACTION_MOVE,
-                x, currentY, 0
-            );
-            webView.dispatchTouchEvent(moveEvent);
-            moveEvent.recycle();
-            
-            lastScrollY = currentY;
-            requestRender();
-        });
+        // Native scrolling disabled - use scrollToPosition() with JavaScript instead
     }
     
     @UsedByGodot
     public void scrollEnd(int x, int y) {
+        // Native scrolling disabled - use scrollToPosition() with JavaScript instead
+    }
+    
+    /**
+     * Scroll to a specific position using JavaScript.
+     * This is more reliable than native WebView scrolling for texture capture.
+     * @param scrollY The vertical scroll position in pixels
+     */
+    @UsedByGodot
+    public void scrollToPosition(int scrollY) {
         if (!isInitialized.get() || webView == null) return;
         
         mainHandler.post(() -> {
-            if (scrollStartTime != 0) {
-                long now = android.os.SystemClock.uptimeMillis();
-                
-                android.view.MotionEvent upEvent = android.view.MotionEvent.obtain(
-                    scrollStartTime, now,
-                    android.view.MotionEvent.ACTION_UP,
-                    x, y, 0
-                );
-                webView.dispatchTouchEvent(upEvent);
-                upEvent.recycle();
-                
-                scrollStartTime = 0;
-                lastScrollY = 0;
-                requestRender();
-            }
+            webView.evaluateJavascript(
+                "window.scrollTo(0, " + scrollY + ");",
+                null
+            );
+            requestRender();
+        });
+    }
+    
+    /**
+     * Scroll by a delta amount using JavaScript.
+     * @param deltaY The amount to scroll (positive = down, negative = up)
+     */
+    @UsedByGodot
+    public void scrollByAmount(int deltaY) {
+        if (!isInitialized.get() || webView == null) return;
+        
+        mainHandler.post(() -> {
+            webView.evaluateJavascript(
+                "window.scrollBy(0, " + deltaY + ");",
+                null
+            );
+            requestRender();
+        });
+    }
+    
+    /**
+     * Get the current scroll position and page height via callback.
+     * Returns a JSON string: {"scrollY": number, "scrollHeight": number, "clientHeight": number}
+     */
+    @UsedByGodot
+    public void getScrollInfo() {
+        if (!isInitialized.get() || webView == null) {
+            emitSignal("scroll_info_received", "{\"scrollY\":0,\"scrollHeight\":0,\"clientHeight\":0}");
+            return;
+        }
+        
+        mainHandler.post(() -> {
+            webView.evaluateJavascript(
+                "(function() { " +
+                "  return JSON.stringify({" +
+                "    scrollY: window.scrollY || document.documentElement.scrollTop || 0," +
+                "    scrollHeight: document.documentElement.scrollHeight || document.body.scrollHeight || 0," +
+                "    clientHeight: window.innerHeight || document.documentElement.clientHeight || 0" +
+                "  });" +
+                "})()",
+                value -> {
+                    // Remove quotes from JSON string result
+                    String result = value;
+                    if (result != null && result.startsWith("\"") && result.endsWith("\"")) {
+                        result = result.substring(1, result.length() - 1);
+                        result = result.replace("\\\"", "\"");
+                    }
+                    emitSignal("scroll_info_received", result != null ? result : "{}");
+                }
+            );
         });
     }
     

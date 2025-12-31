@@ -21,8 +21,9 @@ signal close_requested
 @onready var viewport: SubViewport = $SubViewport
 @onready var mesh_instance: MeshInstance3D = $MeshInstance3D
 @onready var _static_body: StaticBody3D = $MeshInstance3D/StaticBody3D
-@onready var _texture_rect: TextureRect = $SubViewport/BrowserUI/WebContent/TextureRect
+@onready var _texture_rect: TextureRect = $SubViewport/BrowserUI/WebContent/ContentContainer/TextureRect
 @onready var _placeholder_label: Label = $SubViewport/BrowserUI/WebContent/PlaceholderLabel
+@onready var _scroll_bar: VScrollBar = $SubViewport/BrowserUI/WebContent/ContentContainer/ScrollBar
 
 # URL Bar controls
 @onready var _url_input: LineEdit = $SubViewport/BrowserUI/URLBar/URLInput
@@ -45,6 +46,13 @@ var _has_focus: bool = false
 var _backend: WebViewBackend = null
 var _backend_available: bool = false
 var _current_url: String = ""
+
+# Scroll state
+var _scroll_y: int = 0
+var _scroll_height: int = 0
+var _client_height: int = 0
+var _scroll_info_timer: float = 0.0
+const SCROLL_INFO_INTERVAL: float = 0.5  # Request scroll info every 0.5 seconds
 
 
 func _ready() -> void:
@@ -98,6 +106,14 @@ func _setup_url_bar() -> void:
 	# Hide loading bar initially
 	if _loading_bar:
 		_loading_bar.visible = false
+	
+	# Setup scrollbar
+	if _scroll_bar:
+		_scroll_bar.value_changed.connect(_on_scroll_bar_changed)
+		_scroll_bar.min_value = 0
+		_scroll_bar.max_value = 1000
+		_scroll_bar.page = 100
+		_scroll_bar.step = 10
 
 
 func _on_url_input_focus_entered() -> void:
@@ -193,6 +209,8 @@ func _initialize_backend() -> void:
 			_backend.page_loading.connect(_on_backend_page_loading)
 		if _backend.has_signal("load_progress"):
 			_backend.load_progress.connect(_on_backend_load_progress)
+		if _backend.has_signal("scroll_info_received"):
+			_backend.scroll_info_received.connect(_on_backend_scroll_info)
 		
 		print("WebviewViewport3D: Using backend: ", _backend.get_backend_name())
 
@@ -272,9 +290,38 @@ func _on_backend_load_progress(progress: float) -> void:
 			_loading_bar.visible = false
 
 
+func _on_backend_scroll_info(scroll_y: int, scroll_height: int, client_height: int) -> void:
+	_scroll_y = scroll_y
+	_scroll_height = scroll_height
+	_client_height = client_height
+	
+	# Update scrollbar without triggering value_changed
+	if _scroll_bar and scroll_height > client_height:
+		_scroll_bar.set_block_signals(true)
+		_scroll_bar.max_value = scroll_height - client_height
+		_scroll_bar.page = client_height
+		_scroll_bar.value = scroll_y
+		_scroll_bar.set_block_signals(false)
+		_scroll_bar.visible = true
+	elif _scroll_bar:
+		_scroll_bar.visible = false
+
+
+func _on_scroll_bar_changed(value: float) -> void:
+	if _backend and _backend.has_method("scroll_to_position"):
+		_backend.scroll_to_position(int(value))
+
+
 func _process(delta: float) -> void:
 	if _backend and _backend.has_method("update"):
 		_backend.update(delta)
+	
+	# Periodically request scroll info to keep scrollbar in sync
+	if _backend_available and _backend and _backend.has_method("request_scroll_info"):
+		_scroll_info_timer += delta
+		if _scroll_info_timer >= SCROLL_INFO_INTERVAL:
+			_scroll_info_timer = 0.0
+			_backend.request_scroll_info()
 
 
 func _exit_tree() -> void:
@@ -400,9 +447,10 @@ func handle_pointer_event(event: Dictionary) -> void:
 			_send_mouse_motion(viewport_pos)
 			var scroll_value: float = event.get("scroll_value", 0.0)
 			_send_scroll(viewport_pos, scroll_value)
-			if not is_on_url_bar and _backend_available:
-				var backend_pos := _viewport_to_backend_pos(viewport_pos)
-				_backend.send_scroll(int(backend_pos.x), int(backend_pos.y), scroll_value)
+			# Scroll via scrollbar instead of native backend scrolling
+			if not is_on_url_bar and _backend_available and _scroll_bar:
+				var scroll_delta := int(scroll_value * 100)
+				_scroll_bar.value = clampf(_scroll_bar.value - scroll_delta, _scroll_bar.min_value, _scroll_bar.max_value)
 		"exit":
 			_send_mouse_exit()
 			_is_hovering = false

@@ -10,6 +10,7 @@ signal load_progress(progress: float)
 signal page_title_changed(title: String)
 signal error_occurred(error_code: int, description: String)
 signal texture_updated()
+signal scroll_info_received(scroll_y: int, scroll_height: int, client_height: int)
 
 ## Initialize the backend. Returns true on success.
 func initialize(settings: Dictionary) -> bool:
@@ -75,6 +76,18 @@ func send_mouse_up(x: int, y: int, button: int = 0) -> void:
 
 ## Send scroll/wheel event
 func send_scroll(x: int, y: int, delta: float) -> void:
+	pass
+
+## Scroll by a delta amount (pixels)
+func scroll_by_amount(delta_y: int) -> void:
+	pass
+
+## Scroll to a specific position (pixels from top)
+func scroll_to_position(scroll_y: int) -> void:
+	pass
+
+## Request scroll info from the page (emits scroll_info_received signal)
+func request_scroll_info() -> void:
 	pass
 
 ## Send key event
