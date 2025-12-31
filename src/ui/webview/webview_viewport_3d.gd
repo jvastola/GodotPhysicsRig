@@ -3,7 +3,7 @@ class_name WebviewViewport3D
 
 ## WebView Viewport 3D - Cross-platform web content display in VR
 ## Automatically selects the appropriate backend based on platform:
-## - Android/Quest: TLabWebView
+## - Android/Quest: GodotAndroidWebView
 ## - Desktop: gdCEF (Chromium Embedded Framework)
 ## - Fallback: Placeholder with installation instructions
 
@@ -21,8 +21,19 @@ signal close_requested
 @onready var viewport: SubViewport = $SubViewport
 @onready var mesh_instance: MeshInstance3D = $MeshInstance3D
 @onready var _static_body: StaticBody3D = $MeshInstance3D/StaticBody3D
-@onready var _texture_rect: TextureRect = $SubViewport/TextureRect
-@onready var _placeholder_label: Label = $SubViewport/PlaceholderLabel
+@onready var _texture_rect: TextureRect = $SubViewport/BrowserUI/WebContent/TextureRect
+@onready var _placeholder_label: Label = $SubViewport/BrowserUI/WebContent/PlaceholderLabel
+
+# URL Bar controls
+@onready var _url_input: LineEdit = $SubViewport/BrowserUI/URLBar/URLInput
+@onready var _back_button: Button = $SubViewport/BrowserUI/URLBar/BackButton
+@onready var _forward_button: Button = $SubViewport/BrowserUI/URLBar/ForwardButton
+@onready var _reload_button: Button = $SubViewport/BrowserUI/URLBar/ReloadButton
+@onready var _go_button: Button = $SubViewport/BrowserUI/URLBar/GoButton
+@onready var _loading_bar: ProgressBar = $SubViewport/BrowserUI/LoadingBar
+
+# URL bar height in pixels (for determining if click is on URL bar or web content)
+const URL_BAR_HEIGHT: int = 44
 
 var _saved_static_body_layer: int = 0
 var _last_mouse_pos: Vector2 = Vector2(-1, -1)
@@ -55,46 +66,138 @@ func _ready() -> void:
 		mesh_instance.visible = true
 		_static_body.collision_layer = _saved_static_body_layer
 	
+	# Setup URL bar controls
+	_setup_url_bar()
+	
 	# Initialize the appropriate backend
 	_initialize_backend()
 	
 	set_process_input(true)
 
 
+func _setup_url_bar() -> void:
+	# Connect URL bar buttons
+	if _back_button:
+		_back_button.pressed.connect(_on_back_pressed)
+	if _forward_button:
+		_forward_button.pressed.connect(_on_forward_pressed)
+	if _reload_button:
+		_reload_button.pressed.connect(_on_reload_pressed)
+	if _go_button:
+		_go_button.pressed.connect(_on_go_pressed)
+	
+	# Connect URL input
+	if _url_input:
+		_url_input.text = default_url
+		_url_input.text_submitted.connect(_on_url_submitted)
+		# Connect focus signal to notify KeyboardManager
+		_url_input.focus_entered.connect(_on_url_input_focus_entered)
+		# Register with KeyboardManager for virtual keyboard support
+		_register_url_input_with_keyboard()
+	
+	# Hide loading bar initially
+	if _loading_bar:
+		_loading_bar.visible = false
+
+
+func _on_url_input_focus_entered() -> void:
+	# When URL input gets focus, notify KeyboardManager
+	if KeyboardManager and KeyboardManager.instance and _url_input:
+		KeyboardManager.instance.set_focus(_url_input, viewport)
+		print("WebviewViewport3D: URL input received focus")
+
+
+func _register_url_input_with_keyboard() -> void:
+	call_deferred("_deferred_register_keyboard")
+
+
+func _deferred_register_keyboard() -> void:
+	if KeyboardManager and KeyboardManager.instance and _url_input:
+		KeyboardManager.instance.register_control(_url_input, viewport)
+		print("WebviewViewport3D: Registered URL input with KeyboardManager")
+
+
+## Focus the URL input field and summon the keyboard
+func focus_url_input() -> void:
+	if _url_input:
+		_url_input.grab_focus()
+		_url_input.select_all()
+		# Register and set focus with KeyboardManager
+		if KeyboardManager and KeyboardManager.instance:
+			KeyboardManager.instance.register_control(_url_input, viewport)
+			KeyboardManager.instance.set_focus(_url_input, viewport)
+			print("WebviewViewport3D: URL input focused")
+
+
+func _on_back_pressed() -> void:
+	go_back()
+
+
+func _on_forward_pressed() -> void:
+	go_forward()
+
+
+func _on_reload_pressed() -> void:
+	reload()
+
+
+func _on_go_pressed() -> void:
+	if _url_input:
+		_navigate_to_url(_url_input.text)
+
+
+func _on_url_submitted(url: String) -> void:
+	_navigate_to_url(url)
+
+
+func _navigate_to_url(url: String) -> void:
+	if not url.begins_with("http://") and not url.begins_with("https://"):
+		url = "https://" + url
+	load_url(url)
+
+
+func _update_nav_buttons() -> void:
+	if _back_button:
+		_back_button.disabled = not can_go_back()
+	if _forward_button:
+		_forward_button.disabled = not can_go_forward()
+
+
 func _initialize_backend() -> void:
 	var platform := OS.get_name()
 	print("WebviewViewport3D: Initializing on platform: ", platform)
 	
+	# Calculate web content height (total height minus URL bar)
+	var web_content_height: int = int(ui_size.y) - URL_BAR_HEIGHT
+	
 	var settings := {
 		"width": int(ui_size.x),
-		"height": int(ui_size.y),
+		"height": web_content_height,
 		"url": default_url,
 		"parent_node": self,
 		"texture_rect": _texture_rect,
 	}
 	
-	# Try platform-specific backends first
 	if platform == "Android":
 		_backend = _try_android_backend(settings)
 	else:
 		_backend = _try_desktop_backend(settings)
 	
-	# Fallback to placeholder if no backend available
 	if not _backend:
 		_backend = _create_placeholder_backend(settings)
 	
-	# Connect backend signals
 	if _backend:
 		if _backend.has_signal("page_loaded"):
 			_backend.page_loaded.connect(_on_backend_page_loaded)
 		if _backend.has_signal("page_loading"):
 			_backend.page_loading.connect(_on_backend_page_loading)
+		if _backend.has_signal("load_progress"):
+			_backend.load_progress.connect(_on_backend_load_progress)
 		
 		print("WebviewViewport3D: Using backend: ", _backend.get_backend_name())
 
 
 func _try_android_backend(settings: Dictionary) -> WebViewBackend:
-	# Check if GodotAndroidWebView is available
 	if not Engine.has_singleton("GodotAndroidWebView"):
 		print("WebviewViewport3D: GodotAndroidWebView not available")
 		return null
@@ -109,7 +212,6 @@ func _try_android_backend(settings: Dictionary) -> WebViewBackend:
 
 
 func _try_desktop_backend(settings: Dictionary) -> WebViewBackend:
-	# Check if gdCEF is available
 	if not ClassDB.class_exists("GDCef"):
 		print("WebviewViewport3D: gdCEF not available")
 		return null
@@ -148,15 +250,29 @@ func _hide_placeholder() -> void:
 
 func _on_backend_page_loaded(url: String) -> void:
 	_current_url = url
+	if _url_input:
+		_url_input.text = url
+	_update_nav_buttons()
+	if _loading_bar:
+		_loading_bar.visible = false
 	page_loaded.emit(url)
 
 
 func _on_backend_page_loading(url: String) -> void:
+	if _loading_bar:
+		_loading_bar.visible = true
+		_loading_bar.value = 0.0
 	page_loading.emit(url)
 
 
+func _on_backend_load_progress(progress: float) -> void:
+	if _loading_bar:
+		_loading_bar.value = progress
+		if progress >= 1.0:
+			_loading_bar.visible = false
+
+
 func _process(delta: float) -> void:
-	# Update backend (needed for Android texture updates)
 	if _backend and _backend.has_method("update"):
 		_backend.update(delta)
 
@@ -175,6 +291,8 @@ func load_url(url: String) -> void:
 	if not _backend:
 		return
 	_current_url = url
+	if _url_input:
+		_url_input.text = url
 	_backend.load_url(url)
 
 
@@ -227,7 +345,155 @@ func get_backend_name() -> String:
 
 
 # ============================================================================
-# INPUT HANDLING
+# POINTER EVENT HANDLING - Forward to SubViewport UI or WebView backend
+# ============================================================================
+
+func handle_pointer_event(event: Dictionary) -> void:
+	if not viewport or not mesh_instance:
+		return
+	
+	var event_type: String = String(event.get("type", ""))
+	var hit_pos: Vector3 = event.get("global_position", Vector3.ZERO)
+	var local_hit: Vector3 = mesh_instance.global_transform.affine_inverse() * hit_pos
+	var uv: Vector2 = _world_to_uv(local_hit)
+	
+	if debug_coordinates:
+		print("WebviewViewport3D: uv=", uv)
+	
+	if uv.x < 0.0 or uv.x > 1.0 or uv.y < 0.0 or uv.y > 1.0:
+		if _is_hovering:
+			_send_mouse_exit()
+		return
+	
+	var viewport_pos: Vector2 = Vector2(uv.x * ui_size.x, uv.y * ui_size.y)
+	var is_on_url_bar: bool = viewport_pos.y < URL_BAR_HEIGHT
+	
+	match event_type:
+		"enter", "hover":
+			_send_mouse_motion(viewport_pos)
+			_is_hovering = true
+		"press":
+			_send_mouse_motion(viewport_pos)
+			_send_mouse_button(viewport_pos, true, event.get("action_just_pressed", true))
+			_is_pressed = true
+			# If clicking on web content area, also send to backend
+			if not is_on_url_bar and _backend_available:
+				var backend_pos := _viewport_to_backend_pos(viewport_pos)
+				_backend.send_mouse_down(int(backend_pos.x), int(backend_pos.y), 0)
+			set_focus(true)
+		"hold":
+			_send_mouse_motion(viewport_pos)
+			if not _is_pressed:
+				_send_mouse_button(viewport_pos, true, true)
+				_is_pressed = true
+				if not is_on_url_bar and _backend_available:
+					var backend_pos := _viewport_to_backend_pos(viewport_pos)
+					_backend.send_mouse_down(int(backend_pos.x), int(backend_pos.y), 0)
+		"release":
+			_send_mouse_motion(viewport_pos)
+			_send_mouse_button(viewport_pos, false, event.get("action_just_released", true))
+			if not is_on_url_bar and _backend_available:
+				var backend_pos := _viewport_to_backend_pos(viewport_pos)
+				_backend.send_mouse_up(int(backend_pos.x), int(backend_pos.y), 0)
+			_is_pressed = false
+		"scroll":
+			_send_mouse_motion(viewport_pos)
+			var scroll_value: float = event.get("scroll_value", 0.0)
+			_send_scroll(viewport_pos, scroll_value)
+			if not is_on_url_bar and _backend_available:
+				var backend_pos := _viewport_to_backend_pos(viewport_pos)
+				_backend.send_scroll(int(backend_pos.x), int(backend_pos.y), scroll_value)
+		"exit":
+			_send_mouse_exit()
+			_is_hovering = false
+			_is_pressed = false
+
+
+func _viewport_to_backend_pos(viewport_pos: Vector2) -> Vector2:
+	# Convert viewport position to backend position (offset by URL bar height)
+	return Vector2(viewport_pos.x, viewport_pos.y - URL_BAR_HEIGHT)
+
+
+func _world_to_uv(local_pos: Vector3) -> Vector2:
+	var half_size: Vector2 = quad_size * 0.5
+	if half_size.x == 0 or half_size.y == 0:
+		return Vector2(-1, -1)
+	
+	var u: float = (local_pos.x / half_size.x) * 0.5 + 0.5
+	var v: float = (local_pos.y / half_size.y) * 0.5 + 0.5
+	
+	if flip_v:
+		v = 1.0 - v
+	
+	return Vector2(u, v)
+
+
+func _send_mouse_motion(pos: Vector2) -> void:
+	if not viewport:
+		return
+	
+	var motion_event := InputEventMouseMotion.new()
+	motion_event.position = pos
+	motion_event.global_position = pos
+	
+	if _last_mouse_pos.x >= 0:
+		motion_event.relative = pos - _last_mouse_pos
+	else:
+		motion_event.relative = Vector2.ZERO
+	
+	_last_mouse_pos = pos
+	viewport.push_input(motion_event)
+	
+	# Also send to backend if on web content area
+	if _backend_available and pos.y >= URL_BAR_HEIGHT:
+		var backend_pos := _viewport_to_backend_pos(pos)
+		_backend.send_mouse_move(int(backend_pos.x), int(backend_pos.y))
+
+
+func _send_mouse_button(pos: Vector2, pressed: bool, just_changed: bool) -> void:
+	if not viewport or not just_changed:
+		return
+	
+	var button_event := InputEventMouseButton.new()
+	button_event.position = pos
+	button_event.global_position = pos
+	button_event.button_index = MOUSE_BUTTON_LEFT
+	button_event.pressed = pressed
+	
+	viewport.push_input(button_event)
+
+
+func _send_scroll(pos: Vector2, amount: float) -> void:
+	if not viewport:
+		return
+	if abs(amount) <= 0.001:
+		return
+	
+	var scroll_event := InputEventMouseButton.new()
+	scroll_event.position = pos
+	scroll_event.global_position = pos
+	scroll_event.button_index = MOUSE_BUTTON_WHEEL_UP if amount > 0.0 else MOUSE_BUTTON_WHEEL_DOWN
+	scroll_event.pressed = true
+	scroll_event.factor = abs(amount)
+	viewport.push_input(scroll_event)
+
+
+func _send_mouse_exit() -> void:
+	if _last_mouse_pos.x >= 0 and viewport:
+		var exit_pos := Vector2(-100, -100)
+		var motion_event := InputEventMouseMotion.new()
+		motion_event.position = exit_pos
+		motion_event.global_position = exit_pos
+		motion_event.relative = exit_pos - _last_mouse_pos
+		viewport.push_input(motion_event)
+	
+	_last_mouse_pos = Vector2(-1, -1)
+	_is_hovering = false
+	_is_pressed = false
+
+
+# ============================================================================
+# KEYBOARD INPUT
 # ============================================================================
 
 func _input(event: InputEvent) -> void:
@@ -248,98 +514,6 @@ func _input(event: InputEvent) -> void:
 
 func set_focus(focused: bool) -> void:
 	_has_focus = focused
-
-
-func handle_pointer_event(event: Dictionary) -> void:
-	if not mesh_instance:
-		return
-	
-	var event_type: String = String(event.get("type", ""))
-	var hit_pos: Vector3 = event.get("global_position", Vector3.ZERO)
-	
-	var local_hit: Vector3 = mesh_instance.global_transform.affine_inverse() * hit_pos
-	var uv: Vector2 = _world_to_uv(local_hit)
-	
-	if debug_coordinates:
-		print("WebviewViewport3D: Hit uv=", uv)
-	
-	if uv.x < 0.0 or uv.x > 1.0 or uv.y < 0.0 or uv.y > 1.0:
-		if _is_hovering:
-			_send_mouse_exit()
-		return
-	
-	var pixel_x: int = int(uv.x * ui_size.x)
-	var pixel_y: int = int(uv.y * ui_size.y)
-	
-	match event_type:
-		"enter", "hover":
-			_send_mouse_motion(pixel_x, pixel_y)
-			_is_hovering = true
-		"press":
-			_send_mouse_motion(pixel_x, pixel_y)
-			_send_mouse_button(pixel_x, pixel_y, true)
-			_is_pressed = true
-			set_focus(true)
-		"hold":
-			_send_mouse_motion(pixel_x, pixel_y)
-			if not _is_pressed:
-				_send_mouse_button(pixel_x, pixel_y, true)
-				_is_pressed = true
-		"release":
-			_send_mouse_motion(pixel_x, pixel_y)
-			_send_mouse_button(pixel_x, pixel_y, false)
-			_is_pressed = false
-		"scroll":
-			_send_mouse_motion(pixel_x, pixel_y)
-			var scroll_value: float = event.get("scroll_value", 0.0)
-			_send_scroll(pixel_x, pixel_y, scroll_value)
-		"exit":
-			_send_mouse_exit()
-			_is_hovering = false
-			_is_pressed = false
-
-
-func _world_to_uv(local_pos: Vector3) -> Vector2:
-	var half_size: Vector2 = quad_size * 0.5
-	if half_size.x == 0 or half_size.y == 0:
-		return Vector2(-1, -1)
-	
-	var u: float = (local_pos.x / half_size.x) * 0.5 + 0.5
-	var v: float = (local_pos.y / half_size.y) * 0.5 + 0.5
-	
-	if flip_v:
-		v = 1.0 - v
-	
-	return Vector2(u, v)
-
-
-func _send_mouse_motion(x: int, y: int) -> void:
-	if not _backend_available or not _backend:
-		return
-	_backend.send_mouse_move(x, y)
-	_last_mouse_pos = Vector2(x, y)
-
-
-func _send_mouse_button(x: int, y: int, pressed: bool) -> void:
-	if not _backend_available or not _backend:
-		return
-	
-	if pressed:
-		_backend.send_mouse_down(x, y, 0)
-	else:
-		_backend.send_mouse_up(x, y, 0)
-
-
-func _send_scroll(x: int, y: int, delta: float) -> void:
-	if not _backend_available or not _backend:
-		return
-	_backend.send_scroll(x, y, delta)
-
-
-func _send_mouse_exit() -> void:
-	_last_mouse_pos = Vector2(-1, -1)
-	_is_hovering = false
-	_is_pressed = false
 
 
 # ============================================================================
@@ -380,15 +554,12 @@ func pointer_grab_set_scale(new_scale: float) -> void:
 func pointer_grab_set_rotation(pointer: Node3D, grab_point: Vector3 = Vector3.INF) -> void:
 	if not pointer or not is_instance_valid(pointer):
 		return
-	
 	var pointer_origin: Vector3 = pointer.global_transform.origin
 	var direction: Vector3 = Vector3.ZERO
-	
 	if grab_point.is_finite():
 		direction = (grab_point - pointer_origin).normalized()
 	else:
 		direction = (global_position - pointer_origin).normalized()
-	
 	if direction.length_squared() > 0.001:
 		var look_away_point: Vector3 = global_position + direction
 		look_at(look_away_point, Vector3.UP)

@@ -132,21 +132,22 @@ This plan implements a cross-platform webview solution for Godot 4 VR with suppo
     - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
 - [ ] 10. Create browser UI controls (Phase 2)
-  - [ ] 10.1 Create URL bar component
+  - [x] 10.1 Create URL bar component
     - Text input for URL entry
     - Go button to navigate
     - Display current URL
+    - Integrated with KeyboardManager for virtual keyboard support
     - _Requirements: 8.1_
 
-  - [ ] 10.2 Create navigation buttons
+  - [x] 10.2 Create navigation buttons
     - Back, Forward, Reload buttons
     - Connect to backend methods (go_back, go_forward, reload)
     - Visual feedback for can_go_back/can_go_forward state
     - _Requirements: 8.2_
 
-  - [ ] 10.3 Add loading progress indicator
+  - [x] 10.3 Add loading progress indicator
     - Connect to load_progress signal
-    - Visual progress bar or spinner
+    - Visual progress bar
     - _Requirements: 8.3_
 
   - [ ] 10.4 Display page title
