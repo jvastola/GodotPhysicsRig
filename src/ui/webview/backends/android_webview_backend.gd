@@ -170,7 +170,22 @@ func send_mouse_up(x: int, y: int, button: int = 0) -> void:
 
 func send_scroll(x: int, y: int, delta: float) -> void:
 	if _plugin:
-		_plugin.scroll(x, y, int(delta * 50))
+		# delta is typically -1 to 1 range from scroll wheel
+		# Scale it appropriately for the WebView
+		var scroll_amount := int(delta * 100)
+		_plugin.scroll(x, y, scroll_amount)
+
+
+## Start a drag-based scroll gesture (for touch/VR controllers)
+func send_scroll_drag(x: int, start_y: int, current_y: int) -> void:
+	if _plugin:
+		_plugin.scrollDrag(x, start_y, current_y)
+
+
+## End a drag-based scroll gesture
+func send_scroll_end(x: int, y: int) -> void:
+	if _plugin:
+		_plugin.scrollEnd(x, y)
 
 
 func send_key(keycode: int, pressed: bool, shift: bool = false, alt: bool = false, ctrl: bool = false) -> void:

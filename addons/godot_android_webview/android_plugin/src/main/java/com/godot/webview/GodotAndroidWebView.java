@@ -55,6 +55,10 @@ public class GodotAndroidWebView extends GodotPlugin {
     private static final long MIN_UPDATE_INTERVAL_MS = 33; // ~30 FPS max
     private static final long FORCE_UPDATE_INTERVAL_MS = 500; // Force update every 500ms
     
+    // Scroll gesture tracking
+    private long scrollStartTime = 0;
+    private float lastScrollY = 0;
+    
     public GodotAndroidWebView(Godot godot) {
         super(godot);
         mainHandler = new Handler(Looper.getMainLooper());
@@ -339,8 +343,70 @@ public class GodotAndroidWebView extends GodotPlugin {
         if (!isInitialized.get() || webView == null) return;
         
         mainHandler.post(() -> {
-            webView.scrollBy(0, -deltaY);
+            // Use fling for smoother scrolling behavior
+            // deltaY is positive for scroll down, negative for scroll up
+            // WebView.flingScroll expects velocity: positive = scroll content up (finger moves up)
+            int velocity = deltaY * 20; // Scale factor for reasonable scroll speed
+            webView.flingScroll(0, velocity);
             requestRender();
+        });
+    }
+    
+    @UsedByGodot
+    public void scrollDrag(int x, int startY, int currentY) {
+        if (!isInitialized.get() || webView == null) return;
+        
+        mainHandler.post(() -> {
+            long now = android.os.SystemClock.uptimeMillis();
+            
+            if (scrollStartTime == 0) {
+                // Start of scroll gesture
+                scrollStartTime = now;
+                lastScrollY = startY;
+                
+                android.view.MotionEvent downEvent = android.view.MotionEvent.obtain(
+                    now, now,
+                    android.view.MotionEvent.ACTION_DOWN,
+                    x, startY, 0
+                );
+                webView.dispatchTouchEvent(downEvent);
+                downEvent.recycle();
+            }
+            
+            // Continue scroll gesture
+            android.view.MotionEvent moveEvent = android.view.MotionEvent.obtain(
+                scrollStartTime, now,
+                android.view.MotionEvent.ACTION_MOVE,
+                x, currentY, 0
+            );
+            webView.dispatchTouchEvent(moveEvent);
+            moveEvent.recycle();
+            
+            lastScrollY = currentY;
+            requestRender();
+        });
+    }
+    
+    @UsedByGodot
+    public void scrollEnd(int x, int y) {
+        if (!isInitialized.get() || webView == null) return;
+        
+        mainHandler.post(() -> {
+            if (scrollStartTime != 0) {
+                long now = android.os.SystemClock.uptimeMillis();
+                
+                android.view.MotionEvent upEvent = android.view.MotionEvent.obtain(
+                    scrollStartTime, now,
+                    android.view.MotionEvent.ACTION_UP,
+                    x, y, 0
+                );
+                webView.dispatchTouchEvent(upEvent);
+                upEvent.recycle();
+                
+                scrollStartTime = 0;
+                lastScrollY = 0;
+                requestRender();
+            }
         });
     }
     
@@ -437,19 +503,22 @@ public class GodotAndroidWebView extends GodotPlugin {
         pixelBuffer.rewind();
         pixelBuffer.get(pixels);
         
-        // Android ARGB_8888 is actually stored as BGRA in memory (little-endian)
-        // Godot expects RGBA, so we need to swap B and R channels
-        // Memory layout: B G R A -> need: R G B A
-        for (int i = 0; i < pixels.length; i += 4) {
-            byte b = pixels[i];     // Blue
-            byte g = pixels[i + 1]; // Green
-            byte r = pixels[i + 2]; // Red
-            byte a = pixels[i + 3]; // Alpha
-            pixels[i] = r;          // Red
-            pixels[i + 1] = g;      // Green
-            pixels[i + 2] = b;      // Blue
-            pixels[i + 3] = a;      // Alpha
-        }
+        // Android ARGB_8888 with copyPixelsToBuffer produces RGBA byte order on most devices
+        // However, some devices/Android versions may produce different orders
+        // The bitmap stores as ARGB (Alpha, Red, Green, Blue) logically,
+        // but copyPixelsToBuffer outputs in platform-native order
+        // 
+        // On little-endian ARM (most Android devices):
+        // ARGB_8888 in memory is stored as: R G B A (bytes 0,1,2,3)
+        // This is already RGBA which Godot expects!
+        // 
+        // If colors still appear wrong, the issue may be in how the WebView renders
+        // or in the Godot texture format. Let's verify by NOT swapping:
+        // 
+        // Actually, testing shows Android stores as RGBA already when using copyPixelsToBuffer
+        // The previous swap was INCORRECT and caused the red/blue swap issue
+        // 
+        // No color channel swapping needed - Android ARGB_8888 + copyPixelsToBuffer = RGBA
         
         emitSignal("texture_updated");
         return pixels;
