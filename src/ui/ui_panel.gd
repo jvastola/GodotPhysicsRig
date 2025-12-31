@@ -131,6 +131,7 @@ func _setup_panels_tab() -> void:
 		{"label": "Color Picker", "node": "ColorPickerViewport3D"},
 		{"label": "Poly Tool Export", "node": "PolyToolViewport3D"},
 		{"label": "🧱 Block Library", "node": "BlockLibraryViewport3D"},
+		{"label": "🌐 Web Browser", "node": "WebviewViewport3D"},
 	]
 	
 	for entry in quick_panels:
