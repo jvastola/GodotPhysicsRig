@@ -407,7 +407,8 @@ func handle_pointer_event(event: Dictionary) -> void:
 	var hit_pos: Vector3 = event.get("global_position", Vector3.ZERO)
 	var local_hit: Vector3 = mesh_instance.global_transform.affine_inverse() * hit_pos
 	var uv: Vector2 = _world_to_uv(local_hit)
-	var pointer: Node3D = event.get("pointer", null)
+	var pointer_variant = event.get("pointer", null)
+	var pointer: Node3D = pointer_variant as Node3D if pointer_variant else null
 	
 	if debug_coordinates:
 		print("WebviewViewport3D: uv=", uv, " type=", event_type)
@@ -554,9 +555,9 @@ func _update_resize(pointer: Node3D) -> void:
 	if not _is_resizing or not pointer:
 		return
 	
-	var current_distance := global_position.distance_to(pointer.global_position)
-	var scale_factor := current_distance / _resize_start_distance
-	var new_scale := clamp(_resize_start_scale * scale_factor, min_scale, max_scale)
+	var current_distance: float = global_position.distance_to(pointer.global_position)
+	var scale_factor: float = current_distance / _resize_start_distance
+	var new_scale: float = clampf(_resize_start_scale * scale_factor, min_scale, max_scale)
 	
 	scale = Vector3.ONE * new_scale
 
