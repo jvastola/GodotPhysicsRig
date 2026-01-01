@@ -41,6 +41,11 @@ var local_user_id: String = ""  # Our own user ID from Nakama
 var current_match_id: String = ""
 var match_peers: Dictionary = {}  # peer_id -> presence (EXCLUDING self)
 
+# Authentication retry settings
+var _auth_retry_count: int = 0
+var _auth_max_retries: int = 3
+var _auth_retry_delay: float = 1.0
+
 # Op codes for match state (must match across all clients)
 enum MatchOpCode {
 	PLAYER_TRANSFORM = 1,
@@ -56,8 +61,9 @@ enum MatchOpCode {
 
 
 func _ready() -> void:
-	# Create HTTP client
+	# Create HTTP client with timeout
 	http_client = HTTPRequest.new()
+	http_client.timeout = 10.0  # 10 second timeout
 	add_child(http_client)
 	http_client.request_completed.connect(_on_http_request_completed)
 	
@@ -70,8 +76,14 @@ func _ready() -> void:
 	
 	# Create HTTPRequest node for REST API calls
 	http_request = HTTPRequest.new()
+	http_request.timeout = 10.0  # 10 second timeout
 	add_child(http_request)
 	http_request.request_completed.connect(_on_match_list_http_completed)
+	
+	# Wait a moment for network to be ready before any requests
+	# This helps avoid connection errors on startup
+	await get_tree().create_timer(0.5).timeout
+	print("NakamaManager: Network initialization delay complete")
 
 
 func _process(_delta: float) -> void:
@@ -124,15 +136,25 @@ func authenticate_device() -> void:
 		authenticated.emit(session)
 		return
 	
-	# Check if HTTP client is busy
-	if http_client.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
-		print("NakamaManager: HTTP client busy, cancelling previous request")
+	# Reset retry count for new authentication attempt
+	_auth_retry_count = 0
+	
+	# Check if HTTP request is busy (HTTPRequest uses get_http_client_status())
+	var client_status = http_client.get_http_client_status()
+	if client_status != HTTPClient.STATUS_DISCONNECTED and client_status != HTTPClient.STATUS_RESOLVING and client_status != HTTPClient.STATUS_CANT_CONNECT:
+		print("NakamaManager: HTTP client busy (status: %d), cancelling previous request" % client_status)
 		http_client.cancel_request()
 		# Wait a frame before retrying
 		await get_tree().process_frame
 	
 	print("NakamaManager: Authenticating with device ID...")
+	print("NakamaManager: Target URL: http://%s:%d" % [nakama_host, nakama_port])
 	
+	_do_authenticate_request()
+
+
+## Internal function to perform the actual authentication request
+func _do_authenticate_request() -> void:
 	var url = _get_nakama_url() + "/v2/account/authenticate/device?create=true"
 	var body = JSON.stringify({
 		"id": device_id
@@ -143,6 +165,7 @@ func authenticate_device() -> void:
 		"Authorization: Basic " + Marshalls.utf8_to_base64(nakama_server_key + ":")
 	]
 	
+	print("NakamaManager: Sending auth request to: ", url)
 	var err = http_client.request(url, headers, HTTPClient.METHOD_POST, body)
 	if err != OK:
 		push_error("NakamaManager: Failed to start auth request: ", err)
@@ -429,10 +452,43 @@ func _generate_room_code() -> String:
 
 
 func _on_http_request_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	# Map result codes to human-readable strings
+	var result_names = {
+		0: "RESULT_SUCCESS",
+		1: "RESULT_CHUNKED_BODY_SIZE_MISMATCH",
+		2: "RESULT_CANT_CONNECT",
+		3: "RESULT_CANT_RESOLVE",
+		4: "RESULT_CONNECTION_ERROR",
+		5: "RESULT_TLS_HANDSHAKE_ERROR",
+		6: "RESULT_NO_RESPONSE",
+		7: "RESULT_BODY_SIZE_LIMIT_EXCEEDED",
+		8: "RESULT_BODY_DECOMPRESS_FAILED",
+		9: "RESULT_REQUEST_FAILED",
+		10: "RESULT_DOWNLOAD_FILE_CANT_OPEN",
+		11: "RESULT_DOWNLOAD_FILE_WRITE_ERROR",
+		12: "RESULT_REDIRECT_LIMIT_REACHED",
+		13: "RESULT_TIMEOUT"
+	}
+	var result_name = result_names.get(result, "UNKNOWN")
+	
 	if result != HTTPRequest.RESULT_SUCCESS:
-		push_error("NakamaManager: HTTP request failed: ", result)
-		authentication_failed.emit("Connection failed")
+		print("NakamaManager: HTTP request failed: %d (%s) to %s:%d" % [result, result_name, nakama_host, nakama_port])
+		
+		# Retry logic for connection errors
+		if _auth_retry_count < _auth_max_retries:
+			_auth_retry_count += 1
+			print("NakamaManager: Retrying authentication (%d/%d) in %.1fs..." % [_auth_retry_count, _auth_max_retries, _auth_retry_delay])
+			await get_tree().create_timer(_auth_retry_delay).timeout
+			_do_authenticate_request()
+			return
+		
+		push_error("NakamaManager: Authentication failed after %d retries" % _auth_max_retries)
+		_auth_retry_count = 0
+		authentication_failed.emit("Connection failed: " + result_name)
 		return
+	
+	# Reset retry count on success
+	_auth_retry_count = 0
 	
 	if response_code != 200:
 		push_error("NakamaManager: HTTP error: ", response_code)
