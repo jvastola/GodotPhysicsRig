@@ -1,0 +1,236 @@
+#!/bin/bash
+# Build Android GDExtension plugins and export Godot project for Quest 3
+# Usage: ./buildandroid [--deploy] [--clean]
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Configuration
+GODOT_PATH="${GODOT_PATH:-/Applications/Godot.app/Contents/MacOS/godot}"
+EXPORT_PRESET="Quest 3"
+OUTPUT_APK="android/scenetree.apk"
+ADB_PACKAGE="com.anyreality.scenetree"
+
+# Parse arguments
+DEPLOY=false
+CLEAN=false
+SKIP_PLUGINS=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --deploy|-d)
+            DEPLOY=true
+            shift
+            ;;
+        --clean|-c)
+            CLEAN=true
+            shift
+            ;;
+        --skip-plugins|-s)
+            SKIP_PLUGINS=true
+            shift
+            ;;
+        --help|-h)
+            echo "Usage: ./buildandroid [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --deploy, -d       Deploy APK to connected Quest device after build"
+            echo "  --clean, -c        Clean build artifacts before building"
+            echo "  --skip-plugins, -s Skip building Android plugins (use existing AARs)"
+            echo "  --help, -h         Show this help message"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Unknown option: $1${NC}"
+            exit 1
+            ;;
+    esac
+done
+
+echo -e "${BLUE}========================================"
+echo "  Android Build Script for Quest 3"
+echo -e "========================================${NC}"
+echo ""
+
+# Check for Godot
+if [ ! -f "$GODOT_PATH" ]; then
+    echo -e "${RED}ERROR: Godot not found at $GODOT_PATH${NC}"
+    echo "Set GODOT_PATH environment variable to your Godot executable"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Godot found at: $GODOT_PATH${NC}"
+
+# Clean if requested
+if [ "$CLEAN" = true ]; then
+    echo ""
+    echo -e "${YELLOW}Cleaning build artifacts...${NC}"
+    rm -rf addons/godot_android_webview/android_plugin/build
+    rm -rf android_plugin_source/livekit/build
+    rm -rf android/build/build
+    rm -f "$OUTPUT_APK"
+    echo -e "${GREEN}✓ Clean complete${NC}"
+fi
+
+# Build Android plugins
+if [ "$SKIP_PLUGINS" = false ]; then
+    echo ""
+    echo -e "${BLUE}========================================"
+    echo "  Building Android Plugins"
+    echo -e "========================================${NC}"
+    
+    # Build GodotAndroidWebView plugin
+    echo ""
+    echo -e "${YELLOW}Building GodotAndroidWebView plugin...${NC}"
+    WEBVIEW_DIR="addons/godot_android_webview/android_plugin"
+    
+    if [ -d "$WEBVIEW_DIR" ]; then
+        pushd "$WEBVIEW_DIR" > /dev/null
+        
+        # Check for godot-lib.aar
+        if [ ! -f "libs/godot-lib.release.aar" ]; then
+            echo -e "${YELLOW}WARNING: godot-lib.release.aar not found in $WEBVIEW_DIR/libs${NC}"
+            echo "Attempting to continue with Maven dependency..."
+        fi
+        
+        chmod +x gradlew 2>/dev/null || true
+        # Clean and rebuild to ensure latest Java changes are included
+        ./gradlew clean assembleRelease
+        
+        # Copy AAR to android/plugins
+        if [ -f "build/outputs/aar/GodotAndroidWebView-release.aar" ]; then
+            cp -f build/outputs/aar/GodotAndroidWebView-release.aar ../../../android/plugins/GodotAndroidWebView.aar
+            echo -e "${GREEN}✓ GodotAndroidWebView plugin built and copied${NC}"
+        else
+            echo -e "${RED}ERROR: GodotAndroidWebView AAR not found after build${NC}"
+            exit 1
+        fi
+        
+        # Copy gdap file if it exists in addons folder
+        if [ -f "../../../android/plugins/GodotAndroidWebView.gdap" ]; then
+            echo -e "${GREEN}✓ GodotAndroidWebView.gdap already in place${NC}"
+        fi
+        
+        popd > /dev/null
+    else
+        echo -e "${YELLOW}WARNING: WebView plugin directory not found, skipping${NC}"
+    fi
+    
+    # Build GodotLiveKit plugin
+    echo ""
+    echo -e "${YELLOW}Building GodotLiveKit plugin...${NC}"
+    LIVEKIT_DIR="android_plugin_source/livekit"
+    
+    if [ -d "$LIVEKIT_DIR" ]; then
+        pushd "$LIVEKIT_DIR" > /dev/null
+        
+        chmod +x gradlew 2>/dev/null || true
+        ./gradlew assembleRelease --quiet
+        
+        # Copy AAR and gdap to android/plugins
+        if [ -f "build/outputs/aar/livekit-release.aar" ]; then
+            cp build/outputs/aar/livekit-release.aar ../../android/plugins/GodotLiveKit.aar
+            echo -e "${GREEN}✓ GodotLiveKit plugin built${NC}"
+        elif [ -f "build/outputs/aar/GodotLiveKit-release.aar" ]; then
+            cp build/outputs/aar/GodotLiveKit-release.aar ../../android/plugins/GodotLiveKit.aar
+            echo -e "${GREEN}✓ GodotLiveKit plugin built${NC}"
+        else
+            echo -e "${YELLOW}WARNING: GodotLiveKit AAR not found, checking for existing...${NC}"
+            if [ -f "../../android/plugins/GodotLiveKit.aar" ]; then
+                echo -e "${GREEN}✓ Using existing GodotLiveKit.aar${NC}"
+            else
+                echo -e "${RED}ERROR: No GodotLiveKit AAR available${NC}"
+                exit 1
+            fi
+        fi
+        
+        # Copy gdap file if it exists
+        if [ -f "GodotLiveKit.gdap" ]; then
+            cp GodotLiveKit.gdap ../../android/plugins/
+        fi
+        
+        popd > /dev/null
+    else
+        echo -e "${YELLOW}WARNING: LiveKit plugin directory not found, skipping${NC}"
+    fi
+    
+    echo ""
+    echo -e "${GREEN}✓ All plugins built successfully${NC}"
+fi
+
+# Export Godot project
+echo ""
+echo -e "${BLUE}========================================"
+echo "  Exporting Godot Project"
+echo -e "========================================${NC}"
+echo ""
+echo -e "${YELLOW}Exporting to: $OUTPUT_APK${NC}"
+echo -e "${YELLOW}Using preset: $EXPORT_PRESET${NC}"
+echo ""
+
+# Run Godot export
+"$GODOT_PATH" --headless --export-debug "$EXPORT_PRESET" "$OUTPUT_APK"
+
+if [ $? -ne 0 ]; then
+    echo -e "${RED}ERROR: Godot export failed${NC}"
+    exit 1
+fi
+
+if [ ! -f "$OUTPUT_APK" ]; then
+    echo -e "${RED}ERROR: APK not found after export${NC}"
+    exit 1
+fi
+
+APK_SIZE=$(du -h "$OUTPUT_APK" | cut -f1)
+echo ""
+echo -e "${GREEN}✓ Export successful!${NC}"
+echo -e "${GREEN}  APK: $OUTPUT_APK ($APK_SIZE)${NC}"
+
+# Deploy if requested
+if [ "$DEPLOY" = true ]; then
+    echo ""
+    echo -e "${BLUE}========================================"
+    echo "  Deploying to Quest"
+    echo -e "========================================${NC}"
+    echo ""
+    
+    # Check for adb
+    if ! command -v adb &> /dev/null; then
+        echo -e "${RED}ERROR: adb not found in PATH${NC}"
+        echo "Install Android SDK platform-tools and add to PATH"
+        exit 1
+    fi
+    
+    # Check for connected device
+    DEVICE_COUNT=$(adb devices | grep -v "List" | grep -c "device$" || true)
+    if [ "$DEVICE_COUNT" -eq 0 ]; then
+        echo -e "${RED}ERROR: No Quest device connected${NC}"
+        echo "Connect your Quest via USB and enable developer mode"
+        exit 1
+    fi
+    
+    echo -e "${YELLOW}Installing APK...${NC}"
+    adb install -r "$OUTPUT_APK"
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ APK installed successfully${NC}"
+        echo ""
+        echo -e "${YELLOW}Note: Launch the app manually from your Quest's app library${NC}"
+        echo -e "${YELLOW}(Auto-launch is blocked by Quest security restrictions)${NC}"
+    else
+        echo -e "${RED}ERROR: APK installation failed${NC}"
+        exit 1
+    fi
+fi
+
+echo ""
+echo -e "${BLUE}========================================"
+echo -e "${GREEN}  BUILD COMPLETE!${NC}"
+echo -e "${BLUE}========================================${NC}"
+echo ""

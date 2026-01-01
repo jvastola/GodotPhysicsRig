@@ -13,10 +13,15 @@ class_name WebviewViewport3D
 @export var quad_size: Vector2 = Vector2(2.56, 1.44)  # 16:9 aspect ratio
 @export var debug_coordinates: bool = false
 @export var flip_v: bool = true
+@export var enable_resize: bool = true  # Enable corner resize handles
+@export var min_scale: float = 0.5
+@export var max_scale: float = 3.0
 
 signal page_loaded(url: String)
 signal page_loading(url: String)
 signal close_requested
+signal resize_started
+signal resize_ended
 
 @onready var viewport: SubViewport = $SubViewport
 @onready var mesh_instance: MeshInstance3D = $MeshInstance3D
@@ -35,25 +40,38 @@ signal close_requested
 
 # URL bar height in pixels (for determining if click is on URL bar or web content)
 const URL_BAR_HEIGHT: int = 44
+const RESIZE_CORNER_SIZE: float = 0.15  # Size of resize corner in UV space (0-1)
 
 var _saved_static_body_layer: int = 0
 var _last_mouse_pos: Vector2 = Vector2(-1, -1)
 var _is_hovering: bool = false
 var _is_pressed: bool = false
 var _has_focus: bool = false
-var _last_backend_press_pos: Vector2 = Vector2(-1, -1)  # Track where we sent touchDown to backend
+var _last_backend_press_pos: Vector2 = Vector2(-1, -1)
 
 # Backend reference
 var _backend: WebViewBackend = null
 var _backend_available: bool = false
 var _current_url: String = ""
 
-# Scroll state
+# Scroll state - using simple JS scrolling
 var _scroll_y: int = 0
 var _scroll_height: int = 0
 var _client_height: int = 0
 var _scroll_info_timer: float = 0.0
-const SCROLL_INFO_INTERVAL: float = 0.5  # Request scroll info every 0.5 seconds
+const SCROLL_INFO_INTERVAL: float = 0.5
+
+# Drag-to-scroll state
+var _drag_start_pos: Vector2 = Vector2.ZERO
+var _last_drag_pos: Vector2 = Vector2.ZERO
+var _is_dragging: bool = false
+var _accumulated_scroll: float = 0.0  # Accumulate small movements
+
+# Resize state
+var _is_resizing: bool = false
+var _resize_start_scale: float = 1.0
+var _resize_start_distance: float = 0.0
+var _resize_corner: String = ""  # "bl", "br", "tl", "tr" for corners
 
 
 func _ready() -> void:
@@ -108,13 +126,9 @@ func _setup_url_bar() -> void:
 	if _loading_bar:
 		_loading_bar.visible = false
 	
-	# Setup scrollbar
+	# Hide Godot scrollbar - we use JS scrolling only to avoid double scrollbars
 	if _scroll_bar:
-		_scroll_bar.value_changed.connect(_on_scroll_bar_changed)
-		_scroll_bar.min_value = 0
-		_scroll_bar.max_value = 1000
-		_scroll_bar.page = 100
-		_scroll_bar.step = 10
+		_scroll_bar.visible = false
 
 
 func _on_url_input_focus_entered() -> void:
@@ -291,26 +305,15 @@ func _on_backend_load_progress(progress: float) -> void:
 			_loading_bar.visible = false
 
 
-func _on_backend_scroll_info(scroll_y: int, scroll_height: int, client_height: int) -> void:
-	_scroll_y = scroll_y
-	_scroll_height = scroll_height
-	_client_height = client_height
-	
-	# Update scrollbar without triggering value_changed
-	if _scroll_bar and scroll_height > client_height:
-		_scroll_bar.set_block_signals(true)
-		_scroll_bar.max_value = scroll_height - client_height
-		_scroll_bar.page = client_height
-		_scroll_bar.value = scroll_y
-		_scroll_bar.set_block_signals(false)
-		_scroll_bar.visible = true
-	elif _scroll_bar:
-		_scroll_bar.visible = false
+func _on_backend_scroll_info(_scroll_y: int, _scroll_height: int, _client_height: int) -> void:
+	# Scroll info received but not used - Godot scrollbar is hidden
+	# JS scrolling handles everything directly
+	pass
 
 
-func _on_scroll_bar_changed(value: float) -> void:
-	if _backend and _backend.has_method("scroll_to_position"):
-		_backend.scroll_to_position(int(value))
+func _on_scroll_bar_changed(_value: float) -> void:
+	# VScrollBar is hidden - scrolling handled via JS in handle_pointer_event
+	pass
 
 
 func _process(delta: float) -> void:
@@ -404,9 +407,10 @@ func handle_pointer_event(event: Dictionary) -> void:
 	var hit_pos: Vector3 = event.get("global_position", Vector3.ZERO)
 	var local_hit: Vector3 = mesh_instance.global_transform.affine_inverse() * hit_pos
 	var uv: Vector2 = _world_to_uv(local_hit)
+	var pointer: Node3D = event.get("pointer", null)
 	
 	if debug_coordinates:
-		print("WebviewViewport3D: uv=", uv)
+		print("WebviewViewport3D: uv=", uv, " type=", event_type)
 	
 	if uv.x < 0.0 or uv.x > 1.0 or uv.y < 0.0 or uv.y > 1.0:
 		if _is_hovering:
@@ -415,6 +419,7 @@ func handle_pointer_event(event: Dictionary) -> void:
 	
 	var viewport_pos: Vector2 = Vector2(uv.x * ui_size.x, uv.y * ui_size.y)
 	var is_on_url_bar: bool = viewport_pos.y < URL_BAR_HEIGHT
+	var corner := _get_resize_corner(uv)
 	
 	match event_type:
 		"enter", "hover":
@@ -422,48 +427,146 @@ func handle_pointer_event(event: Dictionary) -> void:
 			_is_hovering = true
 		"press":
 			_send_mouse_motion(viewport_pos)
-			_send_mouse_button(viewport_pos, true, event.get("action_just_pressed", true))
 			_is_pressed = true
-			# If clicking on web content area, also send to backend
-			if not is_on_url_bar and _backend_available:
-				var backend_pos := _viewport_to_backend_pos(viewport_pos)
-				_backend.send_mouse_down(int(backend_pos.x), int(backend_pos.y), 0)
-				_last_backend_press_pos = backend_pos
+			
+			# Check if pressing on resize corner
+			if enable_resize and corner != "" and pointer:
+				_start_resize(corner, pointer)
+			else:
+				_send_mouse_button(viewport_pos, true, event.get("action_just_pressed", true))
+				# Start drag tracking for scrolling
+				if not is_on_url_bar and _backend_available:
+					_is_dragging = true
+					_drag_start_pos = viewport_pos
+					_last_drag_pos = viewport_pos
+					_accumulated_scroll = 0.0
 			set_focus(true)
 		"hold":
-			_send_mouse_motion(viewport_pos)
-			if not _is_pressed:
-				_send_mouse_button(viewport_pos, true, true)
-				_is_pressed = true
-				if not is_on_url_bar and _backend_available:
-					var backend_pos := _viewport_to_backend_pos(viewport_pos)
-					_backend.send_mouse_down(int(backend_pos.x), int(backend_pos.y), 0)
-					_last_backend_press_pos = backend_pos
+			if _is_resizing and pointer:
+				_update_resize(pointer)
+			elif _is_dragging and not is_on_url_bar and _backend_available:
+				# Calculate scroll delta
+				var delta_y: float = viewport_pos.y - _last_drag_pos.y
+				_last_drag_pos = viewport_pos
+				
+				# Accumulate scroll for smoother feel
+				_accumulated_scroll += delta_y
+				
+				# Send scroll when accumulated enough (reduces jitter)
+				if abs(_accumulated_scroll) > 2.0:
+					# Invert and amplify for natural scrolling feel
+					var scroll_amount: int = int(_accumulated_scroll * -1.5)
+					_backend.scroll_by_amount(scroll_amount)
+					_accumulated_scroll = 0.0
+					if debug_coordinates:
+						print("WebviewViewport3D: Scroll amount=", scroll_amount)
+			else:
+				_send_mouse_motion(viewport_pos)
+				if not _is_pressed:
+					_send_mouse_button(viewport_pos, true, true)
+					_is_pressed = true
+					if not is_on_url_bar and _backend_available:
+						_is_dragging = true
+						_drag_start_pos = viewport_pos
+						_last_drag_pos = viewport_pos
+						_accumulated_scroll = 0.0
 		"release":
-			_send_mouse_motion(viewport_pos)
-			_send_mouse_button(viewport_pos, false, event.get("action_just_released", true))
-			# Always send touchUp to backend if we had sent a touchDown
-			if _backend_available and _last_backend_press_pos.x >= 0:
-				var backend_pos := _viewport_to_backend_pos(viewport_pos)
-				_backend.send_mouse_up(int(backend_pos.x), int(backend_pos.y), 0)
-				_last_backend_press_pos = Vector2(-1, -1)
+			if _is_resizing:
+				_end_resize()
+			else:
+				_send_mouse_motion(viewport_pos)
+				_send_mouse_button(viewport_pos, false, event.get("action_just_released", true))
+				
+				# Check if this was a tap (click) vs drag (scroll)
+				if _is_dragging and _backend_available:
+					var drag_distance := viewport_pos.distance_to(_drag_start_pos)
+					if drag_distance < 15.0:  # Tap threshold
+						var backend_pos := _viewport_to_backend_pos(viewport_pos)
+						if _backend.has_method("tap"):
+							_backend.tap(int(backend_pos.x), int(backend_pos.y))
+						else:
+							_backend.send_mouse_down(int(backend_pos.x), int(backend_pos.y), 0)
+							_backend.send_mouse_up(int(backend_pos.x), int(backend_pos.y), 0)
+						if debug_coordinates:
+							print("WebviewViewport3D: Tap at ", backend_pos)
+			
+			# Clear states
+			_is_dragging = false
+			_drag_start_pos = Vector2.ZERO
+			_last_drag_pos = Vector2.ZERO
+			_accumulated_scroll = 0.0
+			_last_backend_press_pos = Vector2(-1, -1)
 			_is_pressed = false
 		"scroll":
 			_send_mouse_motion(viewport_pos)
 			var scroll_value: float = event.get("scroll_value", 0.0)
 			_send_scroll(viewport_pos, scroll_value)
-			# Scroll via scrollbar instead of native backend scrolling
-			if not is_on_url_bar and _backend_available and _scroll_bar:
+			if not is_on_url_bar and _backend_available:
 				var scroll_delta := int(scroll_value * 100)
-				_scroll_bar.value = clampf(_scroll_bar.value - scroll_delta, _scroll_bar.min_value, _scroll_bar.max_value)
+				_backend.scroll_by_amount(-scroll_delta)
 		"exit":
 			_send_mouse_exit()
 			_is_hovering = false
-			# If we exit while pressed, send touchUp to backend to release the touch state
-			if _is_pressed and _backend_available and _last_backend_press_pos.x >= 0:
-				_backend.send_mouse_up(int(_last_backend_press_pos.x), int(_last_backend_press_pos.y), 0)
-				_last_backend_press_pos = Vector2(-1, -1)
+			if _is_resizing:
+				_end_resize()
+			_is_dragging = false
+			_drag_start_pos = Vector2.ZERO
+			_last_drag_pos = Vector2.ZERO
+			_accumulated_scroll = 0.0
+			_last_backend_press_pos = Vector2(-1, -1)
 			_is_pressed = false
+
+
+## Check if UV position is in a resize corner, returns corner name or empty string
+func _get_resize_corner(uv: Vector2) -> String:
+	if not enable_resize:
+		return ""
+	
+	var corner_size := RESIZE_CORNER_SIZE
+	
+	# Bottom-left
+	if uv.x < corner_size and uv.y > (1.0 - corner_size):
+		return "bl"
+	# Bottom-right
+	if uv.x > (1.0 - corner_size) and uv.y > (1.0 - corner_size):
+		return "br"
+	# Top-left
+	if uv.x < corner_size and uv.y < corner_size:
+		return "tl"
+	# Top-right
+	if uv.x > (1.0 - corner_size) and uv.y < corner_size:
+		return "tr"
+	
+	return ""
+
+
+func _start_resize(corner: String, pointer: Node3D) -> void:
+	_is_resizing = true
+	_resize_corner = corner
+	_resize_start_scale = scale.x
+	_resize_start_distance = global_position.distance_to(pointer.global_position)
+	resize_started.emit()
+	if debug_coordinates:
+		print("WebviewViewport3D: Resize started from corner ", corner)
+
+
+func _update_resize(pointer: Node3D) -> void:
+	if not _is_resizing or not pointer:
+		return
+	
+	var current_distance := global_position.distance_to(pointer.global_position)
+	var scale_factor := current_distance / _resize_start_distance
+	var new_scale := clamp(_resize_start_scale * scale_factor, min_scale, max_scale)
+	
+	scale = Vector3.ONE * new_scale
+
+
+func _end_resize() -> void:
+	_is_resizing = false
+	_resize_corner = ""
+	resize_ended.emit()
+	if debug_coordinates:
+		print("WebviewViewport3D: Resize ended, scale=", scale.x)
 
 
 func _viewport_to_backend_pos(viewport_pos: Vector2) -> Vector2:
@@ -501,10 +604,8 @@ func _send_mouse_motion(pos: Vector2) -> void:
 	_last_mouse_pos = pos
 	viewport.push_input(motion_event)
 	
-	# Also send to backend if on web content area
-	if _backend_available and pos.y >= URL_BAR_HEIGHT:
-		var backend_pos := _viewport_to_backend_pos(pos)
-		_backend.send_mouse_move(int(backend_pos.x), int(backend_pos.y))
+	# Don't send mouse move to backend during normal hover - only during active interactions
+	# This prevents interference with scrolling
 
 
 func _send_mouse_button(pos: Vector2, pressed: bool, just_changed: bool) -> void:

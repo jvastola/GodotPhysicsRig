@@ -170,6 +170,18 @@ func send_mouse_up(x: int, y: int, button: int = 0) -> void:
 		_plugin.touchUp(x, y)
 
 
+## Perform a tap (click) at the specified position
+func tap(x: int, y: int) -> void:
+	if _plugin:
+		_plugin.tap(x, y)
+
+
+## Cancel current touch gesture
+func touch_cancel() -> void:
+	if _plugin:
+		_plugin.touchCancel()
+
+
 func send_scroll(x: int, y: int, delta: float) -> void:
 	# Native scrolling disabled - use scroll_by_amount instead
 	pass
@@ -256,7 +268,26 @@ static func is_available() -> bool:
 # Signal handlers
 func _on_page_loaded(url: String) -> void:
 	_current_url = url
+	# Inject CSS to hide webpage scrollbar (we handle scrolling via drag gestures)
+	_hide_webpage_scrollbar()
 	page_loaded.emit(url)
+
+
+func _hide_webpage_scrollbar() -> void:
+	if not _plugin:
+		return
+	# Inject CSS to hide scrollbars on the webpage
+	var css_script := """
+		(function() {
+			var style = document.createElement('style');
+			style.textContent = `
+				::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+				html, body { scrollbar-width: none !important; -ms-overflow-style: none !important; }
+			`;
+			document.head.appendChild(style);
+		})();
+	"""
+	_plugin.executeJavaScript(css_script)
 
 
 func _on_page_started(url: String) -> void:
@@ -277,13 +308,25 @@ func _on_texture_updated() -> void:
 
 
 func _on_scroll_info_received(json_str: String) -> void:
+	# Check for null/empty string before parsing (Requirements 3.1, 3.2)
+	if json_str.is_empty() or json_str == "null":
+		push_warning("AndroidWebViewBackend: Received empty or null scroll info")
+		return
+	
 	var json := JSON.new()
 	var error := json.parse(json_str)
-	if error == OK:
-		var data: Dictionary = json.data
-		var scroll_y: int = int(data.get("scrollY", 0))
-		var scroll_height: int = int(data.get("scrollHeight", 0))
-		var client_height: int = int(data.get("clientHeight", 0))
-		scroll_info_received.emit(scroll_y, scroll_height, client_height)
-	else:
+	if error != OK:
 		push_warning("AndroidWebViewBackend: Failed to parse scroll info: ", json_str)
+		return
+	
+	# Check if parsed data is Dictionary before using (Requirements 3.1, 3.2, 3.3)
+	var data = json.data  # Don't type as Dictionary yet
+	if data == null or not data is Dictionary:
+		push_warning("AndroidWebViewBackend: Invalid scroll info data type, expected Dictionary")
+		return
+	
+	# Now safe to use as Dictionary
+	var scroll_y: int = int(data.get("scrollY", 0))
+	var scroll_height: int = int(data.get("scrollHeight", 0))
+	var client_height: int = int(data.get("clientHeight", 0))
+	scroll_info_received.emit(scroll_y, scroll_height, client_height)
