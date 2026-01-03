@@ -1,4 +1,4 @@
-[gd_scene load_steps=62 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=63 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -42,6 +42,7 @@
 [ext_resource type="PackedScene" path="res://src/ui/TerminalViewport3D.tscn" id="46_terminal"]
 [ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://src/objects/viewport_mirror.gd" id="47_viewport_mirror"]
 [ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://src/systems/grid_painter.gd" id="48_grid_painter"]
+[ext_resource type="PackedScene" path="res://src/ui/PassthroughSettingsViewport3D.tscn" id="49_passthrough_settings"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -235,6 +236,9 @@ grab_mode = 0
 
 [node name="TwoHandGrabSettingsViewport3D" parent="." unique_id=1249878899 instance=ExtResource("37_two_hand_settings")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 2.3, 1.3955536)
+
+[node name="PassthroughSettingsViewport3D" parent="." instance=ExtResource("49_passthrough_settings")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.5, 2.3, 1.3955536)
 
 [node name="WorldGrabSphere" parent="." unique_id=2023121301 instance=ExtResource("38_world_grab_sphere")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1.5, 1.3955536)

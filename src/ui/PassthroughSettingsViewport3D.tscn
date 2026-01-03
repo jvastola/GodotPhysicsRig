@@ -1,0 +1,43 @@
+[gd_scene load_steps=6 format=3 uid="uid://passthrough_settings_viewport"]
+
+[ext_resource type="Script" path="res://src/ui/ui_viewport_3d.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://src/ui/PassthroughSettingsUI.tscn" id="2_ui"]
+
+[sub_resource type="ViewportTexture" id="ViewportTexture_ui"]
+viewport_path = NodePath("SubViewport")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ui"]
+resource_local_to_scene = true
+transparency = 1
+shading_mode = 0
+albedo_texture = SubResource("ViewportTexture_ui")
+
+[sub_resource type="QuadMesh" id="QuadMesh_ui"]
+size = Vector2(0.7, 0.9)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ui"]
+size = Vector3(0.7, 0.9, 0.01)
+
+[node name="PassthroughSettingsViewport3D" type="Node3D"]
+script = ExtResource("1_script")
+ui_size = Vector2(700, 900)
+quad_size = Vector2(0.7, 0.9)
+
+[node name="SubViewport" type="SubViewport" parent="."]
+transparent_bg = true
+size = Vector2i(700, 900)
+render_target_update_mode = 4
+
+[node name="PassthroughSettingsUI" parent="SubViewport" instance=ExtResource("2_ui")]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("StandardMaterial3D_ui")
+cast_shadow = 0
+mesh = SubResource("QuadMesh_ui")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="MeshInstance3D"]
+collision_layer = 32
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D/StaticBody3D"]
+shape = SubResource("BoxShape3D_ui")

@@ -1,0 +1,334 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/ui/passthrough_settings_ui.gd" id="1_script"]
+
+[node name="PassthroughSettingsUI" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 15.0
+offset_top = 15.0
+offset_right = -15.0
+offset_bottom = -15.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="TitleRow" type="HBoxContainer" parent="Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Panel/VBoxContainer/TitleRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "🎨 Passthrough Settings"
+horizontal_alignment = 1
+
+[node name="CloseButton" type="Button" parent="Panel/VBoxContainer/TitleRow"]
+custom_minimum_size = Vector2(28, 28)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "✕"
+tooltip_text = "Close panel"
+
+[node name="StatusLabel" type="Label" parent="Panel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "⏳ Initializing..."
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="ModeSection" type="VBoxContainer" parent="Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="ModeLabel" type="Label" parent="Panel/VBoxContainer/ModeSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Passthrough Mode"
+
+[node name="ModeButtons" type="HBoxContainer" parent="Panel/VBoxContainer/ModeSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="FullBtn" type="Button" parent="Panel/VBoxContainer/ModeSection/ModeButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Full"
+tooltip_text = "Full passthrough with transparent background"
+
+[node name="GeometryBtn" type="Button" parent="Panel/VBoxContainer/ModeSection/ModeButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Geometry"
+tooltip_text = "Passthrough on geometry only"
+
+[node name="HolePunchBtn" type="Button" parent="Panel/VBoxContainer/ModeSection/ModeButtons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Hole Punch"
+tooltip_text = "Skybox with hole punch passthrough"
+
+[node name="HSeparator2" type="HSeparator" parent="Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="FilterSection" type="VBoxContainer" parent="Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="FilterLabel" type="Label" parent="Panel/VBoxContainer/FilterSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Passthrough Filter"
+
+[node name="FilterOption" type="OptionButton" parent="Panel/VBoxContainer/FilterSection"]
+layout_mode = 2
+tooltip_text = "Select passthrough filter type"
+
+[node name="HSeparator3" type="HSeparator" parent="Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="BCSSection" type="VBoxContainer" parent="Panel/VBoxContainer"]
+visible = false
+layout_mode = 2
+
+[node name="BCSLabel" type="Label" parent="Panel/VBoxContainer/BCSSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Brightness / Contrast / Saturation"
+
+[node name="Brightness" type="VBoxContainer" parent="Panel/VBoxContainer/BCSSection"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/VBoxContainer/BCSSection/Brightness"]
+layout_mode = 2
+text = "Brightness"
+
+[node name="HSlider" type="HSlider" parent="Panel/VBoxContainer/BCSSection/Brightness"]
+layout_mode = 2
+min_value = -1.0
+max_value = 1.0
+step = 0.05
+value = 0.0
+
+[node name="Value" type="Label" parent="Panel/VBoxContainer/BCSSection/Brightness"]
+layout_mode = 2
+text = "0.00"
+horizontal_alignment = 2
+
+[node name="Contrast" type="VBoxContainer" parent="Panel/VBoxContainer/BCSSection"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/VBoxContainer/BCSSection/Contrast"]
+layout_mode = 2
+text = "Contrast"
+
+[node name="HSlider" type="HSlider" parent="Panel/VBoxContainer/BCSSection/Contrast"]
+layout_mode = 2
+min_value = 0.0
+max_value = 2.0
+step = 0.05
+value = 1.0
+
+[node name="Value" type="Label" parent="Panel/VBoxContainer/BCSSection/Contrast"]
+layout_mode = 2
+text = "1.00"
+horizontal_alignment = 2
+
+[node name="Saturation" type="VBoxContainer" parent="Panel/VBoxContainer/BCSSection"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/VBoxContainer/BCSSection/Saturation"]
+layout_mode = 2
+text = "Saturation"
+
+[node name="HSlider" type="HSlider" parent="Panel/VBoxContainer/BCSSection/Saturation"]
+layout_mode = 2
+min_value = 0.0
+max_value = 2.0
+step = 0.05
+value = 1.0
+
+[node name="Value" type="Label" parent="Panel/VBoxContainer/BCSSection/Saturation"]
+layout_mode = 2
+text = "1.00"
+horizontal_alignment = 2
+
+[node name="LUTSection" type="VBoxContainer" parent="Panel/VBoxContainer"]
+visible = false
+layout_mode = 2
+
+[node name="LUTLabel" type="Label" parent="Panel/VBoxContainer/LUTSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Color LUT Settings"
+
+[node name="LUTWeight" type="VBoxContainer" parent="Panel/VBoxContainer/LUTSection"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/VBoxContainer/LUTSection/LUTWeight"]
+layout_mode = 2
+text = "LUT Weight"
+
+[node name="HSlider" type="HSlider" parent="Panel/VBoxContainer/LUTSection/LUTWeight"]
+layout_mode = 2
+min_value = 0.0
+max_value = 1.0
+step = 0.05
+value = 0.5
+
+[node name="Value" type="Label" parent="Panel/VBoxContainer/LUTSection/LUTWeight"]
+layout_mode = 2
+text = "0.50"
+horizontal_alignment = 2
+
+[node name="EdgeSection" type="VBoxContainer" parent="Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="EdgeLabel" type="Label" parent="Panel/VBoxContainer/EdgeSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Edge Detection Color"
+
+[node name="EdgeR" type="HBoxContainer" parent="Panel/VBoxContainer/EdgeSection"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/VBoxContainer/EdgeSection/EdgeR"]
+custom_minimum_size = Vector2(20, 0)
+layout_mode = 2
+text = "R"
+
+[node name="HSlider" type="HSlider" parent="Panel/VBoxContainer/EdgeSection/EdgeR"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 1.0
+step = 0.05
+value = 1.0
+
+[node name="Value" type="Label" parent="Panel/VBoxContainer/EdgeSection/EdgeR"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "1.00"
+horizontal_alignment = 2
+
+[node name="EdgeG" type="HBoxContainer" parent="Panel/VBoxContainer/EdgeSection"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/VBoxContainer/EdgeSection/EdgeG"]
+custom_minimum_size = Vector2(20, 0)
+layout_mode = 2
+text = "G"
+
+[node name="HSlider" type="HSlider" parent="Panel/VBoxContainer/EdgeSection/EdgeG"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 1.0
+step = 0.05
+value = 1.0
+
+[node name="Value" type="Label" parent="Panel/VBoxContainer/EdgeSection/EdgeG"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "1.00"
+horizontal_alignment = 2
+
+[node name="EdgeB" type="HBoxContainer" parent="Panel/VBoxContainer/EdgeSection"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/VBoxContainer/EdgeSection/EdgeB"]
+custom_minimum_size = Vector2(20, 0)
+layout_mode = 2
+text = "B"
+
+[node name="HSlider" type="HSlider" parent="Panel/VBoxContainer/EdgeSection/EdgeB"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 1.0
+step = 0.05
+value = 1.0
+
+[node name="Value" type="Label" parent="Panel/VBoxContainer/EdgeSection/EdgeB"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "1.00"
+horizontal_alignment = 2
+
+[node name="EdgeA" type="HBoxContainer" parent="Panel/VBoxContainer/EdgeSection"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/VBoxContainer/EdgeSection/EdgeA"]
+custom_minimum_size = Vector2(20, 0)
+layout_mode = 2
+text = "A"
+
+[node name="HSlider" type="HSlider" parent="Panel/VBoxContainer/EdgeSection/EdgeA"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 1.0
+step = 0.05
+value = 0.5
+
+[node name="Value" type="Label" parent="Panel/VBoxContainer/EdgeSection/EdgeA"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "0.50"
+horizontal_alignment = 2
+
+[node name="OpacitySection" type="VBoxContainer" parent="Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="OpacityLabel" type="Label" parent="Panel/VBoxContainer/OpacitySection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Passthrough Opacity"
+
+[node name="Opacity" type="VBoxContainer" parent="Panel/VBoxContainer/OpacitySection"]
+layout_mode = 2
+
+[node name="HSlider" type="HSlider" parent="Panel/VBoxContainer/OpacitySection/Opacity"]
+layout_mode = 2
+min_value = 0.0
+max_value = 1.0
+step = 0.05
+value = 1.0
+
+[node name="Value" type="Label" parent="Panel/VBoxContainer/OpacitySection/Opacity"]
+layout_mode = 2
+text = "1.00"
+horizontal_alignment = 2
+
+[connection signal="pressed" from="Panel/VBoxContainer/ModeSection/ModeButtons/FullBtn" to="." method="_on_full_btn_pressed"]
+[connection signal="pressed" from="Panel/VBoxContainer/ModeSection/ModeButtons/GeometryBtn" to="." method="_on_geometry_btn_pressed"]
+[connection signal="pressed" from="Panel/VBoxContainer/ModeSection/ModeButtons/HolePunchBtn" to="." method="_on_hole_punch_btn_pressed"]
+[connection signal="item_selected" from="Panel/VBoxContainer/FilterSection/FilterOption" to="." method="_on_filter_option_item_selected"]
+[connection signal="value_changed" from="Panel/VBoxContainer/BCSSection/Brightness/HSlider" to="." method="_on_brightness_slider_value_changed"]
+[connection signal="value_changed" from="Panel/VBoxContainer/BCSSection/Contrast/HSlider" to="." method="_on_contrast_slider_value_changed"]
+[connection signal="value_changed" from="Panel/VBoxContainer/BCSSection/Saturation/HSlider" to="." method="_on_saturation_slider_value_changed"]
+[connection signal="value_changed" from="Panel/VBoxContainer/LUTSection/LUTWeight/HSlider" to="." method="_on_lut_weight_slider_value_changed"]
+[connection signal="value_changed" from="Panel/VBoxContainer/EdgeSection/EdgeR/HSlider" to="." method="_on_edge_r_slider_value_changed"]
+[connection signal="value_changed" from="Panel/VBoxContainer/EdgeSection/EdgeG/HSlider" to="." method="_on_edge_g_slider_value_changed"]
+[connection signal="value_changed" from="Panel/VBoxContainer/EdgeSection/EdgeB/HSlider" to="." method="_on_edge_b_slider_value_changed"]
+[connection signal="value_changed" from="Panel/VBoxContainer/EdgeSection/EdgeA/HSlider" to="." method="_on_edge_a_slider_value_changed"]
+[connection signal="value_changed" from="Panel/VBoxContainer/OpacitySection/Opacity/HSlider" to="." method="_on_opacity_slider_value_changed"]
