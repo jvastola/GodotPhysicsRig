@@ -1,13 +1,21 @@
 [gd_resource type="StandardMaterial3D" load_steps=2 format=3 uid="uid://dt14gsjdqu78t"]
 
-[sub_resource type="ORMMaterial3D" id="ORMMaterial3D_wu6j1"]
-transparency = 1
-depth_draw_mode = 1
-
-[resource]
-render_priority = -1
-next_pass = SubResource("ORMMaterial3D_wu6j1")
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pf5tg"]
 transparency = 1
 no_depth_test = true
 shading_mode = 0
-albedo_color = Color(0.8156863, 0.88235295, 0.99607843, 0.08627451)
+albedo_color = Color(0, 0, 0, 1)
+stencil_mode = 3
+stencil_flags = 1
+stencil_compare = 5
+metadata/_stencil_owned = true
+
+[resource]
+render_priority = -1
+next_pass = SubResource("StandardMaterial3D_pf5tg")
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.8156863, 0.88235295, 0.99607843, 0.47058824)
+stencil_mode = 2
+stencil_flags = 2

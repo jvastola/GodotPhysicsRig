@@ -1,4 +1,4 @@
-[gd_scene load_steps=63 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=62 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -6,13 +6,12 @@
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/NodeInspectorTool.tscn" id="5_pswl6"]
 [ext_resource type="PackedScene" uid="uid://b60rl4dw2d13k" path="res://src/objects/GridSnapMesh.tscn" id="6_hjxlr"]
 [ext_resource type="PackedScene" uid="uid://dve0k8qfhgyma" path="res://src/objects/grabbables/GravityInverter.tscn" id="7_gravity_inverter"]
+[ext_resource type="Material" uid="uid://dmgn71ss1mjfr" path="res://src/demos/tools/materials/glass.tres" id="8_7qgd2"]
 [ext_resource type="PackedScene" uid="uid://c4jv0mg3xpn45" path="res://src/objects/grabbables/CameraFlipper.tscn" id="8_camera_flipper"]
-[ext_resource type="PackedScene" path="res://src/ui/webview/WebviewViewport3D.tscn" id="8_d8ksm"]
 [ext_resource type="PackedScene" uid="uid://crqvm2hbh8k5p" path="res://src/objects/grabbables/DizzySphere.tscn" id="9_dizzy_sphere"]
 [ext_resource type="PackedScene" uid="uid://bq7h5xn8vwfkj" path="res://src/objects/grabbables/SpeedBooster.tscn" id="10_speed_booster"]
 [ext_resource type="PackedScene" uid="uid://cnhqkr7y8k7qb" path="res://src/objects/GridLineDisplay.tscn" id="12_grid_display"]
 [ext_resource type="PackedScene" uid="uid://e58b0q1ewqr7" path="res://src/ui/multiplayer/UnifiedRoomViewport3D.tscn" id="13_unified_ui"]
-[ext_resource type="PackedScene" path="res://src/ui/MaterialPickerViewport3D.tscn" id="14_0bb85"]
 [ext_resource type="PackedScene" uid="uid://dak3v2oax4mjy" path="res://src/ui/livekit/LiveKitViewport3D.tscn" id="14_livekit_viewport"]
 [ext_resource type="PackedScene" path="res://src/objects/VoxelToolNew.tscn" id="15_voxel_tool"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/ConvexHullPen.tscn" id="23_convex_hull_pen"]
@@ -50,7 +49,7 @@
 size = Vector3(50, 5, 50)
 
 [sub_resource type="BoxMesh" id="BoxMesh_or5nu"]
-material = ExtResource("2_or5nu")
+material = ExtResource("8_7qgd2")
 size = Vector3(50, 5, 50)
 
 [sub_resource type="ViewportTexture" id="ViewportTexture_y07qc"]
@@ -119,7 +118,7 @@ size = Vector3(0.45, 0.45, 0.45)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_body_grid"]
 
-[node name="MainScene30" type="Node3D" unique_id=1547683746]
+[node name="MainScene31" type="Node3D" unique_id=1547683746]
 
 [node name="ToolPoolManager" type="Node" parent="." unique_id=2101234567]
 script = ExtResource("34_tool_pool")
@@ -133,6 +132,8 @@ remove_preplaced_panels = false
 
 [node name="SceneEnvironmentSetup" type="Node" parent="." unique_id=2105678901]
 script = ExtResource("41_env_setup")
+enable_passthrough = true
+restore_skybox = false
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1403982438]
 environment = SubResource("Environment_main")
@@ -142,7 +143,7 @@ transform = Transform3D(-0.8660238, -0.43301556, 0.2500009, 0.46019384, -0.49477
 shadow_enabled = true
 
 [node name="NodeInspectorTool" parent="." unique_id=1156427494 instance=ExtResource("5_pswl6")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.41976643, -2.2566147)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.778507, 0.41976643, -2.2566147)
 
 [node name="Floor" type="StaticBody3D" parent="." unique_id=386014746]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2.51753, 0)
@@ -154,11 +155,9 @@ shape = SubResource("BoxShape3D_floor")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Floor" unique_id=347202364]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.03215456, -0.027283192, 0.0073566437)
+visible = false
 material_override = ExtResource("2_or5nu")
 mesh = SubResource("BoxMesh_or5nu")
-
-#[node name="WebviewViewport3D" parent="Floor" unique_id=1174598818 instance=ExtResource("8_d8ksm")]
-#transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.9548025, 3.7681088, -5.32683)
 
 [node name="SpawnPoint" type="Marker3D" parent="." unique_id=1507894971]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
@@ -184,9 +183,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.29757, 1.5, 4.3955536)
 
 [node name="CameraFlipper" parent="." unique_id=284514304 instance=ExtResource("8_camera_flipper")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.96446, 1.5, 5.8955536)
-
-[node name="MaterialPickerViewport3D" parent="." unique_id=732983850 instance=ExtResource("14_0bb85")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.9817448, -2.4405)
 
 [node name="DizzySphere" parent="." unique_id=1325823028 instance=ExtResource("9_dizzy_sphere")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.72914, 1.5, 4.3955536)
@@ -237,8 +233,8 @@ grab_mode = 0
 [node name="TwoHandGrabSettingsViewport3D" parent="." unique_id=1249878899 instance=ExtResource("37_two_hand_settings")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 2.3, 1.3955536)
 
-[node name="PassthroughSettingsViewport3D" parent="." instance=ExtResource("49_passthrough_settings")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.5, 2.3, 1.3955536)
+[node name="PassthroughSettingsViewport3D" parent="." unique_id=711707377 instance=ExtResource("49_passthrough_settings")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.01244545, 2.3, -1.7094151)
 
 [node name="WorldGrabSphere" parent="." unique_id=2023121301 instance=ExtResource("38_world_grab_sphere")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1.5, 1.3955536)
@@ -267,10 +263,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.702578, 1.1824706, 1.65456
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.983923, 0.88246953, 1.516645)
 
 [node name="PlasmaDemos" type="Node3D" parent="." unique_id=67851916]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.6498556)
 
 [node name="ShaderPlasma" type="CSGSphere3D" parent="PlasmaDemos" unique_id=1217239899]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -0.49113432, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -0.84171957, 0)
 radius = 0.75
 material = SubResource("StandardMaterial3D_wvm1w")
 script = ExtResource("35_hr53f")
@@ -289,7 +285,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.75, 0)
 material = SubResource("StandardMaterial3D_wvm1w")
 
 [node name="Sphere" type="CSGSphere3D" parent="PlasmaDemos/PlasmaBox" unique_id=716390065]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.9774573)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2.544487)
 operation = 2
 radius = 0.6
 material = ExtResource("34_s8yin")

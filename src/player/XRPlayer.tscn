@@ -1,4 +1,4 @@
-[gd_scene load_steps=27 format=3 uid="uid://cpq6v7yqk8y8j"]
+[gd_scene load_steps=29 format=3 uid="uid://cpq6v7yqk8y8j"]
 
 [ext_resource type="Script" uid="uid://02kpb1kqm303" path="res://src/player/xr_player.gd" id="1_player"]
 [ext_resource type="Script" uid="uid://3ir0c0htxlqh" path="res://src/player/xr_origin_3d.gd" id="2_xr_origin"]
@@ -25,7 +25,7 @@ size = Vector3(0.22, 0.22, 0.22)
 
 [sub_resource type="BoxMesh" id="BoxMesh_hand"]
 material = ExtResource("3_yb8bw")
-size = Vector3(0.1, 0.1, 0.15)
+size = Vector3(0.1, 0.1, 0.1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_watch_face"]
 size = Vector3(0.04, 0.004, 0.04)
@@ -51,6 +51,10 @@ top_radius = 0.01
 bottom_radius = 0.01
 height = 0.001
 radial_segments = 16
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_pe0gf"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_8w1hn"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hand"]
 
@@ -95,6 +99,9 @@ shape = SubResource("BoxShape3D_xxbg3")
 [node name="LeftController" type="XRController3D" parent="PlayerBody/XROrigin3D" unique_id=829066177]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.846876, 0, 0)
 tracker = &"left_hand"
+pose = &"grip"
+
+[node name="OpenXRFbRenderModel" type="OpenXRFbRenderModel" parent="PlayerBody/XROrigin3D/LeftController" unique_id=642638939]
 
 [node name="LeftHandMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController" unique_id=2085390048]
 cast_shadow = 0
@@ -136,6 +143,7 @@ cast_shadow = 0
 mesh = SubResource("SphereMesh_watch_hit")
 
 [node name="HandPointer" type="Node3D" parent="PlayerBody/XROrigin3D/LeftController" unique_id=1391630202]
+transform = Transform3D(1, 0, 0, 0, 0.57357645, 0.81915206, 0, -0.81915206, 0.57357645, 0, 0, 0)
 script = ExtResource("6_pointer")
 ray_length = 7.5
 ray_length_min = 7.0
@@ -173,12 +181,17 @@ mesh = SubResource("CylinderMesh_pointer_hit")
 [node name="RightController" type="XRController3D" parent="PlayerBody/XROrigin3D" unique_id=1759401453]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.549018, 0, 0)
 tracker = &"right_hand"
+pose = &"grip"
+
+[node name="OpenXRFbRenderModel" type="OpenXRFbRenderModel" parent="PlayerBody/XROrigin3D/RightController" unique_id=817189998]
+render_model_type = 1
 
 [node name="RightHandMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/RightController" unique_id=911480807]
 cast_shadow = 0
 mesh = SubResource("BoxMesh_hand")
 
 [node name="HandPointer" type="Node3D" parent="PlayerBody/XROrigin3D/RightController" unique_id=492218641]
+transform = Transform3D(1, 0, 0, 0, 0.57357645, 0.81915206, 0, -0.81915206, 0.57357645, 0, 0, 0)
 script = ExtResource("6_pointer")
 ray_length = 7.0
 ray_length_min = 7.0
@@ -259,13 +272,13 @@ target = NodePath("../PlayerBody/XROrigin3D/LeftController")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="PhysicsHandLeft" unique_id=880726284]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
-shape = SubResource("BoxShape3D_hand")
+shape = SubResource("SphereShape3D_pe0gf")
 
 [node name="PhysicsHandLeftMesh" type="MeshInstance3D" parent="PhysicsHandLeft" unique_id=1450919141]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
 visible = false
 cast_shadow = 0
-mesh = SubResource("BoxMesh_hand")
+mesh = SubResource("SphereMesh_8w1hn")
 
 [node name="PhysicsHandRight" type="RigidBody3D" parent="." unique_id=526551679 node_paths=PackedStringArray("player_rigidbody", "target")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.541033, 0, 0)
@@ -298,7 +311,6 @@ enable_one_hand_world_rotate = false
 enable_one_hand_rotation = false
 show_one_hand_grab_visual = false
 auto_respawn_enabled = true
-player_gravity_enabled = true
 autojoin_enabled = true
 v2_show_visual = false
 enable_two_hand_grab_v3 = false
