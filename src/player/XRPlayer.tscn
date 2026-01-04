@@ -14,6 +14,7 @@
 [ext_resource type="Script" uid="uid://04sudajutma5" path="res://src/player/components/player_network_component.gd" id="14_network_comp"]
 [ext_resource type="Script" uid="uid://cxk34sx374uym" path="res://src/player/components/player_voice_component.gd" id="15_voice_comp"]
 [ext_resource type="Script" uid="uid://dwsx0otrybpmd" path="res://src/player/components/simple_world_grab_component.gd" id="16_simple_grab"]
+[ext_resource type="Material" uid="uid://becyo36svkmbm" path="res://hand_material.tres" id="17_hand_material"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_xxbg3"]
 size = Vector3(0.3, 0.4, 0.2)
@@ -143,7 +144,7 @@ cast_shadow = 0
 mesh = SubResource("SphereMesh_watch_hit")
 
 [node name="RayCast3D" type="RayCast3D" parent="PlayerBody/XROrigin3D/LeftController" unique_id=762596766]
-target_position = Vector3(0, 0, -1)
+target_position = Vector3(0, 0, -10)
 collision_mask = 4
 collide_with_areas = true
 
@@ -230,19 +231,82 @@ cast_shadow = 0
 mesh = SubResource("CylinderMesh_pointer_hit")
 
 [node name="RayCast3D" type="RayCast3D" parent="PlayerBody/XROrigin3D/RightController" unique_id=1242757362]
-target_position = Vector3(0, 0, -1)
+target_position = Vector3(0, 0, -10)
 collision_mask = 4
 collide_with_areas = true
 
 [node name="LeftHandTracker" type="XRNode3D" parent="PlayerBody/XROrigin3D" unique_id=1319717165]
 tracker = &"/user/hand_tracker/left"
+show_when_tracked = true
 
 [node name="OpenXRFbHandTrackingMesh" type="OpenXRFbHandTrackingMesh" parent="PlayerBody/XROrigin3D/LeftHandTracker" unique_id=1125184249]
+material = ExtResource("17_hand_material")
+bones/0/name = "LeftPalm"
+bones/1/name = "LeftHand"
+bones/2/name = "LeftThumbMetacarpal"
+bones/3/name = "LeftThumbProximal"
+bones/4/name = "LeftThumbDistal"
+bones/5/name = "LeftThumbTip"
+bones/6/name = "LeftIndexMetacarpal"
+bones/7/name = "LeftIndexProximal"
+bones/8/name = "LeftIndexIntermediate"
+bones/9/name = "LeftIndexDistal"
+bones/10/name = "LeftIndexTip"
+bones/11/name = "LeftMiddleMetacarpal"
+bones/12/name = "LeftMiddleProximal"
+bones/13/name = "LeftMiddleIntermediate"
+bones/14/name = "LeftMiddleDistal"
+bones/15/name = "LeftMiddleTip"
+bones/16/name = "LeftRingMetacarpal"
+bones/17/name = "LeftRingProximal"
+bones/18/name = "LeftRingIntermediate"
+bones/19/name = "LeftRingDistal"
+bones/20/name = "LeftRingTip"
+bones/21/name = "LeftLittleMetacarpal"
+bones/22/name = "LeftLittleProximal"
+bones/23/name = "LeftLittleIntermediate"
+bones/24/name = "LeftLittleDistal"
+bones/25/name = "LeftLittleTip"
+
+[node name="XRHandModifier3D" type="XRHandModifier3D" parent="PlayerBody/XROrigin3D/LeftHandTracker/OpenXRFbHandTrackingMesh" unique_id=1498497738]
+hand_tracker = &"/user/hand_tracker/left"
 
 [node name="RightHandTracker" type="XRNode3D" parent="PlayerBody/XROrigin3D" unique_id=1278368324]
 tracker = &"/user/hand_tracker/right"
+show_when_tracked = true
 
 [node name="OpenXRFbHandTrackingMesh" type="OpenXRFbHandTrackingMesh" parent="PlayerBody/XROrigin3D/RightHandTracker" unique_id=263602541]
+hand = 1
+material = ExtResource("17_hand_material")
+bones/0/name = "RightPalm"
+bones/1/name = "RightHand"
+bones/2/name = "RightThumbMetacarpal"
+bones/3/name = "RightThumbProximal"
+bones/4/name = "RightThumbDistal"
+bones/5/name = "RightThumbTip"
+bones/6/name = "RightIndexMetacarpal"
+bones/7/name = "RightIndexProximal"
+bones/8/name = "RightIndexIntermediate"
+bones/9/name = "RightIndexDistal"
+bones/10/name = "RightIndexTip"
+bones/11/name = "RightMiddleMetacarpal"
+bones/12/name = "RightMiddleProximal"
+bones/13/name = "RightMiddleIntermediate"
+bones/14/name = "RightMiddleDistal"
+bones/15/name = "RightMiddleTip"
+bones/16/name = "RightRingMetacarpal"
+bones/17/name = "RightRingProximal"
+bones/18/name = "RightRingIntermediate"
+bones/19/name = "RightRingDistal"
+bones/20/name = "RightRingTip"
+bones/21/name = "RightLittleMetacarpal"
+bones/22/name = "RightLittleProximal"
+bones/23/name = "RightLittleIntermediate"
+bones/24/name = "RightLittleDistal"
+bones/25/name = "RightLittleTip"
+
+[node name="XRHandModifier3D" type="XRHandModifier3D" parent="PlayerBody/XROrigin3D/RightHandTracker/OpenXRFbHandTrackingMesh" unique_id=352943663]
+hand_tracker = &"/user/hand_tracker/right"
 
 [node name="DesktopCamera" type="Camera3D" parent="PlayerBody" unique_id=250281076]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.755936, 0)

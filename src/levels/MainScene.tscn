@@ -42,6 +42,7 @@
 [ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://src/objects/viewport_mirror.gd" id="47_viewport_mirror"]
 [ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://src/systems/grid_painter.gd" id="48_grid_painter"]
 [ext_resource type="PackedScene" path="res://src/ui/PassthroughSettingsViewport3D.tscn" id="49_passthrough_settings"]
+[ext_resource type="PackedScene" uid="uid://d3x8y7yqk8y8j" path="res://src/ui/HandTrackingViewport3D.tscn" id="50_hand_tracking_ui"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -361,3 +362,6 @@ collision_mask = 32
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest/GridTargetBody/GridTargetBodyArea" unique_id=1858467520]
 shape = SubResource("BoxShape3D_body_grid")
+
+[node name="HandTrackingUI" parent="." instance=ExtResource("50_hand_tracking_ui")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -5.5)

@@ -1,0 +1,278 @@
+[gd_scene format=3 uid="uid://c8n4y2m5o8p1x"]
+
+[ext_resource type="Script" uid="uid://c8n4y2m5o8p1x" path="res://src/ui/hand_tracking_2d_ui.gd" id="1_script"]
+
+[node name="HandTracking2DUI" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="ColorRect" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.1, 0.1, 0.12, 0.9)
+
+[node name="MainVBox" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 20
+
+[node name="Title" type="Label" parent="MainVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "HAND TRACKING DIAGNOSTICS"
+horizontal_alignment = 1
+
+[node name="StrengthsHBox" type="HBoxContainer" parent="MainVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 40
+
+[node name="LeftVBox" type="VBoxContainer" parent="MainVBox/StrengthsHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Label" type="Label" parent="MainVBox/StrengthsHBox/LeftVBox"]
+layout_mode = 2
+text = "LEFT HAND"
+horizontal_alignment = 1
+
+[node name="index_pinch" type="ProgressBar" parent="MainVBox/StrengthsHBox/LeftVBox"]
+layout_mode = 2
+step = 1.0
+
+[node name="IndexPinchLabel" type="Label" parent="MainVBox/StrengthsHBox/LeftVBox/index_pinch"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 12
+text = "Index"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="middle_pinch" type="ProgressBar" parent="MainVBox/StrengthsHBox/LeftVBox"]
+layout_mode = 2
+step = 1.0
+
+[node name="MiddlePinchLabel" type="Label" parent="MainVBox/StrengthsHBox/LeftVBox/middle_pinch"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 12
+text = "Middle"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ring_pinch" type="ProgressBar" parent="MainVBox/StrengthsHBox/LeftVBox"]
+layout_mode = 2
+step = 1.0
+
+[node name="RingPinchLabel" type="Label" parent="MainVBox/StrengthsHBox/LeftVBox/ring_pinch"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 12
+text = "Ring"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="little_pinch" type="ProgressBar" parent="MainVBox/StrengthsHBox/LeftVBox"]
+layout_mode = 2
+step = 1.0
+
+[node name="LittlePinchLabel" type="Label" parent="MainVBox/StrengthsHBox/LeftVBox/little_pinch"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 12
+text = "Little"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RightVBox" type="VBoxContainer" parent="MainVBox/StrengthsHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Label" type="Label" parent="MainVBox/StrengthsHBox/RightVBox"]
+layout_mode = 2
+text = "RIGHT HAND"
+horizontal_alignment = 1
+
+[node name="index_pinch" type="ProgressBar" parent="MainVBox/StrengthsHBox/RightVBox"]
+layout_mode = 2
+step = 1.0
+
+[node name="IndexPinchLabel" type="Label" parent="MainVBox/StrengthsHBox/RightVBox/index_pinch"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 12
+text = "Index"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="middle_pinch" type="ProgressBar" parent="MainVBox/StrengthsHBox/RightVBox"]
+layout_mode = 2
+step = 1.0
+
+[node name="MiddlePinchLabel" type="Label" parent="MainVBox/StrengthsHBox/RightVBox/middle_pinch"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 12
+text = "Middle"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ring_pinch" type="ProgressBar" parent="MainVBox/StrengthsHBox/RightVBox"]
+layout_mode = 2
+step = 1.0
+
+[node name="RingPinchLabel" type="Label" parent="MainVBox/StrengthsHBox/RightVBox/ring_pinch"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 12
+text = "Ring"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="little_pinch" type="ProgressBar" parent="MainVBox/StrengthsHBox/RightVBox"]
+layout_mode = 2
+step = 1.0
+
+[node name="LittlePinchLabel" type="Label" parent="MainVBox/StrengthsHBox/RightVBox/little_pinch"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 12
+text = "Little"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SignalsGrid" type="GridContainer" parent="MainVBox"]
+layout_mode = 2
+theme_override_constants/h_separation = 20
+theme_override_constants/v_separation = 10
+columns = 4
+
+[node name="L_Title" type="Label" parent="MainVBox/SignalsGrid"]
+layout_mode = 2
+text = "L Signals:"
+
+[node name="L_menu_pressed" type="ColorRect" parent="MainVBox/SignalsGrid"]
+custom_minimum_size = Vector2(20, 20)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+color = Color(0.3, 0.1, 0.1, 1)
+
+[node name="Label" type="Label" parent="MainVBox/SignalsGrid/L_menu_pressed"]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = 5.0
+offset_top = -11.5
+offset_right = 45.0
+offset_bottom = 11.5
+grow_horizontal = 0
+grow_vertical = 2
+theme_override_font_sizes/font_size = 12
+text = "Menu"
+
+[node name="Spacer" type="Control" parent="MainVBox/SignalsGrid"]
+layout_mode = 2
+
+[node name="Spacer2" type="Control" parent="MainVBox/SignalsGrid"]
+layout_mode = 2
+
+[node name="R_Title" type="Label" parent="MainVBox/SignalsGrid"]
+layout_mode = 2
+text = "R Signals:"
+
+[node name="R_menu_pressed" type="ColorRect" parent="MainVBox/SignalsGrid"]
+custom_minimum_size = Vector2(20, 20)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+color = Color(0.3, 0.1, 0.1, 1)
+
+[node name="Label" type="Label" parent="MainVBox/SignalsGrid/R_menu_pressed"]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = 5.0
+offset_top = -11.5
+offset_right = 45.0
+offset_bottom = 11.5
+grow_horizontal = 0
+grow_vertical = 2
+theme_override_font_sizes/font_size = 12
+text = "Menu"
+
+[node name="TogglesHBox" type="HBoxContainer" parent="MainVBox"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 20
+
+[node name="LeftMesh" type="Button" parent="MainVBox/TogglesHBox"]
+layout_mode = 2
+text = "Toggle L Mesh"
+
+[node name="LeftCapsules" type="Button" parent="MainVBox/TogglesHBox"]
+layout_mode = 2
+text = "Toggle L Capsules"
+
+[node name="RightMesh" type="Button" parent="MainVBox/TogglesHBox"]
+layout_mode = 2
+text = "Toggle R Mesh"
+
+[node name="RightCapsules" type="Button" parent="MainVBox/TogglesHBox"]
+layout_mode = 2
+text = "Toggle R Capsules"

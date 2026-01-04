@@ -40,7 +40,13 @@ const CAPSULE_MATERIAL = preload("res://capsule_material.tres")
 var fb_capsule_ext
 var left_capsules_loaded := false
 var right_capsules_loaded := false
+var _left_skeleton_logged := false  # Debug: only log bone count once
+var _right_skeleton_logged := false  # Debug: only log bone count once
 var xr_interface: XRInterface
+@onready var hand_tracking_ui = get_tree().root.find_child("HandTracking2DUI", true, false)
+
+var _left_index_pinch_active := false
+var _right_index_pinch_active := false
 
 
 # Components
@@ -89,9 +95,31 @@ func _ready() -> void:
 	xr_interface = XRServer.find_interface("OpenXR")
 	if xr_interface and xr_interface.is_initialized():
 		fb_capsule_ext = Engine.get_singleton("OpenXRFbHandTrackingCapsulesExtensionWrapper")
+		print("XRPlayer: OpenXR initialized, capsule extension: ", fb_capsule_ext != null)
+	else:
+		print("XRPlayer: OpenXR not initialized yet, deferring capsule extension lookup")
 
-	left_hand_skeleton.openxr_fb_hand_tracking_mesh_ready.connect(_add_mesh_group.bind(left_hand_skeleton, "hand_mesh_left"))
-	right_hand_skeleton.openxr_fb_hand_tracking_mesh_ready.connect(_add_mesh_group.bind(right_hand_skeleton, "hand_mesh_right"))
+	# Hand tracking mesh signals
+	if left_hand_skeleton:
+		left_hand_skeleton.openxr_fb_hand_tracking_mesh_ready.connect(_add_mesh_group.bind(left_hand_skeleton, "hand_mesh_left"))
+		print("XRPlayer: Left hand skeleton connected, visible: ", left_hand_skeleton.visible)
+		left_hand_skeleton.visible = true  # Ensure visibility
+	else:
+		push_warning("XRPlayer: Left hand skeleton not found!")
+	
+	if right_hand_skeleton:
+		right_hand_skeleton.openxr_fb_hand_tracking_mesh_ready.connect(_add_mesh_group.bind(right_hand_skeleton, "hand_mesh_right"))
+		print("XRPlayer: Right hand skeleton connected, visible: ", right_hand_skeleton.visible)
+		right_hand_skeleton.visible = true  # Ensure visibility
+	else:
+		push_warning("XRPlayer: Right hand skeleton not found!")
+	
+	# Ensure tracker nodes are visible	if hand_tracking_ui:
+		hand_tracking_ui.visibility_toggle_requested.connect(_on_hand_ui_visibility_toggle_requested)
+	if left_hand_tracker_node:
+		left_hand_tracker_node.visible = true
+	if right_hand_tracker_node:
+		right_hand_tracker_node.visible = true
 
 	# Connect Controller Signals
 	left_controller.button_pressed.connect(_on_left_controller_button_pressed)
@@ -228,14 +256,34 @@ func _setup_physics_hands() -> void:
 
 
 func _process(delta: float) -> void:
+	# Retry getting capsule extension if not available yet
+	if fb_capsule_ext == null:
+		xr_interface = XRServer.find_interface("OpenXR")
+		if xr_interface and xr_interface.is_initialized():
+			fb_capsule_ext = Engine.get_singleton("OpenXRFbHandTrackingCapsulesExtensionWrapper")
+			if fb_capsule_ext:
+				print("XRPlayer: Late-bound capsule extension successfully")
+	
 	if not left_capsules_loaded:
 		var tracker: XRHandTracker = XRServer.get_tracker("/user/hand_tracker/left")
-		if tracker and tracker.has_tracking_data:
-			hand_capsule_setup(0, tracker)
+		if tracker:
+			if tracker.has_tracking_data:
+				print("XRPlayer: Left hand tracker has data, setting up capsules...")
+				hand_capsule_setup(0, tracker)
+			# Also check if OpenXRFbHandTrackingMesh has skeleton data
+			if left_hand_skeleton and left_hand_skeleton.get_bone_count() > 0:
+				print("XRPlayer: Left skeleton has ", left_hand_skeleton.get_bone_count(), " bones")
+	
 	if not right_capsules_loaded:
 		var tracker: XRHandTracker = XRServer.get_tracker("/user/hand_tracker/right")
-		if tracker and tracker.has_tracking_data:
-			hand_capsule_setup(1, tracker)
+		if tracker:
+			if tracker.has_tracking_data:
+				print("XRPlayer: Right hand tracker has data, setting up capsules...")
+				hand_capsule_setup(1, tracker)
+			if right_hand_skeleton and right_hand_skeleton.get_bone_count() > 0:
+				print("XRPlayer: Right skeleton has ", right_hand_skeleton.get_bone_count(), " bones")
+
+	_update_hand_tracking_ui_pinches()
 
 	var current_world_scale := XRServer.world_scale
 	if not is_equal_approx(current_world_scale, _last_world_scale):
@@ -256,6 +304,27 @@ func _process(delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# Handle raycasts in physics process to avoid Jolt "Space state inaccessible" errors
+	if _left_index_pinch_active:
+		if left_hand_ray_cast:
+			left_hand_ray_cast.enabled = true
+			left_hand_ray_cast.force_raycast_update()
+			if left_hand_ray_cast.is_colliding():
+				var collider = left_hand_ray_cast.get_collider()
+				if collider:
+					update_collider(collider)
+		_left_index_pinch_active = false
+	
+	if _right_index_pinch_active:
+		if right_hand_ray_cast:
+			right_hand_ray_cast.enabled = true
+			right_hand_ray_cast.force_raycast_update()
+			if right_hand_ray_cast.is_colliding():
+				var collider = right_hand_ray_cast.get_collider()
+				if collider:
+					update_collider(collider)
+		_right_index_pinch_active = false
+
 	if movement_component:
 		movement_component.physics_process_turning(delta)
 		movement_component.physics_process_locomotion(delta)
@@ -608,25 +677,53 @@ func _setup_audio_listeners() -> void:
 
 
 func _add_mesh_group(p_parent: Node3D, p_group: String) -> void:
+	print("XRPlayer: _add_mesh_group called for '", p_group, "', parent: ", p_parent.name if p_parent else "NULL")
+	var mesh_count := 0
 	for child in p_parent.get_children():
 		if child is MeshInstance3D:
 			child.add_to_group(p_group)
+			# Ensure skinning is active for the generated mesh
+			if p_parent is OpenXRFbHandTrackingMesh:
+				child.skeleton = p_parent.get_path()
+			child.visible = true  # Ensure the mesh is visible
+			mesh_count += 1
+			print("  - Added mesh child: ", child.name, " to group ", p_group)
+	print("XRPlayer: Hand tracking mesh ready - ", p_group, " with ", mesh_count, " meshes, parent visible: ", p_parent.visible)
+	# Ensure the parent skeleton is visible
+	if p_parent:
+		p_parent.visible = true
 
 
 func hand_capsule_setup(hand_idx: int, hand_tracker: XRHandTracker) -> void:
 	if not fb_capsule_ext:
+		print("XRPlayer: hand_capsule_setup - fb_capsule_ext is null, cannot create capsules")
 		return
 
 	var skeletons := [left_hand_skeleton, right_hand_skeleton]
+	var skeleton = skeletons[hand_idx]
+	var hand_name = "left" if hand_idx == 0 else "right"
+	
+	if not skeleton:
+		print("XRPlayer: hand_capsule_setup - ", hand_name, " skeleton is null")
+		return
+	
+	var bone_count = skeleton.get_bone_count() if skeleton.has_method("get_bone_count") else -1
+	print("XRPlayer: hand_capsule_setup - ", hand_name, " hand, skeleton bone count: ", bone_count)
+	
+	var capsule_count = fb_capsule_ext.get_hand_capsule_count()
+	print("XRPlayer: hand_capsule_setup - Creating ", capsule_count, " capsules for ", hand_name, " hand")
 
-	for capsule_idx in fb_capsule_ext.get_hand_capsule_count():
+	for capsule_idx in capsule_count:
 		var capsule_mesh := CapsuleMesh.new()
-		capsule_mesh.height = fb_capsule_ext.get_hand_capsule_height(hand_idx, capsule_idx)
-		capsule_mesh.radius = fb_capsule_ext.get_hand_capsule_radius(hand_idx, capsule_idx)
+		var height = fb_capsule_ext.get_hand_capsule_height(hand_idx, capsule_idx)
+		var radius = fb_capsule_ext.get_hand_capsule_radius(hand_idx, capsule_idx)
+		capsule_mesh.height = height
+		capsule_mesh.radius = radius
 
 		var mesh_instance := MeshInstance3D.new()
 		mesh_instance.mesh = capsule_mesh
 		mesh_instance.set_surface_override_material(0, CAPSULE_MATERIAL)
+		mesh_instance.visible = true  # Ensure capsule is visible
 		match hand_idx:
 			0:
 				mesh_instance.add_to_group("hand_capsule_left")
@@ -634,56 +731,116 @@ func hand_capsule_setup(hand_idx: int, hand_tracker: XRHandTracker) -> void:
 				mesh_instance.add_to_group("hand_capsule_right")
 
 		var bone_attachment := BoneAttachment3D.new()
-		bone_attachment.bone_idx = fb_capsule_ext.get_hand_capsule_joint(hand_idx, capsule_idx)
+		var joint_idx = fb_capsule_ext.get_hand_capsule_joint(hand_idx, capsule_idx)
+		bone_attachment.bone_idx = joint_idx
+		bone_attachment.name = "CapsuleBone_" + str(capsule_idx)
 
 		bone_attachment.add_child(mesh_instance)
-		skeletons[hand_idx].add_child(bone_attachment)
+		skeleton.add_child(bone_attachment)
 
 		var capsule_transform: Transform3D = fb_capsule_ext.get_hand_capsule_transform(hand_idx, capsule_idx)
-		var bone_transform: Transform3D = hand_tracker.get_hand_joint_transform(fb_capsule_ext.get_hand_capsule_joint(hand_idx, capsule_idx))
+		var bone_transform: Transform3D = hand_tracker.get_hand_joint_transform(joint_idx)
 		mesh_instance.transform = bone_transform.inverse() * capsule_transform
+		
+		if capsule_idx < 3:  # Log just a few to avoid spam
+			print("XRPlayer: Capsule ", capsule_idx, " - joint: ", joint_idx, ", h: ", snapped(height, 0.001), ", r: ", snapped(radius, 0.001))
 
 	match hand_idx:
 		0:
 			left_capsules_loaded = true
+			print("XRPlayer: Left hand capsules loaded (", capsule_count, " capsules)")
 		1:
 			right_capsules_loaded = true
+			print("XRPlayer: Right hand capsules loaded (", capsule_count, " capsules)")
+
+
+func _get_manual_pinch_strength(tracker: XRHandTracker, joint_idx: int) -> float:
+	# Fallback for missing get_hand_joint_pinch_strength
+	# Standard OpenXR Hand Joint Indices: Thumb Tip (5), Index Tip (10), Middle Tip (15), Ring Tip (20), Little Tip (25)
+	var thumb_tip_transform = tracker.get_hand_joint_transform(5)
+	var finger_tip_transform = tracker.get_hand_joint_transform(joint_idx)
+	
+	# If either joint is untracked, return 0
+	if thumb_tip_transform == Transform3D() or finger_tip_transform == Transform3D():
+		return 0.0
+		
+	var distance = thumb_tip_transform.origin.distance_to(finger_tip_transform.origin)
+	
+	# Mapping distance to pinch strength:
+	# 7cm or more = 0.0 (fully open)
+	# 2cm or less = 1.0 (fully pinched)
+	var max_dist = 0.07
+	var min_dist = 0.02
+	
+	return clamp((max_dist - distance) / (max_dist - min_dist), 0.0, 1.0)
+
+
+func _update_hand_tracking_ui_pinches() -> void:
+	if not hand_tracking_ui:
+		return
+	
+	# Polling pinch strengths directly for better accuracy/independence
+	var left_tracker := XRServer.get_tracker("/user/hand_tracker/left") as XRHandTracker
+	if left_tracker and left_tracker.has_tracking_data:
+		var p_index = _get_manual_pinch_strength(left_tracker, 10)
+		var p_middle = _get_manual_pinch_strength(left_tracker, 15)
+		var p_ring = _get_manual_pinch_strength(left_tracker, 20)
+		var p_little = _get_manual_pinch_strength(left_tracker, 25)
+		
+		hand_tracking_ui.set_pinch_strength(0, "index_pinch", p_index)
+		hand_tracking_ui.set_pinch_strength(0, "middle_pinch", p_middle)
+		hand_tracking_ui.set_pinch_strength(0, "ring_pinch", p_ring)
+		hand_tracking_ui.set_pinch_strength(0, "little_pinch", p_little)
+		
+		# Sync discrete indicators with strength (> 0.8 is green)
+		hand_tracking_ui.set_discrete_signal(0, "index_pinch", p_index > 0.8)
+		hand_tracking_ui.set_discrete_signal(0, "middle_pinch", p_middle > 0.8)
+		hand_tracking_ui.set_discrete_signal(0, "ring_pinch", p_ring > 0.8)
+		hand_tracking_ui.set_discrete_signal(0, "little_pinch", p_little > 0.8)
+		
+	var right_tracker := XRServer.get_tracker("/user/hand_tracker/right") as XRHandTracker
+	if right_tracker and right_tracker.has_tracking_data:
+		var p_index = _get_manual_pinch_strength(right_tracker, 10)
+		var p_middle = _get_manual_pinch_strength(right_tracker, 15)
+		var p_ring = _get_manual_pinch_strength(right_tracker, 20)
+		var p_little = _get_manual_pinch_strength(right_tracker, 25)
+		
+		hand_tracking_ui.set_pinch_strength(1, "index_pinch", p_index)
+		hand_tracking_ui.set_pinch_strength(1, "middle_pinch", p_middle)
+		hand_tracking_ui.set_pinch_strength(1, "ring_pinch", p_ring)
+		hand_tracking_ui.set_pinch_strength(1, "little_pinch", p_little)
+		
+		# Sync discrete indicators with strength (> 0.8 is green)
+		hand_tracking_ui.set_discrete_signal(1, "index_pinch", p_index > 0.8)
+		hand_tracking_ui.set_discrete_signal(1, "middle_pinch", p_middle > 0.8)
+		hand_tracking_ui.set_discrete_signal(1, "ring_pinch", p_ring > 0.8)
+		hand_tracking_ui.set_discrete_signal(1, "little_pinch", p_little > 0.8)
 
 
 func _on_left_controller_input_float_changed(name: String, value: float) -> void:
-	# Keep empty for now as we don't have the strength indicators
+	# Handled via polling in _process for diagnostic UI
 	pass
 
 
 func _on_right_controller_input_float_changed(name: String, value: float) -> void:
-	# Keep empty for now as we don't have the strength indicators
+	# Handled via polling in _process for diagnostic UI
 	pass
 
-
 func _on_left_controller_button_pressed(name: String) -> void:
+	# Keep controller events for non-hand-tracking or system-level signals
+	# but diagnostic UI lights are handled by polling in _process for accuracy
+	
 	if name == "index_pinch":
-		left_hand_ray_cast.enabled = true
-		left_hand_ray_cast.force_raycast_update()
-		if left_hand_ray_cast.is_colliding():
-			var collider = left_hand_ray_cast.get_collider()
-			if collider:
-				# Use groups or name check? User example uses name
-				update_collider(collider)
+		_left_index_pinch_active = true
 
 
 func _on_left_controller_button_released(name: String) -> void:
 	if name == "index_pinch":
 		left_hand_ray_cast.enabled = false
 
-
 func _on_right_controller_button_pressed(name: String) -> void:
 	if name == "index_pinch":
-		right_hand_ray_cast.enabled = true
-		right_hand_ray_cast.force_raycast_update()
-		if right_hand_ray_cast.is_colliding():
-			var collider = right_hand_ray_cast.get_collider()
-			if collider:
-				update_collider(collider)
+		_right_index_pinch_active = true
 
 
 func _on_right_controller_button_released(name: String) -> void:
@@ -691,12 +848,19 @@ func _on_right_controller_button_released(name: String) -> void:
 		right_hand_ray_cast.enabled = false
 
 
+func _on_hand_ui_visibility_toggle_requested(collider_name: String) -> void:
+	# Handler for the 2D UI signals
+	_handle_hand_interaction(collider_name)
+
+
 func update_collider(collider: Node) -> void:
-	# Adapted "update" function from example to use collider node
-	# Checking collider name or groups
-	var collider_name = collider.name
-	# Debug print
-	print("Hand Interaction: Hit ", collider_name)
+	# For raycast interactions directly with 3D nodes (toggles)
+	_handle_hand_interaction(collider.name)
+
+
+func _handle_hand_interaction(collider_name: String) -> void:
+	# Shared logic for both 2D UI signals and 3D node raycasts
+	print("XRPlayer: Hand Interaction with '", collider_name, "'")
 	
 	match collider_name:
 		"LeftHandMesh":
