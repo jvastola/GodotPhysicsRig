@@ -130,7 +130,15 @@ options/attach_log=false
 
 openxr/enabled=true
 openxr/foveation_level=3
+openxr/extensions/hand_tracking=true
+openxr/extensions/hand_tracking_unobstructed_data_source=true
+openxr/extensions/hand_tracking_controller_data_source=true
+openxr/extensions/hand_interaction_profile=true
 shaders/enabled=true
 openxr/extensions/meta/color_space/starting_color_space=3
 openxr/extensions/meta/passthrough=true
 openxr/extensions/meta/render_model=true
+openxr/extensions/meta/hand_tracking_aim=true
+openxr/extensions/meta/hand_tracking_mesh=true
+openxr/extensions/meta/hand_tracking_capsules=true
+openxr/extensions/meta/simultaneous_hands_and_controllers=true

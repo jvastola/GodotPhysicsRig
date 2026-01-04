@@ -27,6 +27,22 @@ extends Node3D
 @onready var head_mesh: MeshInstance3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadMesh
 @onready var body_mesh: MeshInstance3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea/BodyMesh
 
+# Hand Tracking
+const CAPSULE_MATERIAL = preload("res://capsule_material.tres")
+
+@onready var left_hand_ray_cast: RayCast3D = $PlayerBody/XROrigin3D/LeftController/RayCast3D
+@onready var left_hand_tracker_node: XRNode3D = $PlayerBody/XROrigin3D/LeftHandTracker
+@onready var left_hand_skeleton: OpenXRFbHandTrackingMesh = $PlayerBody/XROrigin3D/LeftHandTracker/OpenXRFbHandTrackingMesh
+@onready var right_hand_ray_cast: RayCast3D = $PlayerBody/XROrigin3D/RightController/RayCast3D
+@onready var right_hand_tracker_node: XRNode3D = $PlayerBody/XROrigin3D/RightHandTracker
+@onready var right_hand_skeleton: OpenXRFbHandTrackingMesh = $PlayerBody/XROrigin3D/RightHandTracker/OpenXRFbHandTrackingMesh
+
+var fb_capsule_ext
+var left_capsules_loaded := false
+var right_capsules_loaded := false
+var xr_interface: XRInterface
+
+
 # Components
 var network_component: PlayerNetworkComponent
 var voice_component: PlayerVoiceComponent
@@ -68,6 +84,23 @@ func _ready() -> void:
 	_cache_base_scales()
 	_last_world_scale = XRServer.world_scale
 	_apply_rig_scale()
+
+	# Initialize Hand Tracking
+	xr_interface = XRServer.find_interface("OpenXR")
+	if xr_interface and xr_interface.is_initialized():
+		fb_capsule_ext = Engine.get_singleton("OpenXRFbHandTrackingCapsulesExtensionWrapper")
+
+	left_hand_skeleton.openxr_fb_hand_tracking_mesh_ready.connect(_add_mesh_group.bind(left_hand_skeleton, "hand_mesh_left"))
+	right_hand_skeleton.openxr_fb_hand_tracking_mesh_ready.connect(_add_mesh_group.bind(right_hand_skeleton, "hand_mesh_right"))
+
+	# Connect Controller Signals
+	left_controller.button_pressed.connect(_on_left_controller_button_pressed)
+	left_controller.button_released.connect(_on_left_controller_button_released)
+	left_controller.input_float_changed.connect(_on_left_controller_input_float_changed)
+
+	right_controller.button_pressed.connect(_on_right_controller_button_pressed)
+	right_controller.button_released.connect(_on_right_controller_button_released)
+	right_controller.input_float_changed.connect(_on_right_controller_input_float_changed)
 
 	# Initialize components
 	_setup_components()
@@ -195,6 +228,15 @@ func _setup_physics_hands() -> void:
 
 
 func _process(delta: float) -> void:
+	if not left_capsules_loaded:
+		var tracker: XRHandTracker = XRServer.get_tracker("/user/hand_tracker/left")
+		if tracker and tracker.has_tracking_data:
+			hand_capsule_setup(0, tracker)
+	if not right_capsules_loaded:
+		var tracker: XRHandTracker = XRServer.get_tracker("/user/hand_tracker/right")
+		if tracker and tracker.has_tracking_data:
+			hand_capsule_setup(1, tracker)
+
 	var current_world_scale := XRServer.world_scale
 	if not is_equal_approx(current_world_scale, _last_world_scale):
 		_last_world_scale = current_world_scale
@@ -563,3 +605,109 @@ func _setup_audio_listeners() -> void:
 		desktop_camera.add_child(desktop_listener)
 	
 	print("XRPlayer: Audio listeners setup")
+
+
+func _add_mesh_group(p_parent: Node3D, p_group: String) -> void:
+	for child in p_parent.get_children():
+		if child is MeshInstance3D:
+			child.add_to_group(p_group)
+
+
+func hand_capsule_setup(hand_idx: int, hand_tracker: XRHandTracker) -> void:
+	if not fb_capsule_ext:
+		return
+
+	var skeletons := [left_hand_skeleton, right_hand_skeleton]
+
+	for capsule_idx in fb_capsule_ext.get_hand_capsule_count():
+		var capsule_mesh := CapsuleMesh.new()
+		capsule_mesh.height = fb_capsule_ext.get_hand_capsule_height(hand_idx, capsule_idx)
+		capsule_mesh.radius = fb_capsule_ext.get_hand_capsule_radius(hand_idx, capsule_idx)
+
+		var mesh_instance := MeshInstance3D.new()
+		mesh_instance.mesh = capsule_mesh
+		mesh_instance.set_surface_override_material(0, CAPSULE_MATERIAL)
+		match hand_idx:
+			0:
+				mesh_instance.add_to_group("hand_capsule_left")
+			1:
+				mesh_instance.add_to_group("hand_capsule_right")
+
+		var bone_attachment := BoneAttachment3D.new()
+		bone_attachment.bone_idx = fb_capsule_ext.get_hand_capsule_joint(hand_idx, capsule_idx)
+
+		bone_attachment.add_child(mesh_instance)
+		skeletons[hand_idx].add_child(bone_attachment)
+
+		var capsule_transform: Transform3D = fb_capsule_ext.get_hand_capsule_transform(hand_idx, capsule_idx)
+		var bone_transform: Transform3D = hand_tracker.get_hand_joint_transform(fb_capsule_ext.get_hand_capsule_joint(hand_idx, capsule_idx))
+		mesh_instance.transform = bone_transform.inverse() * capsule_transform
+
+	match hand_idx:
+		0:
+			left_capsules_loaded = true
+		1:
+			right_capsules_loaded = true
+
+
+func _on_left_controller_input_float_changed(name: String, value: float) -> void:
+	# Keep empty for now as we don't have the strength indicators
+	pass
+
+
+func _on_right_controller_input_float_changed(name: String, value: float) -> void:
+	# Keep empty for now as we don't have the strength indicators
+	pass
+
+
+func _on_left_controller_button_pressed(name: String) -> void:
+	if name == "index_pinch":
+		left_hand_ray_cast.enabled = true
+		left_hand_ray_cast.force_raycast_update()
+		if left_hand_ray_cast.is_colliding():
+			var collider = left_hand_ray_cast.get_collider()
+			if collider:
+				# Use groups or name check? User example uses name
+				update_collider(collider)
+
+
+func _on_left_controller_button_released(name: String) -> void:
+	if name == "index_pinch":
+		left_hand_ray_cast.enabled = false
+
+
+func _on_right_controller_button_pressed(name: String) -> void:
+	if name == "index_pinch":
+		right_hand_ray_cast.enabled = true
+		right_hand_ray_cast.force_raycast_update()
+		if right_hand_ray_cast.is_colliding():
+			var collider = right_hand_ray_cast.get_collider()
+			if collider:
+				update_collider(collider)
+
+
+func _on_right_controller_button_released(name: String) -> void:
+	if name == "index_pinch":
+		right_hand_ray_cast.enabled = false
+
+
+func update_collider(collider: Node) -> void:
+	# Adapted "update" function from example to use collider node
+	# Checking collider name or groups
+	var collider_name = collider.name
+	# Debug print
+	print("Hand Interaction: Hit ", collider_name)
+	
+	match collider_name:
+		"LeftHandMesh":
+			for hand_mesh in get_tree().get_nodes_in_group("hand_mesh_left"):
+				hand_mesh.visible = not hand_mesh.visible
+		"LeftHandCapsules":
+			for hand_capsule in get_tree().get_nodes_in_group("hand_capsule_left"):
+				hand_capsule.visible = not hand_capsule.visible
+		"RightHandMesh":
+			for hand_mesh in get_tree().get_nodes_in_group("hand_mesh_right"):
+				hand_mesh.visible = not hand_mesh.visible
+		"RightHandCapsules":
+			for hand_capsule in get_tree().get_nodes_in_group("hand_capsule_right"):
+				hand_capsule.visible = not hand_capsule.visible

@@ -58,7 +58,7 @@ radial_segments = 16
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hand"]
 
-[node name="XRPlayer2" type="Node3D" unique_id=1985006532]
+[node name="XRPlayer4" type="Node3D" unique_id=1985006532]
 script = ExtResource("1_player")
 desktop_extra_collider_offset = Vector3(0, 0, 0)
 
@@ -142,6 +142,11 @@ cast_shadow = 0
 cast_shadow = 0
 mesh = SubResource("SphereMesh_watch_hit")
 
+[node name="RayCast3D" type="RayCast3D" parent="PlayerBody/XROrigin3D/LeftController" unique_id=762596766]
+target_position = Vector3(0, 0, -1)
+collision_mask = 4
+collide_with_areas = true
+
 [node name="HandPointer" type="Node3D" parent="PlayerBody/XROrigin3D/LeftController" unique_id=1391630202]
 transform = Transform3D(1, 0, 0, 0, 0.57357645, 0.81915206, 0, -0.81915206, 0.57357645, 0, 0, 0)
 script = ExtResource("6_pointer")
@@ -223,6 +228,21 @@ cast_shadow = 0
 [node name="PointerRayHit" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/RightController/HandPointer" unique_id=1202519073]
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_pointer_hit")
+
+[node name="RayCast3D" type="RayCast3D" parent="PlayerBody/XROrigin3D/RightController" unique_id=1242757362]
+target_position = Vector3(0, 0, -1)
+collision_mask = 4
+collide_with_areas = true
+
+[node name="LeftHandTracker" type="XRNode3D" parent="PlayerBody/XROrigin3D" unique_id=1319717165]
+tracker = &"/user/hand_tracker/left"
+
+[node name="OpenXRFbHandTrackingMesh" type="OpenXRFbHandTrackingMesh" parent="PlayerBody/XROrigin3D/LeftHandTracker" unique_id=1125184249]
+
+[node name="RightHandTracker" type="XRNode3D" parent="PlayerBody/XROrigin3D" unique_id=1278368324]
+tracker = &"/user/hand_tracker/right"
+
+[node name="OpenXRFbHandTrackingMesh" type="OpenXRFbHandTrackingMesh" parent="PlayerBody/XROrigin3D/RightHandTracker" unique_id=263602541]
 
 [node name="DesktopCamera" type="Camera3D" parent="PlayerBody" unique_id=250281076]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.755936, 0)
