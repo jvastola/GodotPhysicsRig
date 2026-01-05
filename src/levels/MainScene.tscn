@@ -1,4 +1,4 @@
-[gd_scene load_steps=62 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene load_steps=63 format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -6,7 +6,7 @@
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/NodeInspectorTool.tscn" id="5_pswl6"]
 [ext_resource type="PackedScene" uid="uid://b60rl4dw2d13k" path="res://src/objects/GridSnapMesh.tscn" id="6_hjxlr"]
 [ext_resource type="PackedScene" uid="uid://dve0k8qfhgyma" path="res://src/objects/grabbables/GravityInverter.tscn" id="7_gravity_inverter"]
-[ext_resource type="Material" uid="uid://dmgn71ss1mjfr" path="res://src/demos/tools/materials/glass.tres" id="8_7qgd2"]
+[ext_resource type="Material" path="res://assets/wireframe-material.tres" id="8_7qgd2"]
 [ext_resource type="PackedScene" uid="uid://c4jv0mg3xpn45" path="res://src/objects/grabbables/CameraFlipper.tscn" id="8_camera_flipper"]
 [ext_resource type="PackedScene" uid="uid://crqvm2hbh8k5p" path="res://src/objects/grabbables/DizzySphere.tscn" id="9_dizzy_sphere"]
 [ext_resource type="PackedScene" uid="uid://bq7h5xn8vwfkj" path="res://src/objects/grabbables/SpeedBooster.tscn" id="10_speed_booster"]
@@ -32,17 +32,17 @@
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/WorldGrabSphere.tscn" id="38_world_grab_sphere"]
 [ext_resource type="Script" uid="uid://om3k532gai8j" path="res://src/ui/ui_panel_manager.gd" id="39_ui_panel_manager"]
 [ext_resource type="PackedScene" path="res://src/ui/git/GitViewport3D.tscn" id="39_wh2ee"]
-[ext_resource type="Script" uid="uid://bqrnwqkyb00kx" path="res://src/ui/ui_panel_scene_setup.gd" id="40_ui_panel_setup"]
-[ext_resource type="Script" uid="uid://bid6ju5yhq61q" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
+[ext_resource type="Script" path="res://src/ui/ui_panel_scene_setup.gd" id="40_ui_panel_setup"]
+[ext_resource type="Script" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
 [ext_resource type="PackedScene" uid="uid://cm8nv7v0apls3" path="res://src/objects/grabbables/GrappleHook.tscn" id="42_grapple_hook"]
 [ext_resource type="PackedScene" path="res://src/objects/ReferenceBlock.tscn" id="43_reference_block"]
 [ext_resource type="PackedScene" path="res://src/ui/BlockLibraryViewport3D.tscn" id="44_block_library_viewport"]
 [ext_resource type="PackedScene" uid="uid://baesap7jjgmfh" path="res://src/objects/grabbables/PaintBrush.tscn" id="45_paint_brush"]
 [ext_resource type="PackedScene" path="res://src/ui/TerminalViewport3D.tscn" id="46_terminal"]
-[ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://src/objects/viewport_mirror.gd" id="47_viewport_mirror"]
+[ext_resource type="Script" uid="uid://dacfvlwh7dwcm" path="res://src/objects/viewport_mirror.gd" id="47_viewport_mirror"]
 [ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://src/systems/grid_painter.gd" id="48_grid_painter"]
 [ext_resource type="PackedScene" path="res://src/ui/PassthroughSettingsViewport3D.tscn" id="49_passthrough_settings"]
-[ext_resource type="PackedScene" uid="uid://d3x8y7yqk8y8j" path="res://src/ui/HandTrackingViewport3D.tscn" id="50_hand_tracking_ui"]
+[ext_resource type="PackedScene" path="res://src/ui/HandTrackingViewport3D.tscn" id="50_hand_tracking_ui"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -156,7 +156,6 @@ shape = SubResource("BoxShape3D_floor")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Floor" unique_id=347202364]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.03215456, -0.027283192, 0.0073566437)
-visible = false
 material_override = ExtResource("2_or5nu")
 mesh = SubResource("BoxMesh_or5nu")
 
@@ -267,7 +266,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.983923, 0.88246953, 1.516
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.6498556)
 
 [node name="ShaderPlasma" type="CSGSphere3D" parent="PlasmaDemos" unique_id=1217239899]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -0.84171957, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -1.1352291, 0)
 radius = 0.75
 material = SubResource("StandardMaterial3D_wvm1w")
 script = ExtResource("35_hr53f")
@@ -286,7 +285,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.75, 0)
 material = SubResource("StandardMaterial3D_wvm1w")
 
 [node name="Sphere" type="CSGSphere3D" parent="PlasmaDemos/PlasmaBox" unique_id=716390065]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2.544487)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2.148313)
 operation = 2
 radius = 0.6
 material = ExtResource("34_s8yin")
@@ -363,5 +362,5 @@ collision_mask = 32
 [node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest/GridTargetBody/GridTargetBodyArea" unique_id=1858467520]
 shape = SubResource("BoxShape3D_body_grid")
 
-[node name="HandTrackingUI" parent="." instance=ExtResource("50_hand_tracking_ui")]
+[node name="HandTrackingUI" parent="." unique_id=472303655 instance=ExtResource("50_hand_tracking_ui")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -5.5)
