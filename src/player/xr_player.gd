@@ -114,8 +114,10 @@ func _ready() -> void:
 	else:
 		push_warning("XRPlayer: Right hand skeleton not found!")
 	
-	# Ensure tracker nodes are visible	if hand_tracking_ui:
+	# Ensure tracker nodes are visible
+	if hand_tracking_ui:
 		hand_tracking_ui.visibility_toggle_requested.connect(_on_hand_ui_visibility_toggle_requested)
+	
 	if left_hand_tracker_node:
 		left_hand_tracker_node.visible = true
 	if right_hand_tracker_node:
@@ -266,22 +268,17 @@ func _process(delta: float) -> void:
 	
 	if not left_capsules_loaded:
 		var tracker: XRHandTracker = XRServer.get_tracker("/user/hand_tracker/left")
-		if tracker:
-			if tracker.has_tracking_data:
-				print("XRPlayer: Left hand tracker has data, setting up capsules...")
-				hand_capsule_setup(0, tracker)
-			# Also check if OpenXRFbHandTrackingMesh has skeleton data
+		if tracker and tracker.has_tracking_data:
 			if left_hand_skeleton and left_hand_skeleton.get_bone_count() > 0:
-				print("XRPlayer: Left skeleton has ", left_hand_skeleton.get_bone_count(), " bones")
+				print("XRPlayer: Left hand tracker and skeleton ready (", left_hand_skeleton.get_bone_count(), " bones), setting up capsules...")
+				hand_capsule_setup(0, tracker)
 	
 	if not right_capsules_loaded:
 		var tracker: XRHandTracker = XRServer.get_tracker("/user/hand_tracker/right")
-		if tracker:
-			if tracker.has_tracking_data:
-				print("XRPlayer: Right hand tracker has data, setting up capsules...")
-				hand_capsule_setup(1, tracker)
+		if tracker and tracker.has_tracking_data:
 			if right_hand_skeleton and right_hand_skeleton.get_bone_count() > 0:
-				print("XRPlayer: Right skeleton has ", right_hand_skeleton.get_bone_count(), " bones")
+				print("XRPlayer: Right hand tracker and skeleton ready (", right_hand_skeleton.get_bone_count(), " bones), setting up capsules...")
+				hand_capsule_setup(1, tracker)
 
 	_update_hand_tracking_ui_pinches()
 
@@ -700,18 +697,45 @@ func hand_capsule_setup(hand_idx: int, hand_tracker: XRHandTracker) -> void:
 		return
 
 	var skeletons := [left_hand_skeleton, right_hand_skeleton]
-	var skeleton = skeletons[hand_idx]
+	var skeleton_parent = skeletons[hand_idx]
 	var hand_name = "left" if hand_idx == 0 else "right"
 	
-	if not skeleton:
-		print("XRPlayer: hand_capsule_setup - ", hand_name, " skeleton is null")
+	if not skeleton_parent:
+		print("XRPlayer: hand_capsule_setup - ", hand_name, " skeleton_parent is null")
 		return
+
+	# Try to find actual Skeleton3D if skeleton_parent is just a mesh
+	var actual_skeleton: Skeleton3D = null
+	if skeleton_parent is Skeleton3D:
+		actual_skeleton = skeleton_parent
+	else:
+		# Search children for a Skeleton3D
+		for child in skeleton_parent.get_children():
+			if child is Skeleton3D:
+				actual_skeleton = child
+				break
 	
-	var bone_count = skeleton.get_bone_count() if skeleton.has_method("get_bone_count") else -1
-	print("XRPlayer: hand_capsule_setup - ", hand_name, " hand, skeleton bone count: ", bone_count)
+	if not actual_skeleton:
+		print("XRPlayer: hand_capsule_setup - WARNING: Could not find Skeleton3D under ", skeleton_parent.name)
+		# Fallback to the node itself if it has bone methods, though it might not work for BoneAttachment3D
+		if skeleton_parent.has_method("get_bone_count"):
+			print("XRPlayer: hand_capsule_setup - Parent has bone methods, using it as fallback.")
+			# But BoneAttachment3D strictly requires a Skeleton3D parent in Godot 4
+	
+	var bone_count = -1
+	if actual_skeleton:
+		bone_count = actual_skeleton.get_bone_count()
+	elif skeleton_parent.has_method("get_bone_count"):
+		bone_count = skeleton_parent.get_bone_count()
+		
+	print("XRPlayer: hand_capsule_setup - ", hand_name, " hand, bone count: ", bone_count)
 	
 	var capsule_count = fb_capsule_ext.get_hand_capsule_count()
-	print("XRPlayer: hand_capsule_setup - Creating ", capsule_count, " capsules for ", hand_name, " hand")
+	print("XRPlayer: hand_capsule_setup - Extension reports ", capsule_count, " capsules for ", hand_name, " hand")
+
+	if capsule_count == 0:
+		print("XRPlayer: hand_capsule_setup - WARNING: capsule_count is 0.")
+		return
 
 	for capsule_idx in capsule_count:
 		var capsule_mesh := CapsuleMesh.new()
@@ -723,27 +747,44 @@ func hand_capsule_setup(hand_idx: int, hand_tracker: XRHandTracker) -> void:
 		var mesh_instance := MeshInstance3D.new()
 		mesh_instance.mesh = capsule_mesh
 		mesh_instance.set_surface_override_material(0, CAPSULE_MATERIAL)
-		mesh_instance.visible = true  # Ensure capsule is visible
+		mesh_instance.visible = true
 		match hand_idx:
 			0:
 				mesh_instance.add_to_group("hand_capsule_left")
 			1:
 				mesh_instance.add_to_group("hand_capsule_right")
 
-		var bone_attachment := BoneAttachment3D.new()
 		var joint_idx = fb_capsule_ext.get_hand_capsule_joint(hand_idx, capsule_idx)
-		bone_attachment.bone_idx = joint_idx
+		var bone_name = ""
+		if actual_skeleton:
+			bone_name = actual_skeleton.get_bone_name(joint_idx)
+		elif skeleton_parent.has_method("get_bone_name"):
+			bone_name = skeleton_parent.get_bone_name(joint_idx)
+		
+		var bone_attachment := BoneAttachment3D.new()
+		if bone_name != "":
+			bone_attachment.bone_name = bone_name
+		else:
+			bone_attachment.bone_idx = joint_idx
+		
 		bone_attachment.name = "CapsuleBone_" + str(capsule_idx)
-
 		bone_attachment.add_child(mesh_instance)
-		skeleton.add_child(bone_attachment)
+		
+		if actual_skeleton:
+			actual_skeleton.add_child(bone_attachment)
+		else:
+			skeleton_parent.add_child(bone_attachment)
 
+		# Important: In Godot 4, BoneAttachment3D might need to be notified of its skeleton
+		# especially if it's not a direct child of a Skeleton3D node.
+		# But we are adding it as a child.
+		
 		var capsule_transform: Transform3D = fb_capsule_ext.get_hand_capsule_transform(hand_idx, capsule_idx)
 		var bone_transform: Transform3D = hand_tracker.get_hand_joint_transform(joint_idx)
 		mesh_instance.transform = bone_transform.inverse() * capsule_transform
 		
-		if capsule_idx < 3:  # Log just a few to avoid spam
-			print("XRPlayer: Capsule ", capsule_idx, " - joint: ", joint_idx, ", h: ", snapped(height, 0.001), ", r: ", snapped(radius, 0.001))
+		if capsule_idx < 3:
+			print("XRPlayer: Added Capsule ", capsule_idx, " to ", bone_name if bone_name != "" else "joint " + str(joint_idx), " under ", (actual_skeleton.name if actual_skeleton else skeleton_parent.name), " (h: ", snapped(height, 0.001), ", r: ", snapped(radius, 0.001), ")")
 
 	match hand_idx:
 		0:
@@ -819,14 +860,18 @@ func _update_hand_tracking_ui_pinches() -> void:
 
 func _on_left_controller_input_float_changed(name: String, value: float) -> void:
 	# Handled via polling in _process for diagnostic UI
+	# print("L Float: ", name, " ", value)
 	pass
 
 
 func _on_right_controller_input_float_changed(name: String, value: float) -> void:
 	# Handled via polling in _process for diagnostic UI
+	# print("R Float: ", name, " ", value)
 	pass
 
+
 func _on_left_controller_button_pressed(name: String) -> void:
+	print("XRPlayer Left Button: ", name)
 	# Keep controller events for non-hand-tracking or system-level signals
 	# but diagnostic UI lights are handled by polling in _process for accuracy
 	
@@ -839,6 +884,7 @@ func _on_left_controller_button_released(name: String) -> void:
 		left_hand_ray_cast.enabled = false
 
 func _on_right_controller_button_pressed(name: String) -> void:
+	print("XRPlayer Right Button: ", name)
 	if name == "index_pinch":
 		_right_index_pinch_active = true
 
@@ -864,14 +910,22 @@ func _handle_hand_interaction(collider_name: String) -> void:
 	
 	match collider_name:
 		"LeftHandMesh":
-			for hand_mesh in get_tree().get_nodes_in_group("hand_mesh_left"):
+			var nodes = get_tree().get_nodes_in_group("hand_mesh_left")
+			print("XRPlayer: Toggling ", nodes.size(), " left hand meshes")
+			for hand_mesh in nodes:
 				hand_mesh.visible = not hand_mesh.visible
 		"LeftHandCapsules":
-			for hand_capsule in get_tree().get_nodes_in_group("hand_capsule_left"):
+			var nodes = get_tree().get_nodes_in_group("hand_capsule_left")
+			print("XRPlayer: Toggling ", nodes.size(), " left hand capsules")
+			for hand_capsule in nodes:
 				hand_capsule.visible = not hand_capsule.visible
 		"RightHandMesh":
-			for hand_mesh in get_tree().get_nodes_in_group("hand_mesh_right"):
+			var nodes = get_tree().get_nodes_in_group("hand_mesh_right")
+			print("XRPlayer: Toggling ", nodes.size(), " right hand meshes")
+			for hand_mesh in nodes:
 				hand_mesh.visible = not hand_mesh.visible
 		"RightHandCapsules":
-			for hand_capsule in get_tree().get_nodes_in_group("hand_capsule_right"):
+			var nodes = get_tree().get_nodes_in_group("hand_capsule_right")
+			print("XRPlayer: Toggling ", nodes.size(), " right hand capsules")
+			for hand_capsule in nodes:
 				hand_capsule.visible = not hand_capsule.visible
