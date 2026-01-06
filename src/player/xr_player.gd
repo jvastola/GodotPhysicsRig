@@ -81,6 +81,18 @@ var _hand_visual_nodes: Array[Node3D] = []
 var _base_hand_visual_scales: Dictionary = {}
 var _base_hand_visual_transforms: Dictionary = {}
 
+# Poke Interaction
+var left_poke_area: Area3D
+var right_poke_area: Area3D
+var left_poke_visual: MeshInstance3D
+var right_poke_visual: MeshInstance3D
+var left_ui_last_collider: Node = null
+var right_ui_last_collider: Node = null
+var _poke_radius: float = 0.005
+var _poke_visual_color := Color(0.0, 0.8, 1.0, 0.8)
+var _poke_active_color := Color(0.2, 1.0, 0.2, 1.0)
+var _pinch_threshold: float = 0.8  # Strength to trigger grab
+
 # Audio Listeners
 var vr_listener: AudioListener3D = null
 var desktop_listener: AudioListener3D = null
@@ -158,6 +170,9 @@ func _ready() -> void:
 	
 	# Setup audio listeners
 	_setup_audio_listeners()
+	
+	# Setup poke interaction
+	_setup_poke_interaction()
 
 
 func _setup_components() -> void:
@@ -281,6 +296,7 @@ func _process(delta: float) -> void:
 				hand_capsule_setup(1, tracker)
 
 	_update_hand_tracking_ui_pinches()
+	_process_poke_and_pinch(delta)
 
 	var current_world_scale := XRServer.world_scale
 	if not is_equal_approx(current_world_scale, _last_world_scale):
@@ -929,3 +945,163 @@ func _handle_hand_interaction(collider_name: String) -> void:
 			print("XRPlayer: Toggling ", nodes.size(), " right hand capsules")
 			for hand_capsule in nodes:
 				hand_capsule.visible = not hand_capsule.visible
+
+
+func _setup_poke_interaction() -> void:
+	"""Setup areas and visuals for poke interaction"""
+	if not left_hand_tracker_node or not right_hand_tracker_node:
+		return
+
+	# Left Hand Poke
+	left_poke_area = _create_poke_area("LeftPokeArea")
+	left_poke_visual = _create_poke_visual("LeftPokeVisual")
+	left_poke_area.add_child(left_poke_visual)
+	add_child(left_poke_area)
+
+	# Right Hand Poke
+	right_poke_area = _create_poke_area("RightPokeArea")
+	right_poke_visual = _create_poke_visual("RightPokeVisual")
+	right_poke_area.add_child(right_poke_visual)
+	add_child(right_poke_area)
+
+
+func _create_poke_area(p_name: String) -> Area3D:
+	var area := Area3D.new()
+	area.name = p_name
+	area.collision_layer = 0  # Don't get hit by others
+	area.collision_mask = 1 << 5 # Layer 6 (UI) usually
+	area.monitorable = false
+	area.monitoring = true
+	
+	var col := CollisionShape3D.new()
+	var shape := SphereShape3D.new()
+	shape.radius = _poke_radius
+	col.shape = shape
+	area.add_child(col)
+	return area
+
+
+func _create_poke_visual(p_name: String) -> MeshInstance3D:
+	var mesh_inst := MeshInstance3D.new()
+	mesh_inst.name = p_name
+	var mesh := SphereMesh.new()
+	mesh.radius = _poke_radius
+	mesh.height = _poke_radius * 2.0
+	mesh.radial_segments = 16
+	mesh_inst.mesh = mesh
+	
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = _poke_visual_color
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.no_depth_test = true # Visualize through objects
+	mesh_inst.material_override = mat
+	
+	return mesh_inst
+
+
+func _process_poke_and_pinch(delta: float) -> void:
+	var left_tracker := XRServer.get_tracker("/user/hand_tracker/left") as XRHandTracker
+	var right_tracker := XRServer.get_tracker("/user/hand_tracker/right") as XRHandTracker
+
+	# --- Left Hand ---
+	if left_tracker and left_tracker.has_tracking_data:
+		# Update Poke Position (Index Tip = 10)
+		var index_tip: Transform3D = left_tracker.get_hand_joint_transform(10)
+		# Transform to world space
+		if xr_origin:
+			var world_tip = xr_origin.global_transform * index_tip
+			if left_poke_area:
+				left_poke_area.global_transform = world_tip
+				_handle_poke_physics(left_poke_area, left_poke_visual, true)
+		
+		# Update Pinch Grab
+		var pinch_strength = _get_manual_pinch_strength(left_tracker, 10)
+		if physics_hand_left and physics_hand_left.has_method("set_pinch_grab"):
+			physics_hand_left.set_pinch_grab(pinch_strength > _pinch_threshold)
+	else:
+		if left_poke_area: left_poke_area.visible = false
+
+	# --- Right Hand ---
+	if right_tracker and right_tracker.has_tracking_data:
+		# Update Poke Position
+		var index_tip: Transform3D = right_tracker.get_hand_joint_transform(10)
+		if xr_origin:
+			var world_tip = xr_origin.global_transform * index_tip
+			if right_poke_area:
+				right_poke_area.global_transform = world_tip
+				_handle_poke_physics(right_poke_area, right_poke_visual, false)
+
+		# Update Pinch Grab
+		var pinch_strength = _get_manual_pinch_strength(right_tracker, 10)
+		if physics_hand_right and physics_hand_right.has_method("set_pinch_grab"):
+			physics_hand_right.set_pinch_grab(pinch_strength > _pinch_threshold)
+	else:
+		if right_poke_area: right_poke_area.visible = false
+
+
+func _handle_poke_physics(area: Area3D, visual: MeshInstance3D, is_left: bool) -> void:
+	if not area: return
+	area.visible = true
+	
+	var overlapping_bodies = area.get_overlapping_bodies()
+	var overlapping_areas = area.get_overlapping_areas()
+	var all_overlapping = overlapping_bodies + overlapping_areas
+	var touching_ui: Node = null
+	
+	for body in all_overlapping:
+		# Traverse up to find a node that handles pointer events
+		var candidate = body
+		for i in range(5): # Check up to 5 levels up
+			if not is_instance_valid(candidate):
+				break
+			if candidate.has_method("handle_pointer_event"):
+				touching_ui = candidate
+				break
+			candidate = candidate.get_parent()
+		
+		if touching_ui:
+			break
+	
+	# Handle Interaction
+	var last_collider = left_ui_last_collider if is_left else right_ui_last_collider
+	
+	if touching_ui:
+		# Visual feedback
+		if visual:
+			var mat = visual.material_override as StandardMaterial3D
+			if mat: mat.albedo_color = _poke_active_color
+			
+		# Interaction
+		# Calculate detailed event properties
+		var just_pressed = (touching_ui != last_collider)
+		var event_type = "press" if just_pressed else "hold"
+		
+		var event = {
+			"type": event_type,
+			"global_position": area.global_position,
+			"action_just_pressed": just_pressed,
+			"action_pressed": true
+		}
+		touching_ui.handle_pointer_event(event)
+	else:
+		# Visual feedback
+		if visual:
+			var mat = visual.material_override as StandardMaterial3D
+			if mat: mat.albedo_color = _poke_visual_color
+			
+		# Release previous
+		if last_collider and is_instance_valid(last_collider):
+			var event = {
+				"type": "release",
+				"global_position": area.global_position,
+				"action_just_released": true,
+				"action_pressed": false
+			}
+			last_collider.handle_pointer_event(event)
+
+	# Update state
+	if is_left:
+		left_ui_last_collider = touching_ui
+	else:
+		right_ui_last_collider = touching_ui

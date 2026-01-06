@@ -1,9 +1,11 @@
-[gd_resource type="ShaderMaterial" format=3 uid="uid://cl3ucly7cjhvy"]
+[gd_resource type="ShaderMaterial" load_steps=3 format=3 uid="uid://cl3ucly7cjhvy"]
 
 [ext_resource type="Shader" path="res://assets/wireframe-material.gdshader" id="1_f1auu"]
+[ext_resource type="Material" uid="uid://dt14gsjdqu78t" path="res://world_grab_demo/ghost_hand.tres" id="1_fjmw3"]
 
 [resource]
 render_priority = 0
+next_pass = ExtResource("1_fjmw3")
 shader = ExtResource("1_f1auu")
 shader_parameter/albedo = Color(1, 1, 1, 0)
 shader_parameter/wire_color = Color(1, 1, 1, 0.392157)

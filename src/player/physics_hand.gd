@@ -55,6 +55,8 @@ var nearby_grabbables: Array = []
 
 # Sticky trigger state tracking
 var _prev_release_button_pressed: bool = false
+var _is_pinch_grabbing: bool = false
+var _using_pinch_grab: bool = false
 
 
 func _ready() -> void:
@@ -250,16 +252,26 @@ func _handle_grab_input() -> void:
 
 	# Try to grab if trigger or grip pressed and not holding anything
 	if held_object == null:
-		if trigger_pressed or grip_pressed:
+		if trigger_pressed or grip_pressed or _is_pinch_grabbing:
 			_try_grab_nearest()
 
 	# Simple release: rising edge of the configured release action
 	else:
-		if release_button_pressed and not _prev_release_button_pressed:
+		# Release if release button pressed OR if using pinch and we stopped pinching
+		if (release_button_pressed and not _prev_release_button_pressed) or (_using_pinch_grab and not _is_pinch_grabbing):
 			_release_object()
 	
 	# Store previous release state for rising-edge detection
 	_prev_release_button_pressed = release_button_pressed
+
+
+func set_pinch_grab(active: bool) -> void:
+	"""Set pinch grab state from external source (e.g. XRPlayer hand tracking)"""
+	_is_pinch_grabbing = active
+	if active and held_object == null:
+		_using_pinch_grab = true
+	elif not active and held_object == null:
+		_using_pinch_grab = false
 
 
 func _check_release_button(controller: XRController3D) -> bool:

@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://cpq6v7yqk8y8j"]
+[gd_scene load_steps=30 format=3 uid="uid://cpq6v7yqk8y8j"]
 
 [ext_resource type="Script" uid="uid://02kpb1kqm303" path="res://src/player/xr_player.gd" id="1_player"]
 [ext_resource type="Script" uid="uid://3ir0c0htxlqh" path="res://src/player/xr_origin_3d.gd" id="2_xr_origin"]
@@ -59,7 +59,7 @@ radial_segments = 16
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hand"]
 
-[node name="XRPlayer5" type="Node3D" unique_id=1985006532]
+[node name="XRPlayer6" type="Node3D" unique_id=1985006532]
 script = ExtResource("1_player")
 desktop_extra_collider_offset = Vector3(0, 0, 0)
 
