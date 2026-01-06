@@ -122,6 +122,18 @@ metadata/_tab_index = 3
 layout_mode = 2
 theme_override_constants/separation = 8
 
+[node name="RenderModeScroll" type="ScrollContainer" parent="TabContainer"]
+visible = false
+layout_mode = 2
+follow_focus = true
+vertical_scroll_mode = 2
+horizontal_scroll_mode = 0
+metadata/_tab_index = 4
+
+[node name="RenderModeVBox" type="VBoxContainer" parent="TabContainer/RenderModeScroll"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
 [node name="TestLabel6" type="Label" parent="TabContainer/MultiplayerScroll/MultiplayerVBox"]
 layout_mode = 2
 text = "Multiplayer Tab"

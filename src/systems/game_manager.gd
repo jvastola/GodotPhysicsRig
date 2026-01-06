@@ -59,6 +59,10 @@ func _log_error(msg: String, extra: Variant = null) -> void:
 func _ready() -> void:
 	AppLogger.apply_project_setting_default()
 	_log_info("Ready (log level: %s)" % AppLogger.get_level_label())
+	
+	# Enable wireframe generation so DEBUG_DRAW_WIREFRAME works
+	RenderingServer.set_debug_generate_wireframes(true)
+	
 	set_process(true)
 	# Track the initial scene as current_world
 	call_deferred("_setup_initial_world")

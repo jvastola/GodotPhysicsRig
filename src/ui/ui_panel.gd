@@ -5,6 +5,7 @@ extends Control
 @onready var vbox_general = $TabContainer/GeneralScroll/GeneralVBox
 @onready var vbox_movement = $TabContainer/MovementScroll/MovementVBox
 @onready var vbox_multiplayer = $TabContainer/MultiplayerScroll/MultiplayerVBox
+@onready var vbox_render = $TabContainer/RenderModeScroll/RenderModeVBox
 
 var movement_component: PlayerMovementComponent
 var player_body: RigidBody3D
@@ -74,9 +75,11 @@ func _setup_ui() -> void:
 		c.queue_free()
 	for c in vbox_multiplayer.get_children():
 		c.queue_free()
+	for c in vbox_render.get_children():
+		c.queue_free()
 	
 	# Ensure all tabs are visible once populated
-	var all_vboxes = [vbox_panels, vbox_general, vbox_movement, vbox_multiplayer]
+	var all_vboxes = [vbox_panels, vbox_general, vbox_movement, vbox_multiplayer, vbox_render]
 	for vbox in all_vboxes:
 		if vbox:
 			vbox.visible = true
@@ -97,6 +100,9 @@ func _setup_ui() -> void:
 	
 	# === MULTIPLAYER TAB ===
 	_setup_multiplayer_tab()
+	
+	# === RENDER MODE TAB ===
+	_setup_render_mode_tab()
 
 	# Set tab titles
 	if tab and tab.get_child_count() >= 4:
@@ -104,6 +110,7 @@ func _setup_ui() -> void:
 		tab.set_tab_title(1, "General")
 		tab.set_tab_title(2, "Movement")
 		tab.set_tab_title(3, "Multiplayer")
+		tab.set_tab_title(4, "Render Mode")
 
 func _setup_panels_tab() -> void:
 	"""Setup the Panels tab with quick access to all UI panels"""
@@ -446,6 +453,36 @@ func _setup_multiplayer_tab() -> void:
 		feature_btn.disabled = true
 		feature_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		vbox_multiplayer.add_child(feature_btn)
+
+func _setup_render_mode_tab() -> void:
+	"""Setup the Render Mode tab"""
+	var title_label = Label.new()
+	title_label.text = "Render Mode"
+	title_label.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox_render.add_child(title_label)
+	
+	_add_separator(vbox_render)
+	
+	var modes = [
+		{"label": "Normal", "mode": Viewport.DEBUG_DRAW_DISABLED},
+		{"label": "Wireframe", "mode": Viewport.DEBUG_DRAW_WIREFRAME},
+		{"label": "Overdraw", "mode": Viewport.DEBUG_DRAW_OVERDRAW},
+		{"label": "Unshaded", "mode": Viewport.DEBUG_DRAW_UNSHADED}
+	]
+	
+	for entry in modes:
+		var btn = Button.new()
+		btn.text = entry["label"]
+		btn.custom_minimum_size = Vector2(0, 40)
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.pressed.connect(func(): _set_render_mode(entry["mode"]))
+		vbox_render.add_child(btn)
+
+func _set_render_mode(mode: int) -> void:
+	# Apply to the root viewport so it affects the main game view
+	if _root_viewport:
+		_root_viewport.debug_draw = mode
 
 func _add_separator(parent: VBoxContainer) -> void:
 	"""Add a visual separator line"""
