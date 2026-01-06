@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://c8n4y2m5o8p1x"]
 
-[ext_resource type="Script" uid="uid://c8n4y2m5o8p1x" path="res://src/ui/hand_tracking_2d_ui.gd" id="1_script"]
+[ext_resource type="Script" path="res://src/ui/hand_tracking_2d_ui.gd" id="1_script"]
 
 [node name="HandTracking2DUI" type="Control"]
 layout_mode = 3

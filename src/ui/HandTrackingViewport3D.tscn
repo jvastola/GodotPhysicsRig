@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://d3x8y7yqk8y8j"]
 
-[ext_resource type="Script" uid="uid://dcednjyo6sb8j" path="res://src/ui/ui_viewport_3d.gd" id="1_ui_script"]
+[ext_resource type="Script" path="res://src/ui/ui_viewport_3d.gd" id="1_ui_script"]
 [ext_resource type="PackedScene" uid="uid://c8n4y2m5o8p1x" path="res://src/ui/HandTracking2DUI.tscn" id="2_hand_ui"]
 
 [sub_resource type="ViewportTexture" id="ViewportTexture_ui"]
