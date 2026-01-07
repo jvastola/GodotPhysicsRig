@@ -54,6 +54,7 @@ var network_component: PlayerNetworkComponent
 var voice_component: PlayerVoiceComponent
 var movement_component: PlayerMovementComponent
 var simple_world_grab: SimpleWorldGrabComponent
+var hand_movement_component: HandMovementComponent
 
 # Player settings
 var player_height := 0.0  # Using headset tracking; keep 0 to avoid artificial offset
@@ -207,6 +208,12 @@ func _setup_components() -> void:
 	if simple_world_grab:
 		simple_world_grab.setup(xr_origin, xr_camera, left_controller, right_controller)
 		simple_world_grab.enabled = false  # Disabled by default, enable via UI
+	
+	# Hand Movement Component (middle finger pinch world grab)
+	hand_movement_component = get_node_or_null("HandMovementComponent")
+	if hand_movement_component:
+		hand_movement_component.setup(player_body, xr_origin)
+		hand_movement_component.enabled = false  # Disabled by default, enable via settings
 
 
 func _find_livekit_manager() -> Node:

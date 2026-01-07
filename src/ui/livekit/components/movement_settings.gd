@@ -85,6 +85,13 @@ const DEFAULTS := {
 	"v3_rotation_sensitivity": 1.0,
 	"v3_translation_sensitivity": 1.0,
 	"v3_smoothing": 0.5,
+	# === Hand Movement (Middle Finger Pinch) Settings ===
+	"enable_hand_movement": false,
+	"hand_movement_grab_mode": 0,  # 0 = RELATIVE, 1 = ANCHORED
+	"hand_movement_sensitivity": 0.25,
+	"hand_movement_invert_direction": true,
+	"hand_movement_apply_release_velocity": true,
+	"hand_movement_show_visual": true,
 }
 
 const INPUT_ACTIONS := [
@@ -199,6 +206,15 @@ var v3_translation_sensitivity_slider: HSlider
 var v3_translation_sensitivity_label: Label
 var v3_smoothing_slider: HSlider
 var v3_smoothing_label: Label
+
+# Hand Movement (Middle Finger Pinch) UI
+var hand_movement_enable_check: CheckBox
+var hand_movement_grab_mode_btn: OptionButton
+var hand_movement_sensitivity_slider: HSlider
+var hand_movement_sensitivity_label: Label
+var hand_movement_invert_check: CheckBox
+var hand_movement_release_vel_check: CheckBox
+var hand_movement_show_visual_check: CheckBox
 
 # Simple World Grab UI
 var simple_world_grab_check: CheckBox
@@ -1087,6 +1103,73 @@ func _build_ui():
 	simple_world_grab_check.toggled.connect(func(pressed: bool): _on_simple_world_grab_toggled(pressed))
 	simple_grab_card.add_child(simple_world_grab_check)
 
+	# === Hand Movement (Middle Finger Pinch) ===
+	var hand_movement_card = _create_card(main_vbox, "Hand Movement (Pinch)", "Move using middle finger pinch gesture", "🤏")
+	
+	hand_movement_enable_check = CheckBox.new()
+	hand_movement_enable_check.text = "Enable Hand Movement"
+	hand_movement_enable_check.add_theme_font_size_override("font_size", 12)
+	hand_movement_enable_check.tooltip_text = "Pinch with middle finger and thumb to grab and move the world. Works with hand tracking."
+	hand_movement_enable_check.button_pressed = _get_hand_movement_enabled()
+	hand_movement_enable_check.toggled.connect(func(pressed: bool): _on_hand_movement_toggled(pressed))
+	hand_movement_card.add_child(hand_movement_enable_check)
+	
+	# Grab Mode dropdown
+	var grab_mode_row = HBoxContainer.new()
+	grab_mode_row.add_theme_constant_override("separation", 8)
+	var grab_mode_label = Label.new()
+	grab_mode_label.text = "Grab Mode:"
+	grab_mode_label.add_theme_font_size_override("font_size", 12)
+	grab_mode_row.add_child(grab_mode_label)
+	hand_movement_grab_mode_btn = OptionButton.new()
+	hand_movement_grab_mode_btn.add_theme_font_size_override("font_size", 12)
+	hand_movement_grab_mode_btn.add_item("Relative", 0)
+	hand_movement_grab_mode_btn.add_item("Anchored", 1)
+	hand_movement_grab_mode_btn.selected = _get_hand_movement_grab_mode()
+	hand_movement_grab_mode_btn.tooltip_text = "Relative: anchor follows player. Anchored: anchor stays fixed in world."
+	hand_movement_grab_mode_btn.item_selected.connect(func(index: int): _on_hand_movement_grab_mode_changed(index))
+	grab_mode_row.add_child(hand_movement_grab_mode_btn)
+	hand_movement_card.add_child(grab_mode_row)
+	
+	var initial_hand_move_sense = _get_hand_movement_sensitivity()
+	var hand_move_sense_block = _add_slider_block(
+		hand_movement_card,
+		"Movement Sensitivity",
+		"How much the player moves relative to hand movement (0.05–2.0).",
+		0.05,
+		2.0,
+		0.05,
+		initial_hand_move_sense,
+		func(value): return " x%.2f" % value
+	)
+	hand_movement_sensitivity_label = hand_move_sense_block.label
+	hand_movement_sensitivity_slider = hand_move_sense_block.slider
+	hand_movement_sensitivity_slider.value_changed.connect(func(value: float): _on_hand_movement_sensitivity_changed(value))
+	
+	hand_movement_invert_check = CheckBox.new()
+	hand_movement_invert_check.text = "Invert Direction"
+	hand_movement_invert_check.add_theme_font_size_override("font_size", 12)
+	hand_movement_invert_check.tooltip_text = "Reverse the motion direction (pull to move forward vs push)."
+	hand_movement_invert_check.button_pressed = _get_hand_movement_invert()
+	hand_movement_invert_check.toggled.connect(func(pressed: bool): _on_hand_movement_invert_toggled(pressed))
+	hand_movement_card.add_child(hand_movement_invert_check)
+	
+	hand_movement_release_vel_check = CheckBox.new()
+	hand_movement_release_vel_check.text = "Apply Release Velocity"
+	hand_movement_release_vel_check.add_theme_font_size_override("font_size", 12)
+	hand_movement_release_vel_check.tooltip_text = "Keep momentum when releasing the pinch."
+	hand_movement_release_vel_check.button_pressed = _get_hand_movement_release_velocity()
+	hand_movement_release_vel_check.toggled.connect(func(pressed: bool): _on_hand_movement_release_vel_toggled(pressed))
+	hand_movement_card.add_child(hand_movement_release_vel_check)
+	
+	hand_movement_show_visual_check = CheckBox.new()
+	hand_movement_show_visual_check.text = "Show Visual Line"
+	hand_movement_show_visual_check.add_theme_font_size_override("font_size", 12)
+	hand_movement_show_visual_check.tooltip_text = "Display a line from the anchor point to the current pinch position."
+	hand_movement_show_visual_check.button_pressed = _get_hand_movement_show_visual()
+	hand_movement_show_visual_check.toggled.connect(func(pressed: bool): _on_hand_movement_show_visual_toggled(pressed))
+	hand_movement_card.add_child(hand_movement_show_visual_check)
+
 	# === Player ===
 	var player_card = _create_card(main_vbox, "Player", "Gravity and safety preferences", "🧍")
 
@@ -1681,6 +1764,121 @@ func _on_simple_world_grab_toggled(pressed: bool):
 	settings_changed.emit()
 
 
+# === Hand Movement (Middle Finger Pinch) Functions ===
+
+func _get_hand_movement_enabled() -> bool:
+	var player = get_tree().get_first_node_in_group("xr_player")
+	if player:
+		var hand_movement = player.get_node_or_null("HandMovementComponent")
+		if hand_movement:
+			return hand_movement.enabled
+	return defaults_snapshot.get("enable_hand_movement", false)
+
+
+func _get_hand_movement_grab_mode() -> int:
+	var player = get_tree().get_first_node_in_group("xr_player")
+	if player:
+		var hand_movement = player.get_node_or_null("HandMovementComponent")
+		if hand_movement:
+			return hand_movement.grab_mode
+	return defaults_snapshot.get("hand_movement_grab_mode", 0)
+
+
+func _get_hand_movement_sensitivity() -> float:
+	var player = get_tree().get_first_node_in_group("xr_player")
+	if player:
+		var hand_movement = player.get_node_or_null("HandMovementComponent")
+		if hand_movement:
+			return hand_movement.movement_sensitivity
+	return defaults_snapshot.get("hand_movement_sensitivity", 0.25)
+
+
+func _get_hand_movement_invert() -> bool:
+	var player = get_tree().get_first_node_in_group("xr_player")
+	if player:
+		var hand_movement = player.get_node_or_null("HandMovementComponent")
+		if hand_movement:
+			return hand_movement.invert_direction
+	return defaults_snapshot.get("hand_movement_invert_direction", true)
+
+
+func _get_hand_movement_release_velocity() -> bool:
+	var player = get_tree().get_first_node_in_group("xr_player")
+	if player:
+		var hand_movement = player.get_node_or_null("HandMovementComponent")
+		if hand_movement:
+			return hand_movement.apply_release_velocity
+	return defaults_snapshot.get("hand_movement_apply_release_velocity", true)
+
+
+func _get_hand_movement_show_visual() -> bool:
+	var player = get_tree().get_first_node_in_group("xr_player")
+	if player:
+		var hand_movement = player.get_node_or_null("HandMovementComponent")
+		if hand_movement:
+			return hand_movement.show_visual
+	return defaults_snapshot.get("hand_movement_show_visual", true)
+
+
+func _on_hand_movement_toggled(pressed: bool):
+	var player = get_tree().get_first_node_in_group("xr_player")
+	if player:
+		var hand_movement = player.get_node_or_null("HandMovementComponent")
+		if hand_movement:
+			hand_movement.enabled = pressed
+			print("HandMovement: ", "enabled" if pressed else "disabled")
+	settings_changed.emit()
+
+
+func _on_hand_movement_grab_mode_changed(index: int):
+	var player = get_tree().get_first_node_in_group("xr_player")
+	if player:
+		var hand_movement = player.get_node_or_null("HandMovementComponent")
+		if hand_movement:
+			hand_movement.grab_mode = index
+			var mode_name := "ANCHORED" if index == 1 else "RELATIVE"
+			print("HandMovement: grab mode -> ", mode_name)
+	settings_changed.emit()
+
+
+func _on_hand_movement_sensitivity_changed(value: float):
+	var player = get_tree().get_first_node_in_group("xr_player")
+	if player:
+		var hand_movement = player.get_node_or_null("HandMovementComponent")
+		if hand_movement:
+			hand_movement.movement_sensitivity = value
+	if hand_movement_sensitivity_label:
+		hand_movement_sensitivity_label.text = "Movement Sensitivity: x%.2f" % value
+	settings_changed.emit()
+
+
+func _on_hand_movement_invert_toggled(pressed: bool):
+	var player = get_tree().get_first_node_in_group("xr_player")
+	if player:
+		var hand_movement = player.get_node_or_null("HandMovementComponent")
+		if hand_movement:
+			hand_movement.invert_direction = pressed
+	settings_changed.emit()
+
+
+func _on_hand_movement_release_vel_toggled(pressed: bool):
+	var player = get_tree().get_first_node_in_group("xr_player")
+	if player:
+		var hand_movement = player.get_node_or_null("HandMovementComponent")
+		if hand_movement:
+			hand_movement.apply_release_velocity = pressed
+	settings_changed.emit()
+
+
+func _on_hand_movement_show_visual_toggled(pressed: bool):
+	var player = get_tree().get_first_node_in_group("xr_player")
+	if player:
+		var hand_movement = player.get_node_or_null("HandMovementComponent")
+		if hand_movement:
+			hand_movement.show_visual = pressed
+	settings_changed.emit()
+
+
 func _on_auto_respawn_toggled(pressed: bool):
 	if movement_component:
 		movement_component.auto_respawn_enabled = pressed
@@ -1944,6 +2142,20 @@ func refresh():
 		if v3_debug_check:
 			v3_debug_check.button_pressed = movement_component.v3_debug_logs
 	
+	# Hand Movement refresh (uses separate component)
+	if hand_movement_enable_check:
+		hand_movement_enable_check.button_pressed = _get_hand_movement_enabled()
+	if hand_movement_grab_mode_btn:
+		hand_movement_grab_mode_btn.selected = _get_hand_movement_grab_mode()
+	if hand_movement_sensitivity_slider:
+		hand_movement_sensitivity_slider.value = _get_hand_movement_sensitivity()
+	if hand_movement_invert_check:
+		hand_movement_invert_check.button_pressed = _get_hand_movement_invert()
+	if hand_movement_release_vel_check:
+		hand_movement_release_vel_check.button_pressed = _get_hand_movement_release_velocity()
+	if hand_movement_show_visual_check:
+		hand_movement_show_visual_check.button_pressed = _get_hand_movement_show_visual()
+	
 	_update_turn_mode_ui()
 	_update_locomotion_controls_enabled()
 	_update_status_label()
@@ -2120,6 +2332,25 @@ func _apply_defaults(source: Dictionary):
 		physics_hands_check.button_pressed = source.get("enable_physics_hands", DEFAULTS["enable_physics_hands"])
 	if player_drag_slider:
 		player_drag_slider.value = source.get("player_drag_force", DEFAULTS["player_drag_force"])
+	# Hand Movement settings
+	if hand_movement_enable_check:
+		hand_movement_enable_check.button_pressed = source.get("enable_hand_movement", DEFAULTS["enable_hand_movement"])
+		_on_hand_movement_toggled(hand_movement_enable_check.button_pressed)
+	if hand_movement_grab_mode_btn:
+		hand_movement_grab_mode_btn.selected = source.get("hand_movement_grab_mode", DEFAULTS["hand_movement_grab_mode"])
+		_on_hand_movement_grab_mode_changed(hand_movement_grab_mode_btn.selected)
+	if hand_movement_sensitivity_slider:
+		hand_movement_sensitivity_slider.value = source.get("hand_movement_sensitivity", DEFAULTS["hand_movement_sensitivity"])
+		_on_hand_movement_sensitivity_changed(hand_movement_sensitivity_slider.value)
+	if hand_movement_invert_check:
+		hand_movement_invert_check.button_pressed = source.get("hand_movement_invert_direction", DEFAULTS["hand_movement_invert_direction"])
+		_on_hand_movement_invert_toggled(hand_movement_invert_check.button_pressed)
+	if hand_movement_release_vel_check:
+		hand_movement_release_vel_check.button_pressed = source.get("hand_movement_apply_release_velocity", DEFAULTS["hand_movement_apply_release_velocity"])
+		_on_hand_movement_release_vel_toggled(hand_movement_release_vel_check.button_pressed)
+	if hand_movement_show_visual_check:
+		hand_movement_show_visual_check.button_pressed = source.get("hand_movement_show_visual", DEFAULTS["hand_movement_show_visual"])
+		_on_hand_movement_show_visual_toggled(hand_movement_show_visual_check.button_pressed)
 
 
 func _update_turn_mode_ui():
@@ -2267,6 +2498,13 @@ func _collect_settings_data() -> Dictionary:
 		"v3_rotation_sensitivity": v3_rotation_sensitivity_slider.value if v3_rotation_sensitivity_slider else DEFAULTS["v3_rotation_sensitivity"],
 		"v3_translation_sensitivity": v3_translation_sensitivity_slider.value if v3_translation_sensitivity_slider else DEFAULTS["v3_translation_sensitivity"],
 		"v3_smoothing": v3_smoothing_slider.value if v3_smoothing_slider else DEFAULTS["v3_smoothing"],
+		# Hand Movement settings
+		"enable_hand_movement": hand_movement_enable_check.button_pressed if hand_movement_enable_check else DEFAULTS["enable_hand_movement"],
+		"hand_movement_grab_mode": hand_movement_grab_mode_btn.selected if hand_movement_grab_mode_btn else DEFAULTS["hand_movement_grab_mode"],
+		"hand_movement_sensitivity": hand_movement_sensitivity_slider.value if hand_movement_sensitivity_slider else DEFAULTS["hand_movement_sensitivity"],
+		"hand_movement_invert_direction": hand_movement_invert_check.button_pressed if hand_movement_invert_check else DEFAULTS["hand_movement_invert_direction"],
+		"hand_movement_apply_release_velocity": hand_movement_release_vel_check.button_pressed if hand_movement_release_vel_check else DEFAULTS["hand_movement_apply_release_velocity"],
+		"hand_movement_show_visual": hand_movement_show_visual_check.button_pressed if hand_movement_show_visual_check else DEFAULTS["hand_movement_show_visual"],
 	}
 
 

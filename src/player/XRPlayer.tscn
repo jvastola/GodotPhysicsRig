@@ -15,6 +15,7 @@
 [ext_resource type="Script" uid="uid://04sudajutma5" path="res://src/player/components/player_network_component.gd" id="14_network_comp"]
 [ext_resource type="Script" uid="uid://cxk34sx374uym" path="res://src/player/components/player_voice_component.gd" id="15_voice_comp"]
 [ext_resource type="Script" uid="uid://dwsx0otrybpmd" path="res://src/player/components/simple_world_grab_component.gd" id="16_simple_grab"]
+[ext_resource type="Script" path="res://src/player/components/hand_movement_component.gd" id="17_hand_movement"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_xxbg3"]
 size = Vector3(0.3, 0.4, 0.2)
@@ -388,3 +389,8 @@ script = ExtResource("15_voice_comp")
 
 [node name="SimpleWorldGrabComponent" type="Node" parent="." unique_id=739088080]
 script = ExtResource("16_simple_grab")
+
+[node name="HandMovementComponent" type="Node" parent="."]
+script = ExtResource("17_hand_movement")
+enabled = false
+show_visual = true
