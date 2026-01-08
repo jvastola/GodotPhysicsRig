@@ -23,22 +23,22 @@ const MAIN_SCENE_PATH := "res://src/levels/MainScene.tscn"
 const UIPanelManager = preload("res://src/ui/ui_panel_manager.gd")
 
 func _ready() -> void:
-	print("UIPanel: _ready() called")
+	print("WatchMenuUI: _ready() called")
 	# Find the player and movement component
 	# We defer this slightly to ensure the player is ready and in the group
 	call_deferred("_find_player_and_setup")
 
 func _find_player_and_setup() -> void:
-	print("UIPanel: _find_player_and_setup() called")
+	print("WatchMenuUI: _find_player_and_setup() called")
 	var player = get_tree().get_first_node_in_group("xr_player")
-	print("UIPanel: Found player: ", player)
+	print("WatchMenuUI: Found player: ", player)
 	
 	if player:
 		movement_component = player.get_node_or_null("PlayerMovementComponent")
-		print("UIPanel: Found movement_component: ", movement_component)
+		print("WatchMenuUI: Found movement_component: ", movement_component)
 		xr_player = player
 		player_body = player.get_node_or_null("PlayerBody") as RigidBody3D
-		print("UIPanel: Found player_body: ", player_body)
+		print("WatchMenuUI: Found player_body: ", player_body)
 	
 	_xr_interface = XRServer.find_interface("OpenXR")
 	_root_viewport = get_tree().root
@@ -47,24 +47,24 @@ func _find_player_and_setup() -> void:
 	_find_world_environment()
 	
 	if movement_component:
-		print("UIPanel: Calling _setup_ui()")
+		print("WatchMenuUI: Calling _setup_ui()")
 		_setup_ui()
 	else:
-		print("UIPanel: ERROR - Could not find PlayerMovementComponent")
-		print("UIPanel: Available children of player: ")
+		print("WatchMenuUI: ERROR - Could not find PlayerMovementComponent")
+		print("WatchMenuUI: Available children of player: ")
 		if player:
 			for child in player.get_children():
 				print("  - ", child.name, " (", child.get_class(), ")")
 
 func _setup_ui() -> void:
-	print("UIPanel: _setup_ui() starting")
+	print("WatchMenuUI: _setup_ui() starting")
 	
 	# Only clear if we have a movement component to populate with
 	if not movement_component:
-		print("UIPanel: No movement component, keeping default UI")
+		print("WatchMenuUI: No movement component, keeping default UI")
 		return
 	
-	print("UIPanel: Movement component found, populating UI with settings")
+	print("WatchMenuUI: Movement component found, populating UI with settings")
 	
 	# Clear default test children from all tabs
 	for c in vbox_panels.get_children():
@@ -468,7 +468,8 @@ func _setup_render_mode_tab() -> void:
 		{"label": "Normal", "mode": Viewport.DEBUG_DRAW_DISABLED},
 		{"label": "Wireframe", "mode": Viewport.DEBUG_DRAW_WIREFRAME},
 		{"label": "Overdraw", "mode": Viewport.DEBUG_DRAW_OVERDRAW},
-		{"label": "Unshaded", "mode": Viewport.DEBUG_DRAW_UNSHADED}
+		{"label": "Unshaded", "mode": Viewport.DEBUG_DRAW_UNSHADED},
+		{"label": "Collision", "mode": -1} # Special custom mode
 	]
 	
 	for entry in modes:
@@ -482,7 +483,13 @@ func _setup_render_mode_tab() -> void:
 func _set_render_mode(mode: int) -> void:
 	# Apply to the root viewport so it affects the main game view
 	if _root_viewport:
-		_root_viewport.debug_draw = mode
+		# If mode is -1, it's our special "Collision" mode
+		if mode == -1:
+			_root_viewport.debug_draw = Viewport.DEBUG_DRAW_DISABLED
+			get_tree().debug_collisions_hint = true
+		else:
+			_root_viewport.debug_draw = mode
+			get_tree().debug_collisions_hint = false
 
 func _add_separator(parent: VBoxContainer) -> void:
 	"""Add a visual separator line"""
@@ -529,7 +536,7 @@ func _on_player_scale_changed(value: float, label: Label) -> void:
 		if movement_component and movement_component.has_method("set_manual_player_scale"):
 			movement_component.set_manual_player_scale(value)
 	else:
-		print("UIPanel: Cannot change player scale, PlayerBody not found")
+		print("WatchMenuUI: Cannot change player scale, PlayerBody not found")
 
 # === Player Scale Helpers ===
 
@@ -705,7 +712,7 @@ func _create_panel_manager_and_open(node_name: String) -> void:
 			scene_root = gm.get("current_world")
 	
 	if not scene_root:
-		print("UIPanel: Cannot create UIPanelManager - no scene root")
+		print("WatchMenuUI: Cannot create UIPanelManager - no scene root")
 		return
 	
 	# Check if manager already exists
@@ -718,7 +725,7 @@ func _create_panel_manager_and_open(node_name: String) -> void:
 	var manager := UIPanelManager.new()
 	manager.name = "UIPanelManager"
 	scene_root.add_child(manager)
-	print("UIPanel: Created UIPanelManager")
+	print("WatchMenuUI: Created UIPanelManager")
 	
 	# Open the panel
 	manager.open_panel(node_name, true)

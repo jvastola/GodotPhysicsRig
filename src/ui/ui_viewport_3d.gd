@@ -95,9 +95,9 @@ func _ready() -> void:
 	print("UIViewport3D: _ready() complete")
 
 func _connect_button_signals() -> void:
-	var button1: Button = viewport.get_node_or_null("UIPanel/VBoxContainer/Button1") as Button
-	var button2: Button = viewport.get_node_or_null("UIPanel/VBoxContainer/Button2") as Button
-	var button3: Button = viewport.get_node_or_null("UIPanel/VBoxContainer/Button3") as Button
+	var button1: Button = viewport.get_node_or_null("WatchMenuUI/VBoxContainer/Button1") as Button
+	var button2: Button = viewport.get_node_or_null("WatchMenuUI/VBoxContainer/Button2") as Button
+	var button3: Button = viewport.get_node_or_null("WatchMenuUI/VBoxContainer/Button3") as Button
 	
 	if button1:
 		button1.pressed.connect(self._on_button1_pressed)

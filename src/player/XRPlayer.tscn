@@ -17,6 +17,8 @@
 [ext_resource type="Script" uid="uid://dwsx0otrybpmd" path="res://src/player/components/simple_world_grab_component.gd" id="16_simple_grab"]
 [ext_resource type="Script" path="res://src/player/components/hand_movement_component.gd" id="17_hand_movement"]
 
+[ext_resource type="PackedScene" path="res://src/ui/WatchMenuViewport3D.tscn" id="18_watch_viewport"]
+
 [sub_resource type="BoxMesh" id="BoxMesh_xxbg3"]
 size = Vector3(0.3, 0.4, 0.2)
 
@@ -117,7 +119,7 @@ ray_length = 1.0
 show_line = false
 show_hitpoint = false
 
-[node name="UIViewportWatch" parent="PlayerBody/XROrigin3D/LeftController/Watch" unique_id=766114696 instance=ExtResource("7_ui_viewport")]
+[node name="UIViewportWatch" parent="PlayerBody/XROrigin3D/LeftController/Watch" unique_id=766114696 instance=ExtResource("18_watch_viewport")]
 transform = Transform3D(0.12, 0, 0, 0, 0.055748, 0.106271, 0, -0.106271, 0.055748, 0, 0.058575, -0.118114)
 
 [node name="WatchFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch" unique_id=1295475450]

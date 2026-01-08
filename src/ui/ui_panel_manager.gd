@@ -76,7 +76,7 @@ const UI_SCENE_PATHS := {
 	"TwoHandGrabSettingsViewport3D": "res://src/ui/TwoHandGrabSettingsViewport3D.tscn",
 	"AddNodeViewport3D": "res://src/ui/AddNodeViewport3D.tscn",
 	"WebviewViewport3D": "res://src/ui/webview/WebviewViewport3D.tscn",
-	"MainPanelViewport3D": "res://src/ui/UIViewport3D.tscn",
+	"MainPanelViewport3D": "res://src/ui/WatchMenuViewport3D.tscn",
 }
 
 

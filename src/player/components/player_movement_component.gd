@@ -170,6 +170,10 @@ var _jump_cooldown_timer := 0.0
 var _autojoin_triggered := false
 var _initial_spawn_position := Vector3.ZERO
 
+# Render Mode Reset state
+var _render_mode_reset_timer: float = 0.0
+const RENDER_MODE_RESET_TIME: float = 2.0
+
 # Input mapping helper
 var _input_binding_manager: InputBindingManager
 
@@ -271,6 +275,9 @@ func _physics_process(delta: float) -> void:
 	
 	# Autojoin check runs regardless of VR mode
 	_check_autojoin()
+	
+	# Check for render mode reset hold
+	_check_render_mode_reset(delta)
 		
 	# Head collision is now an Area3D parented to the XRCamera3D; it follows the headset automatically
 
@@ -798,7 +805,9 @@ func _update_world_grab() -> void:
 			var anchor_point := xr_camera.global_transform.origin if xr_camera else player_body.global_transform.origin
 			XRServer.world_scale = _world_grab_current_scale
 			_reanchor_player(anchor_point)
-	
+
+
+
 	# Update target anchors to account for scale about the initial midpoint.
 	var safe_scale: float = max(_world_grab_current_scale, 0.0001)
 	var scale_ratio: float = _world_grab_initial_scale / safe_scale
@@ -864,6 +873,31 @@ func _update_world_grab() -> void:
 	_world_grab_prev_midpoint = current_midpoint
 	_world_grab_prev_vector = current_vector
 	_update_two_hand_visual(left_controller.global_position, right_controller.global_position, current_midpoint)
+
+
+func _check_render_mode_reset(delta: float) -> void:
+	# Checks if any debug render modes are active, and if so, checks for trigger hold to reset.
+	var root_viewport = get_tree().root
+	var is_debug_draw = root_viewport.debug_draw != Viewport.DEBUG_DRAW_DISABLED
+	var is_collision_hint = get_tree().debug_collisions_hint
+	
+	if is_debug_draw or is_collision_hint:
+		# Check right trigger hold (typically right hand is dominant, or just check right controller specifically)
+		if right_controller and _is_action_pressed(right_controller, "trigger"):
+			_render_mode_reset_timer += delta
+			if _render_mode_reset_timer > RENDER_MODE_RESET_TIME:
+				print("PlayerMovementComponent: Resetting Render Mode via Trigger Hold")
+				root_viewport.debug_draw = Viewport.DEBUG_DRAW_DISABLED
+				get_tree().debug_collisions_hint = false
+				_render_mode_reset_timer = 0.0
+				
+				# Optional haptic feedback to confirm reset
+				if right_controller:
+					right_controller.trigger_haptic_pulse("haptic", 100.0, 0.5, 0.1, 0.0)
+		else:
+			_render_mode_reset_timer = 0.0
+	else:
+		_render_mode_reset_timer = 0.0
 
 
 func _start_one_hand_grab(controller: XRController3D) -> void:

@@ -1,6 +1,7 @@
-[gd_scene load_steps=6 format=3 uid="uid://b2gkx1eim00mw"]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" uid="uid://dcednjyo6sb8j" path="res://src/ui/ui_viewport_3d.gd" id="1_ui_script"]
+[ext_resource type="PackedScene" uid="uid://buvibmbg15qul" path="res://src/ui/WatchMenuUI.tscn" id="2_ui_panel"]
 
 [sub_resource type="ViewportTexture" id="ViewportTexture_ui"]
 viewport_path = NodePath("SubViewport")
@@ -17,12 +18,14 @@ size = Vector2(2, 2)
 [sub_resource type="BoxShape3D" id="BoxShape3D_ui"]
 size = Vector3(2, 2, 0.01)
 
-[node name="UIViewport3D" type="Node3D"]
+[node name="WatchMenuViewport3D" type="Node3D"]
 script = ExtResource("1_ui_script")
 
 [node name="SubViewport" type="SubViewport" parent="."]
 transparent_bg = true
 render_target_update_mode = 4
+
+[node name="WatchMenuUI" parent="SubViewport" instance=ExtResource("2_ui_panel")]
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
 material_override = SubResource("StandardMaterial3D_ui")

@@ -1,8 +1,8 @@
 [gd_scene load_steps=2 format=3 uid="uid://buvibmbg15qul"]
 
-[ext_resource type="Script" uid="uid://7bcle0qspug0" path="res://src/ui/ui_panel.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://dfjq3h830ps6l" path="res://src/ui/watch_menu_ui.gd" id="1_script"]
 
-[node name="UIPanel" type="Control"]
+[node name="WatchMenuUI" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
