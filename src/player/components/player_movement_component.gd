@@ -1356,7 +1356,7 @@ func _check_autojoin() -> void:
 		_autojoin_log("ERROR: player_body is null")
 		return
 	if _initial_spawn_position == Vector3.ZERO:
-		_autojoin_log("ERROR: _initial_spawn_position is Vector3.ZERO - was setup() called?")
+		#_autojoin_log("ERROR: _initial_spawn_position is Vector3.ZERO - was setup() called?")
 		return
 	
 	# Check if already in a Nakama match

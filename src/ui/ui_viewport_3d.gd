@@ -18,6 +18,8 @@ extends Node3D
 @export var resize_handle_color: Color = Color(0.9, 0.95, 1.0, 0.7)
 @export var resize_handle_hover_color: Color = Color(1.0, 1.0, 1.0, 1.0)
 @export_flags_3d_physics var resize_handle_collision_layer: int = 1 << 5
+@export var enable_panel_grab: bool = true  # If false, this panel ignores pointer grab requests (for wrapper use)
+var grab_delegate: Node3D = null # If set, grab calls are forwarded here
 
 @onready var viewport: SubViewport = get_node_or_null("SubViewport") as SubViewport
 @onready var mesh_instance: MeshInstance3D = get_node_or_null("MeshInstance3D") as MeshInstance3D
@@ -280,6 +282,11 @@ func pointer_grab_set_distance(new_distance: float, pointer: Node3D) -> void:
 	"""Set the distance of this UI panel from the pointer origin.
 	Called by hand_pointer during grip grab mode.
 	Also rotates the panel to face toward the pointer."""
+	if not enable_panel_grab:
+		if grab_delegate and grab_delegate.has_method("pointer_grab_set_distance"):
+			grab_delegate.pointer_grab_set_distance(new_distance, pointer)
+		return
+
 	if not pointer or not is_instance_valid(pointer):
 		return
 	
@@ -316,6 +323,11 @@ func pointer_grab_set_scale(new_scale: float) -> void:
 func pointer_grab_set_rotation(pointer: Node3D, grab_point: Vector3 = Vector3.INF) -> void:
 	"""Rotate this panel to face the pointer origin.
 	Called by hand_pointer during grip grab mode - position is handled separately."""
+	if not enable_panel_grab:
+		if grab_delegate and grab_delegate.has_method("pointer_grab_set_rotation"):
+			grab_delegate.pointer_grab_set_rotation(pointer, grab_point)
+		return
+
 	if not pointer or not is_instance_valid(pointer):
 		return
 	
@@ -340,6 +352,11 @@ func pointer_grab_set_rotation(pointer: Node3D, grab_point: Vector3 = Vector3.IN
 
 func pointer_grab_get_distance(pointer: Node3D) -> float:
 	"""Get current distance from the pointer origin."""
+	if not enable_panel_grab:
+		if grab_delegate and grab_delegate.has_method("pointer_grab_get_distance"):
+			return grab_delegate.pointer_grab_get_distance(pointer)
+		return 0.0
+
 	if not pointer or not is_instance_valid(pointer):
 		return 0.0
 	return global_position.distance_to(pointer.global_transform.origin)
@@ -348,6 +365,14 @@ func pointer_grab_get_distance(pointer: Node3D) -> float:
 func pointer_grab_get_scale() -> float:
 	"""Get current uniform scale."""
 	return scale.x
+
+
+func get_grab_target() -> Node3D:
+	"""Return the actual target that should be grabbed/moved.
+	Used by hand_pointer to redirect grabs (e.g. to a parent wrapper)."""
+	if not enable_panel_grab:
+		return grab_delegate # Returns null if no delegate set!
+	return self
 
 
 # ============================================================================

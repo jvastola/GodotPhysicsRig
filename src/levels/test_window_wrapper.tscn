@@ -1,0 +1,27 @@
+[gd_scene format=3 uid="uid://bs1u28fygu8sy"]
+
+[ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_player"]
+[ext_resource type="PackedScene" uid="uid://qsf5yp02t1i7" path="res://src/ui/window_wrapper/WindowWrapper.tscn" id="2_wrapper"]
+[ext_resource type="PackedScene" path="res://src/ui/PerformancePanelViewport3D.tscn" id="3_perf"]
+
+[sub_resource type="Environment" id="Environment_1"]
+background_mode = 1
+background_color = Color(0.1, 0.1, 0.1, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.4, 0.4, 0.4, 1)
+
+[node name="TestWindowWrapper" type="Node3D" unique_id=304110542]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=74379699]
+environment = SubResource("Environment_1")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=2050407604]
+transform = Transform3D(0.707107, -0.5, 0.5, 0, 0.707107, 0.707107, -0.707107, -0.5, 0.5, 0, 10, 0)
+shadow_enabled = true
+
+[node name="XRPlayer" parent="." unique_id=1130334128 instance=ExtResource("1_player")]
+
+[node name="WindowWrapper" parent="." unique_id=155592978 instance=ExtResource("2_wrapper")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -2)
+title = "Performance Test"
+content_viewport_scene = ExtResource("3_perf")

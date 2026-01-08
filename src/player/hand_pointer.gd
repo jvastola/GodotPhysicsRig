@@ -1626,7 +1626,16 @@ func _try_start_grab() -> void:
 		if not _hover_target is Node3D:
 			return
 	
-	_grab_target = _hover_target
+	# Resolve actual grab target (allows redirection, e.g. from UI panel to WindowWrapper)
+	# If get_grab_target() exists, we MUST use its result. If it returns null, it means "ungrabbable".
+	var final_target: Node = _hover_target
+	if _hover_target.has_method("get_grab_target"):
+		final_target = _hover_target.get_grab_target()
+		if not final_target:
+			# Target explicitly requested no grab
+			return
+	
+	_grab_target = final_target
 	_grab_should_rotate = false
 	
 	# Check if we should allow rotation based on collision layer
@@ -1645,18 +1654,21 @@ func _try_start_grab() -> void:
 	var axis_world: Vector3 = (global_transform.basis * axis_local).normalized()
 	var start: Vector3 = global_transform.origin
 	
-	if _hover_target is Node3D:
-		var target_3d: Node3D = _hover_target as Node3D
+	# Calculate grab parameters based on the ACTUAL target we are moving
+	if _grab_target is Node3D:
+		var target_3d: Node3D = _grab_target as Node3D
 		
-		# Get the actual hit point from raycast for offset calculation
-		var hit_point: Vector3 = target_3d.global_position  # default to center
+		# Get the actual hit point from raycast
+		var hit_point: Vector3 = target_3d.global_position # Default to center if ray fails
 		if _raycast and _raycast.is_colliding():
 			hit_point = _raycast.get_collision_point()
 		
 		# Calculate offset from hit point to object center (in object's local space)
+		# IMPORTANT: Use target_3d (Wrapper) position, even if we hit a child (Chrome)
 		_grab_offset = target_3d.global_position - hit_point
 		
 		# Calculate distance along ray to HIT POINT (not object center)
+		# This ensures we grab it "where it is" relative to the pointer
 		var to_hit: Vector3 = hit_point - start
 		_grab_distance = to_hit.dot(axis_world)
 		_grab_distance = clamp(_grab_distance, grab_min_distance, grab_max_distance)
@@ -1665,6 +1677,8 @@ func _try_start_grab() -> void:
 		_grab_distance = ray_length
 		_grab_initial_scale = Vector3.ONE
 		_grab_offset = Vector3.ZERO
+
+
 	
 	print("HandPointer: Started grab on ", _grab_target.name, " at distance ", _grab_distance, " offset ", _grab_offset)
 

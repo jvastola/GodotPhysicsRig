@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3 uid="uid://windowwrapperscene001"]
+
+[ext_resource type="Script" path="res://src/ui/window_wrapper/window_wrapper.gd" id="1_wrapper"]
+
+[node name="WindowWrapper" type="Node3D"]
+script = ExtResource("1_wrapper")
+
+[node name="ContentAnchor" type="Node3D" parent="."]
+
+[node name="ChromeAnchor" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
