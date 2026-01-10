@@ -8,6 +8,10 @@ async function migrate() {
   console.log('Running asset library migrations...\n');
 
   try {
+    // Enable pgcrypto extension for gen_random_uuid()
+    await db.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`);
+    console.log('✓ Enabled pgcrypto extension');
+
     // Create assets table
     await db.query(`
       CREATE TABLE IF NOT EXISTS assets (
