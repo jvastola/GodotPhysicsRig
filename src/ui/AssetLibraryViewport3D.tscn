@@ -1,0 +1,44 @@
+[gd_scene load_steps=6 format=3 uid="uid://asset_library_viewport3d"]
+
+[ext_resource type="Script" path="res://src/ui/ui_viewport_3d.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://src/ui/AssetLibraryUI.tscn" id="2_ui"]
+
+[sub_resource type="ViewportTexture" id="1_viewport_texture"]
+viewport_path = NodePath("SubViewport")
+
+[sub_resource type="StandardMaterial3D" id="2_material"]
+resource_local_to_scene = true
+transparency = 1
+shading_mode = 0
+albedo_texture = SubResource("1_viewport_texture")
+
+[sub_resource type="QuadMesh" id="3_quad_mesh"]
+size = Vector2(0.6, 0.8)
+
+[sub_resource type="BoxShape3D" id="4_box_shape"]
+size = Vector3(0.6, 0.8, 0.01)
+
+[node name="AssetLibraryViewport3D" type="Node3D"]
+script = ExtResource("1_script")
+ui_size = Vector2(600, 800)
+quad_size = Vector2(0.6, 0.8)
+
+[node name="SubViewport" type="SubViewport" parent="."]
+transparent_bg = true
+size = Vector2i(600, 800)
+render_target_update_mode = 4
+gui_embed_subwindows = true
+
+[node name="AssetLibraryUI" parent="SubViewport" instance=ExtResource("2_ui")]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("2_material")
+cast_shadow = 0
+mesh = SubResource("3_quad_mesh")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="MeshInstance3D"]
+collision_layer = 32
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D/StaticBody3D"]
+shape = SubResource("4_box_shape")

@@ -77,6 +77,7 @@ const UI_SCENE_PATHS := {
 	"AddNodeViewport3D": "res://src/ui/AddNodeViewport3D.tscn",
 	"WebviewViewport3D": "res://src/ui/webview/WebviewViewport3D.tscn",
 	"MainPanelViewport3D": "res://src/ui/WatchMenuViewport3D.tscn",
+	"AssetLibraryViewport3D": "res://src/ui/AssetLibraryViewport3D.tscn",
 }
 
 
