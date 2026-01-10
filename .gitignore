@@ -121,3 +121,9 @@ addons/gdcef/thirdparty/godot-4.3/cpp/**/build/
 *.dll
 *.exe
 *.app
+
+# Asset Server
+asset-server/node_modules/
+asset-server/uploads/
+asset-server/.env
+asset-server/package-lock.json

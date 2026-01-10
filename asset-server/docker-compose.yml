@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  asset-server:
+    build: .
+    container_name: asset-server
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./uploads:/app/uploads
+    environment:
+      - PORT=3001
+      - DATABASE_URL=postgres://postgres:localdb@postgres:5432/nakama
+      - NAKAMA_URL=http://nakama:7350
+      - STORAGE_PROVIDER=local
+      - UPLOAD_DIR=/app/uploads
+    networks:
+      - nakama_default
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+networks:
+  nakama_default:
+    external: true
+    name: nakama_default
