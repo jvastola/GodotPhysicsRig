@@ -7,7 +7,10 @@ extends PanelContainer
 static var instance: AssetLibraryUI = null
 
 # Config
-# Placeholder mock URL. If the user enters this, we use local mock data.
+# Cloud Asset Server URL
+const ASSET_SERVER_URL = "http://158.101.21.99:3001"
+# Local fallback (useful if working offline)
+const LOCAL_ASSET_SERVER_URL = "http://localhost:3001"
 const MOCK_URL = "mock://assets" 
 
 # UI Elements
@@ -35,8 +38,8 @@ func _ready() -> void:
 	_setup_network()
 	_build_ui()
 	
-	# Initial fetch if mock
-	url_input.text = MOCK_URL
+	# Initial fetch from cloud
+	url_input.text = ASSET_SERVER_URL + "/assets"
 	call_deferred("_fetch_library")
 
 func _exit_tree() -> void:
@@ -159,15 +162,22 @@ func _set_status(text: String, is_error: bool = false) -> void:
 
 func _fetch_library() -> void:
 	var url = url_input.text.strip_edges()
+	
+	# Auto-correct to cloud if it looks like we want the real server
+	if url.is_empty() or url == "cloud":
+		url = ASSET_SERVER_URL + "/assets"
+		url_input.text = url
+	
 	_set_status("Fetching library...")
 	
 	# Clear grid
 	for child in asset_grid.get_children():
 		child.queue_free()
 	
-	if url == MOCK_URL or url.is_empty():
+	if url == MOCK_URL:
 		_load_mock_data()
 	else:
+		http_request_list.cancel_request()
 		var error = http_request_list.request(url)
 		if error != OK:
 			_set_status("Request failed: " + str(error), true)
@@ -183,13 +193,6 @@ func _load_mock_data() -> void:
 			"name": "Box (GLB)",
 			"url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Box/glTF-Binary/Box.glb",
 			"type": "gltf"
-		},
-		{
-			"name": "Example Package (PCK)",
-			"url": "https://example.com/demo.pck",
-			"type": "package",
-			"scene_path": "res://demo/main.tscn",
-			"description": "Entire scene with scripts (requires valid URL)"
 		}
 	]
 	_populate_grid(mock_assets)
@@ -211,17 +214,53 @@ func _on_list_request_completed(result, response_code, headers, body) -> void:
 		return
 		
 	var data = json.get_data()
+	
+	# Support both old Array format and new Paginated {assets: []} format
+	var assets = []
 	if data is Array:
-		_populate_grid(data)
-		_set_status("Library loaded")
+		assets = data
+	elif data is Dictionary and data.has("assets"):
+		assets = data.get("assets", [])
+	
+	if assets.size() > 0:
+		_populate_grid(assets)
+		_set_status("Library loaded (%d items)" % assets.size())
 	else:
-		_set_status("Invalid data format (expected Array)", true)
+		_set_status("No assets found")
 
 func _populate_grid(assets: Array) -> void:
+	# Get current server base for relative URLs
+	# If URL ends in /assets, base is the parent dir.
+	var current_url = url_input.text.strip_edges()
+	var base_url = current_url
+	
+	if base_url.ends_with("/assets") or base_url.ends_with("/assets/"):
+		base_url = base_url.get_base_dir()
+	
+	if not base_url.begins_with("http"):
+		base_url = ASSET_SERVER_URL
+
+	# Ensure base_url doesn't end with a slash for consistent joining
+	if base_url.ends_with("/"):
+		base_url = base_url.left(-1)
+
 	for item in assets:
 		if not item is Dictionary: continue
+		var asset_id = item.get("id", "")
 		var name = item.get("name", "Unknown")
 		var url = item.get("url", "")
+		var thumb_url = item.get("thumbnail_url", "")
+		
+		# Asset server returns thumbnail_url relative to /files
+		if thumb_url and not thumb_url.begins_with("http"):
+			thumb_url = base_url + thumb_url
+		
+		# If user uses the new API, they might just have asset_id
+		if url.is_empty() and not asset_id.is_empty():
+			url = base_url + "/assets/" + asset_id + "/download"
+		elif url and not url.begins_with("http"):
+			url = base_url + url
+
 		if url.is_empty(): continue
 		
 		var panel = PanelContainer.new()
@@ -230,16 +269,25 @@ func _populate_grid(assets: Array) -> void:
 		var vbox = VBoxContainer.new()
 		panel.add_child(vbox)
 		
-		# Thumbnail placeholder (could fetch image if url provided)
+		# Thumbnail placeholder
 		var thumb_rect = ColorRect.new()
 		thumb_rect.custom_minimum_size = Vector2(0, 80)
 		thumb_rect.color = Color(0.2, 0.2, 0.2)
 		vbox.add_child(thumb_rect)
 		
+		# If we have a thumbnail, we could potentially load it here
+		# For now just showing name
+		
 		var name_lbl = Label.new()
 		name_lbl.text = name
 		name_lbl.clip_text = true
 		vbox.add_child(name_lbl)
+		
+		var type_lbl = Label.new()
+		type_lbl.text = item.get("category", item.get("type", "unknown")).to_upper()
+		type_lbl.add_theme_font_size_override("font_size", 10)
+		type_lbl.modulate = Color(0.7, 0.7, 0.7)
+		vbox.add_child(type_lbl)
 		
 		var load_btn = Button.new()
 		load_btn.text = "Load"
@@ -269,6 +317,7 @@ func _download_asset(url: String, metadata: Dictionary = {}) -> void:
 	
 	var error = http_request_download.request(url)
 	if error != OK:
+		printerr("AssetLibrary: Download request failed for URL: ", url, " Error code: ", error)
 		_set_status("Download request failed", true)
 
 func _on_download_request_completed(result, response_code, headers, body) -> void:
@@ -361,11 +410,11 @@ func _spawn_asset(path: String) -> void:
 	
 	_position_in_front_of_player(root_node)
 	_set_status("Spawned: " + root_node.name)
-    
-    # Try to make it grabbable if possible (advanced topic, but let's try)
-    # If the user has a generic Grabbable script, we could attach it.
-    # checking... Grabbable.gd exists in project? Likely.
-    # But for now, just spawning is enough success.
+	
+	# Try to make it grabbable if possible (advanced topic, but let's try)
+	# If the user has a generic Grabbable script, we could attach it.
+	# checking... Grabbable.gd exists in project? Likely.
+	# But for now, just spawning is enough success.
 
 func _mock_publish(name: String) -> void:
 	if name.is_empty():
