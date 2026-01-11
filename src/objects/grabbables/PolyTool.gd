@@ -15,12 +15,10 @@ enum ToolMode {
 	SELECT
 }
 
-enum PointVisibilityMode {
-	ALWAYS,
-	WHEN_HELD,
-	WITHIN_RADIUS,
-	HELD_AND_RADIUS
-}
+# Rendering Configuration
+@export var point_proximity_radius: float = 0.15
+@export var point_min_size: float = 0.0
+@export var point_max_size: float = 5.0 # Scale multiplier for 1mm base mesh (5.0 = 5mm radius)
 
 enum EditSelectionType {
 	POINT,
@@ -34,8 +32,7 @@ enum EditSelectionType {
 @export var trigger_threshold: float = 0.5
 @export var tip_forward_offset: float = 0.05
 @export var max_points: int = 128
-@export var point_visibility_mode: PointVisibilityMode = PointVisibilityMode.WITHIN_RADIUS
-@export var point_visibility_radius: float = 1.0
+
 @export var edge_selection_radius: float = 0.03
 @export var face_selection_radius: float = 0.1
 @export var merge_overlapping_points: bool = true
@@ -71,12 +68,13 @@ var _drag_index: int = -1
 # Layer System
 class PolyLayer:
 	var name: String = ""
-	var points: Array[Node3D] = []
+	var points: PackedVector3Array = []
+	var point_colors: PackedColorArray = []
 	var triangles: Array[Array] = []
 	var material: Material = null
 	var mesh_instance: MeshInstance3D = null
 	var mesh_params: ArrayMesh = null
-	var point_container: Node3D = null
+	var point_multimesh: MultiMeshInstance3D = null
 	var visible: bool = true
 
 var _layers: Array[PolyLayer] = []
@@ -93,16 +91,18 @@ var active_layer_idx: int:
 	get: return _active_layer_idx
 
 # Convenience accessors for active layer
-var _points: Array[Node3D]:
-	get: return _layers[_active_layer_idx].points if _active_layer_idx < _layers.size() else []
+var _points: PackedVector3Array:
+	get: return _layers[_active_layer_idx].points if _active_layer_idx < _layers.size() else PackedVector3Array()
+var _point_colors: PackedColorArray:
+	get: return _layers[_active_layer_idx].point_colors if _active_layer_idx < _layers.size() else PackedColorArray()
 var _triangles: Array[Array]:
 	get: return _layers[_active_layer_idx].triangles if _active_layer_idx < _layers.size() else []
 var _mesh_instance: MeshInstance3D:
 	get: return _layers[_active_layer_idx].mesh_instance if _active_layer_idx < _layers.size() else null
 var _mesh_params: ArrayMesh:
 	get: return _layers[_active_layer_idx].mesh_params if _active_layer_idx < _layers.size() else null
-var _point_container: Node3D:
-	get: return _layers[_active_layer_idx].point_container if _active_layer_idx < _layers.size() else null
+var _point_mm_instance: MultiMeshInstance3D:
+	get: return _layers[_active_layer_idx].point_multimesh if _active_layer_idx < _layers.size() else null
 
 # Connect Mode State
 var _connect_sequence: Array[int] = []
@@ -171,9 +171,9 @@ func _rebuild_mesh_indices() -> void:
 
 func _rebuild_spatial_grid() -> void:
 	_spatial_grid.clear()
-	for i in _points.size():
-		if not is_instance_valid(_points[i]): continue
-		var key = _get_cell_key(_points[i].global_position)
+	var points = _points
+	for i in points.size():
+		var key = _get_cell_key(points[i])
 		if not _spatial_grid.has(key):
 			_spatial_grid[key] = []
 		_spatial_grid[key].append(i)
@@ -192,7 +192,6 @@ func _get_nearest_k_points(pos: Vector3, k: int) -> Array[int]:
 	var center_cell := _get_cell_key(pos)
 	var candidates: Array[int] = []
 	
-	# Search 3x3x3 neighborhood
 	for dx in range(-1, 2):
 		for dy in range(-1, 2):
 			for dz in range(-1, 2):
@@ -200,13 +199,12 @@ func _get_nearest_k_points(pos: Vector3, k: int) -> Array[int]:
 				if _spatial_grid.has(key):
 					candidates.append_array(_spatial_grid[key])
 	
-	# Narrow sort by distance squared
+	if candidates.is_empty():
+		return []
+		
+	var pts = _points
 	candidates.sort_custom(func(a, b):
-		var p_a = _points[a]
-		var p_b = _points[b]
-		if not is_instance_valid(p_a) or not is_instance_valid(p_b): return false
-		return p_a.global_position.distance_squared_to(pos) < \
-			   p_b.global_position.distance_squared_to(pos))
+		return pts[a].distance_squared_to(pos) < pts[b].distance_squared_to(pos))
 			
 	return candidates.slice(0, min(k, candidates.size()))
 
@@ -257,10 +255,20 @@ func _add_layer(layer_name: String = "") -> PolyLayer:
 	else:
 		layer.name = layer_name
 	
-	layer.point_container = Node3D.new()
-	layer.point_container.name = "Points_%s" % layer.name
-	_add_to_root(layer.point_container)
+	layer.point_multimesh = MultiMeshInstance3D.new()
+	layer.point_multimesh.name = "Points_%s" % layer.name
+	var mm = MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_custom_data = true
+	mm.mesh = _make_sphere_mesh(0.001) # 1mm radius base mesh (Fail-safe)
+	mm.instance_count = MAX_VISIBLE_POINTS
+	layer.point_multimesh.multimesh = mm
 	
+	var point_shader = ShaderMaterial.new()
+	point_shader.shader = load("res://src/objects/grabbables/point_visual.gdshader")
+	layer.point_multimesh.material_override = point_shader
+	_add_to_root(layer.point_multimesh)
+
 	layer.mesh_instance = MeshInstance3D.new()
 	layer.mesh_instance.name = "Mesh_%s" % layer.name
 	layer.mesh_params = ArrayMesh.new()
@@ -359,11 +367,16 @@ func _on_released() -> void:
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
 	
-	_visibility_frame_counter += 1
-	if _visibility_frame_counter >= VISIBILITY_UPDATE_INTERVAL:
-		_visibility_frame_counter = 0
-		_update_point_visibility()
+	# Pass tip position and params to point shader for proximity effects
+	var target = _get_target_point()
+	if _point_mm_instance and _point_mm_instance.material_override is ShaderMaterial:
+		var mat = _point_mm_instance.material_override as ShaderMaterial
+		mat.set_shader_parameter("tip_pos", target)
+		mat.set_shader_parameter("max_radius", point_proximity_radius)
+		mat.set_shader_parameter("min_size", point_min_size)
+		mat.set_shader_parameter("max_size", point_max_size)
 		
+	_update_point_pool(target)
 	_update_paint_dot()
 	
 	if not is_inside_tree():
@@ -376,7 +389,7 @@ func _physics_process(delta: float) -> void:
 
 	_handle_input()
 	
-	var target = _get_target_point()
+	target = _get_target_point()
 	var hover = _get_nearest_point(target)
 	var snapped_pos = target
 	
@@ -457,7 +470,7 @@ func _handle_input() -> void:
 				if hover.index != -1 and hover.distance < selection_radius:
 					_remove_point(hover.index)
 				else:
-					var h_face = _get_nearest_face_within_radius(target, _get_visibility_origin())
+					var h_face = _get_nearest_face_within_radius(target, _get_target_point())
 					if h_face.index != -1 and h_face.distance < face_selection_radius:
 						_remove_face(h_face.index)
 				
@@ -514,7 +527,7 @@ func _handle_input() -> void:
 				pass # Just ensure highlights work
 			
 			if just_pressed:
-				var h_face = _get_nearest_face_within_radius(target, _get_visibility_origin())
+				var h_face = _get_nearest_face_within_radius(target, _get_target_point())
 				if h_face.index != -1 and h_face.distance < face_selection_radius:
 					_start_extrude_drag(h_face.index, target)
 			
@@ -544,32 +557,23 @@ func _update_mode_visuals() -> void:
 	_update_selection_visuals()
 
 func _add_point(pos: Vector3) -> void:
-	var node = Node3D.new()
-	node.name = "P%d" % _points.size()
+	var layer = _layers[_active_layer_idx]
+	layer.points.append(pos)
+	layer.point_colors.append(Color(0.8, 0.8, 0.8))
 	
-	var mesh = MeshInstance3D.new()
-	mesh.mesh = _make_sphere_mesh(0.015)
-	mesh.material_override = _make_unshaded_material(Color(0.8, 0.8, 0.8))
-	mesh.visible = false # Hidden by default
-	node.add_child(mesh)
-	
-	_point_container.add_child(node)
-	node.global_position = pos # Important: set after adding to tree
-	_points.append(node)
 	_rebuild_mesh_indices()
-	_update_point_visibility()
+	_update_point_pool(_get_target_point())
 
 func _remove_point(index: int) -> void:
-	if index < 0 or index >= _points.size(): return
+	var layer = _layers[_active_layer_idx]
+	if index < 0 or index >= layer.points.size(): return
 	
-	# Remove point node
-	var node = _points[index]
-	_points.remove_at(index)
-	node.queue_free()
+	layer.points.remove_at(index)
+	layer.point_colors.remove_at(index)
 	
 	# Remove triangles using this index
 	var new_tris: Array[Array] = []
-	for tri in _triangles:
+	for tri in layer.triangles:
 		if index in tri:
 			continue # Drop this triangle
 		
@@ -582,10 +586,34 @@ func _remove_point(index: int) -> void:
 				new_tri.append(p_idx)
 		new_tris.append(new_tri)
 		
-	_triangles = new_tris
+	layer.triangles = new_tris
 	_rebuild_mesh()
 	_rebuild_mesh_indices()
-	_update_point_visibility()
+	_update_point_pool(_get_target_point())
+
+func _update_point_pool(origin: Vector3) -> void:
+	if _layers.is_empty() or _active_layer_idx >= _layers.size():
+		return
+		
+	var layer = _layers[_active_layer_idx]
+	if not layer.point_multimesh: return
+	
+	var mm = layer.point_multimesh.multimesh
+	var nearest_indices = _get_nearest_k_points(origin, MAX_VISIBLE_POINTS)
+	
+	for i in MAX_VISIBLE_POINTS:
+		var t = Transform3D()
+		if i < nearest_indices.size():
+			var idx = nearest_indices[i]
+			t.origin = layer.points[idx]
+			mm.set_instance_transform(i, t)
+			mm.set_instance_custom_data(i, layer.point_colors[idx])
+		else:
+			# Hide unused instances far away or scale to 0
+			t.origin = Vector3(1000, 1000, 1000)
+			mm.set_instance_transform(i, t)
+			mm.set_instance_custom_data(i, Color(0,0,0,0))
+
 
 func _remove_face(index: int) -> void:
 	if index < 0 or index >= _triangles.size(): return
@@ -602,6 +630,8 @@ func _add_triangle(indices: Array) -> void:
 	_rebuild_mesh()
 
 func _rebuild_mesh() -> void:
+	if _layers.is_empty() or _active_layer_idx >= _layers.size(): return
+	var layer = _layers[_active_layer_idx]
 	_mesh_params.clear_surfaces()
 	if _triangles.is_empty(): return
 	
@@ -610,16 +640,9 @@ func _rebuild_mesh() -> void:
 	
 	for tri in _triangles:
 		if tri.size() < 3: continue
-		var node0 = _points[tri[0]]
-		var node1 = _points[tri[1]]
-		var node2 = _points[tri[2]]
-		
-		if not is_instance_valid(node0) or not is_instance_valid(node1) or not is_instance_valid(node2):
-			continue
-			
-		var p0 = node0.global_position
-		var p1 = node1.global_position
-		var p2 = node2.global_position
+		var p0 = _points[tri[0]]
+		var p1 = _points[tri[1]]
+		var p2 = _points[tri[2]]
 		
 		# Compute normal
 		var normal_calc = (p1 - p0).cross(p2 - p0)
@@ -634,13 +657,13 @@ func _rebuild_mesh() -> void:
 		
 		st.set_normal(normal)
 		# Add vertices in order with UVs
-		st.set_color(_get_point_color(node0))
+		st.set_color(layer.point_colors[tri[0]])
 		st.set_uv(uv0)
 		st.add_vertex(p0)  
-		st.set_color(_get_point_color(node1))
+		st.set_color(layer.point_colors[tri[1]])
 		st.set_uv(uv1)
 		st.add_vertex(p1)
-		st.set_color(_get_point_color(node2))
+		st.set_color(layer.point_colors[tri[2]])
 		st.set_uv(uv2)
 		st.add_vertex(p2)
 		
@@ -675,7 +698,7 @@ func _update_connect_lines(current_target: Vector3) -> void:
 	
 	for idx in _connect_sequence:
 		if idx < _points.size():
-			_connect_line_immediate.surface_add_vertex(_points[idx].global_position)
+			_connect_line_immediate.surface_add_vertex(_points[idx])
 	
 	_connect_line_immediate.surface_add_vertex(current_target)
 	_connect_line_immediate.surface_end()
@@ -715,7 +738,7 @@ func _update_edit_mode_highlights(target: Vector3) -> void:
 	if _drag_index != -1 or not _drag_edge.is_empty() or _drag_face_idx != -1:
 		return
 	
-	var origin = _get_visibility_origin()
+	var origin = _get_target_point()
 	
 	# Update highlight colors based on mode
 	if _current_mode == ToolMode.REMOVE:
@@ -773,6 +796,7 @@ func _get_nearest_edge_within_radius(target: Vector3, _origin: Vector3) -> Dicti
 	var checked_triangles := {}
 	var checked_edges := {}
 	
+	var points = _points
 	for p_idx in nearby_point_indices:
 		if not _point_to_triangles.has(p_idx): continue
 		for t_idx in _point_to_triangles[p_idx]:
@@ -791,10 +815,8 @@ func _get_nearest_edge_within_radius(target: Vector3, _origin: Vector3) -> Dicti
 				if checked_edges.has(e_key): continue
 				checked_edges[e_key] = true
 				
-				if not is_instance_valid(_points[edge[0]]) or not is_instance_valid(_points[edge[1]]):
-					continue
-				var p0 = _points[edge[0]].global_position
-				var p1 = _points[edge[1]].global_position
+				var p0 = points[edge[0]]
+				var p1 = points[edge[1]]
 				
 				# Find closest point on edge to target
 				var closest = _closest_point_on_segment(target, p0, p1)
@@ -816,6 +838,7 @@ func _get_nearest_face_within_radius(target: Vector3, _origin: Vector3) -> Dicti
 	var nearby_point_indices = _get_nearest_k_points(target, 50)
 	var checked_triangles := {}
 	
+	var points = _points
 	for p_idx in nearby_point_indices:
 		if not _point_to_triangles.has(p_idx): continue
 		for t_idx in _point_to_triangles[p_idx]:
@@ -825,11 +848,10 @@ func _get_nearest_face_within_radius(target: Vector3, _origin: Vector3) -> Dicti
 			var tri = _triangles[t_idx]
 			if tri.size() < 3:
 				continue
-			if not is_instance_valid(_points[tri[0]]) or not is_instance_valid(_points[tri[1]]) or not is_instance_valid(_points[tri[2]]):
-				continue
-			var p0 = _points[tri[0]].global_position
-			var p1 = _points[tri[1]].global_position
-			var p2 = _points[tri[2]].global_position
+			
+			var p0 = points[tri[0]]
+			var p1 = points[tri[1]]
+			var p2 = points[tri[2]]
 			
 			# Project target onto plane and check if inside triangle
 			var plane_normal = (p1 - p0).cross(p2 - p0)
@@ -893,8 +915,8 @@ func _draw_edge_highlight(edge: Array[int]) -> void:
 	
 	_edge_highlight_mesh.clear_surfaces()
 	_edge_highlight_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
-	_edge_highlight_mesh.surface_add_vertex(_points[edge[0]].global_position)
-	_edge_highlight_mesh.surface_add_vertex(_points[edge[1]].global_position)
+	_edge_highlight_mesh.surface_add_vertex(_points[edge[0]])
+	_edge_highlight_mesh.surface_add_vertex(_points[edge[1]])
 	_edge_highlight_mesh.surface_end()
 	_edge_highlight.visible = true
 
@@ -909,9 +931,9 @@ func _draw_face_highlight(face_idx: int) -> void:
 		_clear_face_highlight()
 		return
 	
-	var p0 = _points[tri[0]].global_position
-	var p1 = _points[tri[1]].global_position
-	var p2 = _points[tri[2]].global_position
+	var p0 = _points[tri[0]]
+	var p1 = _points[tri[1]]
+	var p2 = _points[tri[2]]
 	
 	_face_highlight_mesh.clear_surfaces()
 	_face_highlight_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -959,7 +981,7 @@ func _start_edit_drag(target: Vector3, hover: Dictionary) -> void:
 					_drag_point_indices = [hover.index]
 				# Store positions relative to grab point
 				for idx in _drag_point_indices:
-					var relative_pos = _points[idx].global_position - _drag_grab_point
+					var relative_pos = _points[idx] - _drag_grab_point
 					_drag_start_positions.append(relative_pos)
 		
 		EditSelectionType.EDGE:
@@ -976,7 +998,7 @@ func _start_edit_drag(target: Vector3, hover: Dictionary) -> void:
 				for idx in indices_set.keys():
 					_drag_point_indices.append(idx)
 					# Store positions relative to grab point
-					var relative_pos = _points[idx].global_position - _drag_grab_point
+					var relative_pos = _points[idx] - _drag_grab_point
 					_drag_start_positions.append(relative_pos)
 		
 		EditSelectionType.FACE:
@@ -994,7 +1016,7 @@ func _start_edit_drag(target: Vector3, hover: Dictionary) -> void:
 				for idx in indices_set.keys():
 					_drag_point_indices.append(idx)
 					# Store positions relative to grab point
-					var relative_pos = _points[idx].global_position - _drag_grab_point
+					var relative_pos = _points[idx] - _drag_grab_point
 					_drag_start_positions.append(relative_pos)
 
 
@@ -1002,6 +1024,7 @@ func _continue_edit_drag(target: Vector3) -> void:
 	if _drag_point_indices.is_empty():
 		return
 	
+	var layer = _layers[_active_layer_idx]
 	# Get current tool basis and calculate rotation delta
 	var current_basis = _get_tool_basis()
 	var rotation_delta = current_basis * _drag_start_basis.inverse()
@@ -1020,11 +1043,11 @@ func _continue_edit_drag(target: Vector3) -> void:
 			relative_pos = rotation_delta * relative_pos
 		
 		var new_pos = target + relative_pos
-		_points[idx].global_position = new_pos
+		layer.points[idx] = new_pos
 	
 	_rebuild_mesh()
 	_rebuild_mesh_indices()
-	_update_point_visibility()
+	_update_point_pool(_get_target_point())
 	
 	# Update highlights while dragging
 	if not _drag_edge.is_empty():
@@ -1058,9 +1081,9 @@ func _start_extrude_drag(face_idx: int, grab_pos: Vector3) -> void:
 	var p1_idx = tri[1]
 	var p2_idx = tri[2]
 	
-	var p0 = _points[p0_idx].global_position
-	var p1 = _points[p1_idx].global_position
-	var p2 = _points[p2_idx].global_position
+	var p0 = _points[p0_idx]
+	var p1 = _points[p1_idx]
+	var p2 = _points[p2_idx]
 	
 	# Calculate normal
 	_extrude_normal = (p1 - p0).cross(p2 - p0).normalized()
@@ -1071,7 +1094,7 @@ func _start_extrude_drag(face_idx: int, grab_pos: Vector3) -> void:
 	# Store initial positions (which are currently same as base)
 	_extrude_initial_cap_positions.clear()
 	for idx in _extrude_new_point_indices:
-		_extrude_initial_cap_positions.append(_points[idx].global_position)
+		_extrude_initial_cap_positions.append(_points[idx])
 	
 	_rebuild_mesh()
 
@@ -1083,9 +1106,9 @@ func _extrude_face_topology(face_idx: int) -> Array[int]:
 	var p2_idx = old_tri[2]
 	
 	# Create 3 new points at the same positions
-	var n0 = _create_point_at(_points[p0_idx].global_position)
-	var n1 = _create_point_at(_points[p1_idx].global_position)
-	var n2 = _create_point_at(_points[p2_idx].global_position)
+	var n0 = _create_point_at(_points[p0_idx])
+	var n1 = _create_point_at(_points[p1_idx])
+	var n2 = _create_point_at(_points[p2_idx])
 	
 	# Update the original triangle to be the "cap" (using new points)
 	_triangles[face_idx] = [n0.index, n1.index, n2.index]
@@ -1103,7 +1126,7 @@ func _extrude_face_topology(face_idx: int) -> Array[int]:
 func _create_point_at(pos: Vector3) -> Dictionary:
 	_add_point(pos)
 	var idx = _points.size() - 1
-	return {"node": _points[idx], "index": idx}
+	return {"position": _points[idx], "index": idx}
 
 func _add_quad_tris(i0: int, i1: int, i2: int, i3: int) -> void:
 	_add_triangle([i0, i1, i2])
@@ -1112,6 +1135,7 @@ func _add_quad_tris(i0: int, i1: int, i2: int, i3: int) -> void:
 func _continue_extrude_drag(target_pos: Vector3) -> void:
 	if _extrude_drag_face_index == -1: return
 	
+	var layer = _layers[_active_layer_idx]
 	var drag_vec = target_pos - _extrude_drag_start_pos
 	# Project drag onto normal for constrained movement
 	var offset_dist = drag_vec.dot(_extrude_normal)
@@ -1119,12 +1143,13 @@ func _continue_extrude_drag(target_pos: Vector3) -> void:
 	
 	for i in _extrude_new_point_indices.size():
 		var idx = _extrude_new_point_indices[i]
-		if idx < _points.size():
+		if idx < layer.points.size():
 			var initial = _extrude_initial_cap_positions[i]
-			_points[idx].global_position = initial + offset
+			layer.points[idx] = initial + offset
 	
 	_rebuild_mesh()
-	_update_point_visibility()
+	_rebuild_mesh_indices()
+	_update_point_pool(_get_target_point())
 
 func _end_extrude_drag() -> void:
 	_extrude_drag_face_index = -1
@@ -1175,9 +1200,7 @@ func _get_nearest_point(pos: Vector3) -> Dictionary:
 				var key := center_cell + Vector3i(dx, dy, dz)
 				if _spatial_grid.has(key):
 					for idx in _spatial_grid[key]:
-						var point = _points[idx]
-						if not is_instance_valid(point): continue
-						var p_pos = point.global_position
+						var p_pos = _points[idx]
 						var d = p_pos.distance_to(pos)
 						if d < best_dist:
 							best_dist = d
@@ -1194,6 +1217,7 @@ func _find_nearest_triangle(pos: Vector3) -> Dictionary:
 	var nearby_point_indices = _get_nearest_k_points(pos, 50)
 	var checked_triangles := {}
 	
+	var points = _points
 	for p_idx in nearby_point_indices:
 		if not _point_to_triangles.has(p_idx): continue
 		for t_idx in _point_to_triangles[p_idx]:
@@ -1203,12 +1227,9 @@ func _find_nearest_triangle(pos: Vector3) -> Dictionary:
 			var tri = _triangles[t_idx]
 			if tri.size() < 3: continue
 			
-			if not is_instance_valid(_points[tri[0]]) or not is_instance_valid(_points[tri[1]]) or not is_instance_valid(_points[tri[2]]):
-				continue
-				
-			var p0 = _points[tri[0]].global_position
-			var p1 = _points[tri[1]].global_position
-			var p2 = _points[tri[2]].global_position
+			var p0 = points[tri[0]]
+			var p1 = points[tri[1]]
+			var p2 = points[tri[2]]
 			
 			var plane_normal = (p1 - p0).cross(p2 - p0)
 			if plane_normal.length_squared() < 1e-6:
@@ -1247,29 +1268,13 @@ func _is_point_in_triangle(p: Vector3, a: Vector3, b: Vector3, c: Vector3) -> bo
 func _update_point_visibility() -> void:
 	if _layers.is_empty(): return
 	
-	var origin = _get_visibility_origin()
-	
-	# Hide previously visible points
-	for idx in _visible_point_indices:
-		if idx < _points.size() and is_instance_valid(_points[idx]):
-			var mesh = _get_point_mesh(_points[idx])
-			if mesh: mesh.visible = false
-			
-	# Update layer container visibility
+	# Update layer visibility
 	for i in _layers.size():
 		var layer = _layers[i]
-		if is_instance_valid(layer.point_container):
-			layer.point_container.visible = (i == _active_layer_idx)
-			
-	# Find new nearest k points to show
-	_visible_point_indices = _get_nearest_k_points(origin, MAX_VISIBLE_POINTS)
-	
-	for idx in _visible_point_indices:
-		var point = _points[idx]
-		if not is_instance_valid(point): continue
-		var mesh = _get_point_mesh(point)
-		if mesh:
-			mesh.visible = true
+		if is_instance_valid(layer.point_multimesh):
+			layer.point_multimesh.visible = (i == _active_layer_idx)
+		if is_instance_valid(layer.mesh_instance):
+			layer.mesh_instance.visible = (i == _active_layer_idx)
 
 func _cycle_layers() -> void:
 	if _layers.is_empty(): return
@@ -1286,7 +1291,7 @@ func _add_new_layer() -> void:
 func _remove_active_layer() -> void:
 	if _layers.size() <= 1: return # Keep at least one
 	var layer = _layers[_active_layer_idx]
-	if is_instance_valid(layer.point_container): layer.point_container.queue_free()
+	if is_instance_valid(layer.point_multimesh): layer.point_multimesh.queue_free()
 	if is_instance_valid(layer.mesh_instance): layer.mesh_instance.queue_free()
 	_layers.remove_at(_active_layer_idx)
 	_active_layer_idx = clampi(_active_layer_idx, 0, _layers.size() - 1)
@@ -1303,50 +1308,14 @@ func _update_layer_label() -> void:
 			_mode_name(_current_mode)
 		]
 
-func _is_point_visible(point_pos: Vector3, origin: Vector3) -> bool:
-	match point_visibility_mode:
-		PointVisibilityMode.ALWAYS:
-			return true
-		PointVisibilityMode.WHEN_HELD:
-			return is_grabbed
-		PointVisibilityMode.WITHIN_RADIUS:
-			return point_pos.distance_to(origin) <= point_visibility_radius
-		PointVisibilityMode.HELD_AND_RADIUS:
-			return is_grabbed and point_pos.distance_to(origin) <= point_visibility_radius
-	return true
-
-func _get_visibility_origin() -> Vector3:
-	# Safe origin even if not in tree
-	if not is_inside_tree():
-		return Vector3.ZERO
-	if is_instance_valid(_tip) and _tip.is_inside_tree():
-		return _tip.global_transform.origin
-	return global_transform.origin
-
-func _get_point_mesh(point: Node3D) -> VisualInstance3D:
-	if not is_instance_valid(point):
-		return null
-	for child in point.get_children():
-		if child is VisualInstance3D:
-			return child
-	return null
-
-
-func _get_point_color(point: Node3D) -> Color:
-	var mesh = _get_point_mesh(point)
-	if mesh and mesh.material_override and mesh.material_override is StandardMaterial3D:
-		return (mesh.material_override as StandardMaterial3D).albedo_color
-	return Color(0.8, 0.8, 0.8)
 
 
 func _set_point_color(index: int, color: Color) -> void:
-	if index < 0 or index >= _points.size():
+	var layer = _layers[_active_layer_idx]
+	if index < 0 or index >= layer.points.size():
 		return
-	var mesh = _get_point_mesh(_points[index])
-	if mesh:
-		var mat = mesh.material_override as StandardMaterial3D
-		if mat:
-			mat.albedo_color = color
+	layer.point_colors[index] = color
+	_update_point_pool(_get_target_point())
 
 
 func _get_paint_color() -> Color:
@@ -1568,7 +1537,7 @@ func _ensure_preview_dot() -> void:
 		return
 	_preview_dot = MeshInstance3D.new()
 	_preview_dot.name = "PreviewDot"
-	_preview_dot.mesh = _make_sphere_mesh(0.015)
+	_preview_dot.mesh = _make_sphere_mesh(0.0025)
 	_preview_mat = _make_unshaded_material(Color.WHITE)
 	_preview_dot.material_override = _preview_mat
 	_preview_dot.visible = false
@@ -1580,7 +1549,7 @@ func _ensure_paint_dot() -> void:
 		return
 	_paint_dot = MeshInstance3D.new()
 	_paint_dot.name = "PaintDot"
-	_paint_dot.mesh = _make_sphere_mesh(0.018)
+	_paint_dot.mesh = _make_sphere_mesh(0.004)
 	_paint_mat = _make_unshaded_material(_get_paint_color())
 	_paint_dot.material_override = _paint_mat
 	_paint_dot.visible = true
@@ -1631,7 +1600,7 @@ func _begin_mode_select() -> void:
 	_clear_mode_select_nodes()
 	_is_selecting_mode = true
 	
-	var anchor := _get_visibility_origin()
+	var anchor := _get_target_point()
 	var basis := global_transform.basis
 	
 	var modes_to_show = _MODE_ORDER
@@ -1795,13 +1764,12 @@ func _mode_name(mode: ToolMode) -> String:
 func _nearest_mode_index() -> int:
 	if _mode_select_nodes.is_empty():
 		return -1
-	var tip_pos := _get_visibility_origin()
+	var tip_pos := _get_target_point()
 	var best_idx := -1
 	var best_dist := INF
 	for i in _mode_select_nodes.size():
 		var node = _mode_select_nodes[i]
-		if not is_instance_valid(node):
-			continue
+		if not is_instance_valid(node): continue
 		var d = node.global_position.distance_to(tip_pos)
 		if d < best_dist:
 			best_dist = d
@@ -1880,20 +1848,20 @@ func export_selection_to_gltf(path: String) -> int:
 		var layer_has_geo := false
 		
 		for tri in layer.triangles:
-			var p0 = layer.points[tri[0]].global_position
-			var p1 = layer.points[tri[1]].global_position
-			var p2 = layer.points[tri[2]].global_position
+			var p0 = layer.points[tri[0]]
+			var p1 = layer.points[tri[1]]
+			var p2 = layer.points[tri[2]]
 			
 			# If any point is within radius, include triangle? 
 			# Or if all? Let's go with "any" for now.
 			if p0.distance_to(target_pos) < radius or p1.distance_to(target_pos) < radius or p2.distance_to(target_pos) < radius:
 				var normal = (p1 - p0).cross(p2 - p0).normalized()
 				st.set_normal(normal)
-				st.set_color(_get_point_color(layer.points[tri[0]]))
+				st.set_color(layer.point_colors[tri[0]])
 				st.add_vertex(p0)
-				st.set_color(_get_point_color(layer.points[tri[1]]))
+				st.set_color(layer.point_colors[tri[1]])
 				st.add_vertex(p1)
-				st.set_color(_get_point_color(layer.points[tri[2]]))
+				st.set_color(layer.point_colors[tri[2]])
 				st.add_vertex(p2)
 				layer_has_geo = true
 				has_geo = true
@@ -2009,26 +1977,21 @@ func load_from_gltf(path: String) -> int:
 	var target_size := 0.5
 	var scale_factor: float = target_size / max_dim if max_dim > 0.01 else 1.0
 	
-	# Position in front of the tool
+	var layer = _layers[_active_layer_idx]
 	var spawn_pos := global_position + global_transform.basis.z * -0.5
 	
 	# Recreate points - centered and scaled
 	for i in vertices.size():
-		var node = Node3D.new()
-		node.name = "P%d" % i
-		var dot = MeshInstance3D.new()
-		dot.mesh = _make_sphere_mesh(0.015)
 		var color := Color(0.8, 0.8, 0.8)
 		if colors.size() == vertices.size():
 			color = colors[i]
-		dot.material_override = _make_unshaded_material(color)
-		dot.visible = false # Hidden by default, shown by performance logic
-		node.add_child(dot)
-		_point_container.add_child(node)
+		
 		# Center, scale, and position the vertex
 		var local_pos: Vector3 = (vertices[i] - mesh_center) * scale_factor
-		node.global_position = spawn_pos + local_pos
-		_points.append(node)
+		var global_p = spawn_pos + local_pos
+		
+		layer.points.append(global_p)
+		layer.point_colors.append(color)
 	
 	# Recreate triangles
 	for t in range(0, indices.size(), 3):
@@ -2052,6 +2015,7 @@ func load_from_gltf(path: String) -> int:
 	
 	_rebuild_mesh()
 	_rebuild_mesh_indices()
+	_update_point_pool(_get_target_point())
 	_update_point_visibility()
 	return OK
 
@@ -2122,45 +2086,47 @@ func on_unpooled() -> void:
 
 
 func _clear_geometry() -> void:
-	for p in _points:
-		if is_instance_valid(p):
-			p.queue_free()
-	_points.clear()
-	_triangles.clear()
+	if _layers.is_empty() or _active_layer_idx >= _layers.size(): return
+	var layer = _layers[_active_layer_idx]
+	layer.points = PackedVector3Array()
+	layer.point_colors = PackedColorArray()
+	layer.triangles.clear()
 	_spatial_grid.clear()
 	_point_to_triangles.clear()
 	_visible_point_indices.clear()
-	if _mesh_params:
-		_mesh_params.clear_surfaces()
+	if layer.mesh_params:
+		layer.mesh_params.clear_surfaces()
+	_update_point_pool(_get_target_point())
 
 
 # Merges points that are within merge_distance of each other
 # Returns a mapping of old indices to new indices
 func _merge_overlapping_points_impl() -> void:
-	if _points.size() < 2:
+	var layer = _layers[_active_layer_idx]
+	if layer.points.size() < 2:
 		return
 	
 	# Build groups of overlapping points
 	var merge_map: Array[int] = [] # old_index -> new_index
-	merge_map.resize(_points.size())
-	for i in _points.size():
+	merge_map.resize(layer.points.size())
+	for i in layer.points.size():
 		merge_map[i] = i
 	
 	# Find overlapping points and mark them for merging
-	for i in _points.size():
+	for i in layer.points.size():
 		if merge_map[i] != i:
 			continue # Already merged into another point
-		var pos_i = _points[i].global_position
-		for j in range(i + 1, _points.size()):
+		var pos_i = layer.points[i]
+		for j in range(i + 1, layer.points.size()):
 			if merge_map[j] != j:
 				continue # Already merged
-			var pos_j = _points[j].global_position
+			var pos_j = layer.points[j]
 			if pos_i.distance_to(pos_j) <= merge_distance:
 				merge_map[j] = i # Merge j into i
 	
 	# Check if any merging is needed
 	var needs_merge := false
-	for i in _points.size():
+	for i in layer.points.size():
 		if merge_map[i] != i:
 			needs_merge = true
 			break
@@ -2169,25 +2135,24 @@ func _merge_overlapping_points_impl() -> void:
 		return
 	
 	# Build new point list and index remapping
-	var new_points: Array[Node3D] = []
-	var old_to_new: Array[int] = []
-	old_to_new.resize(_points.size())
+	var new_points: PackedVector3Array = []
+	var new_colors: PackedColorArray = []
+	var old_to_new: Dictionary = {}
 	
-	for i in _points.size():
+	for i in layer.points.size():
 		if merge_map[i] == i:
 			# This point is kept
 			old_to_new[i] = new_points.size()
-			new_points.append(_points[i])
+			new_points.append(layer.points[i])
+			new_colors.append(layer.point_colors[i])
 		else:
-			# This point is merged into another - copy its color if needed
+			# This point is merged, use the kept point's new index
 			var target_idx = merge_map[i]
 			old_to_new[i] = old_to_new[target_idx]
-			# Free the duplicate point
-			_points[i].queue_free()
 	
 	# Update triangles with new indices
 	var new_triangles: Array[Array] = []
-	for tri in _triangles:
+	for tri in layer.triangles:
 		var new_tri: Array[int] = []
 		for idx in tri:
 			new_tri.append(old_to_new[idx])
@@ -2195,10 +2160,12 @@ func _merge_overlapping_points_impl() -> void:
 		if new_tri[0] != new_tri[1] and new_tri[1] != new_tri[2] and new_tri[0] != new_tri[2]:
 			new_triangles.append(new_tri)
 	
-	_points = new_points
-	_triangles = new_triangles
+	layer.points = new_points
+	layer.point_colors = new_colors
+	layer.triangles = new_triangles
 	_rebuild_mesh()
 	_rebuild_mesh_indices()
+	_update_point_pool(_get_target_point())
 	_update_point_visibility()
 
 
@@ -2208,51 +2175,53 @@ func _get_colocated_points(index: int) -> Array[int]:
 	if not merge_overlapping_points:
 		return result
 	
-	if index < 0 or index >= _points.size() or not is_instance_valid(_points[index]):
+	var points = _points
+	if index < 0 or index >= points.size():
 		return result
 		
-	var pos = _points[index].global_position
-	for i in _points.size():
+	var pos = points[index]
+	for i in points.size():
 		if i == index:
 			continue
-		var p_node = _points[i]
-		if not is_instance_valid(p_node):
-			continue
-		if p_node.global_position.distance_to(pos) <= merge_distance:
+		var p_pos = points[i]
+		if p_pos.distance_to(pos) <= merge_distance:
 			result.append(i)
 	return result
 
 
 # Move a point and all colocated points together
 func _move_point_with_colocated(index: int, pos: Vector3) -> void:
-	if index < 0 or index >= _points.size():
+	var layer = _layers[_active_layer_idx]
+	if index < 0 or index >= layer.points.size():
 		return
 	
 	if merge_overlapping_points:
 		var colocated = _get_colocated_points(index)
 		for idx in colocated:
-			_points[idx].global_position = pos
+			layer.points[idx] = pos
 	else:
-		_points[index].global_position = pos
+		layer.points[index] = pos
 	
 	_rebuild_mesh()
-	_update_point_visibility()
+	_rebuild_mesh_indices()
+	_update_point_pool(_get_target_point())
 
 
 # Move all points that were at start_pos to new_pos (used during drag for colocated points)
 func _move_points_by_start_position(start_pos: Vector3, new_pos: Vector3) -> void:
+	var layer = _layers[_active_layer_idx]
 	if not merge_overlapping_points:
 		# Find the point at start_pos and move it
-		for i in _points.size():
-			if not is_instance_valid(_points[i]):
-				continue
-			if _points[i].global_position.distance_to(start_pos) <= merge_distance:
-				_points[i].global_position = new_pos
+		for i in layer.points.size():
+			if layer.points[i].distance_to(start_pos) <= merge_distance:
+				layer.points[i] = new_pos
 				break
 	else:
 		# Move all points that were at start_pos
-		for i in _points.size():
-			if not is_instance_valid(_points[i]):
-				continue
-			if _points[i].global_position.distance_to(start_pos) <= merge_distance:
-				_points[i].global_position = new_pos
+		for i in layer.points.size():
+			if layer.points[i].distance_to(start_pos) <= merge_distance:
+				layer.points[i] = new_pos
+	
+	_rebuild_mesh()
+	_rebuild_mesh_indices()
+	_update_point_pool(_get_target_point())
