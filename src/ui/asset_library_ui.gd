@@ -3,8 +3,9 @@ extends PanelContainer
 
 ## UI for browsing and loading assets (GLTF/GLB) from external sources
 
-# Singleton instance for easy access
+# Singleton instance and state tracking
 static var instance: AssetLibraryUI = null
+static var last_spawned_node: Node3D = null
 
 # Config
 # Cloud Asset Server URL
@@ -394,6 +395,7 @@ func _load_package(path: String, scene_path: String) -> void:
 	if not scene: scene = get_tree().root.get_child(0)
 	
 	scene.add_child(instance)
+	last_spawned_node = instance
 	_position_in_front_of_player(instance)
 	_set_status("Spawned package item: " + instance.name)
 
@@ -421,6 +423,7 @@ func _spawn_asset(path: String) -> void:
 	# For now, just spawn in front of player
 	root_node.name = path.get_file().get_basename()
 	scene.add_child(root_node)
+	last_spawned_node = root_node
 	
 	_position_in_front_of_player(root_node)
 	_set_status("Spawned: " + root_node.name)

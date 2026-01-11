@@ -12,7 +12,8 @@ enum ToolMode {
 	APPLY_MATERIAL,
 	EXTRUDE,
 	LAYER,
-	SELECT
+	SELECT,
+	CONVERT_VOLUME
 }
 
 # Rendering Configuration
@@ -50,6 +51,7 @@ enum EditSelectionType {
 @export var color_face_highlight: Color = Color(1.0, 0.9, 0.2, 0.4) # Semi-transparent yellow for faces
 @export var color_apply_material: Color = Color(0.8, 0.2, 0.8) # Purple for apply material mode
 @export var color_extrude: Color = Color(1.0, 0.0, 1.0) # Magenta for extrude
+@export var color_convert_volume: Color = Color(0.2, 1.0, 0.8) # Cyan-ish for volume conversion
 
 # State
 static var instance: PolyTool
@@ -70,6 +72,7 @@ class PolyLayer:
 	var name: String = ""
 	var points: PackedVector3Array = []
 	var point_colors: PackedColorArray = []
+	var point_uvs: PackedVector2Array = []
 	var triangles: Array[Array] = []
 	var material: Material = null
 	var mesh_instance: MeshInstance3D = null
@@ -95,6 +98,8 @@ var _points: PackedVector3Array:
 	get: return _layers[_active_layer_idx].points if _active_layer_idx < _layers.size() else PackedVector3Array()
 var _point_colors: PackedColorArray:
 	get: return _layers[_active_layer_idx].point_colors if _active_layer_idx < _layers.size() else PackedColorArray()
+var _point_uvs: PackedVector2Array:
+	get: return _layers[_active_layer_idx].point_uvs if _active_layer_idx < _layers.size() else PackedVector2Array()
 var _triangles: Array[Array]:
 	get: return _layers[_active_layer_idx].triangles if _active_layer_idx < _layers.size() else []
 var _mesh_instance: MeshInstance3D:
@@ -139,7 +144,7 @@ var _mode_select_modes: Array[ToolMode] = []
 var _is_selecting_mode: bool = false
 var _mode_select_radius: float = 0.12
 var _mode_select_height: float = 0.02
-const _MODE_ORDER := [ToolMode.PLACE, ToolMode.EDIT, ToolMode.EXTRUDE, ToolMode.REMOVE, ToolMode.CONNECT, ToolMode.PAINT, ToolMode.APPLY_MATERIAL, ToolMode.LAYER, ToolMode.SELECT]
+const _MODE_ORDER := [ToolMode.PLACE, ToolMode.EDIT, ToolMode.EXTRUDE, ToolMode.REMOVE, ToolMode.CONNECT, ToolMode.PAINT, ToolMode.APPLY_MATERIAL, ToolMode.LAYER, ToolMode.SELECT, ToolMode.CONVERT_VOLUME]
 var _mode_labels: Array[MeshInstance3D] = []
 const POOL_TYPE := "poly_tool"
 
@@ -220,6 +225,13 @@ var _extrude_initial_cap_positions: Array[Vector3] = []
 var _extrude_drag_start_pos: Vector3 = Vector3.ZERO
 var _extrude_normal: Vector3 = Vector3.UP
 
+# Convert Volume Mode State
+var _volume_start_pos: Vector3 = Vector3.ZERO
+var _volume_end_pos: Vector3 = Vector3.ZERO
+var _is_drawing_volume: bool = false
+var _volume_selection_box: MeshInstance3D = null
+var _volume_selection_mat: StandardMaterial3D = null
+
 func add_new_layer(layer_name: String = "") -> void:
 	_add_new_layer()
 
@@ -276,10 +288,8 @@ func _add_layer(layer_name: String = "") -> PolyLayer:
 	
 	var mat = StandardMaterial3D.new()
 	mat.albedo_color = Color(1, 1, 1, 1)
-	mat.cull_mode = BaseMaterial3D.CULL_BACK 
-	mat.vertex_color_use_as_albedo = true
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED 
 	layer.mesh_instance.material_override = mat
 	layer.mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_add_to_root(layer.mesh_instance)
@@ -312,6 +322,7 @@ func _create_non_layer_visuals() -> void:
 
 	_ensure_paint_dot()
 	_create_edit_highlights()
+	_create_volume_selection_visuals()
 
 func _exit_tree() -> void:
 	super._exit_tree()
@@ -326,6 +337,7 @@ func _exit_tree() -> void:
 	if is_instance_valid(_connect_line): _connect_line.queue_free()
 	if is_instance_valid(_edge_highlight): _edge_highlight.queue_free()
 	if is_instance_valid(_face_highlight): _face_highlight.queue_free()
+	if is_instance_valid(_volume_selection_box): _volume_selection_box.queue_free()
 	_clear_mode_select_nodes()
 
 func _on_grabbed(hand: RigidBody3D) -> void:
@@ -414,6 +426,7 @@ func _physics_process(delta: float) -> void:
 	
 	# Selection Visuals
 	_update_selection_visuals()
+	_update_volume_selection_visuals()
 
 func _handle_input() -> void:
 	var trigger = _is_trigger_pressed()
@@ -446,12 +459,15 @@ func _handle_input() -> void:
 	
 	# Trigger Actions
 	var just_pressed = trigger and not _prev_trigger_pressed
-	var _just_released = not trigger and _prev_trigger_pressed
+	var just_released = not trigger and _prev_trigger_pressed
 	
 	var target = _get_target_point()
 	var hover = _get_nearest_point(target)
 	
 	match _current_mode:
+		ToolMode.CONVERT_VOLUME:
+			_handle_convert_volume_input(target, just_pressed, trigger, just_released)
+		
 		ToolMode.PLACE:
 			if just_pressed and _points.size() < max_points:
 				_add_point(target)
@@ -540,7 +556,7 @@ func _handle_input() -> void:
 	_prev_grip_pressed = grip
 
 func _cycle_mode() -> void:
-	var next = (_current_mode + 1) % 7
+	var next = (_current_mode + 1) % ToolMode.size()
 	_current_mode = next as ToolMode
 	_update_mode_visuals()
 
@@ -560,6 +576,7 @@ func _add_point(pos: Vector3) -> void:
 	var layer = _layers[_active_layer_idx]
 	layer.points.append(pos)
 	layer.point_colors.append(Color(0.8, 0.8, 0.8))
+	layer.point_uvs.append(Vector2.ZERO)
 	
 	_rebuild_mesh_indices()
 	_update_point_pool(_get_target_point())
@@ -570,6 +587,8 @@ func _remove_point(index: int) -> void:
 	
 	layer.points.remove_at(index)
 	layer.point_colors.remove_at(index)
+	if index < layer.point_uvs.size():
+		layer.point_uvs.remove_at(index)
 	
 	# Remove triangles using this index
 	var new_tris: Array[Array] = []
@@ -650,10 +669,16 @@ func _rebuild_mesh() -> void:
 			continue
 		var normal = normal_calc.normalized()
 		
-		# Generate UVs using planar projection based on dominant axis
-		var uv0 = _calculate_planar_uv(p0, normal)
-		var uv1 = _calculate_planar_uv(p1, normal)
-		var uv2 = _calculate_planar_uv(p2, normal)
+		# Use stored UVs if available and non-zero
+		var uv0 = _point_uvs[tri[0]] if tri[0] < _point_uvs.size() else Vector2.ZERO
+		var uv1 = _point_uvs[tri[1]] if tri[1] < _point_uvs.size() else Vector2.ZERO
+		var uv2 = _point_uvs[tri[2]] if tri[2] < _point_uvs.size() else Vector2.ZERO
+		
+		# If all UVs are zero, fall back to planar projection
+		if uv0.is_zero_approx() and uv1.is_zero_approx() and uv2.is_zero_approx():
+			uv0 = _calculate_planar_uv(p0, normal)
+			uv1 = _calculate_planar_uv(p1, normal)
+			uv2 = _calculate_planar_uv(p2, normal)
 		
 		st.set_normal(normal)
 		# Add vertices in order with UVs
@@ -1584,6 +1609,12 @@ func _mode_color(mode: ToolMode) -> Color:
 			return color_apply_material
 		ToolMode.EXTRUDE:
 			return color_extrude
+		ToolMode.LAYER:
+			return Color(0.5, 0.5, 0.5) # Grey for layer organization
+		ToolMode.SELECT:
+			return Color(1.0, 1.0, 1.0) # White for general selection
+		ToolMode.CONVERT_VOLUME:
+			return color_convert_volume
 	return Color.WHITE
 
 func _add_to_root(node: Node) -> void:
@@ -1915,7 +1946,7 @@ func _update_selection_visuals() -> void:
 		_selection_sphere.visible = false
 
 
-func load_from_gltf(path: String) -> int:
+func load_from_gltf(path: String, merge_overlapping_points: bool = true) -> int:
 	var target_path := path.strip_edges()
 	if target_path.is_empty():
 		return ERR_FILE_NOT_FOUND
@@ -1937,80 +1968,95 @@ func load_from_gltf(path: String) -> int:
 	if not scene:
 		return ERR_PARSE_ERROR
 	
-	var mesh_instance := _find_first_mesh_instance(scene)
-	if not mesh_instance or not mesh_instance.mesh:
-		return ERR_DOES_NOT_EXIST
+	# For GLTF files, we center and scale to ~0.5m in front of tool
+	var spawn_pos := global_position + global_transform.basis.z * -0.5
+	return import_data_from_node(scene, true, spawn_pos, 0.5, merge_overlapping_points)
+
+
+func import_from_node(source_node: Node, merge: bool = true, append: bool = false) -> int:
+	if not source_node: return ERR_INVALID_PARAMETER
+	# For existing nodes, we import them exactly where they are
+	return import_data_from_node(source_node, false, Vector3.ZERO, 1.0, merge, append)
+
+
+func import_data_from_node(root_node: Node, normalize: bool, target_pos: Vector3, target_size: float, merge: bool, append: bool = false) -> int:
+	var total_vertices: PackedVector3Array = []
+	var total_indices: PackedInt32Array = []
+	var total_colors: PackedColorArray = []
+	var total_uvs: PackedVector2Array = []
+	var mesh_instances: Array[MeshInstance3D] = []
 	
-	var array_mesh := mesh_instance.mesh
-	if not (array_mesh is ArrayMesh):
+	_collect_mesh_data_recursive(root_node, Transform3D.IDENTITY, total_vertices, total_indices, total_colors, total_uvs, mesh_instances)
+	
+	if total_vertices.is_empty():
 		return ERR_INVALID_DATA
-	if array_mesh.get_surface_count() == 0:
-		return ERR_INVALID_DATA
+		
+	if not append:
+		_clear_geometry()
 	
-	var arrays := array_mesh.surface_get_arrays(0)
-	var vertices: PackedVector3Array = arrays[ArrayMesh.ARRAY_VERTEX]
-	var indices: PackedInt32Array = arrays[ArrayMesh.ARRAY_INDEX] if arrays[ArrayMesh.ARRAY_INDEX] else PackedInt32Array()
-	var colors: PackedColorArray = arrays[ArrayMesh.ARRAY_COLOR] if arrays[ArrayMesh.ARRAY_COLOR] else PackedColorArray()
-	if vertices.is_empty():
-		return ERR_INVALID_DATA
-	if indices.is_empty():
-		if vertices.size() % 3 != 0:
-			return ERR_INVALID_DATA
-		indices = PackedInt32Array()
-		for i in range(vertices.size()):
-			indices.append(i)
+	var mesh_center := Vector3.ZERO
+	var scale_factor := 1.0
 	
-	_clear_geometry()
-	
-	# Calculate mesh bounds for centering and scaling
-	var min_pos := vertices[0]
-	var max_pos := vertices[0]
-	for v in vertices:
-		min_pos = Vector3(min(min_pos.x, v.x), min(min_pos.y, v.y), min(min_pos.z, v.z))
-		max_pos = Vector3(max(max_pos.x, v.x), max(max_pos.y, v.y), max(max_pos.z, v.z))
-	
-	var mesh_center := (min_pos + max_pos) * 0.5
-	var mesh_size := max_pos - min_pos
-	var max_dim: float = max(mesh_size.x, max(mesh_size.y, mesh_size.z))
-	
-	# Target size of ~0.5 meters and position in front of tool
-	var target_size := 0.5
-	var scale_factor: float = target_size / max_dim if max_dim > 0.01 else 1.0
+	if normalize:
+		# Calculate mesh bounds for centering and scaling
+		var min_pos := total_vertices[0]
+		var max_pos := total_vertices[0]
+		for v in total_vertices:
+			min_pos = Vector3(min(min_pos.x, v.x), min(min_pos.y, v.y), min(min_pos.z, v.z))
+			max_pos = Vector3(max(max_pos.x, v.x), max(max_pos.y, v.y), max(max_pos.z, v.z))
+		
+		mesh_center = (min_pos + max_pos) * 0.5
+		var mesh_size := max_pos - min_pos
+		var max_dim: float = max(mesh_size.x, max(mesh_size.y, mesh_size.z))
+		scale_factor = target_size / max_dim if max_dim > 0.01 else 1.0
 	
 	var layer = _layers[_active_layer_idx]
-	var spawn_pos := global_position + global_transform.basis.z * -0.5
 	
-	# Recreate points - centered and scaled
-	for i in vertices.size():
-		var color := Color(0.8, 0.8, 0.8)
-		if colors.size() == vertices.size():
-			color = colors[i]
-		
-		# Center, scale, and position the vertex
-		var local_pos: Vector3 = (vertices[i] - mesh_center) * scale_factor
-		var global_p = spawn_pos + local_pos
-		
-		layer.points.append(global_p)
-		layer.point_colors.append(color)
+	# Recreate points
+	for i in total_vertices.size():
+		var p = total_vertices[i]
+		if normalize:
+			p = target_pos + (p - mesh_center) * scale_factor
+		else:
+			# If importing from scene, use absolute world position of the node
+			if root_node is Node3D:
+				p = root_node.global_transform * (total_vertices[i])
+			else:
+				p = total_vertices[i]
+				
+		layer.points.append(p)
+		layer.point_colors.append(total_colors[i])
+		layer.point_uvs.append(total_uvs[i])
 	
 	# Recreate triangles
-	for t in range(0, indices.size(), 3):
-		if t + 2 >= indices.size():
+	for t in range(0, total_indices.size(), 3):
+		if t + 2 >= total_indices.size():
 			break
-		_triangles.append([indices[t], indices[t + 1], indices[t + 2]])
+		_triangles.append([total_indices[t], total_indices[t + 1], total_indices[t + 2]])
 	
-	# Apply material if present (copy it properly for the PolyTool mesh)
-	if mesh_instance.material_override:
-		_applied_material = mesh_instance.material_override.duplicate()
-		if _mesh_instance:
-			_mesh_instance.material_override = _applied_material
-	elif array_mesh.surface_get_material(0):
-		_applied_material = array_mesh.surface_get_material(0).duplicate()
-		if _mesh_instance:
-			_mesh_instance.material_override = _applied_material
+	# Apply material if present (copy it from the first mesh part found)
+	var first_instance: MeshInstance3D = mesh_instances[0]
+	if first_instance.material_override:
+		_applied_material = first_instance.material_override.duplicate()
+	elif first_instance.mesh and first_instance.mesh.get_surface_count() > 0:
+		var surface_mat = first_instance.mesh.surface_get_material(0)
+		if surface_mat:
+			_applied_material = surface_mat.duplicate()
+	
+	# Force unshaded
+	if _applied_material:
+		if _applied_material is StandardMaterial3D:
+			_applied_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			_applied_material.cull_mode = BaseMaterial3D.CULL_DISABLED # Ensure double sided
+		elif _applied_material is ORMMaterial3D: # Handle ORM materials too if present
+			_applied_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			_applied_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	
+	if _applied_material and _mesh_instance:
+		_mesh_instance.material_override = _applied_material
 	
 	# Merge overlapping points if enabled
-	if merge_overlapping_points:
+	if merge:
 		_merge_overlapping_points_impl()
 	
 	_rebuild_mesh()
@@ -2020,15 +2066,61 @@ func load_from_gltf(path: String) -> int:
 	return OK
 
 
-func _find_first_mesh_instance(root: Node) -> MeshInstance3D:
+func _collect_mesh_data_recursive(node: Node, to_root_transform: Transform3D, total_vertices: PackedVector3Array, total_indices: PackedInt32Array, total_colors: PackedColorArray, total_uvs: PackedVector2Array, mesh_instances: Array[MeshInstance3D]) -> void:
+	if node is MeshInstance3D and node.mesh is ArrayMesh:
+		mesh_instances.append(node)
+		var array_mesh = node.mesh as ArrayMesh
+		for s in array_mesh.get_surface_count():
+			var arrays := array_mesh.surface_get_arrays(s)
+			var surface_vertices: PackedVector3Array = arrays[ArrayMesh.ARRAY_VERTEX]
+			var surface_indices: PackedInt32Array = arrays[ArrayMesh.ARRAY_INDEX] if arrays[ArrayMesh.ARRAY_INDEX] else PackedInt32Array()
+			var surface_colors: PackedColorArray = arrays[ArrayMesh.ARRAY_COLOR] if arrays[ArrayMesh.ARRAY_COLOR] else PackedColorArray()
+			var surface_uvs: PackedVector2Array = arrays[ArrayMesh.ARRAY_TEX_UV] if arrays[ArrayMesh.ARRAY_TEX_UV] else PackedVector2Array()
+			
+			if surface_vertices.is_empty():
+				continue
+				
+			var vert_offset = total_vertices.size()
+			# Apply transform to vertices
+			for v in surface_vertices:
+				total_vertices.append(to_root_transform * v)
+				
+			if not surface_colors.is_empty():
+				total_colors.append_array(surface_colors)
+			else:
+				for i in range(surface_vertices.size()):
+					total_colors.append(Color(0.8, 0.8, 0.8))
+			
+			if not surface_uvs.is_empty():
+				total_uvs.append_array(surface_uvs)
+			else:
+				for i in range(surface_vertices.size()):
+					total_uvs.append(Vector2.ZERO)
+					
+			if surface_indices.is_empty():
+				for i in range(surface_vertices.size()):
+					total_indices.append(vert_offset + i)
+			else:
+				for idx in surface_indices:
+					total_indices.append(vert_offset + idx)
+	
+	for child in node.get_children():
+		if child is Node3D:
+			_collect_mesh_data_recursive(child, to_root_transform * child.transform, total_vertices, total_indices, total_colors, total_uvs, mesh_instances)
+		else:
+			_collect_mesh_data_recursive(child, to_root_transform, total_vertices, total_indices, total_colors, total_uvs, mesh_instances)
+
+
+func find_mesh_instances(root: Node) -> Array[MeshInstance3D]:
+	var result: Array[MeshInstance3D] = []
 	var queue: Array = [root]
 	while not queue.is_empty():
 		var node: Node = queue.pop_front()
-		if node is MeshInstance3D and (node as MeshInstance3D).mesh:
-			return node as MeshInstance3D
+		if node is MeshInstance3D and node.mesh:
+			result.append(node)
 		for child in node.get_children():
 			queue.append(child)
-	return null
+	return result
 
 
 func on_pooled() -> void:
@@ -2090,6 +2182,7 @@ func _clear_geometry() -> void:
 	var layer = _layers[_active_layer_idx]
 	layer.points = PackedVector3Array()
 	layer.point_colors = PackedColorArray()
+	layer.point_uvs = PackedVector2Array()
 	layer.triangles.clear()
 	_spatial_grid.clear()
 	_point_to_triangles.clear()
@@ -2121,8 +2214,14 @@ func _merge_overlapping_points_impl() -> void:
 			if merge_map[j] != j:
 				continue # Already merged
 			var pos_j = layer.points[j]
+			
 			if pos_i.distance_to(pos_j) <= merge_distance:
-				merge_map[j] = i # Merge j into i
+				# Also check UVs to preserve seams
+				var uv_i = layer.point_uvs[i] if i < layer.point_uvs.size() else Vector2.ZERO
+				var uv_j = layer.point_uvs[j] if j < layer.point_uvs.size() else Vector2.ZERO
+				
+				if uv_i.distance_to(uv_j) <= 0.001:
+					merge_map[j] = i # Merge j into i
 	
 	# Check if any merging is needed
 	var needs_merge := false
@@ -2137,6 +2236,7 @@ func _merge_overlapping_points_impl() -> void:
 	# Build new point list and index remapping
 	var new_points: PackedVector3Array = []
 	var new_colors: PackedColorArray = []
+	var new_uvs: PackedVector2Array = []
 	var old_to_new: Dictionary = {}
 	
 	for i in layer.points.size():
@@ -2145,6 +2245,10 @@ func _merge_overlapping_points_impl() -> void:
 			old_to_new[i] = new_points.size()
 			new_points.append(layer.points[i])
 			new_colors.append(layer.point_colors[i])
+			if i < layer.point_uvs.size():
+				new_uvs.append(layer.point_uvs[i])
+			else:
+				new_uvs.append(Vector2.ZERO)
 		else:
 			# This point is merged, use the kept point's new index
 			var target_idx = merge_map[i]
@@ -2162,6 +2266,7 @@ func _merge_overlapping_points_impl() -> void:
 	
 	layer.points = new_points
 	layer.point_colors = new_colors
+	layer.point_uvs = new_uvs
 	layer.triangles = new_triangles
 	_rebuild_mesh()
 	_rebuild_mesh_indices()
@@ -2225,3 +2330,91 @@ func _move_points_by_start_position(start_pos: Vector3, new_pos: Vector3) -> voi
 	_rebuild_mesh()
 	_rebuild_mesh_indices()
 	_update_point_pool(_get_target_point())
+
+func _create_volume_selection_visuals() -> void:
+	_volume_selection_box = MeshInstance3D.new()
+	_volume_selection_box.name = "VolumeSelectionBox"
+	var box_mesh = BoxMesh.new()
+	# We'll scale the instance instead of the mesh data
+	box_mesh.size = Vector3(1, 1, 1)
+	_volume_selection_box.mesh = box_mesh
+	
+	_volume_selection_mat = StandardMaterial3D.new()
+	_volume_selection_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_volume_selection_mat.albedo_color = color_convert_volume.lightened(0.5)
+	_volume_selection_mat.albedo_color.a = 0.2
+	_volume_selection_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_volume_selection_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	
+	_volume_selection_box.material_override = _volume_selection_mat
+	_volume_selection_box.visible = false
+	_add_to_root(_volume_selection_box)
+
+func _handle_convert_volume_input(target_pos: Vector3, just_pressed: bool, trigger: bool, just_released: bool) -> void:
+	if just_pressed:
+		_volume_start_pos = target_pos
+		_volume_end_pos = target_pos
+		_is_drawing_volume = true
+		_volume_selection_box.visible = true
+	
+	if trigger and _is_drawing_volume:
+		_volume_end_pos = target_pos
+		
+	if just_released and _is_drawing_volume:
+		_is_drawing_volume = false
+		_volume_selection_box.visible = false
+		_convert_volume()
+
+func _update_volume_selection_visuals() -> void:
+	if not _volume_selection_box or not _is_drawing_volume:
+		if _volume_selection_box and _current_mode != ToolMode.CONVERT_VOLUME:
+			_volume_selection_box.visible = false
+		return
+		
+	var center = (_volume_start_pos + _volume_end_pos) * 0.5
+	var size = (_volume_end_pos - _volume_start_pos).abs()
+	
+	# Avoid zero-size issues
+	size.x = max(size.x, 0.001)
+	size.y = max(size.y, 0.001)
+	size.z = max(size.z, 0.001)
+	
+	_volume_selection_box.global_position = center
+	_volume_selection_box.scale = size
+	_volume_selection_box.visible = true
+
+func _convert_volume() -> void:
+	var aabb = AABB(_volume_start_pos, Vector3.ZERO).expand(_volume_end_pos)
+	print("Converting volume: ", aabb)
+	
+	# Find all MeshInstance3Ds in the scene that overlap with this AABB
+	var root = get_tree().root
+	var mesh_instances: Array[MeshInstance3D] = []
+	_find_meshes_in_aabb_recursive(root, aabb, mesh_instances)
+	
+	if mesh_instances.is_empty():
+		print("No meshes found in volume.")
+		return
+		
+	print("Found %d mesh instances to convert." % mesh_instances.size())
+	
+	var first = true
+	for mi in mesh_instances:
+		# Don't convert ourselves or our descendants
+		if is_ancestor_of(mi) or mi == _mesh_instance:
+			continue
+			
+		# Import it!
+		# Using append=true for all but the first (if we want to clear)
+		# Actually, let's always append in this mode so we can multi-select
+		import_from_node(mi, true, true)
+		first = false
+
+func _find_meshes_in_aabb_recursive(node: Node, aabb: AABB, result: Array[MeshInstance3D]) -> void:
+	if node is MeshInstance3D:
+		var mi_aabb = node.global_transform * node.get_aabb()
+		if aabb.intersects(mi_aabb):
+			result.append(node)
+			
+	for child in node.get_children():
+		_find_meshes_in_aabb_recursive(child, aabb, result)

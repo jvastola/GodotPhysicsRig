@@ -205,6 +205,7 @@ func _switch_to_section(section_name: String) -> void:
 			"Paint": tool.current_mode = PolyTool.ToolMode.PAINT
 			"Material": tool.current_mode = PolyTool.ToolMode.APPLY_MATERIAL
 			"Select": tool.current_mode = PolyTool.ToolMode.SELECT
+			"Convert Volume": tool.current_mode = PolyTool.ToolMode.CONVERT_VOLUME
 
 func _create_section(section_name: String) -> VBoxContainer:
 	var section = VBoxContainer.new()
@@ -224,7 +225,8 @@ func _populate_mode_sections() -> void:
 		["Remove", "Remove Mode Settings"],
 		["Connect", "Connect Mode Settings"],
 		["Paint", "Paint Mode Settings"],
-		["Select", "Select Mode Settings"]
+		["Select", "Select Mode Settings"],
+		["Convert Volume", "Volume Conversion Settings"]
 	]
 	
 	for m in modes:
@@ -438,9 +440,9 @@ func _populate_file_section() -> void:
 	save_row.add_child(load_button)
 	
 	refresh_button = Button.new()
-	refresh_button.text = "Refresh"
 	refresh_button.pressed.connect(func(): _populate_file_list())
 	save_row.add_child(refresh_button)
+	
 	
 	# Publish row (separate from save/load)
 	var pub_row = HBoxContainer.new()
@@ -753,6 +755,8 @@ func _on_load_pressed() -> void:
 	var err = tool.load_from_gltf(target_path)
 	if status_label:
 		status_label.text = "Loaded" if err == OK else "Error %d" % err
+
+
 
 func _find_poly_tool() -> PolyTool:
 	return PolyTool.instance if PolyTool.instance and is_instance_valid(PolyTool.instance) else null

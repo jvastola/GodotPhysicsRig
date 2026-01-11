@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://cb5k2j3x7m1n4"]
+
+[ext_resource type="Script" uid="uid://c8pb3cc4iibo1" path="res://src/test/poly_conversion_test.gd" id="1_test_script"]
+
+[node name="PolyConversionTest" type="Node3D" unique_id=1592258579]
+script = ExtResource("1_test_script")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1385469239]
+transform = Transform3D(0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, -0.75, 0.433013, 0, 5, 0)
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=299341318]
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1004417206]
+transform = Transform3D(0.32636255, -0.69175476, 0.64417636, -0.80348945, 0.15593924, 0.5745329, -0.49788806, -0.70509475, -0.5049249, 4.200705, 5.163558, -0.5365093)
