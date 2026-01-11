@@ -693,6 +693,8 @@ func _get_nearest_edge_within_radius(target: Vector3, origin: Vector3) -> Dictio
 	for edge in edges:
 		if edge.size() < 2:
 			continue
+		if not is_instance_valid(_points[edge[0]]) or not is_instance_valid(_points[edge[1]]):
+			continue
 		var p0 = _points[edge[0]].global_position
 		var p1 = _points[edge[1]].global_position
 		
@@ -720,6 +722,8 @@ func _get_nearest_face_within_radius(target: Vector3, origin: Vector3) -> Dictio
 	for i in _triangles.size():
 		var tri = _triangles[i]
 		if tri.size() < 3:
+			continue
+		if not is_instance_valid(_points[tri[0]]) or not is_instance_valid(_points[tri[1]]) or not is_instance_valid(_points[tri[2]]):
 			continue
 		var p0 = _points[tri[0]].global_position
 		var p1 = _points[tri[1]].global_position
@@ -1065,6 +1069,8 @@ func _get_nearest_point(pos: Vector3) -> Dictionary:
 	var best_dist = INF
 	var best_pos = Vector3.ZERO
 	for i in _points.size():
+		if not is_instance_valid(_points[i]):
+			continue
 		var p = _points[i].global_position
 		var d = p.distance_to(pos)
 		if d < best_dist:
@@ -1129,6 +1135,8 @@ func _update_point_visibility() -> void:
 		
 		if i == _active_layer_idx:
 			for point in layer.points:
+				if not is_instance_valid(point):
+					continue
 				var mesh = _get_point_mesh(point)
 				if mesh:
 					mesh.visible = _is_point_visible(point.global_position, origin)
@@ -1843,8 +1851,8 @@ func load_from_gltf(path: String) -> int:
 	
 	var arrays := array_mesh.surface_get_arrays(0)
 	var vertices: PackedVector3Array = arrays[ArrayMesh.ARRAY_VERTEX]
-	var indices: PackedInt32Array = arrays[ArrayMesh.ARRAY_INDEX]
-	var colors: PackedColorArray = arrays[ArrayMesh.ARRAY_COLOR]
+	var indices: PackedInt32Array = arrays[ArrayMesh.ARRAY_INDEX] if arrays[ArrayMesh.ARRAY_INDEX] else PackedInt32Array()
+	var colors: PackedColorArray = arrays[ArrayMesh.ARRAY_COLOR] if arrays[ArrayMesh.ARRAY_COLOR] else PackedColorArray()
 	if vertices.is_empty():
 		return ERR_INVALID_DATA
 	if indices.is_empty():
@@ -1856,7 +1864,25 @@ func load_from_gltf(path: String) -> int:
 	
 	_clear_geometry()
 	
-	# Recreate points
+	# Calculate mesh bounds for centering and scaling
+	var min_pos := vertices[0]
+	var max_pos := vertices[0]
+	for v in vertices:
+		min_pos = Vector3(min(min_pos.x, v.x), min(min_pos.y, v.y), min(min_pos.z, v.z))
+		max_pos = Vector3(max(max_pos.x, v.x), max(max_pos.y, v.y), max(max_pos.z, v.z))
+	
+	var mesh_center := (min_pos + max_pos) * 0.5
+	var mesh_size := max_pos - min_pos
+	var max_dim: float = max(mesh_size.x, max(mesh_size.y, mesh_size.z))
+	
+	# Target size of ~0.5 meters and position in front of tool
+	var target_size := 0.5
+	var scale_factor: float = target_size / max_dim if max_dim > 0.01 else 1.0
+	
+	# Position in front of the tool
+	var spawn_pos := global_position + global_transform.basis.z * -0.5
+	
+	# Recreate points - centered and scaled
 	for i in vertices.size():
 		var node = Node3D.new()
 		node.name = "P%d" % i
@@ -1868,7 +1894,9 @@ func load_from_gltf(path: String) -> int:
 		dot.material_override = _make_unshaded_material(color)
 		node.add_child(dot)
 		_point_container.add_child(node)
-		node.global_position = vertices[i]
+		# Center, scale, and position the vertex
+		var local_pos: Vector3 = (vertices[i] - mesh_center) * scale_factor
+		node.global_position = spawn_pos + local_pos
 		_points.append(node)
 	
 	# Recreate triangles
@@ -1877,9 +1905,15 @@ func load_from_gltf(path: String) -> int:
 			break
 		_triangles.append([indices[t], indices[t + 1], indices[t + 2]])
 	
-	# Apply material if present
+	# Apply material if present (copy it properly for the PolyTool mesh)
 	if mesh_instance.material_override:
-		_mesh_instance.material_override = mesh_instance.material_override
+		_applied_material = mesh_instance.material_override.duplicate()
+		if _mesh_instance:
+			_mesh_instance.material_override = _applied_material
+	elif array_mesh.surface_get_material(0):
+		_applied_material = array_mesh.surface_get_material(0).duplicate()
+		if _mesh_instance:
+			_mesh_instance.material_override = _applied_material
 	
 	# Merge overlapping points if enabled
 	if merge_overlapping_points:

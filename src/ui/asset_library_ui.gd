@@ -29,6 +29,7 @@ var http_request_download: HTTPRequest
 var current_assets: Array = []
 var pending_download_path: String = ""
 var pending_metadata: Dictionary = {}
+var pending_mode: String = "spawn"  # "spawn" or "poly_tool"
 
 func _ready() -> void:
 	instance = self
@@ -288,10 +289,20 @@ func _populate_grid(assets: Array) -> void:
 		type_lbl.modulate = Color(0.7, 0.7, 0.7)
 		vbox.add_child(type_lbl)
 		
+		var btn_row = HBoxContainer.new()
+		vbox.add_child(btn_row)
+		
 		var load_btn = Button.new()
 		load_btn.text = "Load"
+		load_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		load_btn.pressed.connect(func(): _download_asset(url, item))
-		vbox.add_child(load_btn)
+		btn_row.add_child(load_btn)
+		
+		var edit_btn = Button.new()
+		edit_btn.text = "Edit"
+		edit_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		edit_btn.pressed.connect(func(): _download_for_poly_tool(url, item))
+		btn_row.add_child(edit_btn)
 		
 		asset_grid.add_child(panel)
 
@@ -346,7 +357,11 @@ func _on_download_request_completed(result, response_code, headers, body) -> voi
 		else:
 			type = "gltf"
 	
-	if type == "package":
+	if pending_mode == "poly_tool":
+		_set_status("Downloaded. Loading into Poly Tool...")
+		call_deferred("_load_into_poly_tool", pending_download_path)
+		pending_mode = "spawn"  # Reset for next download
+	elif type == "package":
 		_set_status("Package downloaded. Mounting...")
 		var scene_path = pending_metadata.get("scene_path", "")
 		call_deferred("_load_package", pending_download_path, scene_path)
@@ -434,3 +449,19 @@ func _position_in_front_of_player(node: Node3D) -> void:
 			node.global_position = head.global_position + forward * 1.5
 			# node.look_at(head.global_position, Vector3.UP)
 			# node.rotate_object_local(Vector3.UP, PI) # Match camera
+
+func _download_for_poly_tool(url: String, metadata: Dictionary = {}) -> void:
+	pending_mode = "poly_tool"
+	_download_asset(url, metadata)
+
+func _load_into_poly_tool(path: String) -> void:
+	var tool = PolyTool.instance
+	if not tool or not is_instance_valid(tool):
+		_set_status("Error: Poly Tool not found. Grab it first!", true)
+		return
+	
+	var err = tool.load_from_gltf(path)
+	if err == OK:
+		_set_status("Loaded into Poly Tool!")
+	else:
+		_set_status("Failed to load into Poly Tool: %d" % err, true)
