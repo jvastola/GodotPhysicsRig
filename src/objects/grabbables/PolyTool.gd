@@ -148,6 +148,68 @@ var _controller: Node = null
 var _prev_trigger_pressed: bool = false
 var _prev_grip_pressed: bool = false
 
+# Performance Optimizations
+const GRID_CELL_SIZE: float = 0.1
+const VISIBILITY_UPDATE_INTERVAL: int = 3
+const MAX_VISIBLE_POINTS: int = 10
+
+var _spatial_grid: Dictionary = {} # Vector3i -> Array[int]
+var _point_to_triangles: Dictionary = {} # int -> Array[int]
+var _visible_point_indices: Array[int] = []
+var _visibility_frame_counter: int = 0
+
+func _get_cell_key(pos: Vector3) -> Vector3i:
+	return Vector3i(
+		int(floor(pos.x / GRID_CELL_SIZE)),
+		int(floor(pos.y / GRID_CELL_SIZE)),
+		int(floor(pos.z / GRID_CELL_SIZE))
+	)
+
+func _rebuild_mesh_indices() -> void:
+	_rebuild_spatial_grid()
+	_rebuild_point_to_triangles()
+
+func _rebuild_spatial_grid() -> void:
+	_spatial_grid.clear()
+	for i in _points.size():
+		if not is_instance_valid(_points[i]): continue
+		var key = _get_cell_key(_points[i].global_position)
+		if not _spatial_grid.has(key):
+			_spatial_grid[key] = []
+		_spatial_grid[key].append(i)
+
+func _rebuild_point_to_triangles() -> void:
+	_point_to_triangles.clear()
+	for i in _triangles.size():
+		var tri = _triangles[i]
+		for p_idx in tri:
+			if not _point_to_triangles.has(p_idx):
+				_point_to_triangles[p_idx] = []
+			if not i in _point_to_triangles[p_idx]:
+				_point_to_triangles[p_idx].append(i)
+
+func _get_nearest_k_points(pos: Vector3, k: int) -> Array[int]:
+	var center_cell := _get_cell_key(pos)
+	var candidates: Array[int] = []
+	
+	# Search 3x3x3 neighborhood
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			for dz in range(-1, 2):
+				var key := center_cell + Vector3i(dx, dy, dz)
+				if _spatial_grid.has(key):
+					candidates.append_array(_spatial_grid[key])
+	
+	# Narrow sort by distance squared
+	candidates.sort_custom(func(a, b):
+		var p_a = _points[a]
+		var p_b = _points[b]
+		if not is_instance_valid(p_a) or not is_instance_valid(p_b): return false
+		return p_a.global_position.distance_squared_to(pos) < \
+			   p_b.global_position.distance_squared_to(pos))
+			
+	return candidates.slice(0, min(k, candidates.size()))
+
 # Material mode state
 var _applied_material: Material = null
 var _material_preview_dot: MeshInstance3D
@@ -296,7 +358,12 @@ func _on_released() -> void:
 
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
-	_update_point_visibility()
+	
+	_visibility_frame_counter += 1
+	if _visibility_frame_counter >= VISIBILITY_UPDATE_INTERVAL:
+		_visibility_frame_counter = 0
+		_update_point_visibility()
+		
 	_update_paint_dot()
 	
 	if not is_inside_tree():
@@ -483,11 +550,13 @@ func _add_point(pos: Vector3) -> void:
 	var mesh = MeshInstance3D.new()
 	mesh.mesh = _make_sphere_mesh(0.015)
 	mesh.material_override = _make_unshaded_material(Color(0.8, 0.8, 0.8))
+	mesh.visible = false # Hidden by default
 	node.add_child(mesh)
 	
 	_point_container.add_child(node)
 	node.global_position = pos # Important: set after adding to tree
 	_points.append(node)
+	_rebuild_mesh_indices()
 	_update_point_visibility()
 
 func _remove_point(index: int) -> void:
@@ -515,6 +584,7 @@ func _remove_point(index: int) -> void:
 		
 	_triangles = new_tris
 	_rebuild_mesh()
+	_rebuild_mesh_indices()
 	_update_point_visibility()
 
 func _remove_face(index: int) -> void:
@@ -539,12 +609,23 @@ func _rebuild_mesh() -> void:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	
 	for tri in _triangles:
-		var p0 = _points[tri[0]].global_position
-		var p1 = _points[tri[1]].global_position
-		var p2 = _points[tri[2]].global_position
+		if tri.size() < 3: continue
+		var node0 = _points[tri[0]]
+		var node1 = _points[tri[1]]
+		var node2 = _points[tri[2]]
+		
+		if not is_instance_valid(node0) or not is_instance_valid(node1) or not is_instance_valid(node2):
+			continue
+			
+		var p0 = node0.global_position
+		var p1 = node1.global_position
+		var p2 = node2.global_position
 		
 		# Compute normal
-		var normal = (p1 - p0).cross(p2 - p0).normalized()
+		var normal_calc = (p1 - p0).cross(p2 - p0)
+		if normal_calc.length_squared() < 1e-8:
+			continue
+		var normal = normal_calc.normalized()
 		
 		# Generate UVs using planar projection based on dominant axis
 		var uv0 = _calculate_planar_uv(p0, normal)
@@ -553,13 +634,13 @@ func _rebuild_mesh() -> void:
 		
 		st.set_normal(normal)
 		# Add vertices in order with UVs
-		st.set_color(_get_point_color(_points[tri[0]]))
+		st.set_color(_get_point_color(node0))
 		st.set_uv(uv0)
 		st.add_vertex(p0)  
-		st.set_color(_get_point_color(_points[tri[1]]))
+		st.set_color(_get_point_color(node1))
 		st.set_uv(uv1)
 		st.add_vertex(p1)
-		st.set_color(_get_point_color(_points[tri[2]]))
+		st.set_color(_get_point_color(node2))
 		st.set_uv(uv2)
 		st.add_vertex(p2)
 		
@@ -682,72 +763,88 @@ func _update_edit_mode_highlights(target: Vector3) -> void:
 		_clear_edit_highlights()
 
 
-func _get_nearest_edge_within_radius(target: Vector3, origin: Vector3) -> Dictionary:
+func _get_nearest_edge_within_radius(target: Vector3, _origin: Vector3) -> Dictionary:
 	var best_edge: Array[int] = []
 	var best_dist := INF
 	var best_point := Vector3.ZERO
 	
-	# Build unique edges from triangles
-	var edges := _get_unique_edges()
+	# Optimization: Only check edges connected to nearby points
+	var nearby_point_indices = _get_nearest_k_points(target, 50)
+	var checked_triangles := {}
+	var checked_edges := {}
 	
-	for edge in edges:
-		if edge.size() < 2:
-			continue
-		if not is_instance_valid(_points[edge[0]]) or not is_instance_valid(_points[edge[1]]):
-			continue
-		var p0 = _points[edge[0]].global_position
-		var p1 = _points[edge[1]].global_position
-		
-		# Check if edge is within visibility radius
-		var edge_center = (p0 + p1) * 0.5
-		if edge_center.distance_to(origin) > point_visibility_radius:
-			continue
-		
-		# Find closest point on edge to target
-		var closest = _closest_point_on_segment(target, p0, p1)
-		var dist = closest.distance_to(target)
-		
-		if dist < best_dist:
-			best_dist = dist
-			best_edge = edge
-			best_point = closest
+	for p_idx in nearby_point_indices:
+		if not _point_to_triangles.has(p_idx): continue
+		for t_idx in _point_to_triangles[p_idx]:
+			if checked_triangles.has(t_idx): continue
+			checked_triangles[t_idx] = true
+			
+			var tri = _triangles[t_idx]
+			if tri.size() < 3: continue
+			
+			# Check 3 edges
+			var tri_edges = [[tri[0], tri[1]], [tri[1], tri[2]], [tri[2], tri[0]]]
+			for edge in tri_edges:
+				var v_min = min(edge[0], edge[1])
+				var v_max = max(edge[0], edge[1])
+				var e_key = (v_min << 16) | v_max # Faster than string keys
+				if checked_edges.has(e_key): continue
+				checked_edges[e_key] = true
+				
+				if not is_instance_valid(_points[edge[0]]) or not is_instance_valid(_points[edge[1]]):
+					continue
+				var p0 = _points[edge[0]].global_position
+				var p1 = _points[edge[1]].global_position
+				
+				# Find closest point on edge to target
+				var closest = _closest_point_on_segment(target, p0, p1)
+				var dist = closest.distance_to(target)
+				
+				if dist < best_dist:
+					best_dist = dist
+					best_edge.assign(edge)
+					best_point = closest
 	
 	return {"edge": best_edge, "distance": best_dist, "position": best_point}
 
 
-func _get_nearest_face_within_radius(target: Vector3, origin: Vector3) -> Dictionary:
+func _get_nearest_face_within_radius(target: Vector3, _origin: Vector3) -> Dictionary:
 	var best_idx := -1
 	var best_dist := INF
 	
-	for i in _triangles.size():
-		var tri = _triangles[i]
-		if tri.size() < 3:
-			continue
-		if not is_instance_valid(_points[tri[0]]) or not is_instance_valid(_points[tri[1]]) or not is_instance_valid(_points[tri[2]]):
-			continue
-		var p0 = _points[tri[0]].global_position
-		var p1 = _points[tri[1]].global_position
-		var p2 = _points[tri[2]].global_position
-		
-		# Check if face center is within visibility radius
-		var center = (p0 + p1 + p2) / 3.0
-		if center.distance_to(origin) > point_visibility_radius:
-			continue
-		
-		# Project target onto plane and check if inside triangle
-		var plane_normal = (p1 - p0).cross(p2 - p0)
-		if plane_normal.length_squared() < 1e-6:
-			continue
-		var plane = Plane(p0, p1, p2)
-		var projected = plane.project(target)
-		
-		if not _is_point_in_triangle(projected, p0, p1, p2):
-			continue
-		
-		var dist = projected.distance_to(target)
-		if dist < best_dist:
-			best_dist = dist
-			best_idx = i
+	# Optimization: Only check triangles connected to nearby points
+	var nearby_point_indices = _get_nearest_k_points(target, 50)
+	var checked_triangles := {}
+	
+	for p_idx in nearby_point_indices:
+		if not _point_to_triangles.has(p_idx): continue
+		for t_idx in _point_to_triangles[p_idx]:
+			if checked_triangles.has(t_idx): continue
+			checked_triangles[t_idx] = true
+			
+			var tri = _triangles[t_idx]
+			if tri.size() < 3:
+				continue
+			if not is_instance_valid(_points[tri[0]]) or not is_instance_valid(_points[tri[1]]) or not is_instance_valid(_points[tri[2]]):
+				continue
+			var p0 = _points[tri[0]].global_position
+			var p1 = _points[tri[1]].global_position
+			var p2 = _points[tri[2]].global_position
+			
+			# Project target onto plane and check if inside triangle
+			var plane_normal = (p1 - p0).cross(p2 - p0)
+			if plane_normal.length_squared() < 1e-6:
+				continue
+			var plane = Plane(p0, p1, p2)
+			var projected = plane.project(target)
+			
+			if not _is_point_in_triangle(projected, p0, p1, p2):
+				continue
+			
+			var dist = projected.distance_to(target)
+			if dist < best_dist:
+				best_dist = dist
+				best_idx = t_idx
 	
 	return {"index": best_idx, "distance": best_dist}
 
@@ -926,6 +1023,7 @@ func _continue_edit_drag(target: Vector3) -> void:
 		_points[idx].global_position = new_pos
 	
 	_rebuild_mesh()
+	_rebuild_mesh_indices()
 	_update_point_visibility()
 	
 	# Update highlights while dragging
@@ -1065,43 +1163,67 @@ func _get_target_point() -> Vector3:
 	return t.origin + (-t.basis.z * tip_forward_offset)
 
 func _get_nearest_point(pos: Vector3) -> Dictionary:
+	var center_cell := _get_cell_key(pos)
 	var best_idx = -1
 	var best_dist = INF
 	var best_pos = Vector3.ZERO
-	for i in _points.size():
-		if not is_instance_valid(_points[i]):
-			continue
-		var p = _points[i].global_position
-		var d = p.distance_to(pos)
-		if d < best_dist:
-			best_dist = d
-			best_idx = i
-			best_pos = p
+	
+	# Search 3x3x3 neighborhood (27 cells)
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			for dz in range(-1, 2):
+				var key := center_cell + Vector3i(dx, dy, dz)
+				if _spatial_grid.has(key):
+					for idx in _spatial_grid[key]:
+						var point = _points[idx]
+						if not is_instance_valid(point): continue
+						var p_pos = point.global_position
+						var d = p_pos.distance_to(pos)
+						if d < best_dist:
+							best_dist = d
+							best_idx = idx
+							best_pos = p_pos
+							
 	return { "index": best_idx, "distance": best_dist, "position": best_pos }
 
 
 func _find_nearest_triangle(pos: Vector3) -> Dictionary:
 	var best_idx := -1
 	var best_dist := INF
-	for i in _triangles.size():
-		var tri = _triangles[i]
-		if tri.size() < 3:
-			continue
-		var p0 = _points[tri[0]].global_position
-		var p1 = _points[tri[1]].global_position
-		var p2 = _points[tri[2]].global_position
-		var plane_normal = (p1 - p0).cross(p2 - p0)
-		if plane_normal.length_squared() < 1e-6:
-			continue
-		var plane = Plane(p0, p1, p2)
-		var projected = plane.project(pos)
-		var inside = _is_point_in_triangle(projected, p0, p1, p2)
-		if not inside:
-			continue
-		var dist = projected.distance_to(pos)
-		if dist < best_dist:
-			best_dist = dist
-			best_idx = i
+	
+	var nearby_point_indices = _get_nearest_k_points(pos, 50)
+	var checked_triangles := {}
+	
+	for p_idx in nearby_point_indices:
+		if not _point_to_triangles.has(p_idx): continue
+		for t_idx in _point_to_triangles[p_idx]:
+			if checked_triangles.has(t_idx): continue
+			checked_triangles[t_idx] = true
+			
+			var tri = _triangles[t_idx]
+			if tri.size() < 3: continue
+			
+			if not is_instance_valid(_points[tri[0]]) or not is_instance_valid(_points[tri[1]]) or not is_instance_valid(_points[tri[2]]):
+				continue
+				
+			var p0 = _points[tri[0]].global_position
+			var p1 = _points[tri[1]].global_position
+			var p2 = _points[tri[2]].global_position
+			
+			var plane_normal = (p1 - p0).cross(p2 - p0)
+			if plane_normal.length_squared() < 1e-6:
+				continue
+				
+			var plane = Plane(p0, p1, p2)
+			var projected = plane.project(pos)
+			if not _is_point_in_triangle(projected, p0, p1, p2):
+				continue
+				
+			var dist = projected.distance_to(pos)
+			if dist < best_dist:
+				best_dist = dist
+				best_idx = t_idx
+				
 	return {"index": best_idx, "distance": best_dist}
 
 
@@ -1126,20 +1248,28 @@ func _update_point_visibility() -> void:
 	if _layers.is_empty(): return
 	
 	var origin = _get_visibility_origin()
+	
+	# Hide previously visible points
+	for idx in _visible_point_indices:
+		if idx < _points.size() and is_instance_valid(_points[idx]):
+			var mesh = _get_point_mesh(_points[idx])
+			if mesh: mesh.visible = false
+			
+	# Update layer container visibility
 	for i in _layers.size():
 		var layer = _layers[i]
-		if not is_instance_valid(layer.point_container): continue
-		
-		# Only points of the ACTIVE layer are visible to avoid clutter
-		layer.point_container.visible = (i == _active_layer_idx)
-		
-		if i == _active_layer_idx:
-			for point in layer.points:
-				if not is_instance_valid(point):
-					continue
-				var mesh = _get_point_mesh(point)
-				if mesh:
-					mesh.visible = _is_point_visible(point.global_position, origin)
+		if is_instance_valid(layer.point_container):
+			layer.point_container.visible = (i == _active_layer_idx)
+			
+	# Find new nearest k points to show
+	_visible_point_indices = _get_nearest_k_points(origin, MAX_VISIBLE_POINTS)
+	
+	for idx in _visible_point_indices:
+		var point = _points[idx]
+		if not is_instance_valid(point): continue
+		var mesh = _get_point_mesh(point)
+		if mesh:
+			mesh.visible = true
 
 func _cycle_layers() -> void:
 	if _layers.is_empty(): return
@@ -1892,6 +2022,7 @@ func load_from_gltf(path: String) -> int:
 		if colors.size() == vertices.size():
 			color = colors[i]
 		dot.material_override = _make_unshaded_material(color)
+		dot.visible = false # Hidden by default, shown by performance logic
 		node.add_child(dot)
 		_point_container.add_child(node)
 		# Center, scale, and position the vertex
@@ -1920,6 +2051,7 @@ func load_from_gltf(path: String) -> int:
 		_merge_overlapping_points_impl()
 	
 	_rebuild_mesh()
+	_rebuild_mesh_indices()
 	_update_point_visibility()
 	return OK
 
@@ -1995,6 +2127,9 @@ func _clear_geometry() -> void:
 			p.queue_free()
 	_points.clear()
 	_triangles.clear()
+	_spatial_grid.clear()
+	_point_to_triangles.clear()
+	_visible_point_indices.clear()
 	if _mesh_params:
 		_mesh_params.clear_surfaces()
 
@@ -2063,6 +2198,7 @@ func _merge_overlapping_points_impl() -> void:
 	_points = new_points
 	_triangles = new_triangles
 	_rebuild_mesh()
+	_rebuild_mesh_indices()
 	_update_point_visibility()
 
 
@@ -2072,11 +2208,17 @@ func _get_colocated_points(index: int) -> Array[int]:
 	if not merge_overlapping_points:
 		return result
 	
+	if index < 0 or index >= _points.size() or not is_instance_valid(_points[index]):
+		return result
+		
 	var pos = _points[index].global_position
 	for i in _points.size():
 		if i == index:
 			continue
-		if _points[i].global_position.distance_to(pos) <= merge_distance:
+		var p_node = _points[i]
+		if not is_instance_valid(p_node):
+			continue
+		if p_node.global_position.distance_to(pos) <= merge_distance:
 			result.append(i)
 	return result
 
@@ -2102,11 +2244,15 @@ func _move_points_by_start_position(start_pos: Vector3, new_pos: Vector3) -> voi
 	if not merge_overlapping_points:
 		# Find the point at start_pos and move it
 		for i in _points.size():
+			if not is_instance_valid(_points[i]):
+				continue
 			if _points[i].global_position.distance_to(start_pos) <= merge_distance:
 				_points[i].global_position = new_pos
 				break
 	else:
 		# Move all points that were at start_pos
 		for i in _points.size():
+			if not is_instance_valid(_points[i]):
+				continue
 			if _points[i].global_position.distance_to(start_pos) <= merge_distance:
 				_points[i].global_position = new_pos
