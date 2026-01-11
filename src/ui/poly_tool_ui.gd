@@ -392,6 +392,18 @@ func _populate_file_section() -> void:
 	var section = _create_section("File")
 	_add_sidebar_button("Export/File", "File")
 	
+	# Name input row
+	var name_row = HBoxContainer.new()
+	section.add_child(name_row)
+	var name_lbl = Label.new()
+	name_lbl.text = "Name:"
+	name_lbl.custom_minimum_size.x = 60
+	name_row.add_child(name_lbl)
+	path_edit = LineEdit.new()
+	path_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	path_edit.placeholder_text = "Enter drawing name"
+	name_row.add_child(path_edit)
+	
 	var loc_lbl = Label.new()
 	loc_lbl.text = "Save Location:"
 	section.add_child(loc_lbl)
@@ -410,6 +422,27 @@ func _populate_file_section() -> void:
 	file_list.item_selected.connect(_on_file_selected)
 	section.add_child(file_list)
 	
+	# Save/Load/Refresh row
+	var save_row = HBoxContainer.new()
+	section.add_child(save_row)
+	save_button = Button.new()
+	save_button.text = "Save"
+	save_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	save_button.pressed.connect(_on_save_pressed)
+	save_row.add_child(save_button)
+	
+	load_button = Button.new()
+	load_button.text = "Load"
+	load_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	load_button.pressed.connect(_on_load_pressed)
+	save_row.add_child(load_button)
+	
+	refresh_button = Button.new()
+	refresh_button.text = "Refresh"
+	refresh_button.pressed.connect(func(): _populate_file_list())
+	save_row.add_child(refresh_button)
+	
+	# Publish row (separate from save/load)
 	var pub_row = HBoxContainer.new()
 	section.add_child(pub_row)
 	var pub_btn = Button.new()
@@ -522,7 +555,7 @@ func _upload_asset(file_path: String, asset_name: String, token: String) -> void
 		http.queue_free()
 	)
 	
-	var err = http.request(server_url, headers, HTTPClient.METHOD_POST, body)
+	var err = http.request_raw(server_url, headers, HTTPClient.METHOD_POST, body)
 	if err != OK:
 		if status_label: status_label.text = "Request Start Error %d" % err
 		http.queue_free()
@@ -689,6 +722,9 @@ func _populate_file_list() -> void:
 	if not file_list: return
 	file_list.clear()
 	var dir_path := _get_current_dir()
+	# Ensure directory exists
+	if not DirAccess.dir_exists_absolute(dir_path):
+		DirAccess.make_dir_recursive_absolute(dir_path)
 	var dir := DirAccess.open(dir_path)
 	if not dir: return
 	dir.list_dir_begin()
