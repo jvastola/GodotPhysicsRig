@@ -410,34 +410,122 @@ func _populate_file_section() -> void:
 	file_list.item_selected.connect(_on_file_selected)
 	section.add_child(file_list)
 	
-	var path_row = HBoxContainer.new()
-	section.add_child(path_row)
-	path_edit = LineEdit.new()
-	path_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	path_row.add_child(path_edit)
-	var ts_btn = Button.new()
-	ts_btn.text = "New"
-	ts_btn.pressed.connect(_reset_path_to_default)
-	path_row.add_child(ts_btn)
-	
-	var btn_row = HBoxContainer.new()
-	section.add_child(btn_row)
-	save_button = Button.new()
-	save_button.text = "Save GLTF"
-	save_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	save_button.pressed.connect(_on_save_pressed)
-	btn_row.add_child(save_button)
-	load_button = Button.new()
-	load_button.text = "Load"
-	load_button.pressed.connect(_on_load_pressed)
-	btn_row.add_child(load_button)
-	refresh_button = Button.new()
-	refresh_button.text = "Ref"
-	refresh_button.pressed.connect(_populate_file_list)
-	btn_row.add_child(refresh_button)
+	var pub_row = HBoxContainer.new()
+	section.add_child(pub_row)
+	var pub_btn = Button.new()
+	pub_btn.text = "Publish to Library"
+	pub_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pub_btn.pressed.connect(_on_publish_pressed)
+	pub_row.add_child(pub_btn)
 	
 	_reset_path_to_default()
 	_populate_file_list()
+
+func _on_publish_pressed() -> void:
+	var tool = _find_poly_tool()
+	if not tool or not path_edit: return
+	
+	var asset_name = path_edit.text.get_basename()
+	if asset_name.is_empty():
+		if status_label: status_label.text = "Error: Name required"
+		return
+	
+	if status_label: status_label.text = "Exporting..."
+	
+	# 1. Export to temp file
+	var temp_path = "user://temp_publish.glb"
+	var err = tool.export_to_gltf(temp_path)
+	if err != OK:
+		if status_label: status_label.text = "Export Error %d" % err
+		return
+		
+	# 2. Get auth token
+	var nakama = get_node_or_null("/root/NakamaManager")
+	if not nakama or not nakama.get("is_authenticated"):
+		if status_label: status_label.text = "Error: Not authenticated"
+		return
+	
+	var token = ""
+	if nakama.get("session") is Dictionary:
+		token = nakama.get("session").get("token", "")
+		
+	if token.is_empty():
+		if status_label: status_label.text = "Error: No session token"
+		return
+		
+	# 3. Upload to server
+	_upload_asset(temp_path, asset_name, token)
+
+func _upload_asset(file_path: String, asset_name: String, token: String) -> void:
+	if status_label: status_label.text = "Publishing..."
+	
+	var file = FileAccess.open(file_path, FileAccess.READ)
+	if not file:
+		if status_label: status_label.text = "Error reading temp file"
+		return
+	
+	var body_data = file.get_buffer(file.get_length())
+	file.close()
+	
+	var boundary = "GodotPolyToolBoundary"
+	var body = PackedByteArray()
+	
+	# Add 'name' field
+	body.append_array(("--" + boundary + "\r\n").to_utf8_buffer())
+	body.append_array(("Content-Disposition: form-data; name=\"name\"\r\n\r\n").to_utf8_buffer())
+	body.append_array((asset_name + "\r\n").to_utf8_buffer())
+	
+	# Add 'category' field
+	body.append_array(("--" + boundary + "\r\n").to_utf8_buffer())
+	body.append_array(("Content-Disposition: form-data; name=\"category\"\r\n\r\n").to_utf8_buffer())
+	body.append_array(("model\r\n").to_utf8_buffer())
+	
+	# Add 'description' field
+	body.append_array(("--" + boundary + "\r\n").to_utf8_buffer())
+	body.append_array(("Content-Disposition: form-data; name=\"description\"\r\n\r\n").to_utf8_buffer())
+	body.append_array(("Created with Poly Tool\r\n").to_utf8_buffer())
+	
+	# Add 'file' field
+	body.append_array(("--" + boundary + "\r\n").to_utf8_buffer())
+	body.append_array(("Content-Disposition: form-data; name=\"file\"; filename=\"" + asset_name + ".glb\"\r\n").to_utf8_buffer())
+	body.append_array(("Content-Type: application/octet-stream\r\n\r\n").to_utf8_buffer())
+	body.append_array(body_data)
+	body.append_array(("\r\n").to_utf8_buffer())
+	
+	# End boundary
+	body.append_array(("--" + boundary + "--\r\n").to_utf8_buffer())
+	
+	var headers = [
+		"Content-Type: multipart/form-data; boundary=" + boundary,
+		"Authorization: Bearer " + token
+	]
+	
+	var server_url = "http://158.101.21.99:3001/assets"
+	if AssetLibraryUI.instance:
+		server_url = AssetLibraryUI.ASSET_SERVER_URL + "/assets"
+		
+	var http = HTTPRequest.new()
+	add_child(http)
+	http.request_completed.connect(func(res, code, hdrs, bdy): 
+		if code == 201:
+			if status_label: status_label.text = "Successfully Published!"
+			# Refresh library if it's open
+			if AssetLibraryUI.instance:
+				AssetLibraryUI.instance._fetch_library()
+		else:
+			var err_msg = "Error %d" % code
+			if bdy.size() > 0:
+				var json = JSON.parse_string(bdy.get_string_from_utf8())
+				if json and json.has("error"):
+					err_msg = json.error
+			if status_label: status_label.text = err_msg
+		http.queue_free()
+	)
+	
+	var err = http.request(server_url, headers, HTTPClient.METHOD_POST, body)
+	if err != OK:
+		if status_label: status_label.text = "Request Start Error %d" % err
+		http.queue_free()
 
 func _populate_layer_section() -> void:
 	var section = _create_section("Layers")

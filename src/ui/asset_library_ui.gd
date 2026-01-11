@@ -9,9 +9,8 @@ static var instance: AssetLibraryUI = null
 # Config
 # Cloud Asset Server URL
 const ASSET_SERVER_URL = "http://158.101.21.99:3001"
-# Local fallback (useful if working offline)
 const LOCAL_ASSET_SERVER_URL = "http://localhost:3001"
-const MOCK_URL = "mock://assets" 
+const MOCK_URL = "mock://assets"
 
 # UI Elements
 var url_input: LineEdit
