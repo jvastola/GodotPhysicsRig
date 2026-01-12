@@ -16,6 +16,7 @@ signal close_requested
 var _current_node: Node = null
 var _property_controls: Dictionary = {}  # property_name -> Control
 var _collapsed_sections: Dictionary = {}  # section_name -> bool (true = collapsed)
+var _inspector_tool: Node = null
 
 # Godot-like colors
 const COLOR_SECTION_HEADER = Color(0.4, 0.55, 0.85, 1.0)
@@ -39,6 +40,13 @@ func _ready() -> void:
 	
 	if close_button:
 		close_button.pressed.connect(func(): close_requested.emit())
+
+
+func set_inspector_tool(tool: Node) -> void:
+	"""Set the reference to the tool that spawned this UI."""
+	_inspector_tool = tool
+	if not _current_node:
+		_show_no_selection()
 
 
 func inspect_node(node: Node) -> void:
@@ -70,11 +78,78 @@ func clear_selection() -> void:
 func _show_no_selection() -> void:
 	if title_label:
 		title_label.text = "🔍 Inspector"
-	if scroll_container:
-		scroll_container.visible = false
 	if no_selection_label:
 		no_selection_label.visible = true
 	_property_controls.clear()
+	
+	# Add tool settings even when no node is selected
+	if _inspector_tool:
+		if not properties_container:
+			return
+			
+		for child in properties_container.get_children():
+			child.queue_free()
+		
+		# Wait a frame for children to be freed
+		await get_tree().process_frame
+		
+		_add_collapsible_section("Tool Settings", func():
+			var hbox = HBoxContainer.new()
+			hbox.add_theme_constant_override("separation", 8)
+			
+			var label = Label.new()
+			label.text = "Select Mode"
+			label.custom_minimum_size.x = 100
+			label.add_theme_font_size_override("font_size", 11)
+			label.add_theme_color_override("font_color", COLOR_LABEL)
+			hbox.add_child(label)
+			
+			var option_btn = OptionButton.new()
+			option_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			option_btn.add_item("Volume Select", 0)
+			option_btn.add_item("Ray Mode", 1)
+			
+			if "_is_active" in _inspector_tool: # Quick check it's the right tool type
+				var current_mode = _inspector_tool.get("select_mode")
+				option_btn.select(current_mode)
+			
+			option_btn.item_selected.connect(func(idx):
+				if _inspector_tool:
+					_inspector_tool.set("select_mode", idx)
+					print("NodeInspectorUI: Switched tool to mode: ", idx)
+			)
+			hbox.add_child(option_btn)
+			properties_container.add_child(hbox)
+			
+			# Also add radius slider for volume mode
+			var radius_hbox = HBoxContainer.new()
+			radius_hbox.add_theme_constant_override("separation", 8)
+			
+			var r_label = Label.new()
+			r_label.text = "Volume Radius"
+			r_label.custom_minimum_size.x = 100
+			r_label.add_theme_font_size_override("font_size", 11)
+			r_label.add_theme_color_override("font_color", COLOR_LABEL)
+			radius_hbox.add_child(r_label)
+			
+			var spinbox = SpinBox.new()
+			spinbox.step = 0.01
+			spinbox.min_value = 0.01
+			spinbox.max_value = 1.0
+			spinbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			spinbox.value = _inspector_tool.get("volume_radius")
+			spinbox.value_changed.connect(func(val):
+				if _inspector_tool:
+					_inspector_tool.set("volume_radius", val)
+			)
+			_register_spinbox(spinbox)
+			radius_hbox.add_child(spinbox)
+			properties_container.add_child(radius_hbox)
+		, false)
+		
+		if scroll_container:
+			scroll_container.get_v_scroll_bar().value = 0
+			scroll_container.visible = true
 
 
 func _build_inspector_ui() -> void:
@@ -142,6 +217,60 @@ func _build_inspector_ui() -> void:
 	
 	# Add exported properties section
 	_add_exported_properties()
+	
+	# Add tool settings section at the bottom
+	if _inspector_tool:
+		_add_collapsible_section("🛠 Tool Settings", func():
+			var hbox = HBoxContainer.new()
+			hbox.add_theme_constant_override("separation", 8)
+			
+			var label = Label.new()
+			label.text = "Select Mode"
+			label.custom_minimum_size.x = 100
+			label.add_theme_font_size_override("font_size", 11)
+			label.add_theme_color_override("font_color", COLOR_LABEL)
+			hbox.add_child(label)
+			
+			var option_btn = OptionButton.new()
+			option_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			option_btn.add_item("Volume Select", 0)
+			option_btn.add_item("Ray Mode", 1)
+			
+			var current_mode = _inspector_tool.get("select_mode")
+			option_btn.select(current_mode)
+			
+			option_btn.item_selected.connect(func(idx):
+				if _inspector_tool:
+					_inspector_tool.set("select_mode", idx)
+			)
+			hbox.add_child(option_btn)
+			properties_container.add_child(hbox)
+			
+			# Also add radius slider
+			var radius_hbox = HBoxContainer.new()
+			radius_hbox.add_theme_constant_override("separation", 8)
+			
+			var r_label = Label.new()
+			r_label.text = "Volume Radius"
+			r_label.custom_minimum_size.x = 100
+			r_label.add_theme_font_size_override("font_size", 11)
+			r_label.add_theme_color_override("font_color", COLOR_LABEL)
+			radius_hbox.add_child(r_label)
+			
+			var spinbox = SpinBox.new()
+			spinbox.step = 0.01
+			spinbox.min_value = 0.01
+			spinbox.max_value = 1.0
+			spinbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			spinbox.value = _inspector_tool.get("volume_radius")
+			spinbox.value_changed.connect(func(val):
+				if _inspector_tool:
+					_inspector_tool.set("volume_radius", val)
+			)
+			_register_spinbox(spinbox)
+			radius_hbox.add_child(spinbox)
+			properties_container.add_child(radius_hbox)
+		, true) # Default collapsed when inspecting a node
 
 
 func _get_class_hierarchy(node: Node) -> Array:

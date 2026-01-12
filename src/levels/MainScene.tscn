@@ -1,4 +1,4 @@
-[gd_scene load_steps=67 format=3 uid="uid://6hnibsqm60w3"]
+[gd_scene format=3 uid="uid://6hnibsqm60w3"]
 
 [ext_resource type="PackedScene" uid="uid://cpq6v7yqk8y8j" path="res://src/player/XRPlayer.tscn" id="1_xrplayer"]
 [ext_resource type="Material" uid="uid://di55ekitynrbx" path="res://assets/materials/grassmaterial.tres" id="2_or5nu"]
@@ -31,8 +31,8 @@
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/WorldGrabSphere.tscn" id="38_world_grab_sphere"]
 [ext_resource type="Script" uid="uid://om3k532gai8j" path="res://src/ui/ui_panel_manager.gd" id="39_ui_panel_manager"]
 [ext_resource type="PackedScene" path="res://src/ui/git/GitViewport3D.tscn" id="39_wh2ee"]
-[ext_resource type="Script" path="res://src/ui/ui_panel_scene_setup.gd" id="40_ui_panel_setup"]
-[ext_resource type="Script" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
+[ext_resource type="Script" uid="uid://bqrnwqkyb00kx" path="res://src/ui/ui_panel_scene_setup.gd" id="40_ui_panel_setup"]
+[ext_resource type="Script" uid="uid://bid6ju5yhq61q" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
 [ext_resource type="PackedScene" uid="uid://cm8nv7v0apls3" path="res://src/objects/grabbables/GrappleHook.tscn" id="42_grapple_hook"]
 [ext_resource type="PackedScene" path="res://src/objects/ReferenceBlock.tscn" id="43_reference_block"]
 [ext_resource type="PackedScene" path="res://src/ui/BlockLibraryViewport3D.tscn" id="44_block_library_viewport"]
@@ -42,7 +42,7 @@
 [ext_resource type="PackedScene" path="res://src/ui/MovementSettingsViewport2.tscn" id="46_sv5fj"]
 [ext_resource type="PackedScene" path="res://src/ui/TerminalViewport3D.tscn" id="46_terminal"]
 [ext_resource type="PackedScene" path="res://src/ui/AssetLibraryViewport3D.tscn" id="47_0ej7u"]
-[ext_resource type="Script" uid="uid://dacfvlwh7dwcm" path="res://src/objects/viewport_mirror.gd" id="47_viewport_mirror"]
+[ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://src/objects/viewport_mirror.gd" id="47_viewport_mirror"]
 [ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://src/systems/grid_painter.gd" id="48_grid_painter"]
 [ext_resource type="PackedScene" path="res://src/ui/PassthroughSettingsViewport3D.tscn" id="49_passthrough_settings"]
 [ext_resource type="PackedScene" uid="uid://d3x8y7yqk8y8j" path="res://src/ui/HandTrackingViewport3D.tscn" id="50_hand_tracking_ui"]
@@ -148,7 +148,7 @@ transform = Transform3D(-0.8660238, -0.43301556, 0.2500009, 0.46019384, -0.49477
 shadow_enabled = true
 
 [node name="NodeInspectorTool" parent="." unique_id=1156427494 instance=ExtResource("5_pswl6")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.778507, 0.41976643, -2.2566147)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.778507, 2.2591286, -2.2566147)
 
 [node name="Floor" type="StaticBody3D" parent="." unique_id=386014746]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2.51753, 0)
@@ -273,7 +273,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.983923, 0.88246953, 1.516
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.6498556)
 
 [node name="ShaderPlasma" type="CSGSphere3D" parent="PlasmaDemos" unique_id=1217239899]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -0.81850994, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -1.0310359, 0)
 radius = 0.75
 material = SubResource("StandardMaterial3D_wvm1w")
 script = ExtResource("35_hr53f")
@@ -292,7 +292,7 @@ transform = Transform3D(-0.44000003, 0, -3.8466023e-08, 0, 0.44, 0, 3.8466023e-0
 material = SubResource("StandardMaterial3D_wvm1w")
 
 [node name="Sphere" type="CSGSphere3D" parent="PlasmaDemos/PlasmaBox" unique_id=716390065]
-transform = Transform3D(2.36, 0, 0, 0, 2.36, 0, 0, 0, 2.36, 0, 0, -1.7647051)
+transform = Transform3D(2.36, 0, 0, 0, 2.36, 0, 0, 0, 2.36, 0, 0, -2.0514994)
 operation = 2
 radius = 0.6
 material = ExtResource("34_s8yin")

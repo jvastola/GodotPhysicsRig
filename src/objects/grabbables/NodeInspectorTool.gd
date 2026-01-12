@@ -13,6 +13,10 @@ extends Grabbable
 @export var panel_scale: float = 0.4  # Scale of spawned panels
 @export var panel_height_offset: float = 0.3  # How high above hit point to spawn panels
 
+enum SelectMode { VOLUME, RAY }
+@export var select_mode: SelectMode = SelectMode.VOLUME
+@export var volume_radius: float = 0.15
+
 # Scene references
 @export var inspector_scene: PackedScene = preload("res://src/ui/NodeInspectorViewport3D.tscn")
 @export var hierarchy_scene: PackedScene = preload("res://src/ui/SceneHierarchyViewport3D.tscn")
@@ -32,6 +36,8 @@ var _laser_material: StandardMaterial3D = null
 var _hit_indicator: MeshInstance3D = null
 var _spawned_inspector: Node3D = null
 var _spawned_hierarchy: Node3D = null
+var _volume_visual: MeshInstance3D = null
+var _volume_shapecast: ShapeCast3D = null
 
 
 func _ready() -> void:
@@ -44,6 +50,8 @@ func _ready() -> void:
 	# Create visual components
 	_create_laser_beam()
 	_create_hit_indicator()
+	_create_volume_visual()
+	_create_volume_shapecast()
 	
 	set_physics_process(false)
 	print("NodeInspectorTool: Ready")
@@ -96,10 +104,55 @@ func _create_hit_indicator() -> void:
 	_hit_indicator.material_override = material
 	_hit_indicator.visible = false
 	
-	# Add to root so it persists during grab
 	var root = get_tree().root
 	if root:
 		root.call_deferred("add_child", _hit_indicator)
+
+
+func _create_volume_visual() -> void:
+	"""Create the volume selection visual"""
+	var sphere_mesh = SphereMesh.new()
+	sphere_mesh.radius = volume_radius
+	sphere_mesh.height = volume_radius * 2.0
+	sphere_mesh.radial_segments = 24
+	sphere_mesh.rings = 12
+	
+	var material = StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = laser_color
+	material.albedo_color.a = 0.2
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.no_depth_test = true
+	material.render_priority = 1
+	
+	_volume_visual = MeshInstance3D.new()
+	_volume_visual.name = "VolumeVisual"
+	_volume_visual.mesh = sphere_mesh
+	_volume_visual.material_override = material
+	_volume_visual.visible = false
+	
+	var root = get_tree().root
+	if root:
+		root.call_deferred("add_child", _volume_visual)
+
+
+func _create_volume_shapecast() -> void:
+	"""Create the ShapeCast3D for volume queries"""
+	_volume_shapecast = ShapeCast3D.new()
+	_volume_shapecast.name = "VolumeShapeCast"
+	
+	var sphere = SphereShape3D.new()
+	sphere.radius = volume_radius
+	_volume_shapecast.shape = sphere
+	
+	_volume_shapecast.enabled = false # Manual updates only
+	_volume_shapecast.collision_mask = 1 # Default layer, matches raycast
+	_volume_shapecast.max_results = 8
+	
+	# Exclude self
+	_volume_shapecast.add_exception(self)
+	
+	add_child(_volume_shapecast)
 
 
 func _on_tool_grabbed(hand: RigidBody3D) -> void:
@@ -146,8 +199,11 @@ func _physics_process(delta: float) -> void:
 	elif InputMap.has_action("trigger_click"):
 		trigger_pressed = Input.is_action_pressed("trigger_click")
 	
-	# Perform raycast
-	_perform_raycast()
+	# Perform selection based on mode
+	if select_mode == SelectMode.RAY:
+		_perform_raycast()
+	else:
+		_perform_volume_select()
 	
 	# Handle trigger press (rising edge)
 	if trigger_pressed and not _prev_trigger_pressed:
@@ -205,9 +261,68 @@ func _perform_raycast() -> void:
 	else:
 		_current_hit_object = null
 		_current_hit_point = Vector3.ZERO
-		# Still show laser pointing forward
 		_update_laser(tip_pos, tip_pos + tip_dir * ray_length)
 		_hide_hit_indicator()
+	
+	if is_instance_valid(_volume_visual):
+		_volume_visual.visible = false
+
+
+func _perform_volume_select() -> void:
+	"""Perform volume selection near tool tip"""
+	var tip_pos = _get_tip_world_position()
+	
+	if is_instance_valid(_volume_visual):
+		_volume_visual.global_position = tip_pos
+		_volume_visual.visible = true
+	
+	if is_instance_valid(_laser_beam):
+		_laser_beam.visible = false
+	_hide_hit_indicator()
+	
+	if not is_instance_valid(_volume_shapecast) or not is_instance_valid(_volume_shapecast.shape):
+		return
+	
+	# Update shapecast params
+	_volume_shapecast.global_position = tip_pos
+	_volume_shapecast.shape.radius = volume_radius
+	
+	# Exclude hand if currently grabbing
+	if is_instance_valid(_hand):
+		if not _volume_shapecast.get_collision_result().is_empty():
+			# Just making sure hand is excluded
+			_volume_shapecast.add_exception(_hand)
+	
+	_volume_shapecast.force_shapecast_update()
+	
+	var best_node: Node = null
+	var best_dist: float = INF
+	
+	for i in _volume_shapecast.get_collision_count():
+		var collider = _volume_shapecast.get_collider(i)
+		var node = _find_inspectable_node(collider)
+		if node:
+			# Calculate distance to tip for best match
+			var dist = 0.0
+			if collider is Node3D:
+				dist = tip_pos.distance_to(collider.global_position)
+			
+			if not best_node or dist < best_dist:
+				best_node = node
+				best_dist = dist
+	
+	_current_hit_object = best_node
+	_current_hit_point = tip_pos # For volume select, we just use tip pos as spawn reference
+	
+	# Update visual feedback
+	if is_instance_valid(_volume_visual) and _volume_visual.material_override:
+		var mat = _volume_visual.material_override as StandardMaterial3D
+		if _current_hit_object:
+			mat.albedo_color = hit_color
+			mat.albedo_color.a = 0.4
+		else:
+			mat.albedo_color = laser_color
+			mat.albedo_color.a = 0.2
 
 
 func _find_inspectable_node(collider: Object) -> Node:
@@ -273,6 +388,8 @@ func _hide_visuals() -> void:
 	if is_instance_valid(_laser_beam):
 		_laser_beam.visible = false
 	_hide_hit_indicator()
+	if is_instance_valid(_volume_visual):
+		_volume_visual.visible = false
 
 
 func _on_trigger_pressed() -> void:
@@ -327,6 +444,8 @@ func _spawn_inspector_panels() -> void:
 		_spawned_inspector.inspect_node(_current_hit_object)
 	elif _spawned_inspector.get_node_or_null("SubViewport/NodeInspectorUI"):
 		var ui = _spawned_inspector.get_node("SubViewport/NodeInspectorUI")
+		if ui.has_method("set_inspector_tool"):
+			ui.set_inspector_tool(self)
 		if ui.has_method("inspect_node"):
 			ui.inspect_node(_current_hit_object)
 	
@@ -371,6 +490,8 @@ func _exit_tree() -> void:
 		_laser_beam.queue_free()
 	if is_instance_valid(_hit_indicator):
 		_hit_indicator.queue_free()
+	if is_instance_valid(_volume_visual):
+		_volume_visual.queue_free()
 	
 	# Note: Don't destroy spawned panels - user might want to keep them
 	
