@@ -1,7 +1,7 @@
 # ConvexHullPen - A grabbable pen that creates convex hull meshes
 # Hold trigger while gripping to record points, release to generate hull
 extends Grabbable
-const ToolPoolManager = preload("res://src/systems/tool_pool_manager.gd")
+
 
 # Configuration
 @export var tip_offset: Vector3 = Vector3(0, 0, -0.15)  # Offset from center to pen tip

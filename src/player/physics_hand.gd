@@ -414,7 +414,7 @@ func _setup_hit_sound() -> void:
 		push_warning("PhysicsHand: Hit sound not found at ", hit_sound_path)
 
 
-func _handle_hit_feedback(body: Node) -> void:
+func _handle_hit_feedback(_body: Node) -> void:
 	"""Handle haptic and audio feedback when hitting an object"""
 	# Calculate impact velocity
 	var impact_velocity := _previous_velocity.length()

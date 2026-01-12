@@ -40,8 +40,7 @@ const CAPSULE_MATERIAL = preload("res://capsule_material.tres")
 var fb_capsule_ext
 var left_capsules_loaded := false
 var right_capsules_loaded := false
-var _left_skeleton_logged := false  # Debug: only log bone count once
-var _right_skeleton_logged := false  # Debug: only log bone count once
+
 var xr_interface: XRInterface
 @onready var hand_tracking_ui = get_tree().root.find_child("HandTracking2DUI", true, false)
 
@@ -358,8 +357,8 @@ func _check_initial_mode() -> void:
 		_on_vr_mode_changed(xr_origin.is_vr_mode)
 	else:
 		# Default to checking if XR interface exists
-		var xr_interface = XRServer.find_interface("OpenXR")
-		_on_vr_mode_changed(xr_interface != null and xr_interface.is_initialized())
+		var interface = XRServer.find_interface("OpenXR")
+		_on_vr_mode_changed(interface != null and interface.is_initialized())
 
 
 func _on_vr_mode_changed(vr_active: bool) -> void:
@@ -601,7 +600,7 @@ func _cache_hand_visual_data() -> void:
 
 func _apply_rig_scale() -> void:
 	var combined_scale := _manual_player_scale * XRServer.world_scale
-	var visual_scale_vec := Vector3.ONE * combined_scale
+
 	if player_body:
 		player_body.scale = _base_player_body_scale * combined_scale
 	
@@ -697,7 +696,7 @@ func _setup_audio_listeners() -> void:
 
 
 func _add_mesh_group(p_parent: Node3D, p_group: String) -> void:
-	print("XRPlayer: _add_mesh_group called for '", p_group, "', parent: ", p_parent.name if p_parent else "NULL")
+	print("XRPlayer: _add_mesh_group called for '", p_group, "', parent: ", str(p_parent.name) if p_parent else "NULL")
 	var mesh_count := 0
 	for child in p_parent.get_children():
 		if child is MeshInstance3D:
@@ -821,8 +820,8 @@ func hand_capsule_setup(hand_idx: int, hand_tracker: XRHandTracker) -> void:
 func _get_manual_pinch_strength(tracker: XRHandTracker, joint_idx: int) -> float:
 	# Fallback for missing get_hand_joint_pinch_strength
 	# Standard OpenXR Hand Joint Indices: Thumb Tip (5), Index Tip (10), Middle Tip (15), Ring Tip (20), Little Tip (25)
-	var thumb_tip_transform = tracker.get_hand_joint_transform(5)
-	var finger_tip_transform = tracker.get_hand_joint_transform(joint_idx)
+	var thumb_tip_transform = tracker.get_hand_joint_transform(5 as XRHandTracker.HandJoint)
+	var finger_tip_transform = tracker.get_hand_joint_transform(joint_idx as XRHandTracker.HandJoint)
 	
 	# If either joint is untracked, return 0
 	if thumb_tip_transform == Transform3D() or finger_tip_transform == Transform3D():
@@ -881,39 +880,39 @@ func _update_hand_tracking_ui_pinches() -> void:
 		hand_tracking_ui.set_discrete_signal(1, "little_pinch", p_little > 0.8)
 
 
-func _on_left_controller_input_float_changed(name: String, value: float) -> void:
+func _on_left_controller_input_float_changed(_name: String, _value: float) -> void:
 	# Handled via polling in _process for diagnostic UI
 	# print("L Float: ", name, " ", value)
 	pass
 
 
-func _on_right_controller_input_float_changed(name: String, value: float) -> void:
+func _on_right_controller_input_float_changed(_name: String, _value: float) -> void:
 	# Handled via polling in _process for diagnostic UI
 	# print("R Float: ", name, " ", value)
 	pass
 
 
-func _on_left_controller_button_pressed(name: String) -> void:
-	print("XRPlayer Left Button: ", name)
+func _on_left_controller_button_pressed(btn_name: String) -> void:
+	print("XRPlayer Left Button: ", btn_name)
 	# Keep controller events for non-hand-tracking or system-level signals
 	# but diagnostic UI lights are handled by polling in _process for accuracy
 	
-	if name == "index_pinch":
+	if btn_name == "index_pinch":
 		_left_index_pinch_active = true
 
 
-func _on_left_controller_button_released(name: String) -> void:
-	if name == "index_pinch":
+func _on_left_controller_button_released(btn_name: String) -> void:
+	if btn_name == "index_pinch":
 		left_hand_ray_cast.enabled = false
 
-func _on_right_controller_button_pressed(name: String) -> void:
-	print("XRPlayer Right Button: ", name)
-	if name == "index_pinch":
+func _on_right_controller_button_pressed(btn_name: String) -> void:
+	print("XRPlayer Right Button: ", btn_name)
+	if btn_name == "index_pinch":
 		_right_index_pinch_active = true
 
 
-func _on_right_controller_button_released(name: String) -> void:
-	if name == "index_pinch":
+func _on_right_controller_button_released(btn_name: String) -> void:
+	if btn_name == "index_pinch":
 		right_hand_ray_cast.enabled = false
 
 
@@ -1007,14 +1006,14 @@ func _create_poke_visual(p_name: String) -> MeshInstance3D:
 	return mesh_inst
 
 
-func _process_poke_and_pinch(delta: float) -> void:
+func _process_poke_and_pinch(_delta: float) -> void:
 	var left_tracker := XRServer.get_tracker("/user/hand_tracker/left") as XRHandTracker
 	var right_tracker := XRServer.get_tracker("/user/hand_tracker/right") as XRHandTracker
 
 	# --- Left Hand ---
 	if left_tracker and left_tracker.has_tracking_data:
 		# Update Poke Position (Index Tip = 10)
-		var index_tip: Transform3D = left_tracker.get_hand_joint_transform(10)
+		var index_tip: Transform3D = left_tracker.get_hand_joint_transform(10 as XRHandTracker.HandJoint)
 		# Transform to world space
 		if xr_origin:
 			var world_tip = xr_origin.global_transform * index_tip
@@ -1032,7 +1031,7 @@ func _process_poke_and_pinch(delta: float) -> void:
 	# --- Right Hand ---
 	if right_tracker and right_tracker.has_tracking_data:
 		# Update Poke Position
-		var index_tip: Transform3D = right_tracker.get_hand_joint_transform(10)
+		var index_tip: Transform3D = right_tracker.get_hand_joint_transform(10 as XRHandTracker.HandJoint)
 		if xr_origin:
 			var world_tip = xr_origin.global_transform * index_tip
 			if right_poke_area:

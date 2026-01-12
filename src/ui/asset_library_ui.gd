@@ -199,7 +199,7 @@ func _load_mock_data() -> void:
 	_populate_grid(mock_assets)
 	_set_status("Mock library loaded")
 
-func _on_list_request_completed(result, response_code, headers, body) -> void:
+func _on_list_request_completed(result, response_code, _headers, body) -> void:
 	if result != HTTPRequest.RESULT_SUCCESS:
 		_set_status("Network error", true)
 		return
@@ -248,7 +248,7 @@ func _populate_grid(assets: Array) -> void:
 	for item in assets:
 		if not item is Dictionary: continue
 		var asset_id = item.get("id", "")
-		var name = item.get("name", "Unknown")
+		var item_name = item.get("name", "Unknown")
 		var url = item.get("url", "")
 		var thumb_url = item.get("thumbnail_url", "")
 		
@@ -280,7 +280,7 @@ func _populate_grid(assets: Array) -> void:
 		# For now just showing name
 		
 		var name_lbl = Label.new()
-		name_lbl.text = name
+		name_lbl.text = item_name
 		name_lbl.clip_text = true
 		vbox.add_child(name_lbl)
 		
@@ -331,7 +331,7 @@ func _download_asset(url: String, metadata: Dictionary = {}) -> void:
 		printerr("AssetLibrary: Download request failed for URL: ", url, " Error code: ", error)
 		_set_status("Download request failed", true)
 
-func _on_download_request_completed(result, response_code, headers, body) -> void:
+func _on_download_request_completed(result, response_code, _headers, body) -> void:
 	if result != HTTPRequest.RESULT_SUCCESS:
 		_set_status("Download failed (Network)", true)
 		return
@@ -390,14 +390,14 @@ func _load_package(path: String, scene_path: String) -> void:
 		_set_status("Invalid scene resource", true)
 		return
 		
-	var instance = packed_scene.instantiate()
+	var pkg_instance = packed_scene.instantiate()
 	var scene = get_tree().current_scene
 	if not scene: scene = get_tree().root.get_child(0)
 	
-	scene.add_child(instance)
-	last_spawned_node = instance
-	_position_in_front_of_player(instance)
-	_set_status("Spawned package item: " + instance.name)
+	scene.add_child(pkg_instance)
+	last_spawned_node = pkg_instance
+	_position_in_front_of_player(pkg_instance)
+	_set_status("Spawned package item: " + pkg_instance.name)
 
 func _spawn_asset(path: String) -> void:
 	var doc = GLTFDocument.new()
@@ -433,13 +433,13 @@ func _spawn_asset(path: String) -> void:
 	# checking... Grabbable.gd exists in project? Likely.
 	# But for now, just spawning is enough success.
 
-func _mock_publish(name: String) -> void:
-	if name.is_empty():
+func _mock_publish(item_name: String) -> void:
+	if item_name.is_empty():
 		_set_status("Please enter a name", true)
 		return
-	_set_status("Publishing '" + name + "'...", false)
+	_set_status("Publishing '" + item_name + "'...", false)
 	await get_tree().create_timer(1.0).timeout
-	_set_status("Successfully published '" + name + "' (Mock)", false)
+	_set_status("Successfully published '" + item_name + "' (Mock)", false)
 
 func _position_in_front_of_player(node: Node3D) -> void:
 	var player = get_tree().get_first_node_in_group("xr_player")

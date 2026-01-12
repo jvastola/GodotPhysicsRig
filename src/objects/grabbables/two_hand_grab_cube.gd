@@ -28,7 +28,7 @@ var _initial_cube_transform: Transform3D
 var _initial_left_pos: Vector3
 var _initial_right_pos: Vector3
 var _initial_distance: float = 1.0
-var _initial_angle: float = 0.0
+
 var _initial_hand_vector: Vector3
 
 # Virtual cursor distances
@@ -86,7 +86,7 @@ func _exit_tree() -> void:
 	if _left_indicator: _left_indicator.queue_free()
 	if _right_indicator: _right_indicator.queue_free()
 
-func handle_pointer_event(event: Dictionary) -> void:
+func handle_pointer_event(_event: Dictionary) -> void:
 	pass
 
 func _physics_process(delta: float) -> void:
@@ -218,7 +218,7 @@ func _process_two_hand_grab(delta: float) -> void:
 	# The cube should follow the midpoint of the hands
 	var initial_mid = (_initial_left_pos + _initial_right_pos) * 0.5
 	var current_mid = (curr_left_pos + curr_right_pos) * 0.5
-	var move_delta = current_mid - initial_mid
+	var _move_delta = current_mid - initial_mid
 	
 	# Construct new transform
 	# Start with initial

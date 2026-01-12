@@ -863,7 +863,7 @@ func _add_color_property(label_text: String, value: Color, prop_name: String) ->
 	_property_controls[prop_name] = color_picker_btn
 
 
-func _add_resource_property(label_text: String, value: Object, prop_name: String) -> void:
+func _add_resource_property(label_text: String, value: Object, _prop_name: String) -> void:
 	"""Add a resource/object property display."""
 	if not properties_container:
 		return
@@ -894,7 +894,7 @@ func _add_resource_property(label_text: String, value: Object, prop_name: String
 	properties_container.add_child(hbox)
 
 
-func _add_transform_property(label_text: String, value: Transform3D, prop_name: String) -> void:
+func _add_transform_property(label_text: String, value: Transform3D, _prop_name: String) -> void:
 	"""Add a Transform3D property display (readonly for now)."""
 	if not properties_container:
 		return
@@ -1031,7 +1031,6 @@ func _send_to_poly_tool() -> void:
 	
 	var poly_tool = get_tree().root.find_child("PolyTool", true, false)
 	# Check for class_name access if static instance is available
-	var poly_tool_class = GDScript.new() # Placeholder if not accessible directly
 	
 	# Try to find PolyTool via group or singleton-like access
 	if not poly_tool:

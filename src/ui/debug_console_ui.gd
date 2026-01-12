@@ -213,7 +213,7 @@ func _refresh_display() -> void:
 	# Auto-scroll to bottom
 	if auto_scroll and scroll_container:
 		await get_tree().process_frame
-		scroll_container.scroll_vertical = scroll_container.get_v_scroll_bar().max_value
+		scroll_container.scroll_vertical = int(scroll_container.get_v_scroll_bar().max_value)
 
 
 func _on_clear_pressed() -> void:

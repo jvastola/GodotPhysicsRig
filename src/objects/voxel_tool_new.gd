@@ -1,6 +1,6 @@
 extends Grabbable
 class_name VoxelToolNew
-const ToolPoolManager = preload("res://src/systems/tool_pool_manager.gd")
+
 ## Grabbable Voxel Tool - Place and remove voxels with adjustable ray and grid size (based on TransformTool)
 
 # === Ray Settings ===

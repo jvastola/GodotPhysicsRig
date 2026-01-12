@@ -66,7 +66,7 @@ func _on_lock_y_toggled(toggled: bool) -> void:
 	if is_instance_valid(_target_cube) and "lock_y_axis" in _target_cube:
 		_target_cube.lock_y_axis = toggled
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	if not is_instance_valid(_target_cube):
 		status_label.text = "Status: Cube Not Found"
 		status_label.modulate = Color.RED

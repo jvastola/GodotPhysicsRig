@@ -20,7 +20,7 @@ var _root_viewport: Viewport
 var _viewport_transparent_default: bool = false
 
 const MAIN_SCENE_PATH := "res://src/levels/MainScene.tscn"
-const UIPanelManager = preload("res://src/ui/ui_panel_manager.gd")
+
 
 func _ready() -> void:
 	print("WatchMenuUI: _ready() called")
@@ -489,7 +489,7 @@ func _set_render_mode(mode: int) -> void:
 			_root_viewport.debug_draw = Viewport.DEBUG_DRAW_DISABLED
 			get_tree().debug_collisions_hint = true
 		else:
-			_root_viewport.debug_draw = mode
+			_root_viewport.debug_draw = mode as Viewport.DebugDraw
 			get_tree().debug_collisions_hint = false
 
 func _add_separator(parent: VBoxContainer) -> void:

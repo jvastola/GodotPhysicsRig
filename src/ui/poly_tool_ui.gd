@@ -541,7 +541,7 @@ func _upload_asset(file_path: String, asset_name: String, token: String) -> void
 		
 	var http = HTTPRequest.new()
 	add_child(http)
-	http.request_completed.connect(func(res, code, hdrs, bdy): 
+	http.request_completed.connect(func(_res, code, _hdrs, bdy):  
 		if code == 201:
 			if status_label: status_label.text = "Successfully Published!"
 			# Refresh library if it's open
@@ -730,11 +730,11 @@ func _populate_file_list() -> void:
 	var dir := DirAccess.open(dir_path)
 	if not dir: return
 	dir.list_dir_begin()
-	var name := dir.get_next()
-	while name != "":
-		if not dir.current_is_dir() and (name.to_lower().ends_with(".gltf") or name.to_lower().ends_with(".glb")):
-			file_list.add_item(name)
-		name = dir.get_next()
+	var file_name := dir.get_next()
+	while file_name != "":
+		if not dir.current_is_dir() and (file_name.to_lower().ends_with(".gltf") or file_name.to_lower().ends_with(".glb")):
+			file_list.add_item(file_name)
+		file_name = dir.get_next()
 	dir.list_dir_end()
 
 func _on_file_selected(index: int) -> void:

@@ -183,7 +183,7 @@ func _send_mouse_button(pos: Vector2, pressed: bool, just_changed: bool, button_
 		else:
 			button_event.button_mask = MOUSE_BUTTON_MASK_LEFT as MouseButtonMask
 	else:
-		button_event.button_mask = 0 as MouseButtonMask
+		button_event.button_mask = 0
 	
 	viewport.push_input(button_event)
 

@@ -4,7 +4,7 @@ extends Grabbable
 # ShapeTool - A grabbable tool that creates box volumes
 # Hold trigger while gripping to start a box, drag to size it, release to create.
 
-const ToolPoolManager = preload("res://src/systems/tool_pool_manager.gd")
+
 
 # Configuration
 @export var tip_offset: Vector3 = Vector3(0, 0, -0.15) # Offset from center to tool tip

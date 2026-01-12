@@ -1,7 +1,6 @@
 class_name PolyTool
 extends Grabbable
-const ToolPoolManager = preload("res://src/systems/tool_pool_manager.gd")
-const ColorPickerUI = preload("res://src/ui/color_picker_ui.gd")
+
 
 enum ToolMode {
 	PLACE,
@@ -96,8 +95,7 @@ var active_layer_idx: int:
 # Convenience accessors for active layer
 var _points: PackedVector3Array:
 	get: return _layers[_active_layer_idx].points if _active_layer_idx < _layers.size() else PackedVector3Array()
-var _point_colors: PackedColorArray:
-	get: return _layers[_active_layer_idx].point_colors if _active_layer_idx < _layers.size() else PackedColorArray()
+
 var _point_uvs: PackedVector2Array:
 	get: return _layers[_active_layer_idx].point_uvs if _active_layer_idx < _layers.size() else PackedVector2Array()
 var _triangles: Array[Array]:
@@ -161,7 +159,7 @@ const MAX_VISIBLE_POINTS: int = 10
 var _spatial_grid: Dictionary = {} # Vector3i -> Array[int]
 var _point_to_triangles: Dictionary = {} # int -> Array[int]
 var _visible_point_indices: Array[int] = []
-var _visibility_frame_counter: int = 0
+
 
 func _get_cell_key(pos: Vector3) -> Vector3i:
 	return Vector3i(
@@ -216,7 +214,7 @@ func _get_nearest_k_points(pos: Vector3, k: int) -> Array[int]:
 # Material mode state
 var _applied_material: Material = null
 var _material_preview_dot: MeshInstance3D
-var _material_preview_mat: StandardMaterial3D
+
 
 # Extrude Mode State
 var _extrude_drag_face_index: int = -1
@@ -233,7 +231,7 @@ var _volume_selection_box: MeshInstance3D = null
 var _volume_selection_mat: StandardMaterial3D = null
 
 func add_new_layer(layer_name: String = "") -> void:
-	_add_new_layer()
+	_add_layer(layer_name)
 
 func remove_active_layer() -> void:
 	_remove_active_layer()
@@ -257,7 +255,7 @@ func _ready() -> void:
 	_update_point_visibility()
 
 func _create_initial_layer() -> void:
-	var layer = _add_layer("Layer 1")
+	_add_layer("Layer 1")
 	_active_layer_idx = 0
 
 func _add_layer(layer_name: String = "") -> PolyLayer:
@@ -276,8 +274,23 @@ func _add_layer(layer_name: String = "") -> PolyLayer:
 	mm.instance_count = MAX_VISIBLE_POINTS
 	layer.point_multimesh.multimesh = mm
 	
-	var point_shader = ShaderMaterial.new()
-	point_shader.shader = load("res://src/objects/grabbables/point_visual.gdshader")
+	var point_shader: Material
+	# Check for OpenGL renderer (compatibility mode) which might not support some 3D shaders or specific features
+	var is_compatibility =  ProjectSettings.get_setting("rendering/renderer/rendering_method") == "gl_compatibility"
+	
+	if is_compatibility:
+		# Fallback to standard material for compatibility/desktop GL mode
+		var std_mat = StandardMaterial3D.new()
+		std_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		std_mat.albedo_color = Color(1, 1, 0, 1) # Yellow dots
+		std_mat.use_point_size = true
+		std_mat.point_size = 4.0
+		point_shader = std_mat
+	else:
+		var shader_mat = ShaderMaterial.new()
+		shader_mat.shader = load("res://src/objects/grabbables/point_visual.gdshader")
+		point_shader = shader_mat
+		
 	layer.point_multimesh.material_override = point_shader
 	_add_to_root(layer.point_multimesh)
 
@@ -1313,7 +1326,7 @@ func _cycle_layers() -> void:
 	_update_layer_label()
 
 func _add_new_layer() -> void:
-	var layer = _add_layer()
+	_add_layer()
 	_active_layer_idx = _layers.size() - 1
 	_update_point_visibility()
 	_update_layer_label()
@@ -1637,7 +1650,7 @@ func _begin_mode_select() -> void:
 	_is_selecting_mode = true
 	
 	var anchor := _get_target_point()
-	var basis := global_transform.basis
+	var tool_basis := global_transform.basis
 	
 	var modes_to_show = _MODE_ORDER
 	var count := modes_to_show.size()
@@ -1645,7 +1658,7 @@ func _begin_mode_select() -> void:
 		var mode: ToolMode = modes_to_show[i]
 		var angle = deg_to_rad(-80.0 + (160.0 * float(i) / max(1.0, float(count - 1))))
 		var offset_local = Vector3(sin(angle), 0, -cos(angle)) * _mode_select_radius + Vector3(0, _mode_select_height, 0)
-		var pos = anchor + basis * offset_local
+		var pos = anchor + tool_basis * offset_local
 		var m := MeshInstance3D.new()
 		m.mesh = _make_sphere_mesh(0.01)
 		var mat := _make_unshaded_material(_mode_color(mode))
@@ -1658,18 +1671,18 @@ func _begin_mode_select() -> void:
 		_add_mode_label(_mode_name(mode), pos)
 	
 	if _current_mode == ToolMode.LAYER:
-		_add_layer_actions(anchor, basis)
+		_add_layer_actions(anchor, tool_basis)
 	elif _current_mode == ToolMode.SELECT:
-		_add_select_actions(anchor, basis)
+		_add_select_actions(anchor, tool_basis)
 		
 	_update_mode_select_visuals()
 
-func _add_layer_actions(anchor: Vector3, basis: Basis) -> void:
+func _add_layer_actions(anchor: Vector3, tool_basis: Basis) -> void:
 	var actions = ["Add Layer", "Remove Layer"]
 	for i in actions.size():
 		var angle = deg_to_rad(-30.0 + (60.0 * i))
 		var offset_local = Vector3(sin(angle), 0, -cos(angle)) * (_mode_select_radius * 1.5) + Vector3(0, _mode_select_height * 2, 0)
-		var pos = anchor + basis * offset_local
+		var pos = anchor + tool_basis * offset_local
 		var m := MeshInstance3D.new()
 		m.mesh = _make_sphere_mesh(0.012)
 		var color = Color.GREEN if i == 0 else Color.RED
@@ -1682,12 +1695,12 @@ func _add_layer_actions(anchor: Vector3, basis: Basis) -> void:
 		m.global_position = pos
 		_add_mode_label(actions[i], pos)
 
-func _add_select_actions(anchor: Vector3, basis: Basis) -> void:
+func _add_select_actions(anchor: Vector3, tool_basis: Basis) -> void:
 	var actions = ["Export Selection", "Clear Selection"]
 	for i in actions.size():
 		var angle = deg_to_rad(-30.0 + (60.0 * i))
 		var offset_local = Vector3(sin(angle), 0, -cos(angle)) * (_mode_select_radius * 1.5) + Vector3(0, _mode_select_height * 2, 0)
-		var pos = anchor + basis * offset_local
+		var pos = anchor + tool_basis * offset_local
 		var m := MeshInstance3D.new()
 		m.mesh = _make_sphere_mesh(0.012)
 		var color = Color.CYAN if i == 0 else Color.GRAY
@@ -1705,18 +1718,18 @@ func _update_mode_select_visuals() -> void:
 	if not _is_selecting_mode:
 		return
 	var nearest_idx := _nearest_mode_index()
-	for i in _mode_select_nodes.size():
-		var node = _mode_select_nodes[i]
-		if not is_instance_valid(node):
-			continue
-		var scale := 1.0
-		if i == nearest_idx:
-			scale = 1.5
-		node.scale = Vector3.ONE * scale
 	if nearest_idx != -1 and nearest_idx < _mode_select_modes.size():
 		var color := _mode_color(_mode_select_modes[nearest_idx])
 		_orb_material.albedo_color = color
 		_orb_material.emission = color
+	for i in _mode_select_nodes.size():
+		var node = _mode_select_nodes[i]
+		if not is_instance_valid(node):
+			continue
+		var visual_scale := 1.0
+		if i == nearest_idx:
+			visual_scale = 1.5
+		node.scale = Vector3.ONE * visual_scale
 	for i in _mode_labels.size():
 		var lbl = _mode_labels[i]
 		if not is_instance_valid(lbl):
@@ -1951,7 +1964,7 @@ func _update_selection_visuals() -> void:
 		_selection_sphere.visible = false
 
 
-func load_from_gltf(path: String, merge_overlapping_points: bool = true) -> int:
+func load_from_gltf(path: String, do_merge: bool = true) -> int:
 	var target_path := path.strip_edges()
 	if target_path.is_empty():
 		return ERR_FILE_NOT_FOUND
@@ -1975,7 +1988,7 @@ func load_from_gltf(path: String, merge_overlapping_points: bool = true) -> int:
 	
 	# For GLTF files, we center and scale to ~0.5m in front of tool
 	var spawn_pos := global_position + global_transform.basis.z * -0.5
-	return import_data_from_node(scene, true, spawn_pos, 0.5, merge_overlapping_points)
+	return import_data_from_node(scene, true, spawn_pos, 0.5, do_merge)
 
 
 func import_from_node(source_node: Node, merge: bool = true, append: bool = false) -> int:
@@ -2403,7 +2416,6 @@ func _convert_volume() -> void:
 		
 	print("Found %d mesh instances to convert." % mesh_instances.size())
 	
-	var first = true
 	for mi in mesh_instances:
 		# Don't convert ourselves or our descendants
 		if is_ancestor_of(mi) or mi == _mesh_instance:
@@ -2413,7 +2425,6 @@ func _convert_volume() -> void:
 		# Using append=true for all but the first (if we want to clear)
 		# Actually, let's always append in this mode so we can multi-select
 		import_from_node(mi, true, true)
-		first = false
 
 func _find_meshes_in_aabb_recursive(node: Node, aabb: AABB, result: Array[MeshInstance3D]) -> void:
 	if node is MeshInstance3D:

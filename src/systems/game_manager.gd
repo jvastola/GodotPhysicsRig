@@ -173,18 +173,18 @@ func _ensure_emergency_floor(at_position: Vector3) -> void:
 	var parent: Node = current_world
 	var existing = parent.get_node_or_null(SAFETY_FLOOR_NAME)
 	if not existing and parent is Node3D:
-		var floor := StaticBody3D.new()
-		floor.name = SAFETY_FLOOR_NAME
+		var safety_floor := StaticBody3D.new()
+		safety_floor.name = SAFETY_FLOOR_NAME
 		# Match default world layer (1) and allow interaction with player (mask includes 1 + 2)
-		floor.collision_layer = 1
-		floor.collision_mask = 1 | 2
+		safety_floor.collision_layer = 1
+		safety_floor.collision_mask = 1 | 2
 		var cs := CollisionShape3D.new()
 		var box := BoxShape3D.new()
 		box.size = Vector3(20, 2, 20)
 		cs.shape = box
-		floor.add_child(cs)
-		parent.add_child(floor)
-		existing = floor
+		safety_floor.add_child(cs)
+		parent.add_child(safety_floor)
+		existing = safety_floor
 	if existing and existing is Node3D:
 		existing.global_position = Vector3(at_position.x, at_position.y - 1.0, at_position.z)
 
@@ -435,11 +435,11 @@ func change_scene_with_player(scene_path: String, player_state: Dictionary = {})
 		_log_warn("change_scene_with_player ignored - already changing scene")
 		return
 	_is_changing_scene = true
-	var _reset_called := false
+	var _reset_state := { "called": false }
 	var _reset_scene_change := func() -> void:
-		if _reset_called:
+		if _reset_state.called:
 			return
-		_reset_called = true
+		_reset_state.called = true
 		_is_changing_scene = false
 		_scene_change_started_msec = 0
 	var _scene_change_guard := SceneChangeResetGuard.new(_reset_scene_change)
