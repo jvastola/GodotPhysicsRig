@@ -3,8 +3,6 @@ extends PanelContainer
 
 signal close_requested
 
-const ToolPoolManager = preload("res://src/systems/tool_pool_manager.gd")
-const UIPanelManager = preload("res://src/ui/ui_panel_manager.gd")
 
 # Node references for tool pool controls
 @onready var _status_label: Label = $MarginContainer/ScrollContainer/VBoxContainer/StatusLabel
@@ -325,10 +323,10 @@ func _update_ui_panel_stats() -> void:
 	if _ui_panel_label:
 		var active: int = stats.get("active_panels", 0)
 		var max_p: int = stats.get("max_panels", 0)
-		var hidden: int = stats.get("hidden_by_distance", 0)
+		var hidden_count: int = stats.get("hidden_by_distance", 0)
 		
 		var max_str := str(max_p) if max_p > 0 else "∞"
-		_ui_panel_label.text = "Active: %d / %s (hidden: %d)" % [active, max_str, hidden]
+		_ui_panel_label.text = "Active: %d / %s (hidden: %d)" % [active, max_str, hidden_count]
 		
 		# Color warning if at limit
 		if max_p > 0 and active >= max_p:

@@ -84,14 +84,14 @@ func _ensure_panel_manager() -> void:
 		return
 	
 	# Also check via the static finder
-	var UIPanelManager := preload("res://src/ui/ui_panel_manager.gd")
-	var found := UIPanelManager.find()
+	var manager_script := preload("res://src/ui/ui_panel_manager.gd")
+	var found := manager_script.find()
 	if found:
 		_manager = found
 		return
 	
 	# Create new manager
-	_manager = UIPanelManager.new()
+	_manager = manager_script.new()
 	_manager.name = "UIPanelManager"
 	parent.add_child(_manager)
 	print("UIPanelSceneSetup: Created UIPanelManager")

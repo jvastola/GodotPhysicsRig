@@ -1,7 +1,6 @@
 # VolumeHullPen - A grabbable pen that creates filled convex hull meshes in real-time
 # Hold trigger while gripping to draw points, mesh updates live as you draw
 extends Grabbable
-const ToolPoolManager = preload("res://src/systems/tool_pool_manager.gd")
 
 # Configuration
 @export var tip_offset: Vector3 = Vector3(0, 0, -0.15)  # Offset from center to pen tip

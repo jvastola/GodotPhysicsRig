@@ -1,15 +1,11 @@
 extends RefCounted
 class_name GitService
 
-## Git service with real git CLI support and fallback to local tracking.
-## Automatically detects if git is available and uses it when possible.
+## Git service with local tracking and GitHub API support.
 ## Includes GitHub API support for Quest/mobile where git CLI isn't available.
 
-signal remote_operation_completed(success: bool, message: String)
-signal remote_progress(message: String)
 
 var repo_root: String
-var _use_real_git: bool = false
 
 # Remote configuration - defaults for your repo
 var remote_url: String = "https://github.com/"
@@ -677,7 +673,7 @@ func _get_file_sha(parent: Node, repo_path: String, callback: Callable) -> void:
 	var http := HTTPRequest.new()
 	parent.add_child(http)
 	
-	http.request_completed.connect(func(result: int, code: int, headers: PackedStringArray, body: PackedByteArray):
+	http.request_completed.connect(func(_result: int, code: int, _headers: PackedStringArray, body: PackedByteArray):
 		http.queue_free()
 		if code == 200:
 			var json: Variant = JSON.parse_string(body.get_string_from_utf8())
@@ -700,7 +696,7 @@ func _upload_file(parent: Node, repo_path: String, content: String, sha: String,
 	var http := HTTPRequest.new()
 	parent.add_child(http)
 	
-	http.request_completed.connect(func(result: int, code: int, headers: PackedStringArray, body: PackedByteArray):
+	http.request_completed.connect(func(_result: int, code: int, _headers: PackedStringArray, body: PackedByteArray):
 		http.queue_free()
 		if code == 200 or code == 201:
 			callback.call(true, "OK")
@@ -739,7 +735,7 @@ func create_pull_request(parent_node: Node, callback: Callable) -> void:
 	var http := HTTPRequest.new()
 	parent_node.add_child(http)
 	
-	http.request_completed.connect(func(result: int, code: int, headers: PackedStringArray, body: PackedByteArray):
+	http.request_completed.connect(func(_result: int, code: int, _headers: PackedStringArray, body: PackedByteArray):
 		http.queue_free()
 		if code != 200:
 			callback.call(false, "Failed to get repo tree: HTTP %d" % code)
@@ -870,7 +866,7 @@ func _download_file(parent: Node, repo_path: String, callback: Callable) -> void
 	var http := HTTPRequest.new()
 	parent.add_child(http)
 	
-	http.request_completed.connect(func(result: int, code: int, headers: PackedStringArray, body: PackedByteArray):
+	http.request_completed.connect(func(_result: int, code: int, _headers: PackedStringArray, body: PackedByteArray):
 		http.queue_free()
 		if code != 200:
 			callback.call(false, "", "HTTP %d" % code)

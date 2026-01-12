@@ -802,7 +802,7 @@ func hand_capsule_setup(hand_idx: int, hand_tracker: XRHandTracker) -> void:
 		# But we are adding it as a child.
 		
 		var capsule_transform: Transform3D = fb_capsule_ext.get_hand_capsule_transform(hand_idx, capsule_idx)
-		var bone_transform: Transform3D = hand_tracker.get_hand_joint_transform(joint_idx)
+		var bone_transform: Transform3D = hand_tracker.get_hand_joint_transform(joint_idx as XRHandTracker.HandJoint)
 		mesh_instance.transform = bone_transform.inverse() * capsule_transform
 		
 		if capsule_idx < 3:

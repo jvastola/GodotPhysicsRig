@@ -25,7 +25,7 @@ var is_final: bool = true
 
 ## Format the timestamp as HH:MM:SS string
 func format_time() -> String:
-	var unix_seconds := timestamp / 1000
+	var unix_seconds := int(timestamp / 1000.0)
 	var dt := Time.get_datetime_dict_from_unix_time(unix_seconds)
 	return "%02d:%02d:%02d" % [dt.hour, dt.minute, dt.second]
 

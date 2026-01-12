@@ -147,7 +147,7 @@ func _add_entry_ui(entry: TranscriptEntry) -> void:
 	# Auto-scroll
 	if auto_scroll and transcript_scroll:
 		await get_tree().process_frame
-		transcript_scroll.scroll_vertical = transcript_scroll.get_v_scroll_bar().max_value
+		transcript_scroll.scroll_vertical = int(transcript_scroll.get_v_scroll_bar().max_value)
 
 
 func _send_to_llm(text: String) -> void:

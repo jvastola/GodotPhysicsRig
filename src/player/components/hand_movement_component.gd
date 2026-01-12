@@ -111,8 +111,8 @@ func _process_hand(hand_idx: int, tracker: XRHandTracker, delta: float) -> void:
 
 func _get_middle_pinch_strength(tracker: XRHandTracker) -> float:
 	# Joint indices: Thumb Tip (5), Middle Tip (15)
-	var thumb_tip_transform := tracker.get_hand_joint_transform(5)
-	var middle_tip_transform := tracker.get_hand_joint_transform(15)
+	var thumb_tip_transform := tracker.get_hand_joint_transform(5 as XRHandTracker.HandJoint)
+	var middle_tip_transform := tracker.get_hand_joint_transform(15 as XRHandTracker.HandJoint)
 	
 	if thumb_tip_transform == Transform3D() or middle_tip_transform == Transform3D():
 		return 0.0
@@ -130,8 +130,8 @@ func _get_middle_pinch_strength(tracker: XRHandTracker) -> float:
 
 func _get_pinch_position(tracker: XRHandTracker) -> Vector3:
 	# Get midpoint between thumb tip and middle finger tip
-	var thumb_tip := tracker.get_hand_joint_transform(5)
-	var middle_tip := tracker.get_hand_joint_transform(15)
+	var thumb_tip := tracker.get_hand_joint_transform(5 as XRHandTracker.HandJoint)
+	var middle_tip := tracker.get_hand_joint_transform(15 as XRHandTracker.HandJoint)
 	
 	if thumb_tip == Transform3D() or middle_tip == Transform3D():
 		return Vector3.ZERO

@@ -1,6 +1,5 @@
 extends PanelContainer
 class_name FileSystemUI
-const ToolPoolManager = preload("res://src/systems/tool_pool_manager.gd")
 
 ## FileSystemUI - Displays project files in a tree structure
 ## Works like Godot's FileSystem dock for VR browsing

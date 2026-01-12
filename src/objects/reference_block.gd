@@ -113,7 +113,7 @@ func _build_texture() -> ImageTexture:
 	
 	for face_idx in range(6):
 		var atlas_x := (face_idx % 3) * face_size
-		var atlas_y := (face_idx / 3) * face_size
+		var atlas_y := int(face_idx / 3.0) * face_size
 		
 		for gy in range(grid_subdivisions):
 			for gx in range(grid_subdivisions):
@@ -167,10 +167,13 @@ func _generate_cube_mesh() -> ArrayMesh:
 
 func _add_face(st: SurfaceTool, face_idx: int, v0: Vector3, v1: Vector3, v2: Vector3, v3: Vector3, normal: Vector3) -> void:
 	# UV coordinates for this face in the atlas
-	var u0 := float(face_idx % 3) / 3.0
-	var v0_uv := float(face_idx / 3) / 2.0
-	var u1 := float((face_idx % 3) + 1) / 3.0
-	var v1_uv := float((face_idx / 3) + 1) / 2.0
+	var col := face_idx % 3
+	var row := int(face_idx / 3.0)
+	
+	var u0 := float(col) / 3.0
+	var v0_uv := float(row) / 2.0
+	var u1 := float(col + 1) / 3.0
+	var v1_uv := float(row + 1) / 2.0
 	
 	# Triangle 1: v0, v1, v2
 	st.set_normal(normal)

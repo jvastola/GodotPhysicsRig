@@ -5,7 +5,6 @@ extends PanelContainer
 
 signal message_sent(message: String)
 signal response_received(response: String)
-signal stream_chunk_received(chunk: String)
 signal api_error(error: String)
 signal tool_call_requested(tool_name: String, arguments: Dictionary)
 signal tool_call_completed(tool_name: String, result: String)
@@ -685,7 +684,7 @@ func _fetch_models() -> void:
 		_add_error_message("Failed to fetch models: " + str(error))
 
 
-func _on_models_request_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+func _on_models_request_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	if result != HTTPRequest.RESULT_SUCCESS or response_code != 200:
 		_add_error_message("Failed to fetch models (code: %d)" % response_code)
 		_update_status("Ready")
@@ -849,7 +848,7 @@ func _refresh_chat_display() -> void:
 	
 	if auto_scroll and chat_scroll:
 		await get_tree().process_frame
-		chat_scroll.scroll_vertical = chat_scroll.get_v_scroll_bar().max_value
+		chat_scroll.scroll_vertical = int(chat_scroll.get_v_scroll_bar().max_value)
 
 
 func _escape_bbcode(text: String) -> String:
@@ -1440,11 +1439,11 @@ func _tool_list_directory(path: String) -> String:
 		return "Error: Cannot open directory: " + path
 	var entries: PackedStringArray = []
 	dir.list_dir_begin()
-	var name := dir.get_next()
-	while name != "":
+	var entry_name := dir.get_next()
+	while entry_name != "":
 		var prefix := "[DIR] " if dir.current_is_dir() else "      "
-		entries.append(prefix + name)
-		name = dir.get_next()
+		entries.append(prefix + entry_name)
+		entry_name = dir.get_next()
 	dir.list_dir_end()
 	entries.sort()
 	return "\n".join(entries) if not entries.is_empty() else "(empty directory)"
@@ -1463,17 +1462,17 @@ func _search_recursive(path: String, pattern: String, results: PackedStringArray
 	if not dir:
 		return
 	dir.list_dir_begin()
-	var name := dir.get_next()
-	while name != "" and results.size() < 50:
-		if name.begins_with("."):
-			name = dir.get_next()
+	var entry_name := dir.get_next()
+	while entry_name != "" and results.size() < 50:
+		if entry_name.begins_with("."):
+			entry_name = dir.get_next()
 			continue
-		var full_path := path.rstrip("/") + "/" + name
+		var full_path := path.rstrip("/") + "/" + entry_name
 		if dir.current_is_dir():
 			_search_recursive(full_path, pattern, results, depth + 1)
-		elif name.containsn(pattern) or full_path.containsn(pattern):
+		elif entry_name.containsn(pattern) or full_path.containsn(pattern):
 			results.append(full_path)
-		name = dir.get_next()
+		entry_name = dir.get_next()
 	dir.list_dir_end()
 
 
@@ -1495,7 +1494,7 @@ func _tool_load_scene(path: String, parent_path: String, position_arr: Array = [
 	
 	# Instantiate the scene with error handling
 	var scene_instance: Node = null
-	var instantiate_error := ""
+	var _instantiate_error := ""
 	
 	# Use call_deferred pattern to catch instantiation errors
 	scene_instance = (scene_resource as PackedScene).instantiate()

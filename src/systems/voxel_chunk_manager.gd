@@ -402,7 +402,7 @@ func _generate_textured_mesh(chunk: VoxelChunk, voxel_list: Array) -> Dictionary
 			
 			# Calculate UV coordinates for this face in the atlas
 			var atlas_col := face_idx % 3
-			var atlas_row := face_idx / 3
+			var atlas_row := int(face_idx / 3.0)
 			var u0 := float(atlas_col) / 3.0
 			var v0 := float(atlas_row) / 2.0
 			var u1 := float(atlas_col + 1) / 3.0

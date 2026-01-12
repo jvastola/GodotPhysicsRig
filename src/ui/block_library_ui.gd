@@ -328,8 +328,8 @@ func _on_save_pressed() -> void:
 	if not _reference_block:
 		_set_status("Reference block not found", true)
 		return
-	var name := _reference_block.save_to_library()
-	_set_status("Saved: %s" % name)
+	var saved_name := _reference_block.save_to_library()
+	_set_status("Saved: %s" % saved_name)
 
 
 func _on_block_saved(_block_name: String, _texture: ImageTexture) -> void:

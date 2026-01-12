@@ -278,7 +278,7 @@ func _refresh_display() -> void:
 	
 	if auto_scroll and scroll_container:
 		await get_tree().process_frame
-		scroll_container.scroll_vertical = scroll_container.get_v_scroll_bar().max_value
+		scroll_container.scroll_vertical = int(scroll_container.get_v_scroll_bar().max_value)
 
 
 func _update_status(status: String) -> void:
@@ -409,15 +409,15 @@ func _complete_path(partial: String, prefix_text: String, suffix_text: String) -
 	
 	var matches: PackedStringArray = []
 	dir.list_dir_begin()
-	var name := dir.get_next()
-	while name != "":
-		if name.begins_with(file_prefix) or file_prefix.is_empty():
-			if not name.begins_with(".") or file_prefix.begins_with("."):
-				var display_name := name
+	var item_name := dir.get_next()
+	while item_name != "":
+		if item_name.begins_with(file_prefix) or file_prefix.is_empty():
+			if not item_name.begins_with(".") or file_prefix.begins_with("."):
+				var display_name := item_name
 				if dir.current_is_dir():
 					display_name += "/"
 				matches.append(display_name)
-		name = dir.get_next()
+		item_name = dir.get_next()
 	dir.list_dir_end()
 	
 	matches.sort()
@@ -679,7 +679,7 @@ func _cmd_xr(_args: Array) -> String:
 	if xr_interface:
 		lines.append("Interface: %s" % xr_interface.name)
 		lines.append("Initialized: %s" % str(xr_interface.is_initialized()))
-		lines.append("Passthrough: %s" % str(xr_interface.is_passthrough_enabled() if xr_interface.has_method("is_passthrough_enabled") else "N/A"))
+		lines.append("Passthrough: %s" % (str(xr_interface.is_passthrough_enabled()) if xr_interface.has_method("is_passthrough_enabled") else "N/A"))
 		
 		var hmd := XRServer.get_hmd_transform()
 		lines.append("HMD Pos: (%.2f, %.2f, %.2f)" % [hmd.origin.x, hmd.origin.y, hmd.origin.z])
@@ -1014,21 +1014,21 @@ func _cmd_ls(args: Array) -> String:
 			full_path = normalized_path + file_name
 		
 		var is_dir := dir.current_is_dir()
-		var size := 0
+		var file_size := 0
 		var modified := ""
 		
 		if long_format:
 			if not is_dir and FileAccess.file_exists(full_path):
 				var f := FileAccess.open(full_path, FileAccess.READ)
 				if f:
-					size = f.get_length()
+					file_size = f.get_length()
 					f.close()
 				modified = Time.get_datetime_string_from_unix_time(FileAccess.get_modified_time(full_path))
 		
 		entries.append({
 			"name": file_name,
 			"is_dir": is_dir,
-			"size": size,
+			"size": file_size,
 			"modified": modified,
 		})
 		
@@ -1343,13 +1343,13 @@ func _cmd_stat(args: Array) -> String:
 			var file_count := 0
 			var dir_count := 0
 			dir.list_dir_begin()
-			var name := dir.get_next()
-			while name != "":
+			var item_name := dir.get_next()
+			while item_name != "":
 				if dir.current_is_dir():
 					dir_count += 1
 				else:
 					file_count += 1
-				name = dir.get_next()
+				item_name = dir.get_next()
 			dir.list_dir_end()
 			lines.append("Contents: %d files, %d directories" % [file_count, dir_count])
 	elif FileAccess.file_exists(path):
@@ -1410,17 +1410,17 @@ func _find_recursive(dir_path: String, pattern: String, results: PackedStringArr
 		return
 	
 	dir.list_dir_begin()
-	var name := dir.get_next()
-	while name != "":
-		var full_path := dir_path.rstrip("/") + "/" + name
+	var item_name := dir.get_next()
+	while item_name != "":
+		var full_path := dir_path.rstrip("/") + "/" + item_name
 		
-		if name.to_lower().contains(pattern):
+		if item_name.to_lower().contains(pattern):
 			results.append(full_path)
 		
-		if dir.current_is_dir() and not name.begins_with("."):
+		if dir.current_is_dir() and not item_name.begins_with("."):
 			_find_recursive(full_path, pattern, results, depth + 1, max_depth)
 		
-		name = dir.get_next()
+		item_name = dir.get_next()
 	dir.list_dir_end()
 
 
@@ -1481,18 +1481,18 @@ func _calculate_dir_size(dir_path: String, total: int) -> int:
 		return total
 	
 	dir.list_dir_begin()
-	var name := dir.get_next()
-	while name != "":
-		var full_path := dir_path.rstrip("/") + "/" + name
+	var item_name := dir.get_next()
+	while item_name != "":
+		var full_path := dir_path.rstrip("/") + "/" + item_name
 		if dir.current_is_dir():
-			if not name.begins_with("."):
+			if not item_name.begins_with("."):
 				total = _calculate_dir_size(full_path, total)
 		else:
 			var file := FileAccess.open(full_path, FileAccess.READ)
 			if file:
 				total += file.get_length()
 				file.close()
-		name = dir.get_next()
+		item_name = dir.get_next()
 	dir.list_dir_end()
 	return total
 
