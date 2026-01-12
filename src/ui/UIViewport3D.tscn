@@ -1,6 +1,6 @@
 [gd_scene load_steps=6 format=3 uid="uid://b2gkx1eim00mw"]
 
-[ext_resource type="Script" uid="uid://dcednjyo6sb8j" path="res://src/ui/ui_viewport_3d.gd" id="1_ui_script"]
+[ext_resource type="Script" uid="uid://d20mjy3mr3gyp" path="res://src/ui/ui_viewport_3d.gd" id="1_ui_script"]
 
 [sub_resource type="ViewportTexture" id="ViewportTexture_ui"]
 viewport_path = NodePath("SubViewport")

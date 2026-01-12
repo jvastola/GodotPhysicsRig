@@ -216,14 +216,19 @@ func _setup_components() -> void:
 
 
 func _find_livekit_manager() -> Node:
-	"""Find the LiveKit manager in the scene"""
-	# Option 1: Look for LiveKitViewport3D and get its manager
+	"""Find the LiveKit manager in the scene or as an autoload"""
+	# Option 1: Look for LiveKitWrapper autoload
+	var livekit_wrapper = get_node_or_null("/root/LiveKitWrapper")
+	if livekit_wrapper:
+		return livekit_wrapper
+		
+	# Option 2: Look for LiveKitViewport3D and get its manager
 	var root = get_tree().root
 	var livekit_ui = _find_node_by_script(root, "livekit_ui.gd")
 	if livekit_ui and livekit_ui.has_method("get") and "livekit_manager" in livekit_ui:
 		return livekit_ui.livekit_manager
 	
-	# Option 2: Look for LiveKitManager directly
+	# Option 3: Look for LiveKitManager directly
 	var livekit_manager = _find_node_by_class(root, "LiveKitManager")
 	if livekit_manager:
 		return livekit_manager

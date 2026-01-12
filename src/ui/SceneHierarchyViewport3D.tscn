@@ -1,6 +1,6 @@
 [gd_scene load_steps=7 format=3 uid="uid://scene_hierarchy_viewport3d"]
 
-[ext_resource type="Script" uid="uid://scene_hierarchy_vp3d_script" path="res://src/ui/scene_hierarchy_viewport_3d.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://b3wma4uiix72q" path="res://src/ui/scene_hierarchy_viewport_3d.gd" id="1_script"]
 [ext_resource type="PackedScene" uid="uid://scene_hierarchy_ui" path="res://src/ui/SceneHierarchyUI.tscn" id="2_ui"]
 
 [sub_resource type="ViewportTexture" id="ViewportTexture_hierarchy"]

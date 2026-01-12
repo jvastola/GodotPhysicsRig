@@ -1,6 +1,6 @@
 [gd_scene load_steps=7 format=3 uid="uid://node_inspector_viewport3d"]
 
-[ext_resource type="Script" uid="uid://node_inspector_vp3d_script" path="res://src/ui/node_inspector_viewport_3d.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://crsjqmbeuq7db" path="res://src/ui/node_inspector_viewport_3d.gd" id="1_script"]
 [ext_resource type="PackedScene" uid="uid://node_inspector_ui" path="res://src/ui/NodeInspectorUI.tscn" id="2_ui"]
 
 [sub_resource type="ViewportTexture" id="ViewportTexture_inspector"]
