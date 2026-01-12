@@ -184,13 +184,24 @@ func _build_inspector_ui() -> void:
 	, false)  # Start expanded
 	
 	# Actions section
-	if _can_teleport_node(_current_node):
+	var can_teleport = _can_teleport_node(_current_node)
+	var has_meshes = _has_mesh_data(_current_node)
+	
+	if can_teleport or has_meshes:
 		_add_collapsible_section("Actions", func():
-			_add_action_button(
-				"📍 Teleport to Node",
-				"Move the player to this node's position",
-				func(): _teleport_current_node()
-			)
+			if can_teleport:
+				_add_action_button(
+					"📍 Teleport to Node",
+					"Move the player to this node's position",
+					func(): _teleport_current_node()
+				)
+			
+			if has_meshes:
+				_add_action_button(
+					"📦 Send to Poly Tool",
+					"Import this node's geometry into the Poly Tool",
+					func(): _send_to_poly_tool()
+				)
 		, false)
 	
 	# Script section
@@ -1001,3 +1012,63 @@ func _get_node_global_position(node: Node) -> Variant:
 		if gt2 is Transform3D:
 			return (gt2 as Transform3D).origin
 	return null
+
+
+func _has_mesh_data(node: Node) -> bool:
+	if not node:
+		return false
+	if node is MeshInstance3D and node.mesh:
+		return true
+	for child in node.get_children():
+		if _has_mesh_data(child):
+			return true
+	return false
+
+
+func _send_to_poly_tool() -> void:
+	if not _current_node:
+		return
+	
+	var poly_tool = get_tree().root.find_child("PolyTool", true, false)
+	# Check for class_name access if static instance is available
+	var poly_tool_class = GDScript.new() # Placeholder if not accessible directly
+	
+	# Try to find PolyTool via group or singleton-like access
+	if not poly_tool:
+		# Use the static instance if available (requires PolyTool to be loaded)
+		# Since we are in the same project, we can try to use the class name
+		# but if it's not and we have a group, that's better.
+		var tools = get_tree().get_nodes_in_group("poly_tool")
+		if not tools.is_empty():
+			poly_tool = tools[0]
+	
+	if not poly_tool:
+		# Fallback to searching by script name or class
+		for n in get_tree().get_nodes_in_group("grabbable"):
+			if n.get_script() and n.get_script().resource_path.ends_with("PolyTool.gd"):
+				poly_tool = n
+				break
+	
+	if poly_tool:
+		if poly_tool.has_method("import_from_node"):
+			poly_tool.call("import_from_node", _current_node)
+			print("NodeInspectorUI: Sent node ", _current_node.name, " to PolyTool")
+			
+			# Switch PolyTool to EDIT mode if possible
+			if "current_mode" in poly_tool:
+				poly_tool.set("current_mode", 1) # ToolMode.EDIT is usually 1
+			
+			# Open PolyTool UI
+			var manager = get_tree().root.find_child("UIPanelManager", true, false)
+			if not manager:
+				# Try group
+				var managers = get_tree().get_nodes_in_group("ui_panel_manager")
+				if not managers.is_empty():
+					manager = managers[0]
+			
+			if manager and manager.has_method("open_panel"):
+				manager.call("open_panel", "PolyToolViewport3D")
+		else:
+			print("NodeInspectorUI: PolyTool found but missing import_from_node method")
+	else:
+		print("NodeInspectorUI: PolyTool not found in scene")
