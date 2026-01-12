@@ -22,6 +22,9 @@ var original_right_target: Node3D
 var desktop_left_target: Node3D
 var desktop_right_target: Node3D
 
+# Desktop interaction component
+var desktop_interaction: DesktopInteractionComponent
+
 
 func _ready() -> void:
 	# Get references
@@ -32,6 +35,9 @@ func _ready() -> void:
 		
 	physics_hand_left = get_node_or_null("../../PhysicsHandLeft")
 	physics_hand_right = get_node_or_null("../../PhysicsHandRight")
+	
+	# Get desktop interaction component
+	desktop_interaction = get_node_or_null("../../DesktopInteractionComponent")
 
 
 func activate(cam: Camera3D) -> void:
@@ -68,12 +74,27 @@ func activate(cam: Camera3D) -> void:
 		if physics_hand_right:
 			original_right_target = physics_hand_right.target
 			physics_hand_right.target = desktop_right_target
+		
+		# Setup desktop interaction component
+		if desktop_interaction:
+			var center_pointer = camera.get_node_or_null("CenterPointer")
+			desktop_interaction.setup(camera, center_pointer)
+			
+			# Get VR hand pointers to disable them
+			var left_pointer = get_node_or_null("../XROrigin3D/LeftController/HandPointer")
+			var right_pointer = get_node_or_null("../XROrigin3D/RightController/HandPointer")
+			desktop_interaction.set_hand_pointers(left_pointer, right_pointer)
+			desktop_interaction.activate()
 
 
 func deactivate() -> void:
 	"""Deactivate desktop controls"""
 	is_active = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	
+	# Deactivate desktop interaction
+	if desktop_interaction:
+		desktop_interaction.deactivate()
 	
 	# Restore targets
 	if physics_hand_left and original_left_target:
@@ -101,12 +122,8 @@ func _input(event: InputEvent) -> void:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		else:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-			
-	# Pickup input
-	if event.is_action_pressed("pickup_left"):
-		_handle_pickup(physics_hand_left)
-	if event.is_action_pressed("pickup_right"):
-		_handle_pickup(physics_hand_right)
+	
+	# Note: Pickup input is now handled by DesktopInteractionComponent
 
 
 func _physics_process(_delta: float) -> void:
@@ -166,38 +183,3 @@ func _is_on_ground() -> bool:
 	
 	var result := space_state.intersect_ray(query)
 	return not result.is_empty()
-
-
-func _handle_pickup(hand: RigidBody3D) -> void:
-	"""Handle pickup/drop action for a specific hand"""
-	if not hand:
-		return
-		
-	# If holding something, drop it
-	if hand.get("held_object"):
-		var obj = hand.get("held_object")
-		if is_instance_valid(obj) and obj.has_method("release"):
-			obj.release()
-		return
-	
-	# Otherwise try to pick up
-	var space_state := camera.get_world_3d().direct_space_state
-	if not space_state:
-		return
-	# Raycast from center of screen
-	var query := PhysicsRayQueryParameters3D.create(
-		camera.global_position,
-		camera.global_position - camera.global_transform.basis.z * 3.0 # 3 meters reach
-	)
-	# Collide with World (1) and Interactable (6) and maybe others?
-	# Let's just use default mask or a broad one.
-	# Grabbables are usually RigidBodies.
-	query.collision_mask = 0xFFFFFFFF # Collide with everything
-	query.exclude = [player_body, hand] # Exclude player and hand
-	
-	var result := space_state.intersect_ray(query)
-	if not result.is_empty():
-		var collider = result.collider
-		if collider is RigidBody3D and collider.is_in_group("grabbable"):
-			if collider.has_method("try_grab"):
-				collider.try_grab(hand)

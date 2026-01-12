@@ -1,4 +1,4 @@
-[gd_scene load_steps=30 format=3 uid="uid://cpq6v7yqk8y8j"]
+[gd_scene load_steps=31 format=3 uid="uid://cpq6v7yqk8y8j"]
 
 [ext_resource type="Script" uid="uid://02kpb1kqm303" path="res://src/player/xr_player.gd" id="1_player"]
 [ext_resource type="Script" uid="uid://3ir0c0htxlqh" path="res://src/player/xr_origin_3d.gd" id="2_xr_origin"]
@@ -16,6 +16,7 @@
 [ext_resource type="Script" uid="uid://cxk34sx374uym" path="res://src/player/components/player_voice_component.gd" id="15_voice_comp"]
 [ext_resource type="Script" uid="uid://dwsx0otrybpmd" path="res://src/player/components/simple_world_grab_component.gd" id="16_simple_grab"]
 [ext_resource type="Script" path="res://src/player/components/hand_movement_component.gd" id="17_hand_movement"]
+[ext_resource type="Script" path="res://src/player/components/desktop_interaction_component.gd" id="18_desktop_interaction"]
 
 [ext_resource type="PackedScene" path="res://src/ui/WatchMenuViewport3D.tscn" id="18_watch_viewport"]
 
@@ -289,9 +290,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.755936, 0)
 
 [node name="CenterPointer" type="Node3D" parent="PlayerBody/DesktopCamera" unique_id=424202139]
 script = ExtResource("6_pointer")
-ray_length = 3.5
+ray_length = 5.0
 ray_length_min = 0.001
 ray_length_max = 1000000.0
+pointer_collision_mask = 33
 include_pointer_color = true
 hit_scale_user_multiplier_min = 0.01
 hit_scale_user_multiplier_max = 10.0
@@ -303,8 +305,8 @@ cast_shadow = 0
 mesh = SubResource("QuadMesh_pointer_face")
 
 [node name="PointerRayCast" type="RayCast3D" parent="PlayerBody/DesktopCamera/CenterPointer" unique_id=399327217]
-target_position = Vector3(0, 0, -3.5)
-collision_mask = 32
+target_position = Vector3(0, 0, -5.0)
+collision_mask = 33
 hit_from_inside = true
 collide_with_areas = true
 
@@ -396,3 +398,7 @@ script = ExtResource("16_simple_grab")
 script = ExtResource("17_hand_movement")
 enabled = false
 show_visual = true
+
+[node name="DesktopInteractionComponent" type="Node" parent="."]
+script = ExtResource("18_desktop_interaction")
+debug_logs = true
