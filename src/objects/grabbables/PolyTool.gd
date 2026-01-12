@@ -326,10 +326,15 @@ func _create_non_layer_visuals() -> void:
 
 func _exit_tree() -> void:
 	super._exit_tree()
+	
+	# Only cleanup if we are actually being destroyed, not just reparented
+	if not is_queued_for_deletion():
+		return
+		
 	if instance == self:
 		instance = null
 	for layer in _layers:
-		if is_instance_valid(layer.point_container): layer.point_container.queue_free()
+		if is_instance_valid(layer.point_multimesh): layer.point_multimesh.queue_free()
 		if is_instance_valid(layer.mesh_instance): layer.mesh_instance.queue_free()
 	_layers.clear()
 	
