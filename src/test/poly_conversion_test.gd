@@ -105,7 +105,7 @@ func _on_uv_wireframe_draw():
 		uv_wireframe.draw_line(uv2, uv3, Color.YELLOW, 1.0)
 		uv_wireframe.draw_line(uv3, uv1, Color.YELLOW, 1.0)
 
-func _on_download_completed(result, response_code, headers, body):
+func _on_download_completed(result, response_code, _headers, body):
 	if result != HTTPRequest.RESULT_SUCCESS or response_code != 200:
 		print("Download failed! Result: %d, Code: %d" % [result, response_code])
 		return

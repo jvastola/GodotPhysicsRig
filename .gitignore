@@ -127,3 +127,5 @@ asset-server/node_modules/
 asset-server/uploads/
 asset-server/.env
 asset-server/package-lock.json
+
+.vscode/settings.json
