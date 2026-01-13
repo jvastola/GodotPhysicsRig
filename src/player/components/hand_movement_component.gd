@@ -53,6 +53,7 @@ var _right_tracker: XRHandTracker
 # Movement state per hand (0 = left, 1 = right)
 var _hand_active: Array[bool] = [false, false]
 var _hand_anchor_world: Array[Vector3] = [Vector3.ZERO, Vector3.ZERO]
+var _hand_anchor_local: Array[Vector3] = [Vector3.ZERO, Vector3.ZERO] # For body-relative anchored mode
 var _hand_initial_pinch_pos: Array[Vector3] = [Vector3.ZERO, Vector3.ZERO]  # For relative mode
 var _hand_initial_body_pos: Array[Vector3] = [Vector3.ZERO, Vector3.ZERO]
 var _hand_prev_body_pos: Array[Vector3] = [Vector3.ZERO, Vector3.ZERO]
@@ -150,10 +151,17 @@ func _get_pinch_position(tracker: XRHandTracker) -> Vector3:
 func _start_hand_movement(hand_idx: int, pinch_pos: Vector3) -> void:
 	_ensure_visuals()
 	_hand_active[hand_idx] = true
+	
+	# Initial anchors
 	_hand_anchor_world[hand_idx] = pinch_pos
-	_hand_initial_pinch_pos[hand_idx] = pinch_pos  # Store initial pinch for relative mode
-	_hand_initial_body_pos[hand_idx] = player_body.global_position
-	_hand_prev_body_pos[hand_idx] = player_body.global_position
+	_hand_initial_pinch_pos[hand_idx] = pinch_pos
+	
+	if player_body:
+		_hand_initial_body_pos[hand_idx] = player_body.global_position
+		_hand_prev_body_pos[hand_idx] = player_body.global_position
+		# Store local anchor for body-relative anchored mode
+		_hand_anchor_local[hand_idx] = player_body.to_local(pinch_pos)
+
 	_hand_last_velocity[hand_idx] = Vector3.ZERO
 	
 	if debug_logs:
@@ -172,40 +180,40 @@ func _update_hand_movement(hand_idx: int, pinch_pos: Vector3, delta: float) -> v
 	var offset: Vector3
 	
 	if grab_mode == GrabMode.ANCHORED:
-		# ANCHORED mode: The anchor is a fixed point in world space.
-		# The player moves so that the current pinch position stays at the anchor.
-		# This is like grabbing a fixed point in space and pulling yourself to it.
-		# offset = where anchor is - where pinch currently is
-		# Moving player by this offset will bring the pinch back to the anchor
-		offset = _hand_anchor_world[hand_idx] - pinch_pos
-		# No sensitivity scaling in anchored mode - direct 1:1 movement
-	else:
-		# RELATIVE mode: calculate offset from initial pinch to current pinch
+		# ANCHORED mode: Velocity based, but the "Zero Point" moves with the player body.
+		# This simulates grabbing a point on your chest rig and pulling.
+		var current_anchor_world = player_body.to_global(_hand_anchor_local[hand_idx])
+		_hand_anchor_world[hand_idx] = current_anchor_world # Keep visual anchor updated
+		
+		# Offset is vector from Anchor (body relative) to Current Hand
+		offset = (pinch_pos - current_anchor_world) * movement_sensitivity
+		
+	else: 
+		# RELATIVE mode: "Joystick" control
+		# Zero Point is fixed where the grab started in world space.
 		offset = (pinch_pos - _hand_initial_pinch_pos[hand_idx]) * movement_sensitivity
-		# Invert if needed (only for relative mode)
-		if invert_direction:
-			offset *= -1.0
-	
-	# Apply movement
+
+	# Apply Inversion (PMC defaults: invert_one_hand_grab_direction = true)
+	if invert_direction:
+		offset *= -1.0
+		
+	# Apply Movement (Displacement per frame = Velocity * Delta)
 	var prev_pos := player_body.global_position
 	var xf := player_body.global_transform
 	xf.origin += offset
 	player_body.global_transform = xf
 	
-	# Update tracking based on mode
-	if grab_mode == GrabMode.RELATIVE:
-		# In relative mode, update initial pinch to current (so movement is incremental)
-		_hand_initial_pinch_pos[hand_idx] = pinch_pos
-		# Anchor follows player for visual
-		_hand_anchor_world[hand_idx] += offset
-	# In anchored mode, anchor stays fixed in world space
-	
-	# Calculate velocity for release momentum
+	# Calculate implied velocity for physics interactions
 	var dt: float = maxf(delta, 0.0001)
 	var new_vel: Vector3 = (xf.origin - prev_pos) / dt
 	player_body.linear_velocity = new_vel
 	_hand_prev_body_pos[hand_idx] = xf.origin
 	_hand_last_velocity[hand_idx] = new_vel
+	
+	# Update visual anchor
+	if grab_mode == GrabMode.RELATIVE:
+		_hand_anchor_world[hand_idx] = _hand_initial_pinch_pos[hand_idx]
+	# (ANCHORED mode already updated anchor above)
 	
 	_update_visual(hand_idx, pinch_pos)
 
