@@ -193,8 +193,14 @@ func _update_hand_movement(hand_idx: int, pinch_pos: Vector3, delta: float) -> v
 		# Zero Point is fixed where the grab started in world space.
 		offset = (pinch_pos - _hand_initial_pinch_pos[hand_idx]) * movement_sensitivity
 
-	# Apply Inversion (PMC defaults: invert_one_hand_grab_direction = true)
-	if invert_direction:
+	# Apply Inversion 
+	# User request: Relative mode should always invert (pull back to go forward).
+	# Anchored mode respects the export setting.
+	var should_invert := invert_direction
+	if grab_mode == GrabMode.RELATIVE:
+		should_invert = true
+		
+	if should_invert:
 		offset *= -1.0
 		
 	# Apply Movement (Displacement per frame = Velocity * Delta)
