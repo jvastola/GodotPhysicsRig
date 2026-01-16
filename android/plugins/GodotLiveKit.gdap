@@ -1,0 +1,8 @@
+[config]
+name="GodotLiveKit"
+binary_type="local"
+binary="GodotLiveKit.aar"
+
+[dependencies]
+local=[]
+remote=["io.livekit:livekit-android:2.5.0", "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"]
