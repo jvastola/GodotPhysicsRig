@@ -106,20 +106,21 @@ func _physics_process(delta: float) -> void:
 	# Call parent physics process for grabbable functionality
 	super._physics_process(delta)
 	
-	if not is_grabbed:
-		return
-	if not is_instance_valid(_hand):
+	if not is_grabbed and not is_desktop_grabbed:
 		return
 	
 	# Read trigger input
 	var trigger_pressed: bool = false
-	if is_instance_valid(_controller) and _controller.has_method("get_float"):
-		var trigger_value = _controller.get_float("trigger")
-		trigger_pressed = trigger_value > 0.5
-	elif is_instance_valid(_controller) and _controller.has_method("is_button_pressed"):
-		trigger_pressed = _controller.is_button_pressed("trigger_click")
-	elif InputMap.has_action("trigger_click"):
-		trigger_pressed = Input.is_action_pressed("trigger_click")
+	if is_instance_valid(_controller):
+		if _controller.has_method("get_float"):
+			trigger_pressed = _controller.get_float("trigger") > 0.5
+		elif _controller.has_method("is_button_pressed"):
+			trigger_pressed = _controller.is_button_pressed("trigger_click")
+	
+	# Fallback to InputMap for desktop
+	if not trigger_pressed:
+		if InputMap.has_action("trigger_click") and Input.is_action_pressed("trigger_click"):
+			trigger_pressed = true
 	
 	# Handle trigger state changes (rising/falling edge)
 	if trigger_pressed and not _prev_trigger_pressed:

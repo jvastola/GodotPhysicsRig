@@ -94,7 +94,7 @@ func _input(event: InputEvent) -> void:
 	if not enabled or not camera:
 		return
 	
-	# Pickup/drop controls
+	# E/F keys toggle pickup
 	if event.is_action_pressed("pickup_left"):
 		_toggle_pickup(Slot.LEFT)
 	elif event.is_action_pressed("pickup_right"):
@@ -185,10 +185,8 @@ func pickup_item(slot: int) -> void:
 		# Disable physics while held
 		(target as RigidBody3D).freeze = true
 	
-	# Reparent to camera for easy positioning
-	if target.get_parent():
-		target.get_parent().remove_child(target)
-	camera.add_child(target)
+	# Reparent to camera for easy positioning (using reparent avoids multiple tree signals)
+	target.reparent(camera, false)
 	
 	# Set initial position
 	var offset := left_slot_offset if slot == Slot.LEFT else right_slot_offset
@@ -220,14 +218,10 @@ func drop_item(slot: int) -> void:
 	# Get world transform before reparenting
 	var world_transform := item.global_transform
 	
-	# Remove from camera
-	camera.remove_child(item)
-	
-	# Restore to original parent or scene root
+	# Restore to original parent or scene root using reparent()
 	var restore_parent := original_parent if is_instance_valid(original_parent) else get_tree().current_scene
 	if restore_parent:
-		restore_parent.add_child(item)
-		item.global_transform = world_transform
+		item.reparent(restore_parent, true)
 	
 	# Re-enable physics if it's a RigidBody
 	if item is RigidBody3D:

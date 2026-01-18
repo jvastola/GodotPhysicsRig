@@ -281,7 +281,7 @@ func _physics_process(_delta: float) -> void:
 	# CRITICAL: Call super to update Grabbable state (sync position with hand)
 	super._physics_process(_delta)
 	
-	if not is_grabbed or not is_instance_valid(grabbing_hand):
+	if not is_grabbed and not is_desktop_grabbed:
 		_preview.visible = false
 		_clear_guide()
 		_clear_beam()
@@ -392,8 +392,11 @@ func _is_trigger_pressed() -> bool:
 		if _controller.has_method("is_button_pressed"):
 			if _controller.is_button_pressed("trigger_click"):
 				return true
-	if InputMap.has_action("trigger_click"):
-		return Input.is_action_pressed("trigger_click")
+	
+	# Fallback to InputMap for desktop
+	if InputMap.has_action("trigger_click") and Input.is_action_pressed("trigger_click"):
+		return true
+		
 	return false
 
 
@@ -405,10 +408,11 @@ func _is_grip_pressed() -> bool:
 		if _controller.has_method("is_button_pressed"):
 			# Fallback if float not available
 			pass
+	
 	# Try generic action
-	if InputMap.has_action("grip_click"):
-		if Input.is_action_pressed("grip_click"):
-			return true
+	if InputMap.has_action("grip_click") and Input.is_action_pressed("grip_click"):
+		return true
+		
 	return false
 
 
@@ -487,7 +491,7 @@ func _update_beam(target: Vector3) -> void:
 	if not is_instance_valid(_beam_immediate):
 		return
 	_beam_immediate.clear_surfaces()
-	if not is_grabbed or not is_instance_valid(grabbing_hand):
+	if not is_grabbed and not is_desktop_grabbed:
 		return
 	var origin = _tip.global_transform.origin if is_instance_valid(_tip) else global_transform.origin
 	_beam_immediate.surface_begin(Mesh.PRIMITIVE_LINES)
@@ -500,7 +504,7 @@ func _update_guide(target: Vector3) -> void:
 	if not is_instance_valid(_guide_immediate):
 		return
 	_guide_immediate.clear_surfaces()
-	if not is_grabbed or not is_instance_valid(grabbing_hand):
+	if not is_grabbed and not is_desktop_grabbed:
 		return
 	_guide_immediate.surface_begin(Mesh.PRIMITIVE_LINES)
 	_guide_immediate.surface_add_vertex(global_transform.origin)

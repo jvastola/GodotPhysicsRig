@@ -1214,16 +1214,16 @@ func _is_trigger_pressed() -> bool:
 	if _controller:
 		if _controller.has_method("get_float") and _controller.get_float("trigger") > trigger_threshold: return true
 		if _controller.has_method("is_button_pressed") and _controller.is_button_pressed("trigger_click"): return true
-	if InputMap.has_action("trigger_click"):
-		return Input.is_action_pressed("trigger_click")
+	if InputMap.has_action("trigger_click") and Input.is_action_pressed("trigger_click"):
+		return true
 	return false
 
 func _is_grip_pressed() -> bool:
 	if _controller:
 		if _controller.has_method("get_float") and _controller.get_float("grip") > 0.5: return true
 		if _controller.has_method("is_button_pressed") and _controller.is_button_pressed("grip_click"): return true
-	if InputMap.has_action("grip_click"):
-		return Input.is_action_pressed("grip_click")
+	if InputMap.has_action("grip_click") and Input.is_action_pressed("grip_click"):
+		return true
 	return false
 
 func _get_target_point() -> Vector3:

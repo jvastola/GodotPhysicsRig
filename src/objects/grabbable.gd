@@ -26,6 +26,10 @@ var original_parent: Node = null
 var grab_offset: Vector3 = Vector3.ZERO
 var grab_rotation_offset: Quaternion = Quaternion.IDENTITY
 
+# Desktop grab state (separate from VR physics hand grab)
+var is_desktop_grabbed := false
+var desktop_grabber: Node = null
+
 # Store collision data during grab
 var grabbed_collision_shapes: Array = []
 var grabbed_mesh_instances: Array = []
@@ -88,7 +92,8 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	# Force cleanup if still grabbed when being removed from tree
 	# This prevents orphaned collision shapes on the physics hand during scene transitions
-	if is_grabbed:
+	# For desktop grab, we ignore this as it often happens during reparenting to camera
+	if is_grabbed and not is_desktop_grabbed:
 		print("Grabbable: ", save_id, " exiting tree while grabbed - forcing cleanup")
 		_force_cleanup_grab_state()
 
@@ -137,6 +142,8 @@ func _force_cleanup_grab_state() -> void:
 	# Reset grab state
 	is_grabbed = false
 	grabbing_hand = null
+	is_desktop_grabbed = false
+	desktop_grabber = null
 	
 	# Update save state to reflect release
 	_save_grab_state(null)
@@ -351,6 +358,8 @@ func release() -> void:
 	
 	is_grabbed = false
 	grabbing_hand = null
+	is_desktop_grabbed = false
+	desktop_grabber = null
 	
 	released.emit()
 	
@@ -368,6 +377,10 @@ func _physics_process(_delta: float) -> void:
 		if network_component:
 			network_component.process_network_sync(_delta)
 		
+		# For desktop grab, skip VR-specific validation and positioning
+		if is_desktop_grabbed:
+			return
+			
 		# If hand is invalid, auto-release
 		if not is_instance_valid(grabbing_hand):
 			print("Grabbable: Auto-releasing due to invalid hand")
@@ -600,3 +613,35 @@ func pointer_grab_get_distance(pointer: Node3D) -> float:
 func pointer_grab_get_scale() -> float:
 	"""Get current uniform scale."""
 	return scale.x
+
+
+# ============================================================================
+# DESKTOP GRAB INTERFACE (for DesktopInteractionComponent keyboard pickup)
+# ============================================================================
+
+func desktop_grab(grabber: Node) -> void:
+	"""Called by DesktopInteractionComponent when picked up with E/F keys.
+	Emits grabbed signal so tools (shape_tool, etc.) can enable their functionality."""
+	if is_grabbed or is_desktop_grabbed:
+		return
+	
+	is_grabbed = true  # Set this so tool _physics_process doesn't early-exit
+	is_desktop_grabbed = true
+	desktop_grabber = grabber
+	
+	# Freeze physics while held
+	freeze = true
+	
+	# Emit grabbed signal with null hand (desktop has no physics hand)
+	# Tools should check for null hand and handle desktop mode appropriately
+	grabbed.emit(null)
+
+
+func desktop_release() -> void:
+	"""Called by DesktopInteractionComponent when dropped.
+	Emits released signal so tools can clean up."""
+	if not is_desktop_grabbed:
+		return
+	
+	# release() handles restoring physics, visibility, and resetting flags
+	release()

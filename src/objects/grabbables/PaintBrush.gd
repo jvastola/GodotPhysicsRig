@@ -167,7 +167,7 @@ func _physics_process(delta: float) -> void:
 	if not is_instance_valid(_color_picker_ui):
 		_find_color_picker()
 	
-	if not is_grabbed or not is_instance_valid(grabbing_hand):
+	if not is_grabbed and not is_desktop_grabbed:
 		_set_visuals_visible(false)
 		_clear_hover()
 		return
@@ -192,11 +192,15 @@ func _update_brush_tip_color() -> void:
 
 
 func _process_input(delta: float) -> void:
+	var trigger_pressed: bool = false
 	var controller = _get_controller()
-	if not controller:
-		return
+	if controller:
+		trigger_pressed = controller.is_button_pressed("trigger_click")
 	
-	var trigger_pressed = controller.is_button_pressed("trigger_click")
+	# Fallback to InputMap for desktop
+	if not trigger_pressed:
+		if InputMap.has_action("trigger_click") and Input.is_action_pressed("trigger_click"):
+			trigger_pressed = true
 	var just_pressed = trigger_pressed and not _was_trigger_pressed
 	var just_released = not trigger_pressed and _was_trigger_pressed
 	

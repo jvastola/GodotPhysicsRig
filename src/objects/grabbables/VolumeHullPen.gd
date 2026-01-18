@@ -122,7 +122,7 @@ func _on_pen_released() -> void:
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
 	
-	if not is_grabbed or not is_instance_valid(_hand):
+	if not is_grabbed and not is_desktop_grabbed:
 		return
 	
 	# Read trigger input
@@ -130,8 +130,11 @@ func _physics_process(delta: float) -> void:
 	if is_instance_valid(_controller) and _controller.has_method("get_float"):
 		var trigger_value = _controller.get_float("trigger")
 		trigger_pressed = trigger_value > 0.5
-	elif InputMap.has_action("trigger_click"):
-		trigger_pressed = Input.is_action_pressed("trigger_click")
+	
+	# Fallback to InputMap for desktop
+	if not trigger_pressed:
+		if InputMap.has_action("trigger_click") and Input.is_action_pressed("trigger_click"):
+			trigger_pressed = true
 	
 	# Handle trigger state changes
 	if trigger_pressed and not _prev_trigger_pressed:

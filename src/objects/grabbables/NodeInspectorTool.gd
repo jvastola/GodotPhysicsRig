@@ -167,7 +167,7 @@ func _on_tool_grabbed(hand: RigidBody3D) -> void:
 	
 	_is_active = true
 	set_physics_process(true)
-	print("NodeInspectorTool: Grabbed by ", hand.name)
+	print("NodeInspectorTool: Grabbed by ", hand.name if hand else "desktop")
 
 
 func _on_tool_released() -> void:
@@ -184,20 +184,21 @@ func _on_tool_released() -> void:
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
 	
-	if not is_grabbed or not _is_active:
-		return
-	if not is_instance_valid(_hand):
+	if not (is_grabbed or is_desktop_grabbed) or not _is_active:
 		return
 	
 	# Get trigger state
 	var trigger_pressed: bool = false
-	if is_instance_valid(_controller) and _controller.has_method("get_float"):
-		var trigger_value = _controller.get_float("trigger")
-		trigger_pressed = trigger_value > 0.5
-	elif is_instance_valid(_controller) and _controller.has_method("is_button_pressed"):
-		trigger_pressed = _controller.is_button_pressed("trigger_click")
-	elif InputMap.has_action("trigger_click"):
-		trigger_pressed = Input.is_action_pressed("trigger_click")
+	if is_instance_valid(_controller):
+		if _controller.has_method("get_float"):
+			trigger_pressed = _controller.get_float("trigger") > 0.5
+		elif _controller.has_method("is_button_pressed"):
+			trigger_pressed = _controller.is_button_pressed("trigger_click")
+	
+	# Fallback to InputMap for desktop
+	if not trigger_pressed:
+		if InputMap.has_action("trigger_click") and Input.is_action_pressed("trigger_click"):
+			trigger_pressed = true
 	
 	# Perform selection based on mode
 	if select_mode == SelectMode.RAY:

@@ -39,7 +39,7 @@ func _ready() -> void:
 	# Create reusable preview resources
 	_preview_box_mesh = BoxMesh.new()
 	
-	print("ShapeTool: Ready")
+	print("ShapeTool: Ready - grabbed signal connected, physics_process=", is_physics_processing())
 
 func _on_tool_grabbed(hand: RigidBody3D) -> void:
 	_hand = hand
@@ -51,7 +51,7 @@ func _on_tool_grabbed(hand: RigidBody3D) -> void:
 			_controller = maybe_target
 			
 	set_physics_process(true)
-	print("ShapeTool: Grabbed by ", hand.name)
+	print("ShapeTool: Grabbed by ", hand.name if hand else "desktop")
 
 func _on_tool_released() -> void:
 	if _is_dragging:
@@ -66,11 +66,10 @@ func _on_tool_released() -> void:
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
 	
-	if not is_grabbed:
+	# Check for either VR grab (is_grabbed) OR desktop grab (is_desktop_grabbed)
+	if not is_grabbed and not is_desktop_grabbed:
 		return
-	if not is_instance_valid(_hand):
-		return
-		
+	
 	# Read trigger input
 	var trigger_pressed: bool = false
 	# Try to get input from controller
@@ -79,10 +78,11 @@ func _physics_process(delta: float) -> void:
 			trigger_pressed = _controller.get_float("trigger") > 0.5
 		elif _controller.has_method("is_button_pressed"):
 			trigger_pressed = _controller.is_button_pressed("trigger_click")
-	# Fallback to InputMap
-	if not trigger_pressed and InputMap.has_action("trigger_click"):
-		trigger_pressed = Input.is_action_pressed("trigger_click")
-		
+	# Fallback to InputMap (left mouse button) for desktop
+	if not trigger_pressed:
+		if InputMap.has_action("trigger_click") and Input.is_action_pressed("trigger_click"):
+			trigger_pressed = true
+	
 	# Handle input state
 	if trigger_pressed and not _prev_trigger_pressed:
 		_start_shape()

@@ -220,24 +220,28 @@ func _physics_process(delta: float) -> void:
 	# Ensure visuals are parented to the SceneTree root
 	_ensure_visuals_parent()
 	
-	if not is_grabbed:
+	if not is_grabbed and not is_desktop_grabbed:
 		return
-	if not is_instance_valid(_hand):
-		return
-
+	
 	# Determine controller transform
 	var controller_transform: Transform3D
 	if is_instance_valid(_controller) and _controller is Node3D:
 		controller_transform = (_controller as Node3D).global_transform
-	else:
+	elif is_instance_valid(_hand):
 		controller_transform = _hand.global_transform
+	else:
+		# Desktop mode fallback - use the tool's own transform
+		controller_transform = global_transform
 
 	# Read trigger input
 	var trigger_pressed: bool = false
 	if is_instance_valid(_controller) and _controller.has_method("is_button_pressed"):
 		trigger_pressed = _controller.is_button_pressed("trigger_click")
-	elif InputMap.has_action("trigger_click"):
-		trigger_pressed = Input.is_action_pressed("trigger_click")
+	
+	# Fallback to InputMap for desktop
+	if not trigger_pressed:
+		if InputMap.has_action("trigger_click") and Input.is_action_pressed("trigger_click"):
+			trigger_pressed = true
 
 	# Prediction: while grabbed and not hooked, update hitmarker
 	if is_instance_valid(_hitmarker) and not _is_hooked:
