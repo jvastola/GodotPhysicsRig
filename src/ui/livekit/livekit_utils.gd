@@ -2,10 +2,13 @@ class_name LiveKitUtils
 extends RefCounted
 ## Utility functions for LiveKit - JWT generation and encoding helpers
 
-# LiveKit Cloud credentials (can be overridden)
-const DEFAULT_API_KEY = "APIbSEA2MXzP8Mf"
-const DEFAULT_API_SECRET = "Kqw1FLCX3rq2IWbuWjilBMlgbODqlzxTkgyzKrzuF6I"
+# Local development keys
+const DEFAULT_API_KEY = "devkey"
+const DEFAULT_API_SECRET = "secret12345678901234567890123456"
 const TOKEN_VALIDITY_HOURS = 24
+
+# TODO: IMPORTANT - Verify these keys match your self-hosted LiveKit instance settings!
+# You should update these with the keys from your Oracle Cloud LiveKit configuration.
 
 
 static func generate_token(participant_id: String, room_name: String = "test-room", 

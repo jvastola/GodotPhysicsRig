@@ -17,7 +17,7 @@ signal auto_connect_requested()
 @onready var auto_connect_button: Button = $VBox/HelperButtons/AutoConnectButton
 @onready var generate_token_button: Button = $VBox/HelperButtons/GenerateTokenButton
 @onready var room_info_label: Label = $VBox/RoomInfo
-@onready var sandbox_http_request: HTTPRequest = $SandboxHTTPRequest
+# SandboxHTTPRequest removed
 
 # State
 var local_username: String = "User-" + str(randi() % 10000)
@@ -35,7 +35,7 @@ func _setup_ui():
 	auto_connect_button.pressed.connect(_on_auto_connect_pressed)
 	generate_token_button.pressed.connect(_on_generate_token_pressed)
 	update_name_button.pressed.connect(_on_update_name_pressed)
-	sandbox_http_request.request_completed.connect(_on_sandbox_request_completed)
+	# sandbox_http_request removed
 	
 	username_entry.text = local_username
 	disconnect_button.disabled = true
@@ -63,7 +63,8 @@ func _register_keyboard_fields() -> void:
 
 
 func _set_defaults():
-	server_entry.text = "ws://localhost:7880"
+	# Default to local LiveKit server
+	server_entry.text = "ws://158.101.21.99:7880"
 	token_entry.text = ""
 
 
@@ -113,34 +114,7 @@ func _on_update_name_pressed():
 		username_changed.emit(new_name)
 
 
-func _on_sandbox_request_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray):
-	auto_connect_button.disabled = false
-	
-	if result != HTTPRequest.RESULT_SUCCESS:
-		set_status("❌ Request Failed")
-		connect_button.disabled = false
-		return
-	
-	if response_code != 200:
-		set_status("❌ API Error: " + str(response_code))
-		connect_button.disabled = false
-		return
-	
-	var json = JSON.parse_string(body.get_string_from_utf8())
-	if json:
-		var server_url = json.get("serverUrl", "")
-		var token = json.get("participantToken", "")
-		
-		if server_url and token:
-			server_entry.text = server_url
-			token_entry.text = token
-			print("✅ Received Sandbox Token")
-			_on_connect_pressed()
-		else:
-			set_status("❌ Invalid Response")
-	else:
-		set_status("❌ JSON Parse Error")
-		connect_button.disabled = false
+
 
 
 # Public API
@@ -160,27 +134,13 @@ func set_connected(connected: bool, room_name: String = ""):
 		room_info_label.text = "Room: Not connected"
 
 
-func request_sandbox_token(nakama_id: String, room_name: String = "godot-demo2"):
-	"""Request token from LiveKit Cloud sandbox"""
-	set_status("⏳ Fetching Sandbox Token...")
-	connect_button.disabled = true
-	auto_connect_button.disabled = true
+func set_token_and_connect(token: String):
+	token_entry.text = token
+	# Ensure URL is correct
+	if server_entry.text.is_empty():
+		server_entry.text = "ws://localhost:7880"
 	
-	var url = "https://cloud-api.livekit.io/api/sandbox/connection-details"
-	var headers = [
-		"X-Sandbox-ID: conference-pkdo9w",
-		"Content-Type: application/json"
-	]
-	var body = JSON.stringify({
-		"room_name": room_name,
-		"participant_name": nakama_id
-	})
-	
-	var error = sandbox_http_request.request(url, headers, HTTPClient.METHOD_POST, body)
-	if error != OK:
-		set_status("❌ HTTP Request Failed")
-		connect_button.disabled = false
-		auto_connect_button.disabled = false
+	_on_connect_pressed()
 
 
 func get_username() -> String:

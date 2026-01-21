@@ -32,10 +32,10 @@ const CAPSULE_MATERIAL = preload("res://capsule_material.tres")
 
 @onready var left_hand_ray_cast: RayCast3D = $PlayerBody/XROrigin3D/LeftController/RayCast3D
 @onready var left_hand_tracker_node: XRNode3D = $PlayerBody/XROrigin3D/LeftHandTracker
-@onready var left_hand_skeleton: OpenXRFbHandTrackingMesh = $PlayerBody/XROrigin3D/LeftHandTracker/OpenXRFbHandTrackingMesh
+@onready var left_hand_skeleton = $PlayerBody/XROrigin3D/LeftHandTracker/OpenXRFbHandTrackingMesh  # Type varies by platform
 @onready var right_hand_ray_cast: RayCast3D = $PlayerBody/XROrigin3D/RightController/RayCast3D
 @onready var right_hand_tracker_node: XRNode3D = $PlayerBody/XROrigin3D/RightHandTracker
-@onready var right_hand_skeleton: OpenXRFbHandTrackingMesh = $PlayerBody/XROrigin3D/RightHandTracker/OpenXRFbHandTrackingMesh
+@onready var right_hand_skeleton = $PlayerBody/XROrigin3D/RightHandTracker/OpenXRFbHandTrackingMesh  # Type varies by platform
 
 var fb_capsule_ext
 var left_capsules_loaded := false
@@ -707,7 +707,7 @@ func _add_mesh_group(p_parent: Node3D, p_group: String) -> void:
 		if child is MeshInstance3D:
 			child.add_to_group(p_group)
 			# Ensure skinning is active for the generated mesh
-			if p_parent is OpenXRFbHandTrackingMesh:
+			if p_parent.has_method("get_path"):
 				child.skeleton = p_parent.get_path()
 			child.visible = true  # Ensure the mesh is visible
 			mesh_count += 1
