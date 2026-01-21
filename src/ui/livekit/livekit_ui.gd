@@ -139,7 +139,15 @@ func _on_auto_connect_requested():
 		_set_status("⚠️ Connect to Nakama first")
 		return
 	
-	connection_panel.request_sandbox_token(nakama_id)
+	# Generate token locally using LiveKitUtils (Client-side generation)
+	# TODO: In production, this should be moved to a Nakama server RPC
+	var room_name = "godot-oracle-room"
+	var token = LiveKitUtils.generate_token(nakama_id, room_name)
+	
+	if connection_panel:
+		connection_panel.set_token_and_connect(token)
+		
+	_set_status("✅ Token generated for: " + nakama_id)
 
 
 func _on_username_changed(new_name: String):
