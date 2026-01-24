@@ -1,0 +1,91 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://src/objects/grabbables/Marker.gd" id="1_marker_script"]
+[ext_resource type="Script" path="res://src/objects/grabbables/MarkerTrail.gd" id="2_trail_script"]
+[ext_resource type="Script" path="res://src/objects/grabbables/Erase.gd" id="3_erase_script"]
+[ext_resource type="Shader" path="res://src/shaders/vrc_marker.gdshader" id="4_marker_shader"]
+[ext_resource type="Script" path="res://src/objects/grabbables/MarkerSync.gd" id="5_sync_script"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_pen"]
+radius = 0.02
+height = 0.25
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pen_body"]
+albedo_color = Color(0.15, 0.15, 0.2, 1)
+metallic = 0.8
+roughness = 0.2
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_pen"]
+material = SubResource("StandardMaterial3D_pen_body")
+radius = 0.02
+height = 0.25
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tip"]
+albedo_color = Color(1.0, 0.4, 0.1, 1)
+emission_enabled = true
+emission = Color(1.0, 0.4, 0.1, 1)
+emission_energy_multiplier = 0.8
+
+[sub_resource type="SphereMesh" id="SphereMesh_tip"]
+material = SubResource("StandardMaterial3D_tip")
+radius = 0.025
+height = 0.05
+radial_segments = 16
+rings = 8
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_marker"]
+shader = ExtResource("4_marker_shader")
+shader_parameter/line_color = Color(1, 1, 1, 1)
+shader_parameter/line_width = 0.003
+shader_parameter/emission_strength = 1.0
+
+[node name="VRCMarkerPen" type="RigidBody3D"]
+mass = 0.2
+gravity_scale = 0.5
+contact_monitor = true
+max_contacts_reported = 4
+script = ExtResource("1_marker_script")
+grab_mode = 0
+tip_offset = Vector3(0, 0, -0.15)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape3D_pen")
+
+[node name="PenMesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("CapsuleMesh_pen")
+
+[node name="TipMarker" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.15)
+
+[node name="TipMesh" type="MeshInstance3D" parent="TipMarker"]
+mesh = SubResource("SphereMesh_tip")
+
+[node name="MarkerTrail" type="Node3D" parent="."]
+script = ExtResource("2_trail_script")
+trail_type = 0
+color = Color(1, 1, 1, 1)
+emission = 1.0
+min_distance = 0.0025
+width = 0.003
+update_rate = 0.03
+smoothing_time = 0.06
+
+[node name="TrailStorage" type="MeshInstance3D" parent="MarkerTrail"]
+material_override = SubResource("ShaderMaterial_marker")
+
+[node name="TipPosition" type="Node3D" parent="MarkerTrail"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.15)
+
+[node name="MarkerSync" type="Node" parent="."]
+script = ExtResource("5_sync_script")
+
+[node name="Erase" type="RigidBody3D" parent="."]
+mass = 0.1
+gravity_scale = 0.5
+script = ExtResource("3_erase_script")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Erase"]
+shape = SubResource("CapsuleShape3D_pen")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Erase"]
+mesh = SubResource("CapsuleMesh_pen")

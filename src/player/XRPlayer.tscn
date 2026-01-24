@@ -1,4 +1,4 @@
-[gd_scene load_steps=31 format=3 uid="uid://cpq6v7yqk8y8j"]
+[gd_scene format=3 uid="uid://cpq6v7yqk8y8j"]
 
 [ext_resource type="Script" uid="uid://02kpb1kqm303" path="res://src/player/xr_player.gd" id="1_player"]
 [ext_resource type="Script" uid="uid://3ir0c0htxlqh" path="res://src/player/xr_origin_3d.gd" id="2_xr_origin"]
@@ -7,7 +7,6 @@
 [ext_resource type="Script" uid="uid://b0ncs507wux1w" path="res://src/player/desktop_controller.gd" id="4_desktop"]
 [ext_resource type="Script" uid="uid://deum3u4irqnyx" path="res://src/objects/watch_compass.gd" id="5_watch"]
 [ext_resource type="Script" uid="uid://u2otyj4gjtl2" path="res://src/player/hand_pointer.gd" id="6_pointer"]
-[ext_resource type="PackedScene" uid="uid://b2gkx1eim00mw" path="res://src/ui/UIViewport3D.tscn" id="7_ui_viewport"]
 [ext_resource type="Material" uid="uid://cl3ucly7cjhvy" path="res://assets/wireframe-material.tres" id="7_xe8se"]
 [ext_resource type="Script" uid="uid://bndx0a4k0k8hw" path="res://src/systems/voxel_chunk_manager.gd" id="11_2d0bc"]
 [ext_resource type="Script" uid="uid://dr821xg418lpi" path="res://src/player/components/player_movement_component.gd" id="12_movement"]
@@ -15,9 +14,8 @@
 [ext_resource type="Script" uid="uid://04sudajutma5" path="res://src/player/components/player_network_component.gd" id="14_network_comp"]
 [ext_resource type="Script" uid="uid://cxk34sx374uym" path="res://src/player/components/player_voice_component.gd" id="15_voice_comp"]
 [ext_resource type="Script" uid="uid://dwsx0otrybpmd" path="res://src/player/components/simple_world_grab_component.gd" id="16_simple_grab"]
-[ext_resource type="Script" path="res://src/player/components/hand_movement_component.gd" id="17_hand_movement"]
-[ext_resource type="Script" path="res://src/player/components/desktop_interaction_component.gd" id="18_desktop_interaction"]
-
+[ext_resource type="Script" uid="uid://ni7m2frmfnh7" path="res://src/player/components/hand_movement_component.gd" id="17_hand_movement"]
+[ext_resource type="Script" uid="uid://cdrcd8vcdgh73" path="res://src/player/components/desktop_interaction_component.gd" id="18_desktop_interaction"]
 [ext_resource type="PackedScene" path="res://src/ui/WatchMenuViewport3D.tscn" id="18_watch_viewport"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_xxbg3"]
@@ -305,7 +303,7 @@ cast_shadow = 0
 mesh = SubResource("QuadMesh_pointer_face")
 
 [node name="PointerRayCast" type="RayCast3D" parent="PlayerBody/DesktopCamera/CenterPointer" unique_id=399327217]
-target_position = Vector3(0, 0, -5.0)
+target_position = Vector3(0, 0, -5)
 collision_mask = 33
 hit_from_inside = true
 collide_with_areas = true
@@ -394,11 +392,10 @@ script = ExtResource("15_voice_comp")
 [node name="SimpleWorldGrabComponent" type="Node" parent="." unique_id=739088080]
 script = ExtResource("16_simple_grab")
 
-[node name="HandMovementComponent" type="Node" parent="."]
+[node name="HandMovementComponent" type="Node" parent="." unique_id=400687513]
 script = ExtResource("17_hand_movement")
 enabled = false
-show_visual = true
 
-[node name="DesktopInteractionComponent" type="Node" parent="."]
+[node name="DesktopInteractionComponent" type="Node" parent="." unique_id=308251478]
 script = ExtResource("18_desktop_interaction")
 debug_logs = true

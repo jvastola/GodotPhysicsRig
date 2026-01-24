@@ -32,7 +32,7 @@
 [ext_resource type="Script" uid="uid://om3k532gai8j" path="res://src/ui/ui_panel_manager.gd" id="39_ui_panel_manager"]
 [ext_resource type="PackedScene" path="res://src/ui/git/GitViewport3D.tscn" id="39_wh2ee"]
 [ext_resource type="Script" uid="uid://bqrnwqkyb00kx" path="res://src/ui/ui_panel_scene_setup.gd" id="40_ui_panel_setup"]
-[ext_resource type="Script" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
+[ext_resource type="Script" uid="uid://bid6ju5yhq61q" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
 [ext_resource type="PackedScene" uid="uid://cm8nv7v0apls3" path="res://src/objects/grabbables/GrappleHook.tscn" id="42_grapple_hook"]
 [ext_resource type="PackedScene" path="res://src/objects/ReferenceBlock.tscn" id="43_reference_block"]
 [ext_resource type="PackedScene" path="res://src/ui/BlockLibraryViewport3D.tscn" id="44_block_library_viewport"]
@@ -42,11 +42,12 @@
 [ext_resource type="PackedScene" path="res://src/ui/MovementSettingsViewport2.tscn" id="46_sv5fj"]
 [ext_resource type="PackedScene" path="res://src/ui/TerminalViewport3D.tscn" id="46_terminal"]
 [ext_resource type="PackedScene" path="res://src/ui/AssetLibraryViewport3D.tscn" id="47_0ej7u"]
-[ext_resource type="Script" path="res://src/objects/viewport_mirror.gd" id="47_viewport_mirror"]
+[ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://src/objects/viewport_mirror.gd" id="47_viewport_mirror"]
 [ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://src/systems/grid_painter.gd" id="48_grid_painter"]
 [ext_resource type="PackedScene" path="res://src/ui/PassthroughSettingsViewport3D.tscn" id="49_passthrough_settings"]
 [ext_resource type="PackedScene" uid="uid://d3x8y7yqk8y8j" path="res://src/ui/HandTrackingViewport3D.tscn" id="50_hand_tracking_ui"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/ShapeTool.tscn" id="51_shape_tool"]
+[ext_resource type="PackedScene" path="res://src/objects/grabbables/VRCMarkerPen.tscn" id="52_vrc_marker"]
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -230,6 +231,15 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1.5, 1.3955536)
 [node name="ShapeTool" parent="." unique_id=2001238079 instance=ExtResource("51_shape_tool")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.09359133, -3.3451385)
 
+[node name="VRCMarkerPen" parent="." unique_id=2001238080 instance=ExtResource("52_vrc_marker")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1.5, 1.3955536)
+
+[node name="VRCMarkerPen2" parent="." unique_id=2001238081 instance=ExtResource("52_vrc_marker")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 1.5, 1.3955536)
+
+[node name="VRCMarkerPen3" parent="." unique_id=2001238082 instance=ExtResource("52_vrc_marker")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.5, 1.3955536)
+
 [node name="PolyToolExport" parent="." unique_id=1827706603 instance=ExtResource("28_wb7rf")]
 transform = Transform3D(1, 0, 0, 0, 1.6025667, 0, 0, 0, 1, 0, -1.54777, -7.050523)
 
@@ -273,7 +283,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.983923, 0.88246953, 1.516
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.6498556)
 
 [node name="ShaderPlasma" type="CSGSphere3D" parent="PlasmaDemos" unique_id=1217239899]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -1.0310359, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -0.74253035, 0)
 radius = 0.75
 material = SubResource("StandardMaterial3D_wvm1w")
 script = ExtResource("35_hr53f")
@@ -292,7 +302,7 @@ transform = Transform3D(-0.44000003, 0, -3.8466023e-08, 0, 0.44, 0, 3.8466023e-0
 material = SubResource("StandardMaterial3D_wvm1w")
 
 [node name="Sphere" type="CSGSphere3D" parent="PlasmaDemos/PlasmaBox" unique_id=716390065]
-transform = Transform3D(2.36, 0, 0, 0, 2.36, 0, 0, 0, 2.36, 0, 0, -2.0514994)
+transform = Transform3D(2.36, 0, 0, 0, 2.36, 0, 0, 0, 2.36, 0, 0, -2.0970871)
 operation = 2
 radius = 0.6
 material = ExtResource("34_s8yin")
