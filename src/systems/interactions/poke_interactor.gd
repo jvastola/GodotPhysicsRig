@@ -11,7 +11,11 @@ class_name PokeInteractor
 
 @export_group("Visual Feedback")
 @export var show_debug_sphere: bool = false
-@export var poke_color: Color = Color(1.0, 0.5, 0.2, 0.5)
+@export var poke_color: Color = Color(1.0, 0.5, 0.2, 0.5):
+	set(value):
+		poke_color = value
+		_update_visual_colors()
+
 
 # Internal
 var _attach_transform: Node3D = null
@@ -112,6 +116,17 @@ func _setup_debug_visuals() -> void:
 	poke_mat.albedo_color = poke_color
 	poke_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_debug_poke_mesh.material_override = poke_mat
+
+
+func _update_visual_colors() -> void:
+	if _debug_hover_mesh and _debug_hover_mesh.material_override:
+		var mat = _debug_hover_mesh.material_override as StandardMaterial3D
+		mat.albedo_color = Color(poke_color.r, poke_color.g, poke_color.b, 0.2)
+	
+	if _debug_poke_mesh and _debug_poke_mesh.material_override:
+		var mat = _debug_poke_mesh.material_override as StandardMaterial3D
+		mat.albedo_color = poke_color
+
 
 
 func _physics_process(delta: float) -> void:
