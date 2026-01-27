@@ -87,3 +87,12 @@ asset-server/uploads/
 asset-server/.env
 asset-server/package-lock.json
 android/build - Copy
+
+# Local development scripts (user-specific paths)
+start_docker.bat
+
+# Android build metadata
+android/.build_version
+
+# Local LiveKit server (use livekit-agent/ for production)
+livekit_server/
