@@ -48,4 +48,3 @@ func _change_floor_color() -> void:
 	var chosen_color: Color = Color(randf(), randf(), randf(), 1.0)
 	mat.albedo_color = chosen_color
 	print("FloorInteractable: Changed color to ", chosen_color)
-

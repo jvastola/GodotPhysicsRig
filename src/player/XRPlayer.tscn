@@ -1,4 +1,4 @@
-[gd_scene load_steps=31 format=3 uid="uid://cpq6v7yqk8y8j"]
+[gd_scene format=3 uid="uid://cpq6v7yqk8y8j"]
 
 [ext_resource type="Script" uid="uid://02kpb1kqm303" path="res://src/player/xr_player.gd" id="1_player"]
 [ext_resource type="Script" uid="uid://3ir0c0htxlqh" path="res://src/player/xr_origin_3d.gd" id="2_xr_origin"]
@@ -7,7 +7,6 @@
 [ext_resource type="Script" uid="uid://b0ncs507wux1w" path="res://src/player/desktop_controller.gd" id="4_desktop"]
 [ext_resource type="Script" uid="uid://deum3u4irqnyx" path="res://src/objects/watch_compass.gd" id="5_watch"]
 [ext_resource type="Script" uid="uid://u2otyj4gjtl2" path="res://src/player/hand_pointer.gd" id="6_pointer"]
-[ext_resource type="PackedScene" uid="uid://b2gkx1eim00mw" path="res://src/ui/UIViewport3D.tscn" id="7_ui_viewport"]
 [ext_resource type="Material" uid="uid://cl3ucly7cjhvy" path="res://assets/wireframe-material.tres" id="7_xe8se"]
 [ext_resource type="Script" uid="uid://bndx0a4k0k8hw" path="res://src/systems/voxel_chunk_manager.gd" id="11_2d0bc"]
 [ext_resource type="Script" uid="uid://dr821xg418lpi" path="res://src/player/components/player_movement_component.gd" id="12_movement"]
@@ -15,9 +14,8 @@
 [ext_resource type="Script" uid="uid://04sudajutma5" path="res://src/player/components/player_network_component.gd" id="14_network_comp"]
 [ext_resource type="Script" uid="uid://cxk34sx374uym" path="res://src/player/components/player_voice_component.gd" id="15_voice_comp"]
 [ext_resource type="Script" uid="uid://dwsx0otrybpmd" path="res://src/player/components/simple_world_grab_component.gd" id="16_simple_grab"]
-[ext_resource type="Script" path="res://src/player/components/hand_movement_component.gd" id="17_hand_movement"]
-[ext_resource type="Script" path="res://src/player/components/desktop_interaction_component.gd" id="18_desktop_interaction"]
-
+[ext_resource type="Script" uid="uid://ni7m2frmfnh7" path="res://src/player/components/hand_movement_component.gd" id="17_hand_movement"]
+[ext_resource type="Script" uid="uid://cdrcd8vcdgh73" path="res://src/player/components/desktop_interaction_component.gd" id="18_desktop_interaction"]
 [ext_resource type="PackedScene" path="res://src/ui/WatchMenuViewport3D.tscn" id="18_watch_viewport"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_xxbg3"]
@@ -106,8 +104,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.846876, 0, 0)
 tracker = &"left_hand"
 pose = &"grip"
 
-[node name="OpenXRFbRenderModel" type="OpenXRFbRenderModel" parent="PlayerBody/XROrigin3D/LeftController" unique_id=642638939]
-
 [node name="LeftHandMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController" unique_id=2085390048]
 cast_shadow = 0
 mesh = SubResource("BoxMesh_hand")
@@ -192,9 +188,6 @@ mesh = SubResource("CylinderMesh_pointer_hit")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.549018, 0, 0)
 tracker = &"right_hand"
 pose = &"grip"
-
-[node name="OpenXRFbRenderModel" type="OpenXRFbRenderModel" parent="PlayerBody/XROrigin3D/RightController" unique_id=817189998]
-render_model_type = 1
 
 [node name="RightHandMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/RightController" unique_id=911480807]
 cast_shadow = 0
@@ -305,7 +298,7 @@ cast_shadow = 0
 mesh = SubResource("QuadMesh_pointer_face")
 
 [node name="PointerRayCast" type="RayCast3D" parent="PlayerBody/DesktopCamera/CenterPointer" unique_id=399327217]
-target_position = Vector3(0, 0, -5.0)
+target_position = Vector3(0, 0, -5)
 collision_mask = 33
 hit_from_inside = true
 collide_with_areas = true
@@ -366,6 +359,7 @@ mesh = SubResource("BoxMesh_hand")
 
 [node name="PlayerMovementComponent" type="Node" parent="." unique_id=232556656]
 script = ExtResource("12_movement")
+locomotion_mode = 0
 turn_mode = 1
 debug_world_grab_logs = false
 enable_one_hand_world_grab = false
@@ -373,6 +367,7 @@ enable_one_hand_world_rotate = false
 enable_one_hand_rotation = false
 show_one_hand_grab_visual = false
 auto_respawn_enabled = true
+player_gravity_enabled = true
 autojoin_enabled = true
 v2_show_visual = false
 enable_two_hand_grab_v3 = false
@@ -394,11 +389,10 @@ script = ExtResource("15_voice_comp")
 [node name="SimpleWorldGrabComponent" type="Node" parent="." unique_id=739088080]
 script = ExtResource("16_simple_grab")
 
-[node name="HandMovementComponent" type="Node" parent="."]
+[node name="HandMovementComponent" type="Node" parent="." unique_id=302677307]
 script = ExtResource("17_hand_movement")
 enabled = false
-show_visual = true
 
-[node name="DesktopInteractionComponent" type="Node" parent="."]
+[node name="DesktopInteractionComponent" type="Node" parent="." unique_id=1298501198]
 script = ExtResource("18_desktop_interaction")
 debug_logs = true

@@ -18,34 +18,25 @@
 [ext_resource type="PackedScene" uid="uid://cdgp2jenr70oq" path="res://src/objects/grabbables/TrianglePointTool.tscn" id="28_triangle_tool"]
 [ext_resource type="PackedScene" uid="uid://cqtv3jhgmgsfw" path="res://src/levels/poly_exports/poly_2025-12-09T16-25-02.gltf" id="28_wb7rf"]
 [ext_resource type="PackedScene" uid="uid://wly7in1mfwww" path="res://src/objects/grabbables/PolyTool.tscn" id="29_poly_tool"]
-[ext_resource type="PackedScene" path="res://src/ui/PolyToolViewport3D.tscn" id="31_poly_tool_viewport"]
-[ext_resource type="PackedScene" path="res://src/ui/LLMChatViewport3D.tscn" id="32_lab7j"]
-[ext_resource type="PackedScene" path="res://src/ui/transcript/WorldTranscriptViewport3D.tscn" id="33_kcv1b"]
 [ext_resource type="PackedScene" path="res://src/objects/TransformTool.tscn" id="33_transform_tool"]
 [ext_resource type="Material" uid="uid://cyo28qn76a78l" path="res://src/demos/tools/materials/lava.tres" id="34_s8yin"]
 [ext_resource type="Script" uid="uid://df75mfql4rt54" path="res://src/systems/tool_pool_manager.gd" id="34_tool_pool"]
 [ext_resource type="Shader" uid="uid://dmtpwwlxwmxxb" path="res://src/demos/tools/shaders/plasma.gdshader" id="35_82eun"]
 [ext_resource type="Script" uid="uid://b6csn023mq1rj" path="res://src/demos/tools/scripts/csg_mover.gd" id="35_hr53f"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/TwoHandGrabCube.tscn" id="36_two_hand_cube"]
-[ext_resource type="PackedScene" path="res://src/ui/TwoHandGrabSettingsViewport3D.tscn" id="37_two_hand_settings"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/WorldGrabSphere.tscn" id="38_world_grab_sphere"]
 [ext_resource type="Script" uid="uid://om3k532gai8j" path="res://src/ui/ui_panel_manager.gd" id="39_ui_panel_manager"]
-[ext_resource type="PackedScene" path="res://src/ui/git/GitViewport3D.tscn" id="39_wh2ee"]
 [ext_resource type="Script" uid="uid://bqrnwqkyb00kx" path="res://src/ui/ui_panel_scene_setup.gd" id="40_ui_panel_setup"]
-[ext_resource type="Script" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
+[ext_resource type="Script" uid="uid://bid6ju5yhq61q" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
 [ext_resource type="PackedScene" uid="uid://cm8nv7v0apls3" path="res://src/objects/grabbables/GrappleHook.tscn" id="42_grapple_hook"]
 [ext_resource type="PackedScene" path="res://src/objects/ReferenceBlock.tscn" id="43_reference_block"]
-[ext_resource type="PackedScene" path="res://src/ui/BlockLibraryViewport3D.tscn" id="44_block_library_viewport"]
 [ext_resource type="PackedScene" path="res://src/ui/WatchMenuViewport3D.tscn" id="44_l4aac"]
 [ext_resource type="PackedScene" uid="uid://qsf5yp02t1i7" path="res://src/ui/window_wrapper/WindowWrapper.tscn" id="45_giw25"]
 [ext_resource type="PackedScene" uid="uid://baesap7jjgmfh" path="res://src/objects/grabbables/PaintBrush.tscn" id="45_paint_brush"]
-[ext_resource type="PackedScene" path="res://src/ui/MovementSettingsViewport2.tscn" id="46_sv5fj"]
-[ext_resource type="PackedScene" path="res://src/ui/TerminalViewport3D.tscn" id="46_terminal"]
-[ext_resource type="PackedScene" path="res://src/ui/AssetLibraryViewport3D.tscn" id="47_0ej7u"]
-[ext_resource type="Script" path="res://src/objects/viewport_mirror.gd" id="47_viewport_mirror"]
+[ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://src/objects/viewport_mirror.gd" id="47_viewport_mirror"]
+[ext_resource type="PackedScene" uid="uid://cgyy8aymftol2" path="res://mountains.tscn" id="48_2vkk0"]
 [ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://src/systems/grid_painter.gd" id="48_grid_painter"]
-[ext_resource type="PackedScene" path="res://src/ui/PassthroughSettingsViewport3D.tscn" id="49_passthrough_settings"]
-[ext_resource type="PackedScene" uid="uid://d3x8y7yqk8y8j" path="res://src/ui/HandTrackingViewport3D.tscn" id="50_hand_tracking_ui"]
+[ext_resource type="Script" uid="uid://cfrhsl8g3fmpt" path="res://src/systems/mesh_collision_generator.gd" id="49_collision"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/ShapeTool.tscn" id="51_shape_tool"]
 
 [sub_resource type="Environment" id="Environment_main"]
@@ -137,8 +128,6 @@ remove_preplaced_panels = false
 
 [node name="SceneEnvironmentSetup" type="Node" parent="." unique_id=2105678901]
 script = ExtResource("41_env_setup")
-enable_passthrough = true
-restore_skybox = false
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1403982438]
 environment = SubResource("Environment_main")
@@ -148,10 +137,11 @@ transform = Transform3D(-0.8660238, -0.43301556, 0.2500009, 0.46019384, -0.49477
 shadow_enabled = true
 
 [node name="NodeInspectorTool" parent="." unique_id=1156427494 instance=ExtResource("5_pswl6")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.778507, 2.2591286, -2.2566147)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.505848, 2.2591286, -2.2566147)
 
 [node name="Floor" type="StaticBody3D" parent="." unique_id=386014746]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2.51753, 0)
+collision_layer = 0
 collision_mask = 0
 script = ExtResource("4_floor_script")
 
@@ -170,10 +160,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
 transform = Transform3D(0.999598, 0, 0, 0, 0.999598, 0, 0, 0, 0.999598, 0, 2, 0)
 
 [node name="UnifiedRoomViewport3D" parent="." unique_id=1842196751 instance=ExtResource("13_unified_ui")]
-transform = Transform3D(0.505, 0, 0, 0, 0.505, 0, 0, 0, 0.505, -3.54267, 0.5762043, 2.4233363)
+transform = Transform3D(0.505, 0, 0, 0, 0.505, 0, 0, 0, 0.505, -3.54267, -0.81940234, -5.979252)
 
 [node name="LiveKitViewport3D" parent="." unique_id=1947332191 instance=ExtResource("14_livekit_viewport")]
-transform = Transform3D(0.505, 0, 0, 0, 0.505, 0, 0, 0, 0.505, 4, 1.04535, 1.8955536)
+transform = Transform3D(0.505, 0, 0, 0, 0.505, 0, 0, 0, 0.505, -5.021433, -0.81899786, -6.0242968)
 
 [node name="GridSnapMesh" parent="." unique_id=590314461 instance=ExtResource("6_hjxlr")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.9205, 0, -2.19572)
@@ -182,17 +172,46 @@ vertex_count = 12
 shape_radius = 0.1
 grab_mode = 0
 
-[node name="GravityInverter" parent="." unique_id=465867166 instance=ExtResource("7_gravity_inverter")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.29757, 1.5, 4.3955536)
+[node name="Node3D" type="Node3D" parent="." unique_id=446305085]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.100463, 1.5, 5.3501425)
 
-[node name="CameraFlipper" parent="." unique_id=284514304 instance=ExtResource("8_camera_flipper")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.96446, 1.5, 5.8955536)
+[node name="VolumeHullPen" parent="Node3D" unique_id=510759392 instance=ExtResource("24_volume_hull_pen")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.7291398, 0, -3)
 
-[node name="DizzySphere" parent="." unique_id=1325823028 instance=ExtResource("9_dizzy_sphere")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.72914, 1.5, 4.3955536)
+[node name="VolumeHullPen2" parent="Node3D" unique_id=909618236 instance=ExtResource("24_volume_hull_pen")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.15765524, 0, -3)
+hull_color = Color(0.34145394, 0.09690256, 0.22746554, 1)
+invert_faces = true
+show_hull_points = false
 
-[node name="SpeedBooster" parent="." unique_id=1021745802 instance=ExtResource("10_speed_booster")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.87087, 1.5, 2.8955536)
+[node name="TrianglePointTool" parent="Node3D" unique_id=1808455527 instance=ExtResource("28_triangle_tool")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.2291398, 0, -3)
+
+[node name="PolyTool" parent="Node3D" unique_id=1848529103 instance=ExtResource("29_poly_tool")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.7291398, 0, -3)
+
+[node name="ShapeTool" parent="Node3D" unique_id=2001238079 instance=ExtResource("51_shape_tool")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.72914, -1.4064087, -7.740692)
+
+[node name="VoxelToolNew" parent="Node3D" unique_id=1529691265 instance=ExtResource("15_voxel_tool")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.3882632, -0.5534687, -5.085684)
+
+[node name="ConvexHullPen" parent="Node3D" unique_id=438475259 instance=ExtResource("23_convex_hull_pen")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.2291398, 0, -3)
+
+[node name="SpeedBooster" parent="Node3D" unique_id=1021745802 instance=ExtResource("10_speed_booster")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.14173031, 0, -1.5)
+
+[node name="DizzySphere" parent="Node3D" unique_id=1325823028 instance=ExtResource("9_dizzy_sphere")]
+
+[node name="CameraFlipper" parent="Node3D" unique_id=284514304 instance=ExtResource("8_camera_flipper")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.7646799, 0, -0.43906498)
+
+[node name="GravityInverter" parent="Node3D" unique_id=465867166 instance=ExtResource("7_gravity_inverter")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.4315696, 0, 0)
+
+[node name="TransformTool" parent="Node3D" unique_id=1583429753 instance=ExtResource("33_transform_tool")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.1291399, -0.5, -3)
 
 [node name="GridLineDisplay" parent="." unique_id=1041894421 instance=ExtResource("12_grid_display")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, 0)
@@ -200,80 +219,34 @@ visible = false
 grid_size = 100
 height_noise_scale = 0.0
 
-[node name="TransformTool" parent="." unique_id=1583429753 instance=ExtResource("33_transform_tool")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.6, 1, 1.3955536)
-
-[node name="ConvexHullPen" parent="." unique_id=438475259 instance=ExtResource("23_convex_hull_pen")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, 1.5, 1.3955536)
-
-[node name="VoxelToolNew" parent="." unique_id=1529691265 instance=ExtResource("15_voxel_tool")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.4867425, 0.9465313, -0.69013023)
-
-[node name="VolumeHullPen" parent="." unique_id=510759392 instance=ExtResource("24_volume_hull_pen")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1.5, 1.3955536)
-
-[node name="VolumeHullPen2" parent="." unique_id=909618236 instance=ExtResource("24_volume_hull_pen")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5714846, 1.5, 1.3955536)
-hull_color = Color(0.34145394, 0.09690256, 0.22746554, 1)
-invert_faces = true
-show_hull_points = false
-
-[node name="TrianglePointTool" parent="." unique_id=1808455527 instance=ExtResource("28_triangle_tool")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 1.5, 1.3955536)
-
-[node name="PolyTool" parent="." unique_id=1848529103 instance=ExtResource("29_poly_tool")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1.5, 1.3955536)
-
-[node name="PolyToolViewport3D" parent="." unique_id=460417354 instance=ExtResource("31_poly_tool_viewport")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1.5, 1.3955536)
-
-[node name="ShapeTool" parent="." unique_id=2001238079 instance=ExtResource("51_shape_tool")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.09359133, -3.3451385)
-
 [node name="PolyToolExport" parent="." unique_id=1827706603 instance=ExtResource("28_wb7rf")]
-transform = Transform3D(1, 0, 0, 0, 1.6025667, 0, 0, 0, 1, 0, -1.54777, -7.050523)
+transform = Transform3D(1, 0, 0, 0, 1.6025667, 0, 0, 0, 1, 10.292227, -3.9222593, 2.9155023)
 
 [node name="TwoHandGrabCube" parent="." unique_id=1441243323 instance=ExtResource("36_two_hand_cube")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 1.5, 1.3955536)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.6269083, -0.9914942, -2.133254)
 grab_mode = 0
 
-[node name="TwoHandGrabSettingsViewport3D" parent="." unique_id=1249878899 instance=ExtResource("37_two_hand_settings")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 2.3, 1.3955536)
-
-[node name="PassthroughSettingsViewport3D" parent="." unique_id=711707377 instance=ExtResource("49_passthrough_settings")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.01244545, 2.3, -1.7094151)
-
 [node name="WorldGrabSphere" parent="." unique_id=2023121301 instance=ExtResource("38_world_grab_sphere")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1.5, 1.3955536)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.93825, 1.4999998, 1.6759646)
 
 [node name="GrappleHook" parent="." unique_id=2106789012 instance=ExtResource("42_grapple_hook")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 1, 1.3955536)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.6244411, 1, 1.3955536)
 rope_sag_factor = 0.005
 rope_sag_max = 0.5
 
 [node name="ReferenceBlock" parent="." unique_id=2107890123 instance=ExtResource("43_reference_block")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.2, -0.69013023)
 
-[node name="BlockLibraryViewport3D" parent="." unique_id=2108901234 instance=ExtResource("44_block_library_viewport")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.8, -0.69013023)
-
 [node name="PaintBrush" parent="." unique_id=2109012345 instance=ExtResource("45_paint_brush")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.8, 0.95, -0.69013023)
-
-[node name="TerminalViewport3D" parent="." unique_id=1892411932 instance=ExtResource("46_terminal")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1.5, 2)
-
-[node name="LLMChatViewport3D" parent="." unique_id=405837670 instance=ExtResource("32_lab7j")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.702578, 1.1824706, 1.6545687)
-
-[node name="WorldTranscriptViewport3D" parent="." unique_id=2139467383 instance=ExtResource("33_kcv1b")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.983923, 0.88246953, 1.516645)
+visible = false
 
 [node name="PlasmaDemos" type="Node3D" parent="." unique_id=67851916]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.6498556)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9907322, 1.6109066, -1.3133671)
 
 [node name="ShaderPlasma" type="CSGSphere3D" parent="PlasmaDemos" unique_id=1217239899]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -1.0310359, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -1.8723283, 0)
+cast_shadow = 0
 radius = 0.75
 material = SubResource("StandardMaterial3D_wvm1w")
 script = ExtResource("35_hr53f")
@@ -289,10 +262,11 @@ offset_bottom = 512.0
 
 [node name="PlasmaBox" type="CSGBox3D" parent="PlasmaDemos" unique_id=21165305]
 transform = Transform3D(-0.44000003, 0, -3.8466023e-08, 0, 0.44, 0, 3.8466023e-08, 0, -0.44000003, 1.85, 0.7, -12.497022)
+cast_shadow = 0
 material = SubResource("StandardMaterial3D_wvm1w")
 
 [node name="Sphere" type="CSGSphere3D" parent="PlasmaDemos/PlasmaBox" unique_id=716390065]
-transform = Transform3D(2.36, 0, 0, 0, 2.36, 0, 0, 0, 2.36, 0, 0, -2.0514994)
+transform = Transform3D(2.36, 0, 0, 0, 2.36, 0, 0, 0, 2.36, 0, 0, -1.8712593)
 operation = 2
 radius = 0.6
 material = ExtResource("34_s8yin")
@@ -309,9 +283,6 @@ ResolutionPerUnit = 500
 MainCamPath = NodePath("../XRPlayer/PlayerBody/XROrigin3D/XRCamera3D")
 MirrorColor = Color(1, 1, 1, 1)
 
-[node name="GitViewport3D" parent="ViewportMirror" unique_id=2017342683 instance=ExtResource("39_wh2ee")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.798975, 0, 2.9331493)
-
 [node name="GridPainterTest" type="Node3D" parent="." unique_id=1341686196]
 transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, -8, 0, -3.5)
 script = ExtResource("48_grid_painter")
@@ -327,6 +298,7 @@ body_subdivisions = Vector3i(6, 8, 4)
 
 [node name="GridTargetLeft" type="MeshInstance3D" parent="GridPainterTest" unique_id=1330662245]
 transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 0.180541, 0.12471, -2)
+cast_shadow = 0
 mesh = SubResource("BoxMesh_left_hand_grid")
 
 [node name="GridTargetLeftArea" type="Area3D" parent="GridPainterTest/GridTargetLeft" unique_id=1846126901]
@@ -338,6 +310,7 @@ shape = SubResource("BoxShape3D_left_hand_grid")
 
 [node name="GridTargetRight" type="MeshInstance3D" parent="GridPainterTest" unique_id=1454956693]
 transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, -0.534751, 0.128569, -2)
+cast_shadow = 0
 mesh = SubResource("BoxMesh_right_hand_grid")
 
 [node name="GridTargetRightArea" type="Area3D" parent="GridPainterTest/GridTargetRight" unique_id=1426291711]
@@ -349,6 +322,7 @@ shape = SubResource("BoxShape3D_right_hand_grid")
 
 [node name="GridTargetHead" type="MeshInstance3D" parent="GridPainterTest" unique_id=1192669384]
 transform = Transform3D(-0.22, 1.9233e-08, 0, -1.9233e-08, -0.22, 0, 0, 0, 0.22, -0.174122, 0.619416, -2.1022)
+cast_shadow = 0
 mesh = SubResource("BoxMesh_head_grid")
 
 [node name="GridTargetHeadArea" type="Area3D" parent="GridPainterTest/GridTargetHead" unique_id=648976370]
@@ -360,6 +334,7 @@ shape = SubResource("BoxShape3D_head_grid")
 
 [node name="GridTargetBody" type="MeshInstance3D" parent="GridPainterTest" unique_id=1129659143]
 transform = Transform3D(0.3, 0, 0, 0, 0.4, 0, 0, 0, 0.2, -0.167079, 0.247408, -2.018)
+cast_shadow = 0
 mesh = SubResource("BoxMesh_body_grid")
 
 [node name="GridTargetBodyArea" type="Area3D" parent="GridPainterTest/GridTargetBody" unique_id=357483678]
@@ -369,18 +344,12 @@ collision_mask = 32
 [node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest/GridTargetBody/GridTargetBodyArea" unique_id=1858467520]
 shape = SubResource("BoxShape3D_body_grid")
 
-[node name="HandTrackingUI" parent="." unique_id=472303655 instance=ExtResource("50_hand_tracking_ui")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -5.5)
-
-[node name="WatchMenuViewport3D" parent="." unique_id=1401560598 instance=ExtResource("44_l4aac")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.465013, 0.9824699, -2.9305544)
-
 [node name="WindowWrapper" parent="." unique_id=858073771 instance=ExtResource("45_giw25")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.4505458, 0.9694128, -2.4343371)
 content_viewport_scene = ExtResource("44_l4aac")
 
-[node name="MovementSettingsViewport2" parent="." unique_id=439130118 instance=ExtResource("46_sv5fj")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.4705753, 0.993963, 0)
+[node name="mountains2" parent="." unique_id=943051498 instance=ExtResource("48_2vkk0")]
+transform = Transform3D(0.7222361, 0.00032064758, 0.6916465, -0.00024327544, 1, -0.00020956765, -0.6916466, -1.693095e-05, 0.72223616, 9.38728, -11.878228, -5.9929123)
 
-[node name="AssetLibraryViewport3D" parent="." unique_id=2145531181 instance=ExtResource("47_0ej7u")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -2.5)
+[node name="CollisionGenerator" type="Node" parent="mountains2" unique_id=943051500]
+script = ExtResource("49_collision")
