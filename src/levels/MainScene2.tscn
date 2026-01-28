@@ -47,9 +47,6 @@
 [ext_resource type="PackedScene" uid="uid://qsf5yp02t1i7" path="res://src/ui/window_wrapper/WindowWrapper.tscn" id="45_lt3uu"]
 [ext_resource type="PackedScene" path="res://src/ui/MovementSettingsViewport2.tscn" id="46_fmx8f"]
 [ext_resource type="PackedScene" path="res://src/ui/AssetLibraryViewport3D.tscn" id="47_gs70c"]
-[ext_resource type="PackedScene" uid="uid://cgyy8aymftol2" path="res://mountains.tscn" id="48_vg4qv"]
-[ext_resource type="Script" path="res://src/systems/mesh_collision_generator.gd" id="49_collision"]
-
 
 [sub_resource type="Environment" id="Environment_main"]
 
@@ -274,7 +271,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.983923, 0.88246953, 1.516
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.6498556)
 
 [node name="ShaderPlasma" type="CSGSphere3D" parent="PlasmaDemos" unique_id=1217239899]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -1.2180703, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -0.9379179, 0)
 radius = 0.75
 material = SubResource("StandardMaterial3D_wvm1w")
 script = ExtResource("37_5ocim")
@@ -293,7 +290,7 @@ transform = Transform3D(-0.44000003, 0, -3.8466023e-08, 0, 0.44, 0, 3.8466023e-0
 material = SubResource("StandardMaterial3D_wvm1w")
 
 [node name="Sphere" type="CSGSphere3D" parent="PlasmaDemos/PlasmaBox" unique_id=716390065]
-transform = Transform3D(2.36, 0, 0, 0, 2.36, 0, 0, 0, 2.36, 0, 0, -2.0499694)
+transform = Transform3D(2.36, 0, 0, 0, 2.36, 0, 0, 0, 2.36, 0, 0, -1.8342277)
 operation = 2
 radius = 0.6
 material = ExtResource("39_c40wo")
@@ -389,10 +386,3 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.4705753, 0.993963, 0)
 
 [node name="AssetLibraryViewport3D" parent="." unique_id=2145531181 instance=ExtResource("47_gs70c")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -2.5)
-
-[node name="mountains2" parent="." unique_id=943051498 instance=ExtResource("48_vg4qv")]
-transform = Transform3D(0.68006855, 0, 0.7331485, 0, 1, 0, -0.7331485, 0, 0.68006855, 9.374904, -11.88872, -5.9883633)
-
-[node name="CollisionGenerator" type="Node" parent="mountains2" unique_id=943051499]
-script = ExtResource("49_collision")
-collision_layer = 1

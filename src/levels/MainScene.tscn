@@ -34,9 +34,7 @@
 [ext_resource type="PackedScene" uid="uid://qsf5yp02t1i7" path="res://src/ui/window_wrapper/WindowWrapper.tscn" id="45_giw25"]
 [ext_resource type="PackedScene" uid="uid://baesap7jjgmfh" path="res://src/objects/grabbables/PaintBrush.tscn" id="45_paint_brush"]
 [ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://src/objects/viewport_mirror.gd" id="47_viewport_mirror"]
-[ext_resource type="PackedScene" uid="uid://cgyy8aymftol2" path="res://mountains.tscn" id="48_2vkk0"]
 [ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://src/systems/grid_painter.gd" id="48_grid_painter"]
-[ext_resource type="Script" uid="uid://cfrhsl8g3fmpt" path="res://src/systems/mesh_collision_generator.gd" id="49_collision"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/ShapeTool.tscn" id="51_shape_tool"]
 
 [sub_resource type="Environment" id="Environment_main"]
@@ -245,7 +243,7 @@ visible = false
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9907322, 1.6109066, -1.3133671)
 
 [node name="ShaderPlasma" type="CSGSphere3D" parent="PlasmaDemos" unique_id=1217239899]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -1.8723283, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -1.85415, 0)
 cast_shadow = 0
 radius = 0.75
 material = SubResource("StandardMaterial3D_wvm1w")
@@ -266,7 +264,7 @@ cast_shadow = 0
 material = SubResource("StandardMaterial3D_wvm1w")
 
 [node name="Sphere" type="CSGSphere3D" parent="PlasmaDemos/PlasmaBox" unique_id=716390065]
-transform = Transform3D(2.36, 0, 0, 0, 2.36, 0, 0, 0, 2.36, 0, 0, -1.8712593)
+transform = Transform3D(2.36, 0, 0, 0, 2.36, 0, 0, 0, 2.36, 0, 0, -1.8400184)
 operation = 2
 radius = 0.6
 material = ExtResource("34_s8yin")
@@ -347,9 +345,3 @@ shape = SubResource("BoxShape3D_body_grid")
 [node name="WindowWrapper" parent="." unique_id=858073771 instance=ExtResource("45_giw25")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.4505458, 0.9694128, -2.4343371)
 content_viewport_scene = ExtResource("44_l4aac")
-
-[node name="mountains2" parent="." unique_id=943051498 instance=ExtResource("48_2vkk0")]
-transform = Transform3D(0.7222361, 0.00032064758, 0.6916465, -0.00024327544, 1, -0.00020956765, -0.6916466, -1.693095e-05, 0.72223616, 9.38728, -11.878228, -5.9929123)
-
-[node name="CollisionGenerator" type="Node" parent="mountains2" unique_id=943051500]
-script = ExtResource("49_collision")
