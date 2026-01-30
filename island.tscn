@@ -1,0 +1,392 @@
+[gd_scene format=3 uid="uid://bdgtb4clc5scx"]
+
+[ext_resource type="PackedScene" uid="uid://bnxdtbg18q0sl" path="res://assets/worlds/island.fbx" id="1_0iamf"]
+
+[node name="island" unique_id=1304383343 instance=ExtResource("1_0iamf")]
+
+[node name="100001" parent="." index="0" unique_id=1265765733]
+cast_shadow = 0
+
+[node name="100004" parent="." index="1" unique_id=1240998074]
+cast_shadow = 0
+
+[node name="100006" parent="." index="2" unique_id=287418130]
+cast_shadow = 0
+
+[node name="100010" parent="." index="3" unique_id=1818432125]
+cast_shadow = 0
+
+[node name="100011" parent="." index="4" unique_id=1628360038]
+cast_shadow = 0
+
+[node name="100012" parent="." index="5" unique_id=1384903689]
+cast_shadow = 0
+
+[node name="100013" parent="." index="6" unique_id=994788379]
+cast_shadow = 0
+
+[node name="100014" parent="." index="7" unique_id=1433508689]
+cast_shadow = 0
+
+[node name="100015" parent="." index="8" unique_id=27530099]
+cast_shadow = 0
+
+[node name="100018" parent="." index="9" unique_id=120410478]
+cast_shadow = 0
+
+[node name="100019" parent="." index="10" unique_id=1700954304]
+cast_shadow = 0
+
+[node name="100020" parent="." index="11" unique_id=679674103]
+cast_shadow = 0
+
+[node name="100021" parent="." index="12" unique_id=460329011]
+cast_shadow = 0
+
+[node name="100022" parent="." index="13" unique_id=1191533514]
+cast_shadow = 0
+
+[node name="100023" parent="." index="14" unique_id=1051433708]
+cast_shadow = 0
+
+[node name="100026" parent="." index="15" unique_id=1907077309]
+cast_shadow = 0
+
+[node name="100027" parent="." index="16" unique_id=1264806992]
+cast_shadow = 0
+
+[node name="100028" parent="." index="17" unique_id=1235315649]
+cast_shadow = 0
+
+[node name="100029" parent="." index="18" unique_id=1398394657]
+cast_shadow = 0
+
+[node name="100030" parent="." index="19" unique_id=1519223073]
+cast_shadow = 0
+
+[node name="100031" parent="." index="20" unique_id=1616304054]
+cast_shadow = 0
+
+[node name="100032" parent="." index="21" unique_id=1697532198]
+cast_shadow = 0
+
+[node name="100033" parent="." index="22" unique_id=312852674]
+cast_shadow = 0
+
+[node name="100038" parent="." index="23" unique_id=907560802]
+cast_shadow = 0
+
+[node name="100039" parent="." index="24" unique_id=1775047280]
+cast_shadow = 0
+
+[node name="100040" parent="." index="25" unique_id=1007100272]
+cast_shadow = 0
+
+[node name="100042" parent="." index="26" unique_id=745862108]
+cast_shadow = 0
+
+[node name="100043" parent="." index="27" unique_id=466556140]
+cast_shadow = 0
+
+[node name="100044" parent="." index="28" unique_id=697067287]
+cast_shadow = 0
+
+[node name="100045" parent="." index="29" unique_id=1454569003]
+cast_shadow = 0
+
+[node name="100047" parent="." index="30" unique_id=1928192397]
+cast_shadow = 0
+
+[node name="100054" parent="." index="31" unique_id=716248559]
+cast_shadow = 0
+
+[node name="100056" parent="." index="32" unique_id=767886635]
+cast_shadow = 0
+
+[node name="100057" parent="." index="33" unique_id=911919989]
+cast_shadow = 0
+
+[node name="100058" parent="." index="34" unique_id=280821023]
+cast_shadow = 0
+
+[node name="100059" parent="." index="35" unique_id=1712468441]
+cast_shadow = 0
+
+[node name="100060" parent="." index="36" unique_id=577597281]
+cast_shadow = 0
+
+[node name="100063" parent="." index="37" unique_id=1330481918]
+cast_shadow = 0
+
+[node name="100064" parent="." index="38" unique_id=1993700818]
+cast_shadow = 0
+
+[node name="100065" parent="." index="39" unique_id=870957148]
+cast_shadow = 0
+
+[node name="100066" parent="." index="40" unique_id=251310114]
+cast_shadow = 0
+
+[node name="100067" parent="." index="41" unique_id=1907546787]
+cast_shadow = 0
+
+[node name="100069" parent="." index="42" unique_id=1235606338]
+cast_shadow = 0
+
+[node name="100070" parent="." index="43" unique_id=1550077071]
+cast_shadow = 0
+
+[node name="100072" parent="." index="44" unique_id=852983624]
+cast_shadow = 0
+
+[node name="100073" parent="." index="45" unique_id=261506328]
+cast_shadow = 0
+
+[node name="100074" parent="." index="46" unique_id=320032230]
+cast_shadow = 0
+
+[node name="100075" parent="." index="47" unique_id=75615435]
+cast_shadow = 0
+
+[node name="100077" parent="." index="48" unique_id=1824212447]
+cast_shadow = 0
+
+[node name="100078" parent="." index="49" unique_id=149343731]
+cast_shadow = 0
+
+[node name="100079" parent="." index="50" unique_id=1859813028]
+cast_shadow = 0
+
+[node name="100080" parent="." index="51" unique_id=150851134]
+cast_shadow = 0
+
+[node name="100008" parent="." index="52" unique_id=1458709616]
+cast_shadow = 0
+
+[node name="100009" parent="." index="53" unique_id=943652712]
+cast_shadow = 0
+
+[node name="100016" parent="." index="54" unique_id=499775264]
+cast_shadow = 0
+
+[node name="100017" parent="." index="55" unique_id=498155055]
+cast_shadow = 0
+
+[node name="100082" parent="." index="56" unique_id=1982350767]
+cast_shadow = 0
+
+[node name="100024" parent="." index="57" unique_id=1121351703]
+cast_shadow = 0
+
+[node name="100025" parent="." index="58" unique_id=504343767]
+cast_shadow = 0
+
+[node name="100035" parent="." index="59" unique_id=1307842445]
+cast_shadow = 0
+
+[node name="100051" parent="." index="60" unique_id=1252555012]
+cast_shadow = 0
+
+[node name="100055" parent="." index="61" unique_id=348756919]
+cast_shadow = 0
+
+[node name="100061" parent="." index="62" unique_id=1901999568]
+cast_shadow = 0
+
+[node name="100083" parent="." index="63" unique_id=99982097]
+cast_shadow = 0
+
+[node name="100086" parent="." index="64" unique_id=1962949651]
+cast_shadow = 0
+
+[node name="100089" parent="." index="65" unique_id=70596025]
+cast_shadow = 0
+
+[node name="100090" parent="." index="66" unique_id=972184520]
+cast_shadow = 0
+
+[node name="100091" parent="." index="67" unique_id=875256123]
+cast_shadow = 0
+
+[node name="100092" parent="." index="68" unique_id=1187133790]
+cast_shadow = 0
+
+[node name="100093" parent="." index="69" unique_id=1443536472]
+cast_shadow = 0
+
+[node name="100095" parent="." index="70" unique_id=981306284]
+cast_shadow = 0
+
+[node name="100099" parent="." index="71" unique_id=838987525]
+cast_shadow = 0
+
+[node name="100100" parent="." index="72" unique_id=224613253]
+cast_shadow = 0
+
+[node name="100102" parent="." index="73" unique_id=1912061698]
+cast_shadow = 0
+
+[node name="100104" parent="." index="74" unique_id=178016110]
+cast_shadow = 0
+
+[node name="100105" parent="." index="75" unique_id=80189795]
+cast_shadow = 0
+
+[node name="100106" parent="." index="76" unique_id=244224675]
+cast_shadow = 0
+
+[node name="100107" parent="." index="77" unique_id=758309747]
+cast_shadow = 0
+
+[node name="100108" parent="." index="78" unique_id=1252429973]
+cast_shadow = 0
+
+[node name="100109" parent="." index="79" unique_id=2102279959]
+cast_shadow = 0
+
+[node name="100110" parent="." index="80" unique_id=2079330106]
+cast_shadow = 0
+
+[node name="100111" parent="." index="81" unique_id=1064550287]
+cast_shadow = 0
+
+[node name="100112" parent="." index="82" unique_id=205125993]
+cast_shadow = 0
+
+[node name="100113" parent="." index="83" unique_id=1060561236]
+cast_shadow = 0
+
+[node name="100114" parent="." index="84" unique_id=234229188]
+cast_shadow = 0
+
+[node name="100115" parent="." index="85" unique_id=869460360]
+cast_shadow = 0
+
+[node name="100117" parent="." index="86" unique_id=719681504]
+cast_shadow = 0
+
+[node name="100118" parent="." index="87" unique_id=1794913684]
+cast_shadow = 0
+
+[node name="100120" parent="." index="88" unique_id=1646732567]
+cast_shadow = 0
+
+[node name="100121" parent="." index="89" unique_id=1964681925]
+cast_shadow = 0
+
+[node name="100122" parent="." index="90" unique_id=1548475581]
+cast_shadow = 0
+
+[node name="100124" parent="." index="91" unique_id=352106503]
+cast_shadow = 0
+
+[node name="100126" parent="." index="92" unique_id=1326993138]
+cast_shadow = 0
+
+[node name="100127" parent="." index="93" unique_id=1412747630]
+cast_shadow = 0
+
+[node name="100128" parent="." index="94" unique_id=1079470987]
+cast_shadow = 0
+
+[node name="100129" parent="." index="95" unique_id=163562984]
+cast_shadow = 0
+
+[node name="100131" parent="." index="96" unique_id=2105855084]
+cast_shadow = 0
+
+[node name="100132" parent="." index="97" unique_id=1267335690]
+cast_shadow = 0
+
+[node name="100133" parent="." index="98" unique_id=661404000]
+cast_shadow = 0
+
+[node name="100134" parent="." index="99" unique_id=578689127]
+cast_shadow = 0
+
+[node name="100135" parent="." index="100" unique_id=131960775]
+cast_shadow = 0
+
+[node name="100141" parent="." index="101" unique_id=1566149327]
+cast_shadow = 0
+
+[node name="100142" parent="." index="102" unique_id=524214528]
+cast_shadow = 0
+
+[node name="100144" parent="." index="103" unique_id=1224029495]
+cast_shadow = 0
+
+[node name="100145" parent="." index="104" unique_id=1331603]
+cast_shadow = 0
+
+[node name="100146" parent="." index="105" unique_id=195569762]
+cast_shadow = 0
+
+[node name="100147" parent="." index="106" unique_id=1325055108]
+cast_shadow = 0
+
+[node name="100148" parent="." index="107" unique_id=782602503]
+cast_shadow = 0
+
+[node name="100149" parent="." index="108" unique_id=966516830]
+cast_shadow = 0
+
+[node name="100150" parent="." index="109" unique_id=1519876446]
+cast_shadow = 0
+
+[node name="100152" parent="." index="110" unique_id=842588908]
+cast_shadow = 0
+
+[node name="100153" parent="." index="111" unique_id=702970182]
+cast_shadow = 0
+
+[node name="100154" parent="." index="112" unique_id=551756859]
+cast_shadow = 0
+
+[node name="100156" parent="." index="113" unique_id=1041544799]
+cast_shadow = 0
+
+[node name="100157" parent="." index="114" unique_id=1202933091]
+cast_shadow = 0
+
+[node name="100158" parent="." index="115" unique_id=1496167461]
+cast_shadow = 0
+
+[node name="100162" parent="." index="116" unique_id=798308261]
+cast_shadow = 0
+
+[node name="100164" parent="." index="117" unique_id=1254042706]
+cast_shadow = 0
+
+[node name="100165" parent="." index="118" unique_id=71938980]
+cast_shadow = 0
+
+[node name="100166" parent="." index="119" unique_id=310222521]
+cast_shadow = 0
+
+[node name="100167" parent="." index="120" unique_id=1833887834]
+cast_shadow = 0
+
+[node name="100171" parent="." index="121" unique_id=1339031556]
+cast_shadow = 0
+
+[node name="100172" parent="." index="122" unique_id=837507415]
+cast_shadow = 0
+
+[node name="100176" parent="." index="123" unique_id=1597188932]
+cast_shadow = 0
+
+[node name="100177" parent="." index="124" unique_id=634823016]
+cast_shadow = 0
+
+[node name="100178" parent="." index="125" unique_id=72316101]
+cast_shadow = 0
+
+[node name="100179" parent="." index="126" unique_id=751842553]
+cast_shadow = 0
+
+[node name="100002" parent="." index="127" unique_id=2113023873]
+cast_shadow = 0
+
+[node name="100003" parent="." index="128" unique_id=502948035]
+cast_shadow = 0
