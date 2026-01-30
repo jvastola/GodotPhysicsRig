@@ -228,6 +228,48 @@ var input_listen_events: Array[InputEvent] = []
 var movement_component: PlayerMovementComponent
 var defaults_snapshot := DEFAULTS.duplicate(true)
 
+# === Recent Toggle Tracking ===
+# Stores recent setting changes for the Watch Menu's "Recent" tab
+signal setting_toggled(setting_name: String, old_value, new_value, revert_callable: Callable)
+
+static var recent_toggles: Array[Dictionary] = []
+const MAX_RECENT_TOGGLES := 15
+
+
+static func record_toggle(setting_name: String, old_val, new_val, revert_callable: Callable) -> void:
+	"""Record a setting change for the Recent tab"""
+	var entry := {
+		"setting_name": setting_name,
+		"old_value": old_val,
+		"new_value": new_val,
+		"timestamp": Time.get_unix_time_from_system(),
+		"revert_callable": revert_callable
+	}
+	recent_toggles.insert(0, entry)
+	if recent_toggles.size() > MAX_RECENT_TOGGLES:
+		recent_toggles.resize(MAX_RECENT_TOGGLES)
+
+
+static func get_recent_toggles() -> Array[Dictionary]:
+	"""Get all recent toggles for display"""
+	return recent_toggles
+
+
+static func revert_toggle(index: int) -> void:
+	"""Revert a toggle at the given index"""
+	if index < 0 or index >= recent_toggles.size():
+		return
+	var entry: Dictionary = recent_toggles[index]
+	var revert_callable: Callable = entry.get("revert_callable", Callable())
+	if revert_callable.is_valid():
+		revert_callable.call()
+	recent_toggles.remove_at(index)
+
+
+static func clear_recent_toggles() -> void:
+	"""Clear all recent toggles"""
+	recent_toggles.clear()
+
 
 func _ready():
 	# Stretch to viewport to avoid clipping; rely on scroll for overflow
@@ -1330,6 +1372,7 @@ func _create_row(parent: VBoxContainer, label_text: String) -> HBoxContainer:
 
 func _on_locomotion_mode_changed(index: int):
 	if movement_component:
+		var old_mode = movement_component.locomotion_mode
 		movement_component.locomotion_mode = index as PlayerMovementComponent.LocomotionMode
 		var names := [
 			"Disabled",
@@ -1339,100 +1382,205 @@ func _on_locomotion_mode_changed(index: int):
 			"Hand Direction (3D)",
 		]
 		print("MovementSettings: Locomotion mode -> ", names[index] if index < names.size() else index)
+		MovementSettingsPanel.record_toggle(
+			"Locomotion Mode",
+			names[old_mode] if old_mode < names.size() else str(old_mode),
+			names[index] if index < names.size() else str(index),
+			func(): _on_locomotion_mode_changed(old_mode)
+		)
 	settings_changed.emit()
 
 
 func _on_locomotion_speed_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.locomotion_speed
 		movement_component.locomotion_speed = value
+		MovementSettingsPanel.record_toggle(
+			"Locomotion Speed",
+			"%.1f m/s" % old_val,
+			"%.1f m/s" % value,
+			func(): _on_locomotion_speed_changed(old_val)
+		)
 	locomotion_speed_label.text = "Speed: %.1f m/s" % value
 	settings_changed.emit()
 
 
 func _on_locomotion_deadzone_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.locomotion_deadzone
 		movement_component.locomotion_deadzone = value
+		MovementSettingsPanel.record_toggle(
+			"Locomotion Deadzone",
+			"%.2f" % old_val,
+			"%.2f" % value,
+			func(): _on_locomotion_deadzone_changed(old_val)
+		)
 	locomotion_deadzone_label.text = "Locomotion Deadzone: %.2f" % value
 	settings_changed.emit()
 
 
 func _on_locomotion_invert_x_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.invert_locomotion_x
 		movement_component.invert_locomotion_x = pressed
+		MovementSettingsPanel.record_toggle(
+			"Invert Locomotion X",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_locomotion_invert_x_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_locomotion_invert_y_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.invert_locomotion_y
 		movement_component.invert_locomotion_y = pressed
+		MovementSettingsPanel.record_toggle(
+			"Invert Locomotion Y",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_locomotion_invert_y_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_turn_mode_changed(index: int):
 	if movement_component:
+		var old_mode = movement_component.turn_mode
 		movement_component.turn_mode = index as PlayerMovementComponent.TurnMode
+		var names := ["Snap", "Smooth"]
+		MovementSettingsPanel.record_toggle(
+			"Turn Mode",
+			names[old_mode] if old_mode < names.size() else str(old_mode),
+			names[index] if index < names.size() else str(index),
+			func(): _on_turn_mode_changed(old_mode)
+		)
 	settings_changed.emit()
 
 
 func _on_snap_angle_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.snap_turn_angle
 		movement_component.snap_turn_angle = value
+		MovementSettingsPanel.record_toggle(
+			"Snap Angle",
+			"%.0f°" % old_val,
+			"%.0f°" % value,
+			func(): _on_snap_angle_changed(old_val)
+		)
 	snap_angle_label.text = "Snap Angle: %.0f°" % value
 	settings_changed.emit()
 
 
 func _on_snap_cooldown_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.snap_turn_cooldown
 		movement_component.snap_turn_cooldown = value
+		MovementSettingsPanel.record_toggle(
+			"Snap Cooldown",
+			"%.2fs" % old_val,
+			"%.2fs" % value,
+			func(): _on_snap_cooldown_changed(old_val)
+		)
 	snap_cooldown_label.text = "Snap Cooldown: %.2fs" % value
 	settings_changed.emit()
 
 
 func _on_smooth_speed_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.smooth_turn_speed
 		movement_component.smooth_turn_speed = value
+		MovementSettingsPanel.record_toggle(
+			"Smooth Speed",
+			"%.0f°/s" % old_val,
+			"%.0f°/s" % value,
+			func(): _on_smooth_speed_changed(old_val)
+		)
 	smooth_speed_label.text = "Smooth Speed: %.0f°/s" % value
 	settings_changed.emit()
 
 
 func _on_deadzone_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.turn_deadzone
 		movement_component.turn_deadzone = value
+		MovementSettingsPanel.record_toggle(
+			"Turn Deadzone",
+			"%.2f" % old_val,
+			"%.2f" % value,
+			func(): _on_deadzone_changed(old_val)
+		)
 	deadzone_label.text = "Deadzone: %.2f" % value
 	settings_changed.emit()
 
 
 func _on_turn_invert_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.invert_turn_x
 		movement_component.invert_turn_x = pressed
+		MovementSettingsPanel.record_toggle(
+			"Invert Turn",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_turn_invert_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_hand_swap_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.hand_assignment == PlayerMovementComponent.HandAssignment.SWAPPED
 		if pressed:
 			movement_component.hand_assignment = PlayerMovementComponent.HandAssignment.SWAPPED
 		else:
 			movement_component.hand_assignment = PlayerMovementComponent.HandAssignment.DEFAULT
 		print("MovementSettings: Hand swap -> ", "Swapped" if pressed else "Default")
+		MovementSettingsPanel.record_toggle(
+			"Swap Hands",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_hand_swap_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_ui_scroll_override_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.ui_scroll_steals_stick
 		movement_component.ui_scroll_steals_stick = pressed
+		MovementSettingsPanel.record_toggle(
+			"UI Scroll Stick",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_ui_scroll_override_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_disable_joystick_grip_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.disable_joystick_on_grip
 		movement_component.disable_joystick_on_grip = pressed
+		MovementSettingsPanel.record_toggle(
+			"Disable Joystick on Grip",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_disable_joystick_grip_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_ui_scroll_speed_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.ui_scroll_wheel_factor
 		movement_component.ui_scroll_wheel_factor = value
+		MovementSettingsPanel.record_toggle(
+			"UI Scroll Speed",
+			"%.0f" % old_val,
+			"%.0f" % value,
+			func(): _on_ui_scroll_speed_changed(old_val)
+		)
 	if ui_scroll_speed_label:
 		ui_scroll_speed_label.text = " %.0f" % value
 	settings_changed.emit()
@@ -1440,57 +1588,121 @@ func _on_ui_scroll_speed_changed(value: float):
 
 func _on_world_scale_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.enable_two_hand_world_scale
 		movement_component.enable_two_hand_world_scale = pressed
+		MovementSettingsPanel.record_toggle(
+			"Two-Hand Scale",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_world_scale_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_world_rotation_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.enable_two_hand_world_rotation
 		movement_component.enable_two_hand_world_rotation = pressed
+		MovementSettingsPanel.record_toggle(
+			"Two-Hand Rotation",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_world_rotation_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_two_hand_left_action_changed(value: String):
 	if movement_component:
+		var old_val = movement_component.two_hand_left_action
 		movement_component.two_hand_left_action = value
+		MovementSettingsPanel.record_toggle(
+			"Two-Hand Left Action",
+			old_val,
+			value,
+			func(): _on_two_hand_left_action_changed(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_two_hand_right_action_changed(value: String):
 	if movement_component:
+		var old_val = movement_component.two_hand_right_action
 		movement_component.two_hand_right_action = value
+		MovementSettingsPanel.record_toggle(
+			"Two-Hand Right Action",
+			old_val,
+			value,
+			func(): _on_two_hand_right_action_changed(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_two_hand_pivot_changed(idx: int):
 	if movement_component:
+		var old_val = movement_component.two_hand_rotation_pivot
 		movement_component.two_hand_rotation_pivot = idx as PlayerMovementComponent.TwoHandPivot
+		var names := ["Midpoint", "Player Origin"]
+		MovementSettingsPanel.record_toggle(
+			"Two-Hand Pivot",
+			names[old_val] if old_val < names.size() else str(old_val),
+			names[idx] if idx < names.size() else str(idx),
+			func(): _on_two_hand_pivot_changed(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_show_two_hand_visual_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.show_two_hand_rotation_visual
 		movement_component.show_two_hand_rotation_visual = pressed
 		movement_component._ensure_visuals()
+		MovementSettingsPanel.record_toggle(
+			"Two-Hand Rotation Visual",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_show_two_hand_visual_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_invert_two_hand_scale_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.invert_two_hand_scale_direction
 		movement_component.invert_two_hand_scale_direction = pressed
+		MovementSettingsPanel.record_toggle(
+			"Invert Two-Hand Scale",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_invert_two_hand_scale_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_world_grab_move_factor_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.world_grab_move_factor
 		movement_component.world_grab_move_factor = value
+		MovementSettingsPanel.record_toggle(
+			"Two-Hand Move Factor",
+			"x%.2f" % old_val,
+			"x%.2f" % value,
+			func(): _on_world_grab_move_factor_changed(old_val)
+		)
 	world_grab_move_factor_label.text = "Two-Hand Move Factor: x%.2f" % value
 	settings_changed.emit()
 
 
 func _on_world_grab_smooth_factor_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.world_grab_smooth_factor
 		movement_component.world_grab_smooth_factor = value
+		MovementSettingsPanel.record_toggle(
+			"Grab Smooth Factor",
+			"x%.2f" % old_val,
+			"x%.2f" % value,
+			func(): _on_world_grab_smooth_factor_changed(old_val)
+		)
 	world_grab_smooth_label.text = "Grab Smooth Factor: x%.2f" % value
 	settings_changed.emit()
 
@@ -1499,7 +1711,14 @@ func _on_world_scale_min_changed(value: float):
 	if world_scale_max_slider and value > world_scale_max_slider.value:
 		world_scale_max_slider.value = value
 	if movement_component:
+		var old_val = movement_component.world_scale_min
 		movement_component.world_scale_min = value
+		MovementSettingsPanel.record_toggle(
+			"World Scale Min",
+			"%.2fx" % old_val,
+			"%.2fx" % value,
+			func(): _on_world_scale_min_changed(old_val)
+		)
 	world_scale_min_label.text = "World Scale Min: %.2fx" % value
 	settings_changed.emit()
 
@@ -1508,118 +1727,245 @@ func _on_world_scale_max_changed(value: float):
 	if world_scale_min_slider and value < world_scale_min_slider.value:
 		world_scale_min_slider.value = value
 	if movement_component:
+		var old_val = movement_component.world_scale_max
 		movement_component.world_scale_max = value
+		MovementSettingsPanel.record_toggle(
+			"World Scale Max",
+			"%.2fx" % old_val,
+			"%.2fx" % value,
+			func(): _on_world_scale_max_changed(old_val)
+		)
 	world_scale_max_label.text = "World Scale Max: %.2fx" % value
 	settings_changed.emit()
 
 
 func _on_world_scale_sensitivity_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.world_scale_sensitivity
 		movement_component.world_scale_sensitivity = value
+		MovementSettingsPanel.record_toggle(
+			"Scale Sensitivity",
+			"x%.2f" % old_val,
+			"x%.2f" % value,
+			func(): _on_world_scale_sensitivity_changed(old_val)
+		)
 	world_scale_sensitivity_label.text = "Scale Sensitivity: x%.2f" % value
 	settings_changed.emit()
 
 
 func _on_world_rotation_sensitivity_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.world_rotation_sensitivity
 		movement_component.world_rotation_sensitivity = value
+		MovementSettingsPanel.record_toggle(
+			"Rotation Sensitivity",
+			"x%.2f" % old_val,
+			"x%.2f" % value,
+			func(): _on_world_rotation_sensitivity_changed(old_val)
+		)
 	world_rotation_sensitivity_label.text = "Rotation Sensitivity: x%.2f" % value
 	settings_changed.emit()
 
 
 func _on_one_hand_world_grab_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.enable_one_hand_world_grab
 		movement_component.enable_one_hand_world_grab = pressed
+		MovementSettingsPanel.record_toggle(
+			"One-Hand Grab",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_one_hand_world_grab_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_invert_one_hand_grab_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.invert_one_hand_grab_direction
 		movement_component.invert_one_hand_grab_direction = pressed
+		MovementSettingsPanel.record_toggle(
+			"Invert One-Hand Grab",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_invert_one_hand_grab_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_show_one_hand_grab_visual_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.show_one_hand_grab_visual
 		movement_component.show_one_hand_grab_visual = pressed
 		movement_component._ensure_visuals()
+		MovementSettingsPanel.record_toggle(
+			"One-Hand Grab Visual",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_show_one_hand_grab_visual_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_one_hand_world_move_sensitivity_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.one_hand_world_move_sensitivity
 		movement_component.one_hand_world_move_sensitivity = value
+		MovementSettingsPanel.record_toggle(
+			"One-Hand Move Sensitivity",
+			"x%.2f" % old_val,
+			"x%.2f" % value,
+			func(): _on_one_hand_world_move_sensitivity_changed(old_val)
+		)
 	one_hand_world_move_sense_label.text = "One-Hand Move Sensitivity: x%.2f" % value
 	settings_changed.emit()
 
 
 func _on_one_hand_grab_mode_changed(idx: int):
 	if movement_component:
+		var old_val = movement_component.one_hand_grab_mode
 		movement_component.one_hand_grab_mode = idx as PlayerMovementComponent.OneHandGrabMode
+		var names := ["Relative", "Anchored"]
+		MovementSettingsPanel.record_toggle(
+			"One-Hand Grab Mode",
+			names[old_val] if old_val < names.size() else str(old_val),
+			names[idx] if idx < names.size() else str(idx),
+			func(): _on_one_hand_grab_mode_changed(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_one_hand_rotation_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.enable_one_hand_rotation
 		movement_component.enable_one_hand_rotation = pressed
+		MovementSettingsPanel.record_toggle(
+			"One-Hand Rotation",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_one_hand_rotation_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_one_hand_rotation_smooth_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.one_hand_rotation_smooth_factor
 		movement_component.one_hand_rotation_smooth_factor = value
+		MovementSettingsPanel.record_toggle(
+			"One-Hand Rotation Smooth",
+			"x%.2f" % old_val,
+			"x%.2f" % value,
+			func(): _on_one_hand_rotation_smooth_changed(old_val)
+		)
 	one_hand_rotation_smooth_label.text = "One-Hand Rotation Smooth: x%.2f" % value
 	settings_changed.emit()
 
 
 func _on_one_hand_world_rotate_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.enable_one_hand_world_rotate
 		movement_component.enable_one_hand_world_rotate = pressed
+		MovementSettingsPanel.record_toggle(
+			"One-Hand World Rotate",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_one_hand_world_rotate_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_invert_one_hand_rotation_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.invert_one_hand_rotation
 		movement_component.invert_one_hand_rotation = pressed
+		MovementSettingsPanel.record_toggle(
+			"Invert One-Hand Rotation",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_invert_one_hand_rotation_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_apply_one_hand_release_vel_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.apply_one_hand_release_velocity
 		movement_component.apply_one_hand_release_velocity = pressed
+		MovementSettingsPanel.record_toggle(
+			"Keep Velocity (one-hand)",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_apply_one_hand_release_vel_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_jump_enabled_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.jump_enabled
 		movement_component.jump_enabled = pressed
+		MovementSettingsPanel.record_toggle(
+			"Jump Enabled",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_jump_enabled_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_jump_impulse_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.jump_impulse
 		movement_component.jump_impulse = value
+		MovementSettingsPanel.record_toggle(
+			"Jump Impulse",
+			"%.1f" % old_val,
+			"%.1f" % value,
+			func(): _on_jump_impulse_changed(old_val)
+		)
 	jump_impulse_label.text = "Jump Impulse: %.1f" % value
 	settings_changed.emit()
 
 
 func _on_jump_cooldown_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.jump_cooldown
 		movement_component.jump_cooldown = value
+		MovementSettingsPanel.record_toggle(
+			"Jump Cooldown",
+			"%.2fs" % old_val,
+			"%.2fs" % value,
+			func(): _on_jump_cooldown_changed(old_val)
+		)
 	jump_cooldown_label.text = "Jump Cooldown: %.2fs" % value
 	settings_changed.emit()
 
 
 func _on_physics_hands_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.enable_physics_hands
 		movement_component.enable_physics_hands = pressed
 		movement_component._update_physics_hands()
+		MovementSettingsPanel.record_toggle(
+			"Physics Hands",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_physics_hands_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_gravity_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.player_gravity_enabled
 		movement_component.set_player_gravity_enabled(pressed)
+		MovementSettingsPanel.record_toggle(
+			"Player Gravity",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_gravity_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
@@ -1627,19 +1973,40 @@ func _on_gravity_toggled(pressed: bool):
 
 func _on_v2_enable_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.enable_two_hand_grab_v2
 		movement_component.enable_two_hand_grab_v2 = pressed
+		MovementSettingsPanel.record_toggle(
+			"V2 Two-Hand Grab",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_v2_enable_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_v2_scale_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.v2_scale_enabled
 		movement_component.v2_scale_enabled = pressed
+		MovementSettingsPanel.record_toggle(
+			"V2 Scale",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_v2_scale_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_v2_rotation_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.v2_rotation_enabled
 		movement_component.v2_rotation_enabled = pressed
+		MovementSettingsPanel.record_toggle(
+			"V2 Rotation",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_v2_rotation_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
@@ -1647,7 +2014,14 @@ func _on_v2_scale_min_changed(value: float):
 	if v2_scale_max_slider and value > v2_scale_max_slider.value:
 		v2_scale_max_slider.value = value
 	if movement_component:
+		var old_val = movement_component.v2_world_scale_min
 		movement_component.v2_world_scale_min = value
+		MovementSettingsPanel.record_toggle(
+			"V2 Scale Min",
+			"%.2fx" % old_val,
+			"%.2fx" % value,
+			func(): _on_v2_scale_min_changed(old_val)
+		)
 	v2_scale_min_label.text = "V2 Scale Min: %.2fx" % value
 	settings_changed.emit()
 
@@ -1656,20 +2030,41 @@ func _on_v2_scale_max_changed(value: float):
 	if v2_scale_min_slider and value < v2_scale_min_slider.value:
 		v2_scale_min_slider.value = value
 	if movement_component:
+		var old_val = movement_component.v2_world_scale_max
 		movement_component.v2_world_scale_max = value
+		MovementSettingsPanel.record_toggle(
+			"V2 Scale Max",
+			"%.2fx" % old_val,
+			"%.2fx" % value,
+			func(): _on_v2_scale_max_changed(old_val)
+		)
 	v2_scale_max_label.text = "V2 Scale Max: %.2fx" % value
 	settings_changed.emit()
 
 
 func _on_v2_show_visual_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.v2_show_visual
 		movement_component.v2_show_visual = pressed
+		MovementSettingsPanel.record_toggle(
+			"V2 Show Visual",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_v2_show_visual_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_v2_debug_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.v2_debug_logs
 		movement_component.v2_debug_logs = pressed
+		MovementSettingsPanel.record_toggle(
+			"V2 Debug Logs",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_v2_debug_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
@@ -1677,7 +2072,14 @@ func _on_v2_debug_toggled(pressed: bool):
 
 func _on_v3_enable_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.enable_two_hand_grab_v3
 		movement_component.enable_two_hand_grab_v3 = pressed
+		MovementSettingsPanel.record_toggle(
+			"V3 Two-Hand Grab",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_v3_enable_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
@@ -1685,7 +2087,14 @@ func _on_v3_scale_min_changed(value: float):
 	if v3_scale_max_slider and value > v3_scale_max_slider.value:
 		v3_scale_max_slider.value = value
 	if movement_component:
+		var old_val = movement_component.v3_world_scale_min
 		movement_component.v3_world_scale_min = value
+		MovementSettingsPanel.record_toggle(
+			"V3 Scale Min",
+			"%.1fx" % old_val,
+			"%.1fx" % value,
+			func(): _on_v3_scale_min_changed(old_val)
+		)
 	v3_scale_min_label.text = "V3 Scale Min: %.1fx" % value
 	settings_changed.emit()
 
@@ -1694,53 +2103,109 @@ func _on_v3_scale_max_changed(value: float):
 	if v3_scale_min_slider and value < v3_scale_min_slider.value:
 		v3_scale_min_slider.value = value
 	if movement_component:
+		var old_val = movement_component.v3_world_scale_max
 		movement_component.v3_world_scale_max = value
+		MovementSettingsPanel.record_toggle(
+			"V3 Scale Max",
+			"%.1fx" % old_val,
+			"%.1fx" % value,
+			func(): _on_v3_scale_max_changed(old_val)
+		)
 	v3_scale_max_label.text = "V3 Scale Max: %.1fx" % value
 	settings_changed.emit()
 
 
 func _on_v3_show_visual_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.v3_show_visual
 		movement_component.v3_show_visual = pressed
+		MovementSettingsPanel.record_toggle(
+			"V3 Show Visual",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_v3_show_visual_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_v3_debug_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.v3_debug_logs
 		movement_component.v3_debug_logs = pressed
+		MovementSettingsPanel.record_toggle(
+			"V3 Debug Logs",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_v3_debug_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_v3_scale_sensitivity_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.v3_scale_sensitivity
 		movement_component.v3_scale_sensitivity = value
+		MovementSettingsPanel.record_toggle(
+			"V3 Scale Sensitivity",
+			"x%.1f" % old_val,
+			"x%.1f" % value,
+			func(): _on_v3_scale_sensitivity_changed(old_val)
+		)
 	v3_scale_sensitivity_label.text = "V3 Scale Sensitivity: x%.1f" % value
 	settings_changed.emit()
 
 
 func _on_v3_invert_scale_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.v3_invert_scale
 		movement_component.v3_invert_scale = pressed
+		MovementSettingsPanel.record_toggle(
+			"V3 Invert Scale",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_v3_invert_scale_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_v3_rotation_sensitivity_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.v3_rotation_sensitivity
 		movement_component.v3_rotation_sensitivity = value
+		MovementSettingsPanel.record_toggle(
+			"V3 Rotation Sensitivity",
+			"x%.1f" % old_val,
+			"x%.1f" % value,
+			func(): _on_v3_rotation_sensitivity_changed(old_val)
+		)
 	v3_rotation_sensitivity_label.text = "V3 Rotation Sensitivity: x%.1f" % value
 	settings_changed.emit()
 
 
 func _on_v3_translation_sensitivity_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.v3_translation_sensitivity
 		movement_component.v3_translation_sensitivity = value
+		MovementSettingsPanel.record_toggle(
+			"V3 Translation Sensitivity",
+			"x%.1f" % old_val,
+			"x%.1f" % value,
+			func(): _on_v3_translation_sensitivity_changed(old_val)
+		)
 	v3_translation_sensitivity_label.text = "V3 Translation Sensitivity: x%.1f" % value
 	settings_changed.emit()
 
 
 func _on_v3_smoothing_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.v3_smoothing
 		movement_component.v3_smoothing = value
+		MovementSettingsPanel.record_toggle(
+			"V3 Smoothing",
+			"%.2f" % old_val,
+			"%.2f" % value,
+			func(): _on_v3_smoothing_changed(old_val)
+		)
 	v3_smoothing_label.text = "V3 Smoothing: %.2f" % value
 	settings_changed.emit()
 
@@ -1759,8 +2224,15 @@ func _on_simple_world_grab_toggled(pressed: bool):
 	if player:
 		var simple_grab = player.get_node_or_null("SimpleWorldGrabComponent")
 		if simple_grab:
+			var old_val = simple_grab.enabled
 			simple_grab.enabled = pressed
 			print("SimpleWorldGrab: ", "enabled" if pressed else "disabled")
+			MovementSettingsPanel.record_toggle(
+				"Simple World Grab",
+				"ON" if old_val else "OFF",
+				"ON" if pressed else "OFF",
+				func(): _on_simple_world_grab_toggled(old_val)
+			)
 	settings_changed.emit()
 
 
@@ -1825,8 +2297,15 @@ func _on_hand_movement_toggled(pressed: bool):
 	if player:
 		var hand_movement = player.get_node_or_null("HandMovementComponent")
 		if hand_movement:
+			var old_val = hand_movement.enabled
 			hand_movement.enabled = pressed
 			print("HandMovement: ", "enabled" if pressed else "disabled")
+			MovementSettingsPanel.record_toggle(
+				"Hand Movement",
+				"ON" if old_val else "OFF",
+				"ON" if pressed else "OFF",
+				func(): _on_hand_movement_toggled(old_val)
+			)
 	settings_changed.emit()
 
 
@@ -1835,9 +2314,16 @@ func _on_hand_movement_grab_mode_changed(index: int):
 	if player:
 		var hand_movement = player.get_node_or_null("HandMovementComponent")
 		if hand_movement:
+			var old_val = hand_movement.grab_mode
 			hand_movement.grab_mode = index
-			var mode_name := "ANCHORED" if index == 1 else "RELATIVE"
-			print("HandMovement: grab mode -> ", mode_name)
+			var names := ["Relative", "Anchored"]
+			print("HandMovement: grab mode -> ", names[index] if index < names.size() else index)
+			MovementSettingsPanel.record_toggle(
+				"Hand Move Mode",
+				names[old_val] if old_val < names.size() else str(old_val),
+				names[index] if index < names.size() else str(index),
+				func(): _on_hand_movement_grab_mode_changed(old_val)
+			)
 	settings_changed.emit()
 
 
@@ -1846,7 +2332,14 @@ func _on_hand_movement_sensitivity_changed(value: float):
 	if player:
 		var hand_movement = player.get_node_or_null("HandMovementComponent")
 		if hand_movement:
+			var old_val = hand_movement.movement_sensitivity
 			hand_movement.movement_sensitivity = value
+			MovementSettingsPanel.record_toggle(
+				"Hand Move sensitivity",
+				"x%.2f" % old_val,
+				"x%.2f" % value,
+				func(): _on_hand_movement_sensitivity_changed(old_val)
+			)
 	if hand_movement_sensitivity_label:
 		hand_movement_sensitivity_label.text = "Movement Sensitivity: x%.2f" % value
 	settings_changed.emit()
@@ -1857,7 +2350,14 @@ func _on_hand_movement_invert_toggled(pressed: bool):
 	if player:
 		var hand_movement = player.get_node_or_null("HandMovementComponent")
 		if hand_movement:
+			var old_val = hand_movement.invert_direction
 			hand_movement.invert_direction = pressed
+			MovementSettingsPanel.record_toggle(
+				"Invert Hand Move",
+				"ON" if old_val else "OFF",
+				"ON" if pressed else "OFF",
+				func(): _on_hand_movement_invert_toggled(old_val)
+			)
 	settings_changed.emit()
 
 
@@ -1866,7 +2366,14 @@ func _on_hand_movement_release_vel_toggled(pressed: bool):
 	if player:
 		var hand_movement = player.get_node_or_null("HandMovementComponent")
 		if hand_movement:
+			var old_val = hand_movement.apply_release_velocity
 			hand_movement.apply_release_velocity = pressed
+			MovementSettingsPanel.record_toggle(
+				"Hand Move Release Vel",
+				"ON" if old_val else "OFF",
+				"ON" if pressed else "OFF",
+				func(): _on_hand_movement_release_vel_toggled(old_val)
+			)
 	settings_changed.emit()
 
 
@@ -1875,39 +2382,80 @@ func _on_hand_movement_show_visual_toggled(pressed: bool):
 	if player:
 		var hand_movement = player.get_node_or_null("HandMovementComponent")
 		if hand_movement:
+			var old_val = hand_movement.show_visual
 			hand_movement.show_visual = pressed
+			MovementSettingsPanel.record_toggle(
+				"Hand Move Visual",
+				"ON" if old_val else "OFF",
+				"ON" if pressed else "OFF",
+				func(): _on_hand_movement_show_visual_toggled(old_val)
+			)
 	settings_changed.emit()
 
 
 func _on_auto_respawn_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.auto_respawn_enabled
 		movement_component.auto_respawn_enabled = pressed
+		MovementSettingsPanel.record_toggle(
+			"Auto Respawn",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_auto_respawn_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_auto_respawn_distance_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.auto_respawn_distance
 		movement_component.auto_respawn_distance = value
+		MovementSettingsPanel.record_toggle(
+			"Respawn Distance",
+			"%.0f m" % old_val,
+			"%.0f m" % value,
+			func(): _on_auto_respawn_distance_changed(old_val)
+		)
 	auto_respawn_distance_label.text = "Respawn Distance: %.0f m" % value
 	settings_changed.emit()
 
 
 func _on_hard_respawn_toggled(pressed: bool):
 	if movement_component:
+		var old_val = movement_component.hard_respawn_resets_settings
 		movement_component.hard_respawn_resets_settings = pressed
+		MovementSettingsPanel.record_toggle(
+			"Hard Respawn resets settings",
+			"ON" if old_val else "OFF",
+			"ON" if pressed else "OFF",
+			func(): _on_hard_respawn_toggled(old_val)
+		)
 	settings_changed.emit()
 
 
 func _on_respawn_now_pressed():
 	if movement_component:
 		movement_component.respawn(movement_component.hard_respawn_resets_settings)
+		MovementSettingsPanel.record_toggle(
+			"Respawn Now",
+			"N/A",
+			"Triggered",
+			func(): pass # No undo for immediate action
+		)
 	settings_changed.emit()
 
 
 func _on_player_drag_changed(value: float):
 	if movement_component:
+		var old_val = movement_component.player_drag_force
 		movement_component.player_drag_force = value
 		movement_component._apply_player_drag()
+		MovementSettingsPanel.record_toggle(
+			"Player Drag",
+			"x%.2f" % old_val,
+			"x%.2f" % value,
+			func(): _on_player_drag_changed(old_val)
+		)
 	player_drag_label.text = "Player Drag: x%.2f" % value
 	settings_changed.emit()
 
@@ -1920,11 +2468,23 @@ func _on_mode_changed(action: String):
 	if not manager:
 		return
 	var binding: Dictionary = manager.get_binding(action)
+	var old_mode: int = binding.get("mode", 0)
 	var events: Array = binding.get("events", [])
 	if events.is_empty():
 		return
 	var mode := _mode_from_selector(row.mode_btn)
 	manager.set_binding(action, events, mode)
+	
+	var mode_names := {0: "Button", 1: "Axis (Positive)", 2: "Axis (Negative)", 3: "Axis (Absolute)"}
+	MovementSettingsPanel.record_toggle(
+		"Input Mode: " + action.capitalize(),
+		mode_names.get(old_mode, str(old_mode)),
+		mode_names.get(mode, str(mode)),
+		func(): 
+			row.mode_btn.selected = old_mode
+			_on_mode_changed(action)
+	)
+	
 	_refresh_input_row(action)
 
 

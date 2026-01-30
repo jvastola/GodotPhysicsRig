@@ -6,6 +6,7 @@ extends Control
 @onready var vbox_movement = $TabContainer/MovementScroll/MovementVBox
 @onready var vbox_multiplayer = $TabContainer/MultiplayerScroll/MultiplayerVBox
 @onready var vbox_render = $TabContainer/RenderModeScroll/RenderModeVBox
+@onready var vbox_recent = $TabContainer/RecentScroll/RecentVBox
 
 var movement_component: PlayerMovementComponent
 var player_body: RigidBody3D
@@ -77,9 +78,11 @@ func _setup_ui() -> void:
 		c.queue_free()
 	for c in vbox_render.get_children():
 		c.queue_free()
+	for c in vbox_recent.get_children():
+		c.queue_free()
 	
 	# Ensure all tabs are visible once populated
-	var all_vboxes = [vbox_panels, vbox_general, vbox_movement, vbox_multiplayer, vbox_render]
+	var all_vboxes = [vbox_panels, vbox_general, vbox_movement, vbox_multiplayer, vbox_render, vbox_recent]
 	for vbox in all_vboxes:
 		if vbox:
 			vbox.visible = true
@@ -103,14 +106,18 @@ func _setup_ui() -> void:
 	
 	# === RENDER MODE TAB ===
 	_setup_render_mode_tab()
+	
+	# === RECENT TAB ===
+	_setup_recent_tab()
 
 	# Set tab titles
-	if tab and tab.get_child_count() >= 4:
+	if tab and tab.get_child_count() >= 6:
 		tab.set_tab_title(0, "Panels")
 		tab.set_tab_title(1, "General")
 		tab.set_tab_title(2, "Movement")
 		tab.set_tab_title(3, "Multiplayer")
 		tab.set_tab_title(4, "Render Mode")
+		tab.set_tab_title(5, "Recent")
 
 func _setup_panels_tab() -> void:
 	"""Setup the Panels tab with quick access to all UI panels"""
@@ -500,31 +507,73 @@ func _add_separator(parent: VBoxContainer) -> void:
 
 func _on_mode_selected(index: int) -> void:
 	if movement_component:
+		var old_mode = movement_component.turn_mode
 		movement_component.turn_mode = index as PlayerMovementComponent.TurnMode
+		MovementSettingsPanel.record_toggle(
+			"Turn Mode",
+			old_mode,
+			index,
+			func(): _on_mode_selected(old_mode)
+		)
 
 func _on_snap_angle_changed(value: float, label: Label) -> void:
 	if movement_component:
+		var old_val = movement_component.snap_turn_angle
 		movement_component.snap_turn_angle = value
 		label.text = "Angle: %.0f°" % value
+		MovementSettingsPanel.record_toggle(
+			"Snap Turn Angle",
+			"%.0f°" % old_val,
+			"%.0f°" % value,
+			func(): _on_snap_angle_changed(old_val, label)
+		)
 
 func _on_smooth_speed_changed(value: float, label: Label) -> void:
 	if movement_component:
+		var old_val = movement_component.smooth_turn_speed
 		movement_component.smooth_turn_speed = value
 		label.text = "Speed: %.0f°/sec" % value
+		MovementSettingsPanel.record_toggle(
+			"Smooth Turn Speed",
+			"%.0f°/sec" % old_val,
+			"%.0f°/sec" % value,
+			func(): _on_smooth_speed_changed(old_val, label)
+		)
 
 func _on_deadzone_changed(value: float, label: Label) -> void:
 	if movement_component:
+		var old_val = movement_component.turn_deadzone
 		movement_component.turn_deadzone = value
 		label.text = "Deadzone: %.2f" % value
+		MovementSettingsPanel.record_toggle(
+			"Turn Deadzone",
+			"%.2f" % old_val,
+			"%.2f" % value,
+			func(): _on_deadzone_changed(old_val, label)
+		)
 
 func _on_cooldown_changed(value: float, label: Label) -> void:
 	if movement_component:
+		var old_val = movement_component.snap_turn_cooldown
 		movement_component.snap_turn_cooldown = value
 		label.text = "Cooldown: %.2fs" % value
+		MovementSettingsPanel.record_toggle(
+			"Snap Turn Cooldown",
+			"%.2fs" % old_val,
+			"%.2fs" % value,
+			func(): _on_cooldown_changed(old_val, label)
+		)
 
 func _on_world_grab_toggled(enabled: bool) -> void:
 	if movement_component:
+		var old_val = movement_component.enable_two_hand_grab_v3
 		movement_component.enable_two_hand_grab_v3 = enabled
+		MovementSettingsPanel.record_toggle(
+			"Two-Hand World Grab",
+			old_val,
+			enabled,
+			func(): _on_world_grab_toggled(old_val)
+		)
 
 func _on_player_scale_changed(value: float, label: Label) -> void:
 	# Apply uniform scale to the player's rig (body, hands, head)
@@ -561,7 +610,15 @@ func _on_apply_scale_change(delta_sign: int, label: Label) -> void:
 		player_body.scale = Vector3(new_scale, new_scale, new_scale)
 		if movement_component and movement_component.has_method("set_manual_player_scale"):
 			movement_component.set_manual_player_scale(new_scale)
+	
 	label.text = "Scale: %.2fx" % new_scale
+	
+	MovementSettingsPanel.record_toggle(
+		"Player Scale",
+		"%.2fx" % current_scale,
+		"%.2fx" % new_scale,
+		func(): _on_apply_scale_change(-delta_sign, label)
+	)
 
 
 func _on_respawn_pressed() -> void:
@@ -582,8 +639,15 @@ func _on_return_to_main_scene_pressed() -> void:
 
 
 func _on_passthrough_toggled(enabled: bool) -> void:
+	var old_val = _current_blend_mode() == XRInterface.XR_ENV_BLEND_MODE_ALPHA_BLEND
 	_apply_passthrough_enabled(enabled)
 	_update_passthrough_ui_state()
+	MovementSettingsPanel.record_toggle(
+		"Skybox Passthrough",
+		old_val,
+		enabled,
+		func(): _on_passthrough_toggled(old_val)
+	)
 
 
 func _find_world_environment() -> void:
@@ -730,3 +794,103 @@ func _create_panel_manager_and_open(node_name: String) -> void:
 	
 	# Open the panel
 	manager.open_panel(node_name, true)
+
+
+# === RECENT TOGGLES TAB ===
+
+func _setup_recent_tab() -> void:
+	"""Setup the Recent tab showing recently toggled settings"""
+	_refresh_recent_list()
+
+
+func _refresh_recent_list() -> void:
+	"""Rebuild the recent toggles display using MovementSettingsPanel's tracking"""
+	if not vbox_recent:
+		return
+	
+	# Clear existing children
+	for c in vbox_recent.get_children():
+		c.queue_free()
+	
+	# Title
+	var title_label = Label.new()
+	title_label.text = "Recently Changed Settings"
+	title_label.add_theme_color_override("font_color", Color(0.7, 0.8, 1.0))
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox_recent.add_child(title_label)
+	
+	_add_separator(vbox_recent)
+	
+	# Get toggles from MovementSettingsPanel (centralized tracking)
+	var toggles := MovementSettingsPanel.get_recent_toggles()
+	
+	if toggles.is_empty():
+		var empty_label = Label.new()
+		empty_label.text = "No recent changes"
+		empty_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+		empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox_recent.add_child(empty_label)
+		return
+	
+	# Display each recent toggle
+	for i in toggles.size():
+		var entry: Dictionary = toggles[i]
+		_create_recent_entry_ui(i, entry)
+
+
+func _create_recent_entry_ui(index: int, entry: Dictionary) -> void:
+	"""Create UI for a single recent toggle entry"""
+	var container = HBoxContainer.new()
+	container.add_theme_constant_override("separation", 8)
+	
+	# Info label
+	var info_vbox = VBoxContainer.new()
+	info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	
+	var name_label = Label.new()
+	name_label.text = entry.get("setting_name", "Unknown")
+	name_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+	info_vbox.add_child(name_label)
+	
+	var value_label = Label.new()
+	var old_val = entry.get("old_value", "?")
+	var new_val = entry.get("new_value", "?")
+	value_label.text = "%s → %s" % [_format_value(old_val), _format_value(new_val)]
+	value_label.add_theme_color_override("font_color", Color(0.6, 0.7, 0.8))
+	value_label.add_theme_font_size_override("font_size", 12)
+	info_vbox.add_child(value_label)
+	
+	container.add_child(info_vbox)
+	
+	# Revert button
+	var revert_btn = Button.new()
+	revert_btn.text = "↩ Revert"
+	revert_btn.custom_minimum_size = Vector2(80, 35)
+	revert_btn.pressed.connect(func(): _on_revert_pressed(index))
+	container.add_child(revert_btn)
+	
+	vbox_recent.add_child(container)
+
+
+func _format_value(val) -> String:
+	"""Format a value for display"""
+	if val is bool:
+		return "ON" if val else "OFF"
+	elif val is int:
+		# Check if it's an enum like TurnMode
+		if val == 0:
+			return "Snap"
+		elif val == 1:
+			return "Smooth"
+		return str(val)
+	elif val is float:
+		return "%.2f" % val
+	else:
+		return str(val)
+
+
+func _on_revert_pressed(index: int) -> void:
+	"""Revert a toggle using MovementSettingsPanel's centralized system"""
+	MovementSettingsPanel.revert_toggle(index)
+	# Refresh display
+	_refresh_recent_list()

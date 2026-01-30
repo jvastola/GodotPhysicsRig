@@ -134,6 +134,23 @@ metadata/_tab_index = 4
 layout_mode = 2
 theme_override_constants/separation = 8
 
+[node name="RecentScroll" type="ScrollContainer" parent="TabContainer"]
+visible = false
+layout_mode = 2
+follow_focus = true
+vertical_scroll_mode = 2
+horizontal_scroll_mode = 0
+metadata/_tab_index = 5
+
+[node name="RecentVBox" type="VBoxContainer" parent="TabContainer/RecentScroll"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TestLabel7" type="Label" parent="TabContainer/RecentScroll/RecentVBox"]
+layout_mode = 2
+text = "Recent Toggles Tab"
+horizontal_alignment = 1
+
 [node name="TestLabel6" type="Label" parent="TabContainer/MultiplayerScroll/MultiplayerVBox"]
 layout_mode = 2
 text = "Multiplayer Tab"
