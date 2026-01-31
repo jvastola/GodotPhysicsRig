@@ -250,8 +250,8 @@ func try_grab(hand: RigidBody3D) -> bool:
 		hand.integrate_grabbed_collision(grabbed_collision_shapes)
 	
 	
-	# Hide original object (keep it around for release)
-	visible = false
+	# Hide original object visuals but keep the parent and other nodes (like SubViewport) active
+	_set_original_visuals_visible(false)
 	# Disable collision on the original
 	collision_layer = 0
 	collision_mask = 0
@@ -342,7 +342,7 @@ func release() -> void:
 	grabbed_mesh_instances.clear()
 	
 	# Restore object visibility and physics
-	visible = true
+	_set_original_visuals_visible(true)
 	freeze = false
 	gravity_scale = 1.0
 	# Restore original collision settings
@@ -392,7 +392,7 @@ func _physics_process(_delta: float) -> void:
 			print("Grabbable: WARNING - No grabbed collision shapes, forcing full release")
 			# Force complete cleanup
 			is_grabbed = false
-			visible = true
+			_set_original_visuals_visible(true)
 			freeze = false
 			collision_layer = original_collision_layer
 			collision_mask = original_collision_mask
@@ -403,10 +403,8 @@ func _physics_process(_delta: float) -> void:
 			return
 		
 		# Validate first collision shape still exists and is a child of hand
-		if not is_instance_valid(grabbed_collision_shapes[0]):
-			print("Grabbable: WARNING - Grabbed collision shape invalid, forcing release")
 			is_grabbed = false
-			visible = true
+			_set_original_visuals_visible(true)
 			freeze = false
 			collision_layer = original_collision_layer
 			collision_mask = original_collision_mask
@@ -448,8 +446,25 @@ func _create_hand_collision_shapes(hand: RigidBody3D) -> void:
 			new_mesh.mesh = child.mesh
 			new_mesh.transform = Transform3D(Basis(grab_rotation_offset), grab_offset) * child.transform
 			new_mesh.name = name + "_grabbed_mesh_" + str(grabbed_mesh_instances.size())
+			
+			# COPY MATERIAL OVERRIDES
+			if child.material_override:
+				new_mesh.material_override = child.material_override
+			for i in child.get_surface_override_material_count():
+				var mat = child.get_surface_override_material(i)
+				if mat:
+					new_mesh.set_surface_override_material(i, mat)
+			
 			hand.add_child(new_mesh)
 			grabbed_mesh_instances.append(new_mesh)
+
+
+func _set_original_visuals_visible(p_visible: bool) -> void:
+	"""Selectively hide meshes/labels of the original object without hiding the whole node tree.
+	This ensures SubViewport children continue to render."""
+	for child in get_children():
+		if child is VisualInstance3D:
+			child.visible = p_visible
 
 
 func _on_collision_entered(body: Node) -> void:

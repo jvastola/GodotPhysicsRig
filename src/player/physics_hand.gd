@@ -57,6 +57,8 @@ var nearby_grabbables: Array = []
 var _prev_release_button_pressed: bool = false
 var _is_pinch_grabbing: bool = false
 var _using_pinch_grab: bool = false
+var is_ghost_mode: bool = false
+var grab_sensor: Area3D = null
 
 
 func _ready() -> void:
@@ -82,6 +84,27 @@ func _ready() -> void:
 	
 	# Setup hit sound player
 	_setup_hit_sound()
+	
+	# Setup grab sensor
+	_setup_grab_sensor()
+
+func _setup_grab_sensor() -> void:
+	grab_sensor = Area3D.new()
+	grab_sensor.name = "GrabSensor"
+	# Mask 1 (World/Default) and 4 (Grabbables)
+	grab_sensor.collision_layer = 0
+	grab_sensor.collision_mask = 5 # Sees Layer 1 and 3
+	grab_sensor.monitorable = false
+	add_child(grab_sensor)
+	
+	var shape = CollisionShape3D.new()
+	var sphere = SphereShape3D.new()
+	sphere.radius = 0.2 # Detection radius
+	shape.shape = sphere
+	grab_sensor.add_child(shape)
+	
+	grab_sensor.body_entered.connect(_on_sensor_body_entered)
+	grab_sensor.body_exited.connect(_on_sensor_body_exited)
 
 func _physics_process(delta: float) -> void:
 	if not is_instance_valid(target): return
@@ -201,26 +224,28 @@ func _get_drag(delta: float) -> float:
 	return drag
 
 
+func _on_sensor_body_entered(_body: Node) -> void:
+	# Track grabbable objects via sensor
+	if _body.is_in_group("grabbable") and _body is RigidBody3D:
+		if not nearby_grabbables.has(_body):
+			nearby_grabbables.append(_body)
+			print("PhysicsHand: (Sensor) Grabbable nearby - ", _body.name)
+
+func _on_sensor_body_exited(_body: Node) -> void:
+	# Remove from nearby grabbables
+	if _body in nearby_grabbables:
+		nearby_grabbables.erase(_body)
+		print("PhysicsHand: (Sensor) Grabbable exited - ", _body.name)
+
+
 func _on_body_entered(_body: Node) -> void:
 	_is_colliding = true
 	
 	# Handle hit feedback (haptics + sound)
 	_handle_hit_feedback(_body)
-	
-	# Track grabbable objects
-	if _body.is_in_group("grabbable") and _body is RigidBody3D:
-		if not nearby_grabbables.has(_body):
-			nearby_grabbables.append(_body)
-			print("PhysicsHand: Grabbable nearby - ", _body.name)
 
 func _on_body_exited(_body: Node) -> void:
-	# This is slightly more robust than the original. It checks if we are still
-	# colliding with other objects before setting _is_colliding to false.
 	_is_colliding = false
-	
-	# Remove from nearby grabbables
-	if _body in nearby_grabbables:
-		nearby_grabbables.erase(_body)
 
 
 func _handle_grab_input() -> void:
@@ -367,6 +392,30 @@ func integrate_grabbed_collision(collision_shapes: Array) -> void:
 	# No additional configuration needed - just log for debugging
 	if collision_shapes.size() > 0:
 		print("PhysicsHand: Integrated ", collision_shapes.size(), " collision shapes from grabbed object")
+	
+	# If in ghost mode, ensure the new shapes also have no collision layer
+	if is_ghost_mode:
+		for shape in collision_shapes:
+			if shape is CollisionShape3D:
+				# We don't want the grabbed object to collide with the world either in ghost mode
+				pass # RigidBody children follow parent's layer/mask anyway
+
+
+func set_ghost_mode(active: bool) -> void:
+	"""Set hand to 'ghost' mode where it can interact but doesn't collide with the world."""
+	is_ghost_mode = active
+	if active:
+		# Ghost mode: No physics collision at all for the main body
+		collision_layer = 0
+		collision_mask = 0
+		freeze = false # Stay non-frozen so PID movement still works!
+		print("PhysicsHand: Ghost Mode Enabled for ", name)
+	else:
+		# Restore standard physics hand (Layer 3/bit 4 as per XRPlayer.tscn)
+		collision_layer = 4
+		collision_mask = 1
+		freeze = false
+		print("PhysicsHand: Ghost Mode Disabled for ", name)
 
 
 func remove_grabbed_collision(collision_shapes: Array) -> void:

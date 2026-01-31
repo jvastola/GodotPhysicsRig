@@ -545,31 +545,40 @@ func _update_physics_hands() -> void:
 
 
 func _set_hand_state(hand: RigidBody3D, enabled: bool) -> void:
-	hand.visible = enabled
-	hand.set_physics_process(enabled)
+	# If we are in VR, we want the hands to be active even if "physics" is disabled, 
+	# as long as we want a ghost hand.
+	var should_be_processing := enabled
+	if is_vr_mode and not enabled:
+		# Ghost mode: still follow target, still visible
+		should_be_processing = true
+	
+	hand.visible = should_be_processing
+	hand.set_physics_process(should_be_processing)
+	
+	if hand.has_method("set_ghost_mode"):
+		hand.set_ghost_mode(not enabled)
 	
 	if enabled:
 		hand.process_mode = Node.PROCESS_MODE_INHERIT
-		hand.freeze = false
-		# Restore collision (Layer 2, Mask 1 - assuming standard setup)
-		# TODO: Ideally we'd cache the original layers, but for this specific rig:
-		# Hands are typically Layer 2 (Vehicle/PlayerProp) and Mask 1 (World).
-		hand.collision_layer = 2
-		hand.collision_mask = 1
+		# Hand is physical - collision layers are handled by set_ghost_mode(false)
 		
 		# FORCE exception again
 		if player_body:
 			player_body.add_collision_exception_with(hand)
 			hand.add_collision_exception_with(player_body)
-			print("PlayerMovementComponent: Enabled hand %s, restored collision & exceptions." % hand.name)
+			print("PlayerMovementComponent: Enabled physical hand %s" % hand.name)
 	else:
-		hand.freeze = true
-		hand.linear_velocity = Vector3.ZERO
-		hand.angular_velocity = Vector3.ZERO
-		# CRITICAL: Disable collision entirely so it doesn't explode if inside player
-		hand.collision_layer = 0
-		hand.collision_mask = 0
-		print("PlayerMovementComponent: Disabled hand %s, CLEARED collision." % hand.name)
+		if is_vr_mode:
+			# Ghost state (Non-Physical)
+			print("PlayerMovementComponent: Hand %s set to GHOST mode (Non-Physical)" % hand.name)
+		else:
+			# Desktop mode: truly disable
+			hand.visible = false
+			hand.set_physics_process(false)
+			hand.freeze = true
+			hand.collision_layer = 0
+			hand.collision_mask = 0
+			print("PlayerMovementComponent: Disabled hand %s (Desktop/Full Disable)" % hand.name)
 
 
 func _handle_turning(delta: float) -> void:
