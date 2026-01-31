@@ -1,9 +1,9 @@
-[gd_scene load_steps=6 format=3 uid="uid://joystick_tool_ui"]
+[gd_scene load_steps=8 format=3 uid="uid://joystick_tool_ui"]
 
 [ext_resource type="Script" path="res://src/ui/joystick_tool_ui.gd" id="1_script"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Main"]
-bg_color = Color(0.1, 0.1, 0.12, 0.9)
+bg_color = Color(0.1, 0.1, 0.12, 0.95)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
@@ -33,6 +33,15 @@ corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Highlight"]
+bg_color = Color(0.1, 0.3, 0.6, 0.8)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_None"]
+
 [node name="JoystickToolUI" type="PanelContainer"]
 custom_minimum_size = Vector2(200, 200)
 offset_right = 200.0
@@ -42,10 +51,10 @@ script = ExtResource("1_script")
 
 [node name="MarginContainer" type="MarginContainer" parent="."]
 layout_mode = 2
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 10
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
 
 [node name="Layout" type="Control" parent="MarginContainer"]
 layout_mode = 2
@@ -53,6 +62,7 @@ layout_mode = 2
 ; CENTER STICK
 [node name="StickBase" type="Panel" parent="MarginContainer/Layout"]
 unique_name_in_owner = true
+z_index = 1
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -76,23 +86,40 @@ offset_right = 43.0
 offset_bottom = 43.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_Handle")
 
-; ICONS
-[node name="IconUp" type="Label" parent="MarginContainer/Layout"]
+; SECTIONS
+[node name="SectionUp" type="Panel" parent="MarginContainer/Layout"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -20.0
-offset_top = 5.0
-offset_right = 20.0
-offset_bottom = 35.0
+offset_left = -40.0
+offset_top = 0.0
+offset_right = 40.0
+offset_bottom = 60.0
 grow_horizontal = 2
+theme_override_styles/panel = SubResource("StyleBoxEmpty_None")
+
+[node name="IconUp" type="Label" parent="MarginContainer/Layout/SectionUp"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_font_sizes/font_size = 32
 text = "✋"
 horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="IconDown" type="Label" parent="MarginContainer/Layout"]
+[node name="SectionDown" type="Panel" parent="MarginContainer/Layout"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 7
@@ -100,32 +127,66 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -20.0
-offset_top = -45.0
-offset_right = 20.0
-offset_bottom = -15.0
+offset_left = -40.0
+offset_top = -60.0
+offset_right = 40.0
+offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_None")
+
+[node name="IconDown" type="Label" parent="MarginContainer/Layout/SectionDown"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_font_sizes/font_size = 32
 text = "🔒"
 horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="IconLeft" type="Label" parent="MarginContainer/Layout"]
+[node name="SectionLeft" type="Panel" parent="MarginContainer/Layout"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
 anchor_bottom = 0.5
-offset_left = 5.0
+offset_left = 0.0
+offset_top = -40.0
+offset_right = 60.0
+offset_bottom = 40.0
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxEmpty_None")
+
+[node name="IconLeft" type="Label" parent="MarginContainer/Layout/SectionLeft"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
 offset_top = -20.0
-offset_right = 45.0
+offset_right = 20.0
 offset_bottom = 20.0
+grow_horizontal = 2
 grow_vertical = 2
 theme_override_font_sizes/font_size = 32
 text = "🖌️"
 horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="IconRight" type="Label" parent="MarginContainer/Layout"]
+[node name="SectionRight" type="Panel" parent="MarginContainer/Layout"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 6
@@ -133,12 +194,29 @@ anchor_left = 1.0
 anchor_top = 0.5
 anchor_right = 1.0
 anchor_bottom = 0.5
-offset_left = -45.0
-offset_top = -20.0
-offset_right = -5.0
-offset_bottom = 20.0
+offset_left = -60.0
+offset_top = -40.0
+offset_right = 0.0
+offset_bottom = 40.0
 grow_horizontal = 0
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxEmpty_None")
+
+[node name="IconRight" type="Label" parent="MarginContainer/Layout/SectionRight"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
 grow_vertical = 2
 theme_override_font_sizes/font_size = 32
 text = "➕"
 horizontal_alignment = 1
+vertical_alignment = 1
