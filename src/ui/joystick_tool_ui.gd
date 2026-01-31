@@ -17,12 +17,18 @@ extends PanelContainer
 @export var activation_threshold: float = 0.6
 @export var highlight_color: Color = Color(1.0, 1.0, 1.0, 1.0) # White for icon when highlighted
 @export var default_color: Color = Color(0.8, 0.8, 0.8, 1)
+@export var reset_scale_on_release: bool = true
 
 var highlight_style: StyleBoxFlat
 var empty_style: StyleBoxEmpty
 
 var current_selection: String = ""
 var active_controller: XRController3D = null
+var trigger_held: bool = false
+var tip_scale: float = 1.0
+
+signal trigger_state_changed(is_held: bool)
+signal tip_scale_changed(new_scale: float)
 
 func _ready() -> void:
 	# Create styles in code for consistency
@@ -39,6 +45,26 @@ func _process(_delta: float) -> void:
 		return
 		
 	var input = active_controller.get_vector2("primary")
+	
+	var new_trigger_held = active_controller.get_float("trigger") > 0.5
+	if new_trigger_held != trigger_held:
+		trigger_held = new_trigger_held
+		trigger_state_changed.emit(trigger_held)
+		
+		# Handle reset on release
+		if not trigger_held and reset_scale_on_release:
+			tip_scale = 1.0
+			tip_scale_changed.emit(tip_scale)
+		
+	# Handle Scaling when in Hand-Trigger mode
+	if trigger_held and current_selection == "up":
+		var scale_speed = 1.5
+		if input.length() > activation_threshold:
+			if abs(input.x) > abs(input.y):
+				tip_scale += input.x * scale_speed * _delta
+				tip_scale = clamp(tip_scale, 0.2, 5.0)
+				tip_scale_changed.emit(tip_scale)
+
 	_update_visuals(input)
 	_process_selection(input)
 
@@ -58,6 +84,18 @@ func _update_visuals(input: Vector2) -> void:
 	for icon in [icon_up, icon_down, icon_left, icon_right]:
 		icon.modulate = default_color
 	
+	# Update Icon Text based on Mode and Trigger
+	if current_selection == "up" and trigger_held:
+		icon_up.text = "✋"
+		icon_down.text = "🔒" # Or hide? User only mentioned - and +
+		icon_left.text = "-"
+		icon_right.text = "+"
+	else:
+		icon_up.text = "✋"
+		icon_down.text = "🔒"
+		icon_left.text = "🖌️"
+		icon_right.text = "➕"
+
 	# 1. APPLY PERSISTENT HIGHLIGHT (Based on current_selection)
 	var active_section: Panel = null
 	var active_icon: Label = null
@@ -115,6 +153,12 @@ func _update_visuals(input: Vector2) -> void:
 				hover_icon.modulate = Color(1.0, 1.0, 0.5, 1.0) # Yellowish hint for hover
 
 func _process_selection(input: Vector2) -> void:
+	# BLOCK mode switching while in Hand-Trigger mode
+	# This allows the user to use left/right for other things (like scale) 
+	# without accidentally switching to the paintbrush.
+	if trigger_held and current_selection == "up":
+		return
+
 	var new_selection = ""
 	if input.length() > activation_threshold:
 		if abs(input.x) > abs(input.y):
