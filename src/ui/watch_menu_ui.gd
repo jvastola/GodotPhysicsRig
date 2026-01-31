@@ -148,6 +148,7 @@ func _setup_panels_tab() -> void:
 		{"label": "🌐 Web Browser", "node": "WebviewViewport3D"},
 		{"label": "📦 Asset Library", "node": "AssetLibraryViewport3D"},
 		{"label": "🎨 Passthrough Settings", "node": "PassthroughSettingsViewport3D"},
+		{"label": "🕹️ Joystick Visualizer", "node": "JoystickVisualizationViewport3D"},
 	]
 	
 	for entry in quick_panels:

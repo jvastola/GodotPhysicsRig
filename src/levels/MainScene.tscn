@@ -27,6 +27,7 @@
 [ext_resource type="PackedScene" uid="uid://bdgtb4clc5scx" path="res://island.tscn" id="37_82eun"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/WorldGrabSphere.tscn" id="38_world_grab_sphere"]
 [ext_resource type="Script" uid="uid://om3k532gai8j" path="res://src/ui/ui_panel_manager.gd" id="39_ui_panel_manager"]
+[ext_resource type="PackedScene" path="res://src/objects/JoystickTool.tscn" id="39_wh2ee"]
 [ext_resource type="Script" uid="uid://bqrnwqkyb00kx" path="res://src/ui/ui_panel_scene_setup.gd" id="40_ui_panel_setup"]
 [ext_resource type="Script" uid="uid://bid6ju5yhq61q" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
 [ext_resource type="PackedScene" uid="uid://cm8nv7v0apls3" path="res://src/objects/grabbables/GrappleHook.tscn" id="42_grapple_hook"]
@@ -249,7 +250,7 @@ visible = false
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.7972612, 2.3442404, -13.928533)
 
 [node name="ShaderPlasma" type="CSGSphere3D" parent="PlasmaDemos" unique_id=1217239899]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -1.9618725, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -1.6396618, 0)
 cast_shadow = 0
 radius = 0.75
 material = SubResource("StandardMaterial3D_wvm1w")
@@ -270,7 +271,7 @@ cast_shadow = 0
 material = SubResource("StandardMaterial3D_wvm1w")
 
 [node name="Sphere" type="CSGSphere3D" parent="PlasmaDemos/PlasmaBox" unique_id=716390065]
-transform = Transform3D(2.36, 0, 0, 0, 2.36, 0, 0, 0, 2.36, 0, 0, -1.746183)
+transform = Transform3D(2.36, 0, 0, 0, 2.36, 0, 0, 0, 2.36, 0, 0, -2.1429212)
 operation = 2
 radius = 0.6
 material = ExtResource("34_s8yin")
@@ -357,3 +358,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -42.440742)
 
 [node name="islandcollision" type="Node" parent="island" unique_id=1618902482]
 script = ExtResource("49_collision")
+
+[node name="JoystickTool" parent="." unique_id=651564829 instance=ExtResource("39_wh2ee")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.23151493, 0, -38.546833)

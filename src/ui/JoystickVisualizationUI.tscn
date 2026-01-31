@@ -1,0 +1,281 @@
+[gd_scene load_steps=6 format=3 uid="uid://joystick_visualization_ui"]
+
+[ext_resource type="Script" path="res://src/ui/joystick_visualization_ui.gd" id="1_script"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_MainBG"]
+bg_color = Color(0.12, 0.12, 0.15, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.3, 0.3, 0.4, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Base"]
+bg_color = Color(0.08, 0.08, 0.1, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.25, 0.25, 0.3, 1)
+corner_radius_top_left = 40
+corner_radius_top_right = 40
+corner_radius_bottom_right = 40
+corner_radius_bottom_left = 40
+anti_aliasing = false
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Handle"]
+bg_color = Color(0.2, 0.6, 1, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.6, 1.0, 1, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+anti_aliasing = false
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Indicator"]
+bg_color = Color(1, 1, 1, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.4, 0.4, 0.4, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+anti_aliasing = false
+
+[node name="JoystickVisualizationUI" type="PanelContainer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = 0.0
+offset_bottom = 0.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_MainBG")
+script = ExtResource("1_script")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="Title" type="Label" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.95, 1)
+theme_override_font_sizes/font_size = 24
+text = "Joystick Input"
+horizontal_alignment = 1
+
+[node name="ContentHBox" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 40
+alignment = 1
+
+; LEFT HAND
+[node name="LeftHandVBox" type="VBoxContainer" parent="MarginContainer/VBoxContainer/ContentHBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="Label" type="Label" parent="MarginContainer/VBoxContainer/ContentHBox/LeftHandVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.7, 0.8, 1)
+text = "LEFT HAND"
+horizontal_alignment = 1
+
+[node name="StickContainer" type="Control" parent="MarginContainer/VBoxContainer/ContentHBox/LeftHandVBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 80)
+size_flags_horizontal = 4
+
+[node name="LeftStickBase" type="Panel" parent="MarginContainer/VBoxContainer/ContentHBox/LeftHandVBox/StickContainer"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_Base")
+
+[node name="LeftStickHandle" type="Panel" parent="MarginContainer/VBoxContainer/ContentHBox/LeftHandVBox/StickContainer/LeftStickBase"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 30.0
+offset_top = 30.0
+offset_right = 50.0
+offset_bottom = 50.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_Handle")
+
+[node name="IndicatorsGrid" type="GridContainer" parent="MarginContainer/VBoxContainer/ContentHBox/LeftHandVBox"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 6
+columns = 3
+
+[node name="Empty1" type="Control" parent="MarginContainer/VBoxContainer/ContentHBox/LeftHandVBox/IndicatorsGrid"]
+layout_mode = 2
+custom_minimum_size = Vector2(25, 25)
+
+[node name="LeftIndicatorUp" type="Panel" parent="MarginContainer/VBoxContainer/ContentHBox/LeftHandVBox/IndicatorsGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(25, 25)
+theme_override_styles/panel = SubResource("StyleBoxFlat_Indicator")
+
+[node name="Empty2" type="Control" parent="MarginContainer/VBoxContainer/ContentHBox/LeftHandVBox/IndicatorsGrid"]
+layout_mode = 2
+custom_minimum_size = Vector2(25, 25)
+
+[node name="LeftIndicatorLeft" type="Panel" parent="MarginContainer/VBoxContainer/ContentHBox/LeftHandVBox/IndicatorsGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(25, 25)
+theme_override_styles/panel = SubResource("StyleBoxFlat_Indicator")
+
+[node name="CenterEmpty" type="Control" parent="MarginContainer/VBoxContainer/ContentHBox/LeftHandVBox/IndicatorsGrid"]
+layout_mode = 2
+custom_minimum_size = Vector2(25, 25)
+
+[node name="LeftIndicatorRight" type="Panel" parent="MarginContainer/VBoxContainer/ContentHBox/LeftHandVBox/IndicatorsGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(25, 25)
+theme_override_styles/panel = SubResource("StyleBoxFlat_Indicator")
+
+[node name="Empty3" type="Control" parent="MarginContainer/VBoxContainer/ContentHBox/LeftHandVBox/IndicatorsGrid"]
+layout_mode = 2
+custom_minimum_size = Vector2(25, 25)
+
+[node name="LeftIndicatorDown" type="Panel" parent="MarginContainer/VBoxContainer/ContentHBox/LeftHandVBox/IndicatorsGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(25, 25)
+theme_override_styles/panel = SubResource("StyleBoxFlat_Indicator")
+
+[node name="Empty4" type="Control" parent="MarginContainer/VBoxContainer/ContentHBox/LeftHandVBox/IndicatorsGrid"]
+layout_mode = 2
+custom_minimum_size = Vector2(25, 25)
+
+[node name="LeftCoordinatesLabel" type="Label" parent="MarginContainer/VBoxContainer/ContentHBox/LeftHandVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.8, 1.0, 1)
+theme_override_font_sizes/font_size = 14
+text = "X: 0.00
+Y: 0.00"
+horizontal_alignment = 1
+
+; RIGHT HAND
+[node name="RightHandVBox" type="VBoxContainer" parent="MarginContainer/VBoxContainer/ContentHBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="Label" type="Label" parent="MarginContainer/VBoxContainer/ContentHBox/RightHandVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.7, 0.8, 1)
+text = "RIGHT HAND"
+horizontal_alignment = 1
+
+[node name="StickContainer" type="Control" parent="MarginContainer/VBoxContainer/ContentHBox/RightHandVBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 80)
+size_flags_horizontal = 4
+
+[node name="RightStickBase" type="Panel" parent="MarginContainer/VBoxContainer/ContentHBox/RightHandVBox/StickContainer"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_Base")
+
+[node name="RightStickHandle" type="Panel" parent="MarginContainer/VBoxContainer/ContentHBox/RightHandVBox/StickContainer/RightStickBase"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 30.0
+offset_top = 30.0
+offset_right = 50.0
+offset_bottom = 50.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_Handle")
+
+[node name="IndicatorsGrid" type="GridContainer" parent="MarginContainer/VBoxContainer/ContentHBox/RightHandVBox"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 6
+columns = 3
+
+[node name="Empty1" type="Control" parent="MarginContainer/VBoxContainer/ContentHBox/RightHandVBox/IndicatorsGrid"]
+layout_mode = 2
+custom_minimum_size = Vector2(25, 25)
+
+[node name="RightIndicatorUp" type="Panel" parent="MarginContainer/VBoxContainer/ContentHBox/RightHandVBox/IndicatorsGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(25, 25)
+theme_override_styles/panel = SubResource("StyleBoxFlat_Indicator")
+
+[node name="Empty2" type="Control" parent="MarginContainer/VBoxContainer/ContentHBox/RightHandVBox/IndicatorsGrid"]
+layout_mode = 2
+custom_minimum_size = Vector2(25, 25)
+
+[node name="RightIndicatorLeft" type="Panel" parent="MarginContainer/VBoxContainer/ContentHBox/RightHandVBox/IndicatorsGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(25, 25)
+theme_override_styles/panel = SubResource("StyleBoxFlat_Indicator")
+
+[node name="CenterEmpty" type="Control" parent="MarginContainer/VBoxContainer/ContentHBox/RightHandVBox/IndicatorsGrid"]
+layout_mode = 2
+custom_minimum_size = Vector2(25, 25)
+
+[node name="RightIndicatorRight" type="Panel" parent="MarginContainer/VBoxContainer/ContentHBox/RightHandVBox/IndicatorsGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(25, 25)
+theme_override_styles/panel = SubResource("StyleBoxFlat_Indicator")
+
+[node name="Empty3" type="Control" parent="MarginContainer/VBoxContainer/ContentHBox/RightHandVBox/IndicatorsGrid"]
+layout_mode = 2
+custom_minimum_size = Vector2(25, 25)
+
+[node name="RightIndicatorDown" type="Panel" parent="MarginContainer/VBoxContainer/ContentHBox/RightHandVBox/IndicatorsGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(25, 25)
+theme_override_styles/panel = SubResource("StyleBoxFlat_Indicator")
+
+[node name="Empty4" type="Control" parent="MarginContainer/VBoxContainer/ContentHBox/RightHandVBox/IndicatorsGrid"]
+layout_mode = 2
+custom_minimum_size = Vector2(25, 25)
+
+[node name="RightCoordinatesLabel" type="Label" parent="MarginContainer/VBoxContainer/ContentHBox/RightHandVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.8, 1.0, 1)
+theme_override_font_sizes/font_size = 14
+text = "X: 0.00
+Y: 0.00"
+horizontal_alignment = 1

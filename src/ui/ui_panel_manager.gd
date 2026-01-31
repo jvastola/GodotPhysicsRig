@@ -80,6 +80,7 @@ const UI_SCENE_PATHS := {
 	"AssetLibraryViewport3D": "res://src/ui/AssetLibraryViewport3D.tscn",
 	"BlockLibraryViewport3D": "res://src/ui/BlockLibraryViewport3D.tscn",
 	"PassthroughSettingsViewport3D": "res://src/ui/PassthroughSettingsViewport3D.tscn",
+	"JoystickVisualizationViewport3D": "res://src/ui/JoystickVisualizationViewport3D.tscn",
 }
 
 

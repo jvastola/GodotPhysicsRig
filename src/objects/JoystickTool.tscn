@@ -1,0 +1,52 @@
+[gd_scene load_steps=9 format=3 uid="uid://joystick_tool"]
+
+[ext_resource type="Script" path="res://src/objects/joystick_tool.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://joystick_tool_ui" path="res://src/ui/JoystickToolUI.tscn" id="2_ui"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_base"]
+size = Vector3(0.2, 0.2, 0.2)
+
+[sub_resource type="BoxMesh" id="BoxMesh_base"]
+size = Vector3(0.2, 0.2, 0.2)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_base"]
+albedo_color = Color(0.2, 0.2, 0.3, 1)
+metallic = 0.5
+roughness = 0.5
+
+[sub_resource type="ViewportTexture" id="ViewportTexture_ui"]
+viewport_path = NodePath("SubViewport")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ui"]
+resource_local_to_scene = true
+transparency = 1
+shading_mode = 0
+albedo_texture = SubResource("ViewportTexture_ui")
+
+[sub_resource type="QuadMesh" id="QuadMesh_ui"]
+size = Vector2(0.18, 0.18)
+
+[node name="JoystickTool" type="RigidBody3D"]
+collision_layer = 4
+collision_mask = 7
+script = ExtResource("1_script")
+grab_mode = 0
+
+[node name="BaseCollision" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_base")
+
+[node name="BaseMesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_base")
+surface_material_override/0 = SubResource("StandardMaterial3D_base")
+
+[node name="SubViewport" type="SubViewport" parent="."]
+transparent_bg = true
+size = Vector2i(200, 200)
+render_target_update_mode = 4
+
+[node name="JoystickToolUI" parent="SubViewport" instance=ExtResource("2_ui")]
+
+[node name="UIMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.101)
+material_override = SubResource("StandardMaterial3D_ui")
+mesh = SubResource("QuadMesh_ui")
