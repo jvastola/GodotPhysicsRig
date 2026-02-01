@@ -16,14 +16,10 @@ metallic = 0.5
 roughness = 0.5
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_point"]
+material = ExtResource("2_v8c5j")
 top_radius = 0.0
 bottom_radius = 0.04
 height = 0.15
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_point"]
-albedo_color = Color(1, 0.8, 0.1, 1)
-metallic = 0.8
-roughness = 0.2
 
 [sub_resource type="SphereMesh" id="SphereMesh_tip"]
 radius = 0.03
@@ -48,21 +44,21 @@ script = ExtResource("1_script")
 grab_mode = 0
 
 [node name="BaseCollision" type="CollisionShape3D" parent="." unique_id=821041306]
+transform = Transform3D(0.34, 0, 0, 0, 0.34, 0, 0, 0, 0.34, 0, 0, 0)
 shape = SubResource("BoxShape3D_base")
 
 [node name="BaseMesh" type="MeshInstance3D" parent="." unique_id=1146869229]
+transform = Transform3D(0.34, 0, 0, 0, 0.34, 0, 0, 0, 0.1017516, 0, 0, 0)
 mesh = SubResource("BoxMesh_base")
 surface_material_override/0 = SubResource("StandardMaterial3D_base")
 
 [node name="PointMesh" type="MeshInstance3D" parent="." unique_id=1678139498]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15536682, 0)
+transform = Transform3D(0.34, 0, 0, 0, 0.34, 0, 0, 0, 0.34, 0, 0.070519105, 0)
 mesh = SubResource("CylinderMesh_point")
-surface_material_override/0 = SubResource("StandardMaterial3D_point")
 
 [node name="TipSphere" type="MeshInstance3D" parent="." unique_id=1785002916]
 unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25813347, 0)
-visible = false
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.12269744, 0)
 mesh = SubResource("SphereMesh_tip")
 surface_material_override/0 = ExtResource("2_v8c5j")
 
@@ -74,6 +70,6 @@ render_target_update_mode = 4
 [node name="JoystickToolUI" parent="SubViewport" unique_id=542981679 instance=ExtResource("2_ui")]
 
 [node name="UIMesh" type="MeshInstance3D" parent="." unique_id=1449802766]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.101)
+transform = Transform3D(0.34, 0, 0, 0, 0.34, 0, 0, 0, 0.34, 0, 0, 0.012123369)
 material_override = SubResource("StandardMaterial3D_ui")
 mesh = SubResource("QuadMesh_ui")

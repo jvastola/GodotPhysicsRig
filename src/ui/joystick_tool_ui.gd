@@ -56,8 +56,8 @@ func _process(_delta: float) -> void:
 			tip_scale = 0.2
 			tip_scale_changed.emit(tip_scale)
 		
-	# Handle Scaling when in Hand-Trigger mode
-	if trigger_held and current_selection == "up":
+	# Handle Scaling when in Hand-Trigger mode (Global now)
+	if trigger_held:
 		var scale_speed = 1.5
 		if input.length() > activation_threshold:
 			if abs(input.x) > abs(input.y):
@@ -85,9 +85,9 @@ func _update_visuals(input: Vector2) -> void:
 		icon.modulate = default_color
 	
 	# Update Icon Text based on Mode and Trigger
-	if current_selection == "up" and trigger_held:
-		icon_up.text = "✋"
-		icon_down.text = "🔒" # Or hide? User only mentioned - and +
+	if trigger_held:
+		icon_up.text = ""
+		icon_down.text = ""
 		icon_left.text = "-"
 		icon_right.text = "+"
 	else:
@@ -156,7 +156,7 @@ func _process_selection(input: Vector2) -> void:
 	# BLOCK mode switching while in Hand-Trigger mode
 	# This allows the user to use left/right for other things (like scale) 
 	# without accidentally switching to the paintbrush.
-	if trigger_held and current_selection == "up":
+	if trigger_held:
 		return
 
 	var new_selection = ""
