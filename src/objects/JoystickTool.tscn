@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://d755rcc14qa3" path="res://src/objects/joystick_tool.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://src/ui/JoystickToolUI.tscn" id="2_ui"]
+[ext_resource type="Material" uid="uid://dt14gsjdqu78t" path="res://world_grab_demo/ghost_hand.tres" id="2_v8c5j"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_base"]
 size = Vector3(0.2, 0.2, 0.2)
@@ -27,12 +28,6 @@ roughness = 0.2
 [sub_resource type="SphereMesh" id="SphereMesh_tip"]
 radius = 0.03
 height = 0.06
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sphere"]
-albedo_color = Color(0.2, 0.6, 1, 1)
-emission_enabled = true
-emission = Color(0.2, 0.6, 1, 1)
-emission_energy_multiplier = 2.0
 
 [sub_resource type="ViewportTexture" id="ViewportTexture_ui"]
 viewport_path = NodePath("SubViewport")
@@ -60,16 +55,16 @@ mesh = SubResource("BoxMesh_base")
 surface_material_override/0 = SubResource("StandardMaterial3D_base")
 
 [node name="PointMesh" type="MeshInstance3D" parent="." unique_id=1678139498]
-transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 0, -0.175)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15536682, 0)
 mesh = SubResource("CylinderMesh_point")
 surface_material_override/0 = SubResource("StandardMaterial3D_point")
 
 [node name="TipSphere" type="MeshInstance3D" parent="." unique_id=1785002916]
 unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.25)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25813347, 0)
 visible = false
 mesh = SubResource("SphereMesh_tip")
-surface_material_override/0 = SubResource("StandardMaterial3D_sphere")
+surface_material_override/0 = ExtResource("2_v8c5j")
 
 [node name="SubViewport" type="SubViewport" parent="." unique_id=1823329650]
 transparent_bg = true

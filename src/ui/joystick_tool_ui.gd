@@ -22,10 +22,10 @@ extends PanelContainer
 var highlight_style: StyleBoxFlat
 var empty_style: StyleBoxEmpty
 
-var current_selection: String = ""
+var current_selection: String = "up"
 var active_controller: XRController3D = null
 var trigger_held: bool = false
-var tip_scale: float = 1.0
+var tip_scale: float = 0.2
 
 signal trigger_state_changed(is_held: bool)
 signal tip_scale_changed(new_scale: float)
@@ -53,7 +53,7 @@ func _process(_delta: float) -> void:
 		
 		# Handle reset on release
 		if not trigger_held and reset_scale_on_release:
-			tip_scale = 1.0
+			tip_scale = 0.2
 			tip_scale_changed.emit(tip_scale)
 		
 	# Handle Scaling when in Hand-Trigger mode
@@ -173,5 +173,13 @@ func _process_selection(input: Vector2) -> void:
 
 func set_controller(controller: XRController3D) -> void:
 	active_controller = controller
-	if not active_controller:
-		current_selection = ""
+	if active_controller:
+		# If no selection is active (e.g. first pickup), default to "up" (Hand)
+		if current_selection == "":
+			current_selection = "up"
+	else:
+		# On release, we can keep the selection state or reset.
+		# User requested "start with hand mode", implying persistence or defaulting.
+		# Let's keep the state so it doesn't look broken on drop, 
+		# or just allow the _process to handle visuals.
+		pass

@@ -6,6 +6,8 @@ extends Grabbable
 @onready var ui_viewport: SubViewport = $SubViewport
 @onready var tool_ui = $SubViewport/JoystickToolUI
 
+var anchor_y: float = 0.0
+
 func _ready() -> void:
 	super._ready()
 	# Connect to grab signals to track which hand is using the tool
@@ -14,6 +16,15 @@ func _ready() -> void:
 	
 	if tool_ui:
 		tool_ui.tip_scale_changed.connect(_on_tip_scale_changed)
+	
+	# Calculate anchor (cone tip) based on initial editor placement
+	var tip_sphere = %TipSphere
+	if tip_sphere:
+		# Assuming initial scale is 1.0 (or whatever is in editor) acting as "base"
+		# Actually, user wants "bottom attached".
+		# Anchor Y = Center Y - Radius
+		# We assume the editor position represents the sphere sitting on the tip.
+		anchor_y = tip_sphere.position.y - 0.03 # Radius is 0.03
 
 func _on_tip_scale_changed(_new_scale: float) -> void:
 	# Processed every frame in _process but we can force an update here if needed
@@ -26,27 +37,35 @@ func _update_tip_sphere() -> void:
 	var tip_sphere = %TipSphere
 	if not tip_sphere or not tool_ui: return
 	
-	# Sync sphere visibility with UI state and trigger
-	var should_be_visible = tool_ui.trigger_held and tool_ui.current_selection == "up"
+	# Visibility: ALWAYS visible as requested
 	# ONLY show the original sphere if we are NOT currently grabbed (Grabbable handles the visual clone)
-	tip_sphere.visible = should_be_visible and not is_grabbed
+	tip_sphere.visible = not is_grabbed
 	
-	# Apply scale
+	# APPLY SCALE
 	var current_scale = tool_ui.tip_scale
 	tip_sphere.scale = Vector3.ONE * current_scale
 	
-	# POSITIONING: Attach bottom of sphere to cone tip (-0.25)
-	# Base radius is 0.03
+	# POSITIONING: Attach bottom of sphere to calculated anchor
 	var radius = 0.03 * current_scale
-	tip_sphere.position.z = -0.25 - radius
+	tip_sphere.position = Vector3(0, anchor_y + radius, 0)
 	
 	# Also update the cloned visuals on the hand if grabbed
 	if is_grabbed and is_instance_valid(grabbing_hand):
+		# Create the transform representing the sphere in Hand space
+		# Reusing the logic from Grabbable._create_hand_collision_shapes
+		var grab_tf = Transform3D(Basis(grab_rotation_offset), grab_offset)
+		var sphere_local_tf = tip_sphere.transform
+		var sphere_hand_tf = grab_tf * sphere_local_tf
+		
 		for mesh in grabbed_mesh_instances:
 			if mesh is MeshInstance3D and mesh.mesh is SphereMesh:
-				mesh.visible = should_be_visible
-				mesh.scale = tip_sphere.scale
-				mesh.position = tip_sphere.position
+				# Always visible on hand
+				mesh.visible = true
+				# Apply the FULL transform (position, rotation, scale)
+				mesh.transform = sphere_hand_tf
+				# Scale is part of basis usually, but if basis is generic, safer to set scale explicitly if needed?
+				# Transform mul includes scale if sphere_local_tf has it.
+				# tip_sphere.transform already includes the scale we set above!
 
 func _on_grabbed(hand: RigidBody3D) -> void:
 	if not hand:
