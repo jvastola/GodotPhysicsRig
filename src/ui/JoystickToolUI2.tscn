@@ -1,0 +1,209 @@
+[gd_scene format=3 uid="uid://nj56rvbdufsc"]
+
+[ext_resource type="Script" uid="uid://c6iufbtilnlyy" path="res://src/ui/joystick_tool_ui_2.gd" id="1_script"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Main"]
+bg_color = Color(0.1, 0.1, 0.12, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.3, 0.3, 0.4, 1)
+corner_radius_top_left = 15
+corner_radius_top_right = 15
+corner_radius_bottom_right = 15
+corner_radius_bottom_left = 15
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Base"]
+bg_color = Color(0.05, 0.05, 0.07, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.2, 0.2, 0.25, 1)
+corner_radius_top_left = 35
+corner_radius_top_right = 35
+corner_radius_bottom_right = 35
+corner_radius_bottom_left = 35
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Handle"]
+bg_color = Color(0.2, 0.5, 1, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_None"]
+
+[node name="JoystickToolUI" type="PanelContainer" unique_id=1575329935]
+custom_minimum_size = Vector2(200, 200)
+offset_right = 200.0
+offset_bottom = 200.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_Main")
+script = ExtResource("1_script")
+
+[node name="MarginContainer" type="MarginContainer" parent="." unique_id=1908516861]
+layout_mode = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="Layout" type="Control" parent="MarginContainer" unique_id=968839385]
+layout_mode = 2
+
+[node name="StickBase" type="Panel" parent="MarginContainer/Layout" unique_id=149056647]
+unique_name_in_owner = true
+z_index = 1
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -35.0
+offset_top = -35.0
+offset_right = 35.0
+offset_bottom = 35.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_Base")
+
+[node name="StickHandle" type="Panel" parent="MarginContainer/Layout/StickBase" unique_id=1094459252]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 27.0
+offset_top = 27.0
+offset_right = 43.0
+offset_bottom = 43.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_Handle")
+
+[node name="SectionUp" type="Panel" parent="MarginContainer/Layout" unique_id=153254687]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -40.0
+offset_right = 40.0
+offset_bottom = 60.0
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("StyleBoxEmpty_None")
+
+[node name="IconUp" type="Label" parent="MarginContainer/Layout/SectionUp" unique_id=2118193937]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 32
+text = "✋"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SectionDown" type="Panel" parent="MarginContainer/Layout" unique_id=1280244504]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -40.0
+offset_top = -60.0
+offset_right = 40.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_None")
+
+[node name="IconDown" type="Label" parent="MarginContainer/Layout/SectionDown" unique_id=1547709950]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 32
+text = "🧲"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SectionLeft" type="Panel" parent="MarginContainer/Layout" unique_id=609868555]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_top = -40.0
+offset_right = 60.0
+offset_bottom = 40.0
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxEmpty_None")
+
+[node name="IconLeft" type="Label" parent="MarginContainer/Layout/SectionLeft" unique_id=176492261]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 32
+text = "↪"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SectionRight" type="Panel" parent="MarginContainer/Layout" unique_id=150620878]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -60.0
+offset_top = -40.0
+offset_bottom = 40.0
+grow_horizontal = 0
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxEmpty_None")
+
+[node name="IconRight" type="Label" parent="MarginContainer/Layout/SectionRight" unique_id=96254556]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 32
+text = "↩"
+horizontal_alignment = 1
+vertical_alignment = 1
