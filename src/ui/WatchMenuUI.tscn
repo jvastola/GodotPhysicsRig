@@ -62,20 +62,6 @@ theme_override_font_sizes/font_size = 16
 text = "UI IS WORKING!"
 horizontal_alignment = 1
 
-[node name="TestLabel2" type="Label" parent="TabContainer/PanelsScroll/PanelsVBox"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 14
-text = "If you can read this, the viewport is rendering."
-
-[node name="TestLabel3" type="Label" parent="TabContainer/PanelsScroll/PanelsVBox"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 14
-text = "Settings will populate when PlayerMovementComponent is found."
-
-[node name="TestButton" type="Button" parent="TabContainer/PanelsScroll/PanelsVBox"]
-layout_mode = 2
-text = "Test Button - Click Me"
-
 [node name="GeneralScroll" type="ScrollContainer" parent="TabContainer"]
 visible = false
 layout_mode = 2
@@ -88,12 +74,12 @@ metadata/_tab_index = 1
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="TestLabel4" type="Label" parent="TabContainer/GeneralScroll/GeneralVBox"]
+[node name="TestLabel2" type="Label" parent="TabContainer/GeneralScroll/GeneralVBox"]
 layout_mode = 2
-text = "General Settings Tab"
+text = "General Tab"
 horizontal_alignment = 1
 
-[node name="MovementScroll" type="ScrollContainer" parent="TabContainer"]
+[node name="HistoryScroll" type="ScrollContainer" parent="TabContainer"]
 visible = false
 layout_mode = 2
 follow_focus = true
@@ -101,16 +87,16 @@ vertical_scroll_mode = 2
 horizontal_scroll_mode = 0
 metadata/_tab_index = 2
 
-[node name="MovementVBox" type="VBoxContainer" parent="TabContainer/MovementScroll"]
+[node name="HistoryVBox" type="VBoxContainer" parent="TabContainer/HistoryScroll"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="TestLabel5" type="Label" parent="TabContainer/MovementScroll/MovementVBox"]
+[node name="TestLabel3" type="Label" parent="TabContainer/HistoryScroll/HistoryVBox"]
 layout_mode = 2
-text = "Movement Settings Tab"
+text = "History Tab"
 horizontal_alignment = 1
 
-[node name="MultiplayerScroll" type="ScrollContainer" parent="TabContainer"]
+[node name="ShapesScroll" type="ScrollContainer" parent="TabContainer"]
 visible = false
 layout_mode = 2
 follow_focus = true
@@ -118,40 +104,11 @@ vertical_scroll_mode = 2
 horizontal_scroll_mode = 0
 metadata/_tab_index = 3
 
-[node name="MultiplayerVBox" type="VBoxContainer" parent="TabContainer/MultiplayerScroll"]
+[node name="ShapesVBox" type="VBoxContainer" parent="TabContainer/ShapesScroll"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="RenderModeScroll" type="ScrollContainer" parent="TabContainer"]
-visible = false
+[node name="TestLabel4" type="Label" parent="TabContainer/ShapesScroll/ShapesVBox"]
 layout_mode = 2
-follow_focus = true
-vertical_scroll_mode = 2
-horizontal_scroll_mode = 0
-metadata/_tab_index = 4
-
-[node name="RenderModeVBox" type="VBoxContainer" parent="TabContainer/RenderModeScroll"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="RecentScroll" type="ScrollContainer" parent="TabContainer"]
-visible = false
-layout_mode = 2
-follow_focus = true
-vertical_scroll_mode = 2
-horizontal_scroll_mode = 0
-metadata/_tab_index = 5
-
-[node name="RecentVBox" type="VBoxContainer" parent="TabContainer/RecentScroll"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="TestLabel7" type="Label" parent="TabContainer/RecentScroll/RecentVBox"]
-layout_mode = 2
-text = "Recent Toggles Tab"
-horizontal_alignment = 1
-
-[node name="TestLabel6" type="Label" parent="TabContainer/MultiplayerScroll/MultiplayerVBox"]
-layout_mode = 2
-text = "Multiplayer Tab"
+text = "Shapes Tab"
 horizontal_alignment = 1

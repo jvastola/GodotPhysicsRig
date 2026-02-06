@@ -16,7 +16,7 @@
 [ext_resource type="Script" uid="uid://dwsx0otrybpmd" path="res://src/player/components/simple_world_grab_component.gd" id="16_simple_grab"]
 [ext_resource type="Script" uid="uid://ni7m2frmfnh7" path="res://src/player/components/hand_movement_component.gd" id="17_hand_movement"]
 [ext_resource type="Script" uid="uid://cdrcd8vcdgh73" path="res://src/player/components/desktop_interaction_component.gd" id="18_desktop_interaction"]
-[ext_resource type="PackedScene" path="res://src/ui/WatchMenuViewport3D.tscn" id="18_watch_viewport"]
+[ext_resource type="PackedScene" uid="uid://beim5pnvstjcv" path="res://src/ui/WatchMenuViewport3D.tscn" id="18_watch_viewport"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_xxbg3"]
 size = Vector3(0.3, 0.4, 0.2)
