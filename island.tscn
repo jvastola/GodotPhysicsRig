@@ -1,6 +1,334 @@
 [gd_scene format=3 uid="uid://bdgtb4clc5scx"]
 
 [ext_resource type="PackedScene" uid="uid://bnxdtbg18q0sl" path="res://assets/worlds/island.fbx" id="1_0iamf"]
+[ext_resource type="Material" uid="uid://7u5tc56wroch" path="res://src/demos/tools/materials/ice.tres" id="3_fgmf3"]
+[ext_resource type="Texture2D" uid="uid://du3b31c0lk6v0" path="res://assets/textures/Grass005_1K-PNG_Color.png" id="3_qurb2"]
+[ext_resource type="Texture2D" uid="uid://bki04eqgf5rla" path="res://src/demos/tools/materials/textures/grass_albedo.tres" id="4_b4opu"]
+[ext_resource type="Texture2D" uid="uid://b6irh3wg1rt4l" path="res://src/demos/tools/materials/textures/grass_normal.tres" id="5_5jwi3"]
+[ext_resource type="Texture2D" uid="uid://d21jeu3y4xk80" path="res://src/demos/tools/materials/textures/sand_albedo.tres" id="6_c7iw8"]
+[ext_resource type="Texture2D" uid="uid://da5bejg157vqo" path="res://src/demos/tools/materials/textures/sand_normal.tres" id="7_8ervs"]
+
+[sub_resource type="Gradient" id="Gradient_wood"]
+offsets = PackedFloat32Array(0, 0.3, 0.6, 1)
+colors = PackedColorArray(0.24, 0.15, 0.14, 1, 0.36, 0.25, 0.21, 1, 0.47, 0.33, 0.28, 1, 0.3, 0.2, 0.18, 1)
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_wood"]
+seed = 100
+frequency = 0.03
+fractal_octaves = 2
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_wood"]
+width = 64
+height = 64
+noise = SubResource("FastNoiseLite_wood")
+color_ramp = SubResource("Gradient_wood")
+seamless = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_qurb2"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.03, 0.03, 0.03)
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_7fk8d"]
+albedo_color = Color(0.515208, 0.515208, 0.515208, 1)
+albedo_texture = ExtResource("3_qurb2")
+uv1_scale = Vector3(-0.01, -0.01, -0.01)
+texture_filter = 0
+grow_amount = -7.111
+point_size = 128.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_04hb4"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gljqa"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_b4opu"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5jwi3"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_c7iw8"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8ervs"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1y0xo"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_k1f3g"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_nytiv"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="Gradient" id="Gradient_stone"]
+offsets = PackedFloat32Array(0, 0.3, 0.7, 1)
+colors = PackedColorArray(0.2, 0.2, 0.22, 1, 0.35, 0.35, 0.37, 1, 0.5, 0.5, 0.52, 1, 0.3, 0.3, 0.32, 1)
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_stone"]
+noise_type = 3
+seed = 300
+frequency = 0.08
+fractal_type = 0
+cellular_jitter = 0.45
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_stone"]
+width = 64
+height = 64
+noise = SubResource("FastNoiseLite_stone")
+color_ramp = SubResource("Gradient_stone")
+seamless = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kjlm2"]
+albedo_color = Color(0.43134022, 0.43134025, 0.43134025, 1)
+albedo_texture = SubResource("NoiseTexture2D_stone")
+uv1_scale = Vector3(-0.02, -0.02, -0.02)
+uv1_triplanar = true
+uv1_triplanar_sharpness = 0.17677711
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="Gradient" id="Gradient_57yod"]
+offsets = PackedFloat32Array(0, 0.51049, 0.671329, 1)
+colors = PackedColorArray(0.0235294, 0.0235294, 0.0392157, 1, 0.113725, 0.113725, 0.164706, 1, 0.128, 0.145067, 0.16, 1, 1, 1, 1, 1)
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_vdicb"]
+frequency = 0.006
+fractal_type = 2
+fractal_octaves = 10
+fractal_lacunarity = 3.0
+fractal_gain = 0.6
+domain_warp_amplitude = 15.0
+domain_warp_frequency = 0.03
+domain_warp_fractal_octaves = 10
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_oc5fq"]
+width = 1024
+height = 1024
+noise = SubResource("FastNoiseLite_vdicb")
+color_ramp = SubResource("Gradient_57yod")
+seamless = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ad6l7"]
+albedo_texture = SubResource("NoiseTexture2D_oc5fq")
+roughness = 0.0
+rim_enabled = true
+rim_tint = 1.0
+clearcoat_roughness = 0.0
+uv1_scale = Vector3(-0.01, -0.01, -0.01)
+uv1_offset = Vector3(-0.43, 0.56, -0.66)
+uv1_triplanar = true
+uv1_triplanar_sharpness = 0.041234583
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_uq18n"]
+albedo_color = Color(0.43134022, 0.43134025, 0.43134025, 1)
+albedo_texture = SubResource("NoiseTexture2D_stone")
+uv1_scale = Vector3(-0.02, -0.02, -0.02)
+uv1_triplanar = true
+uv1_triplanar_sharpness = 0.17677711
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cj5nf"]
+albedo_color = Color(0.43134022, 0.43134025, 0.43134025, 1)
+albedo_texture = SubResource("NoiseTexture2D_stone")
+uv1_scale = Vector3(-0.02, -0.02, -0.02)
+uv1_triplanar = true
+uv1_triplanar_sharpness = 0.17677711
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_l23qb"]
+albedo_color = Color(0.515208, 0.515208, 0.515208, 1)
+albedo_texture = ExtResource("3_qurb2")
+uv1_scale = Vector3(-0.01, -0.01, -0.01)
+texture_filter = 0
+grow_amount = -7.111
+point_size = 128.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_aibdv"]
+albedo_color = Color(0.515208, 0.515208, 0.515208, 1)
+albedo_texture = ExtResource("3_qurb2")
+uv1_scale = Vector3(-0.01, -0.01, -0.01)
+texture_filter = 0
+grow_amount = -7.111
+point_size = 128.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_44qto"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hkouh"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_q2og1"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_l4q3l"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_p2ulv"]
+albedo_texture = ExtResource("4_b4opu")
+normal_enabled = true
+normal_texture = ExtResource("5_5jwi3")
+uv1_scale = Vector3(0.02, 0.02, 0.02)
+texture_filter = 5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wuuey"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(-0.05, -0.05, -0.05)
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_j2kl8"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_uby3m"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ave4v"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_2isaf"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_i5yj6"]
+albedo_color = Color(0.515208, 0.515208, 0.515208, 1)
+albedo_texture = ExtResource("3_qurb2")
+uv1_scale = Vector3(-0.01, -0.01, -0.01)
+texture_filter = 0
+grow_amount = -7.111
+point_size = 128.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rp8et"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sunp3"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_68ui1"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gtlwl"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_5tmlw"]
+frequency = 0.003
+fractal_type = 2
+fractal_octaves = 10
+fractal_lacunarity = 1.342
+fractal_gain = 0.776
+fractal_weighted_strength = 0.04
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_gyhec"]
+width = 1024
+height = 1024
+noise = SubResource("FastNoiseLite_5tmlw")
+seamless = true
+as_normal_map = true
+bump_strength = 4.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_imhev"]
+metallic_specular = 1.0
+normal_texture = SubResource("NoiseTexture2D_gyhec")
+backlight_enabled = true
+backlight = Color(0.6316896, 0.72396743, 0.82155937, 1)
+texture_filter = 0
+grow_amount = 2.433
+stencil_flags = 2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_mdxkg"]
+albedo_color = Color(0.515208, 0.515208, 0.515208, 1)
+albedo_texture = ExtResource("3_qurb2")
+uv1_scale = Vector3(-0.01, -0.01, -0.01)
+texture_filter = 0
+grow_amount = -7.111
+point_size = 128.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cy8yr"]
+albedo_texture = ExtResource("6_c7iw8")
+normal_enabled = true
+normal_texture = ExtResource("7_8ervs")
+uv1_scale = Vector3(0.13, 0.13, 0.13)
+texture_filter = 5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_c5w1u"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_q6p52"]
+albedo_texture = SubResource("NoiseTexture2D_wood")
+uv1_scale = Vector3(0.08, 0.08, 0.08)
+uv1_world_triplanar = true
+texture_filter = 0
 
 [node name="island" unique_id=1304383343 instance=ExtResource("1_0iamf")]
 
@@ -8,12 +336,14 @@
 cast_shadow = 0
 
 [node name="100004" parent="." index="1" unique_id=1240998074]
+material_override = SubResource("StandardMaterial3D_qurb2")
 cast_shadow = 0
 
 [node name="100006" parent="." index="2" unique_id=287418130]
 cast_shadow = 0
 
 [node name="100010" parent="." index="3" unique_id=1818432125]
+material_override = SubResource("StandardMaterial3D_7fk8d")
 cast_shadow = 0
 
 [node name="100011" parent="." index="4" unique_id=1628360038]
@@ -74,30 +404,39 @@ cast_shadow = 0
 cast_shadow = 0
 
 [node name="100038" parent="." index="23" unique_id=907560802]
+transform = Transform3D(-0.005392658, 0.0026855222, -0.00014031309, 0.0026888784, 0.0053799273, -0.0003725081, -4.0741004e-05, -0.00039596733, -0.0060128206, -0.1722765, -1.4983743, 9.526213)
+material_override = SubResource("StandardMaterial3D_04hb4")
 cast_shadow = 0
 
 [node name="100039" parent="." index="24" unique_id=1775047280]
+material_override = SubResource("StandardMaterial3D_gljqa")
 cast_shadow = 0
 
 [node name="100040" parent="." index="25" unique_id=1007100272]
+material_override = SubResource("StandardMaterial3D_b4opu")
 cast_shadow = 0
 
 [node name="100042" parent="." index="26" unique_id=745862108]
+material_override = SubResource("StandardMaterial3D_5jwi3")
 cast_shadow = 0
 
 [node name="100043" parent="." index="27" unique_id=466556140]
+material_override = SubResource("StandardMaterial3D_c7iw8")
 cast_shadow = 0
 
 [node name="100044" parent="." index="28" unique_id=697067287]
+material_override = SubResource("StandardMaterial3D_8ervs")
 cast_shadow = 0
 
 [node name="100045" parent="." index="29" unique_id=1454569003]
+material_override = SubResource("StandardMaterial3D_1y0xo")
 cast_shadow = 0
 
 [node name="100047" parent="." index="30" unique_id=1928192397]
 cast_shadow = 0
 
 [node name="100054" parent="." index="31" unique_id=716248559]
+material_override = SubResource("StandardMaterial3D_7fk8d")
 cast_shadow = 0
 
 [node name="100056" parent="." index="32" unique_id=767886635]
@@ -110,54 +449,70 @@ cast_shadow = 0
 cast_shadow = 0
 
 [node name="100059" parent="." index="35" unique_id=1712468441]
+material_override = SubResource("StandardMaterial3D_k1f3g")
 cast_shadow = 0
 
 [node name="100060" parent="." index="36" unique_id=577597281]
+material_override = SubResource("StandardMaterial3D_nytiv")
 cast_shadow = 0
 
 [node name="100063" parent="." index="37" unique_id=1330481918]
+material_override = SubResource("StandardMaterial3D_kjlm2")
 cast_shadow = 0
 
 [node name="100064" parent="." index="38" unique_id=1993700818]
+material_override = SubResource("StandardMaterial3D_ad6l7")
 cast_shadow = 0
 
 [node name="100065" parent="." index="39" unique_id=870957148]
+material_override = SubResource("StandardMaterial3D_uq18n")
 cast_shadow = 0
 
 [node name="100066" parent="." index="40" unique_id=251310114]
+material_override = SubResource("StandardMaterial3D_cj5nf")
 cast_shadow = 0
 
 [node name="100067" parent="." index="41" unique_id=1907546787]
+material_override = SubResource("StandardMaterial3D_uq18n")
 cast_shadow = 0
 
 [node name="100069" parent="." index="42" unique_id=1235606338]
+material_override = SubResource("StandardMaterial3D_l23qb")
 cast_shadow = 0
 
 [node name="100070" parent="." index="43" unique_id=1550077071]
+material_override = SubResource("StandardMaterial3D_aibdv")
 cast_shadow = 0
 
 [node name="100072" parent="." index="44" unique_id=852983624]
+material_override = SubResource("StandardMaterial3D_uq18n")
 cast_shadow = 0
 
 [node name="100073" parent="." index="45" unique_id=261506328]
+material_override = SubResource("StandardMaterial3D_uq18n")
 cast_shadow = 0
 
 [node name="100074" parent="." index="46" unique_id=320032230]
+material_override = SubResource("StandardMaterial3D_uq18n")
 cast_shadow = 0
 
 [node name="100075" parent="." index="47" unique_id=75615435]
+material_override = SubResource("StandardMaterial3D_7fk8d")
 cast_shadow = 0
 
 [node name="100077" parent="." index="48" unique_id=1824212447]
+material_override = SubResource("StandardMaterial3D_uq18n")
 cast_shadow = 0
 
 [node name="100078" parent="." index="49" unique_id=149343731]
+material_override = SubResource("StandardMaterial3D_uq18n")
 cast_shadow = 0
 
 [node name="100079" parent="." index="50" unique_id=1859813028]
 cast_shadow = 0
 
 [node name="100080" parent="." index="51" unique_id=150851134]
+transform = Transform3D(5000, -1.2173352e-13, -0.0001620429, -2.225463e-11, 111.104, -0.00085572986, 0.0001620429, 1.9015e-05, 5000, 807.79, -71.79129, 476.99637)
 cast_shadow = 0
 
 [node name="100008" parent="." index="52" unique_id=1458709616]
@@ -167,63 +522,82 @@ cast_shadow = 0
 cast_shadow = 0
 
 [node name="100016" parent="." index="54" unique_id=499775264]
+material_override = SubResource("StandardMaterial3D_uq18n")
 cast_shadow = 0
 
 [node name="100017" parent="." index="55" unique_id=498155055]
+material_override = SubResource("StandardMaterial3D_uq18n")
 cast_shadow = 0
 
 [node name="100082" parent="." index="56" unique_id=1982350767]
 cast_shadow = 0
 
 [node name="100024" parent="." index="57" unique_id=1121351703]
+material_override = ExtResource("3_fgmf3")
 cast_shadow = 0
 
 [node name="100025" parent="." index="58" unique_id=504343767]
+material_override = ExtResource("3_fgmf3")
 cast_shadow = 0
 
 [node name="100035" parent="." index="59" unique_id=1307842445]
+material_override = SubResource("StandardMaterial3D_44qto")
 cast_shadow = 0
 
 [node name="100051" parent="." index="60" unique_id=1252555012]
+material_override = SubResource("StandardMaterial3D_hkouh")
 cast_shadow = 0
 
 [node name="100055" parent="." index="61" unique_id=348756919]
+material_override = SubResource("StandardMaterial3D_q2og1")
 cast_shadow = 0
 
 [node name="100061" parent="." index="62" unique_id=1901999568]
+material_override = SubResource("StandardMaterial3D_l4q3l")
 cast_shadow = 0
 
 [node name="100083" parent="." index="63" unique_id=99982097]
+material_override = SubResource("StandardMaterial3D_p2ulv")
 cast_shadow = 0
 
 [node name="100086" parent="." index="64" unique_id=1962949651]
+material_override = SubResource("StandardMaterial3D_wuuey")
 cast_shadow = 0
 
 [node name="100089" parent="." index="65" unique_id=70596025]
+material_override = SubResource("StandardMaterial3D_j2kl8")
 cast_shadow = 0
 
 [node name="100090" parent="." index="66" unique_id=972184520]
+material_override = SubResource("StandardMaterial3D_uby3m")
 cast_shadow = 0
 
 [node name="100091" parent="." index="67" unique_id=875256123]
+material_override = SubResource("StandardMaterial3D_ave4v")
 cast_shadow = 0
 
 [node name="100092" parent="." index="68" unique_id=1187133790]
+material_override = SubResource("StandardMaterial3D_2isaf")
 cast_shadow = 0
 
 [node name="100093" parent="." index="69" unique_id=1443536472]
+material_override = SubResource("StandardMaterial3D_i5yj6")
 cast_shadow = 0
 
 [node name="100095" parent="." index="70" unique_id=981306284]
+material_override = SubResource("StandardMaterial3D_rp8et")
 cast_shadow = 0
 
 [node name="100099" parent="." index="71" unique_id=838987525]
+material_override = SubResource("StandardMaterial3D_sunp3")
 cast_shadow = 0
 
 [node name="100100" parent="." index="72" unique_id=224613253]
+material_override = SubResource("StandardMaterial3D_68ui1")
 cast_shadow = 0
 
 [node name="100102" parent="." index="73" unique_id=1912061698]
+material_override = SubResource("StandardMaterial3D_gtlwl")
 cast_shadow = 0
 
 [node name="100104" parent="." index="74" unique_id=178016110]
@@ -236,6 +610,7 @@ cast_shadow = 0
 cast_shadow = 0
 
 [node name="100107" parent="." index="77" unique_id=758309747]
+material_override = SubResource("StandardMaterial3D_imhev")
 cast_shadow = 0
 
 [node name="100108" parent="." index="78" unique_id=1252429973]
@@ -248,6 +623,7 @@ cast_shadow = 0
 cast_shadow = 0
 
 [node name="100111" parent="." index="81" unique_id=1064550287]
+material_override = SubResource("StandardMaterial3D_imhev")
 cast_shadow = 0
 
 [node name="100112" parent="." index="82" unique_id=205125993]
@@ -260,9 +636,11 @@ cast_shadow = 0
 cast_shadow = 0
 
 [node name="100115" parent="." index="85" unique_id=869460360]
+material_override = SubResource("StandardMaterial3D_mdxkg")
 cast_shadow = 0
 
 [node name="100117" parent="." index="86" unique_id=719681504]
+material_override = SubResource("StandardMaterial3D_cy8yr")
 cast_shadow = 0
 
 [node name="100118" parent="." index="87" unique_id=1794913684]
@@ -275,9 +653,11 @@ cast_shadow = 0
 cast_shadow = 0
 
 [node name="100122" parent="." index="90" unique_id=1548475581]
+material_override = SubResource("StandardMaterial3D_imhev")
 cast_shadow = 0
 
 [node name="100124" parent="." index="91" unique_id=352106503]
+material_override = SubResource("StandardMaterial3D_7fk8d")
 cast_shadow = 0
 
 [node name="100126" parent="." index="92" unique_id=1326993138]
@@ -329,9 +709,11 @@ cast_shadow = 0
 cast_shadow = 0
 
 [node name="100149" parent="." index="108" unique_id=966516830]
+material_override = SubResource("StandardMaterial3D_c5w1u")
 cast_shadow = 0
 
 [node name="100150" parent="." index="109" unique_id=1519876446]
+material_override = SubResource("StandardMaterial3D_imhev")
 cast_shadow = 0
 
 [node name="100152" parent="." index="110" unique_id=842588908]
@@ -386,7 +768,9 @@ cast_shadow = 0
 cast_shadow = 0
 
 [node name="100002" parent="." index="127" unique_id=2113023873]
+material_override = SubResource("StandardMaterial3D_q6p52")
 cast_shadow = 0
 
 [node name="100003" parent="." index="128" unique_id=502948035]
+material_override = ExtResource("3_fgmf3")
 cast_shadow = 0

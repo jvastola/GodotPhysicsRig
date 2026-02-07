@@ -19,21 +19,18 @@
 [ext_resource type="PackedScene" uid="uid://cqtv3jhgmgsfw" path="res://src/levels/poly_exports/poly_2025-12-09T16-25-02.gltf" id="28_wb7rf"]
 [ext_resource type="PackedScene" uid="uid://wly7in1mfwww" path="res://src/objects/grabbables/PolyTool.tscn" id="29_poly_tool"]
 [ext_resource type="PackedScene" path="res://src/objects/TransformTool.tscn" id="33_transform_tool"]
-[ext_resource type="Material" uid="uid://cyo28qn76a78l" path="res://src/demos/tools/materials/lava.tres" id="34_s8yin"]
 [ext_resource type="Script" uid="uid://df75mfql4rt54" path="res://src/systems/tool_pool_manager.gd" id="34_tool_pool"]
-[ext_resource type="Shader" uid="uid://dmtpwwlxwmxxb" path="res://src/demos/tools/shaders/plasma.gdshader" id="35_82eun"]
-[ext_resource type="Script" uid="uid://b6csn023mq1rj" path="res://src/demos/tools/scripts/csg_mover.gd" id="35_hr53f"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/TwoHandGrabCube.tscn" id="36_two_hand_cube"]
 [ext_resource type="PackedScene" uid="uid://bdgtb4clc5scx" path="res://island.tscn" id="37_82eun"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/WorldGrabSphere.tscn" id="38_world_grab_sphere"]
 [ext_resource type="Script" uid="uid://om3k532gai8j" path="res://src/ui/ui_panel_manager.gd" id="39_ui_panel_manager"]
 [ext_resource type="PackedScene" uid="uid://cq0k3d4midg3s" path="res://src/objects/JoystickTool.tscn" id="39_wh2ee"]
 [ext_resource type="PackedScene" path="res://src/objects/JoystickTool2.tscn" id="40_pswl6"]
-[ext_resource type="Script" uid="uid://bqrnwqkyb00kx" path="res://src/ui/ui_panel_scene_setup.gd" id="40_ui_panel_setup"]
+[ext_resource type="Script" uid="uid://dj0boogq57coy" path="res://src/ui/ui_panel_scene_setup.gd" id="40_ui_panel_setup"]
 [ext_resource type="Script" uid="uid://bid6ju5yhq61q" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
 [ext_resource type="PackedScene" uid="uid://cm8nv7v0apls3" path="res://src/objects/grabbables/GrappleHook.tscn" id="42_grapple_hook"]
 [ext_resource type="PackedScene" path="res://src/objects/ReferenceBlock.tscn" id="43_reference_block"]
-[ext_resource type="PackedScene" path="res://src/ui/WatchMenuViewport3D.tscn" id="44_l4aac"]
+[ext_resource type="PackedScene" uid="uid://beim5pnvstjcv" path="res://src/ui/WatchMenuViewport3D.tscn" id="44_l4aac"]
 [ext_resource type="PackedScene" uid="uid://qsf5yp02t1i7" path="res://src/ui/window_wrapper/WindowWrapper.tscn" id="45_giw25"]
 [ext_resource type="PackedScene" uid="uid://baesap7jjgmfh" path="res://src/objects/grabbables/PaintBrush.tscn" id="45_paint_brush"]
 [ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://src/objects/viewport_mirror.gd" id="47_viewport_mirror"]
@@ -53,52 +50,6 @@ size = Vector3(50, 5, 50)
 [sub_resource type="BoxMesh" id="BoxMesh_or5nu"]
 material = ExtResource("2_or5nu")
 size = Vector3(50, 5, 50)
-
-[sub_resource type="ViewportTexture" id="ViewportTexture_y07qc"]
-viewport_path = NodePath("PlasmaDemos/ShaderPlasma/SubViewport")
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wvm1w"]
-resource_local_to_scene = true
-shading_mode = 0
-albedo_texture = SubResource("ViewportTexture_y07qc")
-heightmap_enabled = true
-heightmap_scale = 9.0
-heightmap_deep_parallax = true
-heightmap_min_layers = 8
-heightmap_max_layers = 32
-heightmap_texture = SubResource("ViewportTexture_y07qc")
-heightmap_flip_texture = true
-texture_filter = 5
-
-[sub_resource type="Gradient" id="Gradient_wh2ee"]
-offsets = PackedFloat32Array(0, 0.385224, 0.655673, 0.886544, 1)
-colors = PackedColorArray(1.95531e-08, 0.0213273, 0.0973903, 1, 0.294665, 0.332091, 0.73046, 1, 0.22273, 0.723553, 0.777314, 1, 0.877091, 0.64938, 0.963435, 1, 0.932381, 0.719091, 0.921475, 1)
-
-[sub_resource type="FastNoiseLite" id="FastNoiseLite_pswl6"]
-frequency = 0.002
-fractal_type = 2
-fractal_octaves = 4
-fractal_lacunarity = 2.901
-fractal_gain = 0.353
-
-[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_plasma1"]
-noise = SubResource("FastNoiseLite_pswl6")
-color_ramp = SubResource("Gradient_wh2ee")
-seamless = true
-
-[sub_resource type="FastNoiseLite" id="FastNoiseLite_0bb85"]
-seed = 60607
-fractal_gain = 0.695
-domain_warp_enabled = true
-
-[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_plasma2"]
-noise = SubResource("FastNoiseLite_0bb85")
-seamless = true
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_d8ksm"]
-shader = ExtResource("35_82eun")
-shader_parameter/noise1 = SubResource("NoiseTexture2D_plasma1")
-shader_parameter/noise2 = SubResource("NoiseTexture2D_plasma2")
 
 [sub_resource type="BoxMesh" id="BoxMesh_left_hand_grid"]
 size = Vector3(0.45, 0.45, 0.45)
@@ -247,42 +198,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.2, -0.69013023)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.8, 0.95, -0.69013023)
 visible = false
 
-[node name="PlasmaDemos" type="Node3D" parent="." unique_id=67851916]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.7972612, 2.3442404, -13.928533)
-
-[node name="ShaderPlasma" type="CSGSphere3D" parent="PlasmaDemos" unique_id=1217239899]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -2.1508613, 0)
-cast_shadow = 0
-radius = 0.75
-material = SubResource("StandardMaterial3D_wvm1w")
-script = ExtResource("35_hr53f")
-speed = 0.8
-amplitude = Vector3(0, 0.3, 0)
-
-[node name="SubViewport" type="SubViewport" parent="PlasmaDemos/ShaderPlasma" unique_id=2002528955]
-
-[node name="ColorRect" type="ColorRect" parent="PlasmaDemos/ShaderPlasma/SubViewport" unique_id=1120657162]
-material = SubResource("ShaderMaterial_d8ksm")
-offset_right = 512.0
-offset_bottom = 512.0
-
-[node name="PlasmaBox" type="CSGBox3D" parent="PlasmaDemos" unique_id=21165305]
-transform = Transform3D(-0.44000003, 0, -3.8466023e-08, 0, 0.44, 0, 3.8466023e-08, 0, -0.44000003, 1.8499999, 2.5341587, -12.497022)
-cast_shadow = 0
-material = SubResource("StandardMaterial3D_wvm1w")
-
-[node name="Sphere" type="CSGSphere3D" parent="PlasmaDemos/PlasmaBox" unique_id=716390065]
-transform = Transform3D(2.36, 0, 0, 0, 2.36, 0, 0, 0, 2.36, 0, 0, -2.4245834)
-operation = 2
-radius = 0.6
-material = ExtResource("34_s8yin")
-script = ExtResource("35_hr53f")
-speed = 1.8
-amplitude = Vector3(0, 0, 0.4)
-offset = 1.0
-
 [node name="ViewportMirror" type="Node3D" parent="." unique_id=925737553]
-transform = Transform3D(-0.99809086, 0, -0.061762728, 0, 1, 0, 0.061762728, 0, -0.99809086, 8.64066, -2.578079, -9.116329)
+transform = Transform3D(-0.47085792, 0, 0.88220906, 0, 1, 0, -0.88220906, 0, -0.47085792, -6.6855316, 0.70563793, -36.17745)
 script = ExtResource("47_viewport_mirror")
 size = Vector2(2, 1.5)
 ResolutionPerUnit = 500
@@ -290,7 +207,7 @@ MainCamPath = NodePath("../XRPlayer/PlayerBody/XROrigin3D/XRCamera3D")
 MirrorColor = Color(1, 1, 1, 1)
 
 [node name="GridPainterTest" type="Node3D" parent="." unique_id=1341686196]
-transform = Transform3D(0.99809086, 0, 0.061762813, 0, 1, 0, -0.061762813, 0, 0.99809086, 8.671541, -3.078079, -8.617284)
+transform = Transform3D(0.470858, 0, -0.882209, 0, 1, 0, 0.882209, 0, 0.470858, -7.1266375, 0.20563793, -35.94202)
 script = ExtResource("48_grid_painter")
 load_for_player = false
 left_hand_preview_mesh = NodePath("GridTargetLeft")
