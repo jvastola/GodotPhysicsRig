@@ -630,4 +630,10 @@ public class GodotAndroidWebView extends GodotPlugin {
             isInitialized.set(false);
         });
     }
+    @Override
+    public void onMainDestroy() {
+        // Ensure we clean up the WebView when the activity is destroyed
+        destroy();
+        super.onMainDestroy();
+    }
 }
