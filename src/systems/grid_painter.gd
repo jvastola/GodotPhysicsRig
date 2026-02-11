@@ -101,7 +101,12 @@ var _handler_script: Script = null
 var _save_path: String = "user://grid_painter_surfaces.json"
 var _save_pending: bool = false
 var _save_timer: float = 0.0
+var _network_update_pending: bool = false
+var _network_update_timer: float = 0.0
+var _last_paint_time: float = 0.0
 const SAVE_DEBOUNCE_TIME: float = 0.5  # Save at most every 0.5 seconds during continuous painting
+const NETWORK_UPDATE_DEBOUNCE_TIME: float = 3.0  # Wait 3 seconds after last paint before sending
+const NETWORK_UPDATE_IDLE_CHECK: float = 0.1  # Check every 0.1 seconds if painting has stopped
 
 func _ready() -> void:
 	print("GridPainter: _ready() called, load_for_player: ", load_for_player)
@@ -122,6 +127,16 @@ func _process(delta: float) -> void:
 		if _save_timer <= 0.0:
 			_save_pending = false
 			save_grid_data(_save_path)
+	
+	# Handle debounced network update with idle detection
+	if _network_update_pending:
+		# Check if user has stopped painting (idle for NETWORK_UPDATE_DEBOUNCE_TIME)
+		var time_since_last_paint = Time.get_ticks_msec() / 1000.0 - _last_paint_time
+		if time_since_last_paint >= NETWORK_UPDATE_DEBOUNCE_TIME:
+			# User stopped painting, send update now
+			_network_update_pending = false
+			_trigger_network_avatar_update()
+			print("GridPainter: Sending avatar update after ", snappedf(time_since_last_paint, 0.1), "s idle")
 
 
 func _schedule_save() -> void:
@@ -129,6 +144,15 @@ func _schedule_save() -> void:
 	if not _save_pending:
 		_save_pending = true
 		_save_timer = SAVE_DEBOUNCE_TIME
+
+
+func _schedule_network_update() -> void:
+	"""Schedule a debounced network avatar update to avoid flooding the network during continuous painting"""
+	if load_for_player:
+		# Mark that we have pending changes
+		_network_update_pending = true
+		# Update the last paint time
+		_last_paint_time = Time.get_ticks_msec() / 1000.0
 
 
 func _deferred_init() -> void:
@@ -460,6 +484,12 @@ func _build_texture_from_surface(surface: SurfaceSlot) -> ImageTexture:
 			for py in range(TILE_PIXELS):
 				for px in range(TILE_PIXELS):
 					img.set_pixel(gx * TILE_PIXELS + px, gy * TILE_PIXELS + py, color)
+	
+	if developer_mode:
+		print("GridPainter: Built texture for surface '", surface.id, "': ", w, "x", h, " pixels (", surface.grid_w(), "x", surface.grid_h(), " grid cells)")
+		print("  Face dims: ", surface.face_cell_dims)
+		print("  Face offsets: ", surface.face_offsets)
+	
 	return ImageTexture.create_from_image(img)
 
 func _generate_cube_mesh_with_uvs_for_surface(surface: SurfaceSlot, cube_size: Vector3 = Vector3(1, 1, 1)) -> ArrayMesh:
@@ -546,6 +576,8 @@ func set_cell_color(x: int, y: int, color: Color, origin: NodePath = NodePath(""
 			_assign_texture_to_mesh(origin_node, surface.texture, null)
 	# Save and notify other grid painters (debounced to avoid excessive saves during continuous painting)
 	_schedule_save()
+	# Schedule network update (debounced to avoid flooding the network)
+	_schedule_network_update()
 
 
 func fill_color(color: Color, surface_id: String = "") -> void:
@@ -607,6 +639,10 @@ func _notify_other_grid_painters() -> void:
 		if painter.has_method("refresh_all_surfaces"):
 			painter.call_deferred("refresh_all_surfaces")
 			print("GridPainter: Notified ", painter.name, " to refresh")
+	
+	# Schedule network avatar update if this is the player's grid painter
+	# (uses debouncing to avoid flooding the network)
+	_schedule_network_update()
 
 
 func _find_grid_painters_recursive(node: Node, result: Array[Node]) -> void:
@@ -832,3 +868,43 @@ func get_surface_texture(surface_id: String) -> ImageTexture:
 	if not surface.texture:
 		surface.texture = _build_texture_from_surface(surface)
 	return surface.texture
+
+
+func _trigger_network_avatar_update() -> void:
+	"""Trigger a network update to send the updated avatar to other players"""
+	# Find the PlayerNetworkComponent in the scene
+	var network_component: Node = null
+	
+	# Try to find it as a sibling or in the player hierarchy
+	var parent = get_parent()
+	if parent:
+		for child in parent.get_children():
+			if child.get_script() and child.has_method("send_avatar_texture"):
+				network_component = child
+				break
+	
+	# Try finding it in the player group
+	if not network_component:
+		var players = get_tree().get_nodes_in_group("player")
+		for player in players:
+			for child in player.get_children():
+				if child.get_script() and child.has_method("send_avatar_texture"):
+					network_component = child
+					break
+			if network_component:
+				break
+	
+	if network_component:
+		# Defer the call to ensure textures are fully updated
+		network_component.call_deferred("send_avatar_texture")
+		print("GridPainter: Triggered network avatar update")
+	else:
+		print("GridPainter: Could not find PlayerNetworkComponent to trigger avatar update")
+
+
+func force_network_avatar_update() -> void:
+	"""Immediately send avatar update to network (bypasses debouncing)"""
+	if load_for_player:
+		_network_update_pending = false
+		_trigger_network_avatar_update()
+		print("GridPainter: Forced immediate network avatar update")

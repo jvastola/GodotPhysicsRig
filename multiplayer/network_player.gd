@@ -209,10 +209,28 @@ func apply_avatar_textures(textures_data: Dictionary) -> void:
 	if textures_data.is_empty():
 		return
 	
-	# Apply head texture
+	print("NetworkPlayer ", peer_id, ": Applying avatar textures...")
+	
+	# Find GridPainter to use its mesh generation
+	var grid_painter = _find_grid_painter()
+	if not grid_painter:
+		push_error("NetworkPlayer: Cannot find GridPainter to generate meshes")
+		return
+	
+	# Apply head texture with proper cube mesh from GridPainter
 	if textures_data.has("head"):
 		var texture = _create_texture_from_data(textures_data["head"])
 		if texture and head_visual:
+			var img = texture.get_image()
+			print("  Head texture: ", img.get_width(), "x", img.get_height(), " pixels")
+			
+			# Use GridPainter's mesh generation to ensure exact match
+			var head_surface = grid_painter._get_surface("head")
+			if head_surface:
+				var cube_mesh = grid_painter._generate_cube_mesh_with_uvs_for_surface(head_surface, Vector3(0.22, 0.22, 0.22))
+				if cube_mesh:
+					head_visual.mesh = cube_mesh
+			
 			var mat = StandardMaterial3D.new()
 			mat.albedo_texture = texture
 			mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
@@ -221,10 +239,20 @@ func apply_avatar_textures(textures_data: Dictionary) -> void:
 			head_visual.material_override = mat
 			has_custom_avatar = true
 	
-	# Apply body texture
+	# Apply body texture with proper cube mesh from GridPainter
 	if textures_data.has("body"):
 		var texture = _create_texture_from_data(textures_data["body"])
 		if texture and body_visual:
+			var img = texture.get_image()
+			print("  Body texture: ", img.get_width(), "x", img.get_height(), " pixels")
+			
+			# Use GridPainter's mesh generation to ensure exact match
+			var body_surface = grid_painter._get_surface("body")
+			if body_surface:
+				var cube_mesh = grid_painter._generate_cube_mesh_with_uvs_for_surface(body_surface, Vector3(0.3, 0.4, 0.2))
+				if cube_mesh:
+					body_visual.mesh = cube_mesh
+			
 			var mat = StandardMaterial3D.new()
 			mat.albedo_texture = texture
 			mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
@@ -232,20 +260,30 @@ func apply_avatar_textures(textures_data: Dictionary) -> void:
 			mat.cull_mode = BaseMaterial3D.CULL_BACK
 			body_visual.material_override = mat
 	
-	# Apply hands texture (same for both hands)
+	# Apply hands texture (same for both hands) with proper cube mesh from GridPainter
 	if textures_data.has("hands"):
 		var texture = _create_texture_from_data(textures_data["hands"])
 		if texture:
-			var mat = StandardMaterial3D.new()
-			mat.albedo_texture = texture
-			mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-			mat.cull_mode = BaseMaterial3D.CULL_BACK
+			var img = texture.get_image()
+			print("  Hands texture: ", img.get_width(), "x", img.get_height(), " pixels")
 			
-			if left_hand_visual:
-				left_hand_visual.material_override = mat.duplicate()
-			if right_hand_visual:
-				right_hand_visual.material_override = mat.duplicate()
+			# Use GridPainter's mesh generation to ensure exact match
+			var hand_surface = grid_painter._get_surface("left_hand")
+			if hand_surface:
+				var hand_cube_mesh = grid_painter._generate_cube_mesh_with_uvs_for_surface(hand_surface, Vector3(0.1, 0.1, 0.1))
+				
+				var mat = StandardMaterial3D.new()
+				mat.albedo_texture = texture
+				mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+				mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+				mat.cull_mode = BaseMaterial3D.CULL_BACK
+				
+				if left_hand_visual and hand_cube_mesh:
+					left_hand_visual.mesh = hand_cube_mesh.duplicate()
+					left_hand_visual.material_override = mat.duplicate()
+				if right_hand_visual and hand_cube_mesh:
+					right_hand_visual.mesh = hand_cube_mesh.duplicate()
+					right_hand_visual.material_override = mat.duplicate()
 	
 	print("NetworkPlayer: Applied ", textures_data.size(), " avatar textures to player ", peer_id)
 
@@ -278,3 +316,35 @@ func apply_avatar_texture(texture: ImageTexture) -> void:
 # Old voice chat implementation removed
 # Voice is now handled by PlayerVoiceComponent with LiveKit spatial audio
 # AudioStreamPlayer3D nodes are created and managed by PlayerVoiceComponent based on LiveKit participant data
+
+
+func _find_grid_painter() -> Node:
+	"""Find the GridPainter instance in the scene"""
+	# Try to find it in the player group
+	var players = get_tree().get_nodes_in_group("player")
+	for player in players:
+		for child in player.get_children():
+			if child.get_script() and child.has_method("_generate_cube_mesh_with_uvs_for_surface"):
+				return child
+	
+	# Try to find any GridPainter in the scene
+	var all_nodes = get_tree().root.get_children()
+	for node in all_nodes:
+		var found = _find_grid_painter_recursive(node)
+		if found:
+			return found
+	
+	return null
+
+
+func _find_grid_painter_recursive(node: Node) -> Node:
+	"""Recursively search for GridPainter"""
+	if node.get_script() and node.has_method("_generate_cube_mesh_with_uvs_for_surface"):
+		return node
+	
+	for child in node.get_children():
+		var found = _find_grid_painter_recursive(child)
+		if found:
+			return found
+	
+	return null
