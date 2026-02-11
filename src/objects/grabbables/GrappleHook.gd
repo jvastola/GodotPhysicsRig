@@ -236,11 +236,15 @@ func _physics_process(delta: float) -> void:
 	# Read trigger input
 	var trigger_pressed: bool = false
 	if is_instance_valid(_controller) and _controller.has_method("is_button_pressed"):
-		trigger_pressed = _controller.is_button_pressed("trigger_click")
+		# Check both trigger value and trigger_click
+		var trigger_value = _controller.get_float("trigger")
+		trigger_pressed = _controller.is_button_pressed("trigger_click") or trigger_value > 0.5
 	
 	# Fallback to InputMap for desktop
 	if not trigger_pressed:
 		if InputMap.has_action("trigger_click") and Input.is_action_pressed("trigger_click"):
+			trigger_pressed = true
+		elif Input.is_action_pressed("ui_accept"):  # Space bar fallback
 			trigger_pressed = true
 
 	# Prediction: while grabbed and not hooked, update hitmarker

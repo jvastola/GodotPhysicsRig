@@ -202,8 +202,19 @@ func _process_input(delta: float) -> void:
 	if not controller:
 		return
 	
-	var trigger_pressed = controller.is_button_pressed("trigger_click")
-	var grip_pressed = controller.is_button_pressed("grip_click")
+	# Get current input states - check both trigger value and trigger_click
+	var trigger_pressed = false
+	var grip_pressed = false
+	
+	if controller.has_method("get_float"):
+		var trigger_value = controller.get_float("trigger")
+		trigger_pressed = controller.is_button_pressed("trigger_click") or trigger_value > 0.5
+		var grip_value = controller.get_float("grip")
+		grip_pressed = controller.is_button_pressed("grip_click") or grip_value > 0.5
+	else:
+		trigger_pressed = controller.is_button_pressed("trigger_click")
+		grip_pressed = controller.is_button_pressed("grip_click")
+	
 	_is_remove_mode = grip_pressed
 	
 	# Handle selection / handle dragging
