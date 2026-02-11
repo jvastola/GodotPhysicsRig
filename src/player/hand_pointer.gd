@@ -151,6 +151,9 @@ var _resize_target_viewport: Node = null  # UI viewport being resized
 var _resize_corner_index: int = -1        # Which corner is being dragged
 var _resize_hover_corner: int = -1        # Which corner is being hovered
 
+# Color picker integration
+var _color_picker_ui: ColorPickerUI = null
+
 
 func get_hit_point() -> Vector3:
 	"""Get the current world-space hit point of the pointer raycast"""
@@ -196,6 +199,10 @@ func _ready() -> void:
 		_setup_selection_bounds()
 		_setup_selection_handles()
 		_setup_selection_handle_visuals()
+	
+	# Find color picker for pointer color integration
+	if include_pointer_color:
+		call_deferred("_find_color_picker")
 	
 	set_physics_process(enable_pointer_processing)
 
@@ -291,6 +298,26 @@ func _setup_selection_bounds() -> void:
 	_selection_bounds.material_override = mat
 	_selection_bounds.visible = false
 	add_child(_selection_bounds)
+
+
+func _find_color_picker() -> void:
+	"""Find and cache the ColorPickerUI instance for pointer color integration"""
+	if ColorPickerUI.instance:
+		_color_picker_ui = ColorPickerUI.instance
+		return
+	var pickers := get_tree().get_nodes_in_group("color_picker_ui")
+	if pickers.size() > 0:
+		_color_picker_ui = pickers[0] as ColorPickerUI
+
+
+func _update_pointer_color_from_picker() -> void:
+	"""Update pointer_color from the ColorPickerUI if available"""
+	if not include_pointer_color:
+		return
+	if not is_instance_valid(_color_picker_ui):
+		_find_color_picker()
+	if _color_picker_ui:
+		pointer_color = _color_picker_ui.get_current_color()
 
 
 func _setup_selection_handles() -> void:
@@ -1061,6 +1088,10 @@ func _physics_process(delta: float) -> void:
 	if not _raycast:
 		return
 	_get_movement_component()
+	
+	# Update pointer color from color picker if enabled
+	if include_pointer_color:
+		_update_pointer_color_from_picker()
 
 	if _hover_target and not is_instance_valid(_hover_target):
 		_hover_target = null

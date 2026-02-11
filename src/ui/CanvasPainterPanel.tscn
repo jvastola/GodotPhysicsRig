@@ -1,0 +1,25 @@
+[gd_scene load_steps=4 format=3 uid="uid://canvas_painter_panel_001"]
+
+[ext_resource type="Script" path="res://src/systems/canvas_painter.gd" id="1_painter"]
+[ext_resource type="Script" path="res://src/ui/ui_viewport_3d.gd" id="2_viewport"]
+[ext_resource type="PackedScene" uid="uid://canvas_painter_ui_001" path="res://src/ui/CanvasPainterUI.tscn" id="3_ui"]
+
+[node name="CanvasPainterPanel" type="Node3D"]
+
+[node name="CanvasPainter" type="Node3D" parent="."]
+script = ExtResource("1_painter")
+canvas_width = 512
+canvas_height = 512
+canvas_mesh_path = NodePath("../CanvasMesh")
+canvas_physical_size = Vector2(0.8, 0.8)
+save_path = "user://vr_canvas_painter.png"
+
+[node name="CanvasMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+
+[node name="UIViewport3D" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+script = ExtResource("2_viewport")
+ui_scene = ExtResource("3_ui")
+viewport_size = Vector2i(800, 600)
+panel_size = Vector2(0.8, 0.6)

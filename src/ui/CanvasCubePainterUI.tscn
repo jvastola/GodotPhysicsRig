@@ -1,0 +1,206 @@
+[gd_scene load_steps=3 format=3 uid="uid://canvas_cube_painter_ui_001"]
+
+[ext_resource type="Script" path="res://src/ui/canvas_cube_painter_ui.gd" id="1_cube_ui"]
+[ext_resource type="PackedScene" uid="uid://canvas_cube_painter_viewport_001" path="res://src/ui/CanvasCubePainterViewport3D.tscn" id="2_cube_viewport"]
+
+[node name="CanvasCubePainterUI" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_cube_ui")
+
+[node name="PanelContainer" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="PanelContainer"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="PanelContainer/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TitleLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Canvas Cube Painter"
+horizontal_alignment = 1
+
+[node name="CanvasViewport" parent="PanelContainer/MarginContainer/VBoxContainer" instance=ExtResource("2_cube_viewport")]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ControlsContainer" type="VBoxContainer" parent="PanelContainer/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="FaceLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer"]
+layout_mode = 2
+text = "Current Face"
+
+[node name="FaceButtons" type="GridContainer" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer"]
+layout_mode = 2
+columns = 3
+
+[node name="TopButton" type="Button" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/FaceButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Top"
+
+[node name="Spacer1" type="Control" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/FaceButtons"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+
+[node name="Spacer2" type="Control" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/FaceButtons"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+
+[node name="LeftButton" type="Button" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/FaceButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Left"
+
+[node name="FrontButton" type="Button" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/FaceButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Front"
+
+[node name="RightButton" type="Button" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/FaceButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Right"
+
+[node name="Spacer3" type="Control" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/FaceButtons"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+
+[node name="BackButton" type="Button" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/FaceButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Back"
+
+[node name="Spacer4" type="Control" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/FaceButtons"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+
+[node name="Spacer5" type="Control" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/FaceButtons"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+
+[node name="BottomButton" type="Button" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/FaceButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Bottom"
+
+[node name="Spacer6" type="Control" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/FaceButtons"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+
+[node name="CurrentFaceLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Current: Front"
+horizontal_alignment = 1
+
+[node name="ResolutionLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer"]
+layout_mode = 2
+text = "Resolution (per face)"
+
+[node name="ResolutionHBox" type="HBoxContainer" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer"]
+layout_mode = 2
+
+[node name="ResolutionSpinBox" type="SpinBox" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/ResolutionHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 1.0
+max_value = 512.0
+value = 16.0
+step = 1.0
+
+[node name="ApplyResButton" type="Button" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/ResolutionHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Apply"
+
+[node name="BrushLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer"]
+layout_mode = 2
+text = "Brush Size"
+
+[node name="BrushSizeSlider" type="HSlider" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 1.0
+max_value = 20.0
+value = 2.0
+tick_count = 10
+ticks_on_borders = true
+
+[node name="BrushSizeLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Size: 2"
+horizontal_alignment = 1
+
+[node name="ColorLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer"]
+layout_mode = 2
+text = "Brush Color"
+
+[node name="ColorPickerButton" type="ColorPickerButton" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+color = Color(0, 0, 0, 1)
+
+[node name="PixelPerfectCheck" type="CheckBox" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = "Pixel Perfect (No Blur)"
+
+[node name="ButtonsHBox" type="HBoxContainer" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="ClearFaceButton" type="Button" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/ButtonsHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Clear Face"
+
+[node name="ClearAllButton" type="Button" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/ButtonsHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Clear All"
+
+[node name="ButtonsHBox2" type="HBoxContainer" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="SaveButton" type="Button" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/ButtonsHBox2"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Save"
+
+[node name="LoadButton" type="Button" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/ButtonsHBox2"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Load"
+
+[node name="SyncButton" type="Button" parent="PanelContainer/MarginContainer/VBoxContainer/ControlsContainer/ButtonsHBox2"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Sync to Grid"

@@ -617,25 +617,35 @@ func _find_grid_painters_recursive(node: Node, result: Array[Node]) -> void:
 		_find_grid_painters_recursive(child, result)
 
 func load_grid_data(path: String = _save_path) -> void:
+	const DEFAULT_PATH := "res://assets/textures/grid_painter_surfaces.json"
+	var load_path := path
+	
+	# If no saved file exists, try to load from default
 	if not FileAccess.file_exists(path):
 		print("GridPainter: No save file found at: ", path)
-		return
-	var file := FileAccess.open(path, FileAccess.READ)
+		if FileAccess.file_exists(DEFAULT_PATH):
+			print("GridPainter: Loading default surfaces from: ", DEFAULT_PATH)
+			load_path = DEFAULT_PATH
+		else:
+			print("GridPainter: No default file found either, skipping load")
+			return
+	
+	var file := FileAccess.open(load_path, FileAccess.READ)
 	if not file:
-		print("GridPainter: Failed to open save file: ", path)
+		print("GridPainter: Failed to open file: ", load_path)
 		return
 	var json := JSON.new()
 	var file_content := file.get_as_text()
 	var err := json.parse(file_content)
 	file.close()
 	if err != OK:
-		push_warning("GridPainter: Unable to parse surface save file")
+		push_warning("GridPainter: Unable to parse surface file from: ", load_path)
 		return
 	var data: Variant = json.get_data()
 	if not data.has("surfaces"):
-		print("GridPainter: Save file has no 'surfaces' key")
+		print("GridPainter: File has no 'surfaces' key: ", load_path)
 		return
-	print("GridPainter: Loading ", data["surfaces"].keys().size(), " surfaces from save file")
+	print("GridPainter: Loading ", data["surfaces"].keys().size(), " surfaces from: ", load_path)
 	for id in data["surfaces"].keys():
 		var surface := _get_surface(id)
 		if surface:

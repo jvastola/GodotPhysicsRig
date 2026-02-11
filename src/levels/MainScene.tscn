@@ -244,7 +244,7 @@ collision_mask = 32
 shape = SubResource("BoxShape3D_right_hand_grid")
 
 [node name="GridTargetHead" type="MeshInstance3D" parent="GridPainterTest" unique_id=1192669384]
-transform = Transform3D(-0.22, 1.9233e-08, 0, -1.9233e-08, -0.22, 0, 0, 0, 0.22, -0.174122, 0.619416, -2.1022)
+transform = Transform3D(0.22, 0, 0, 0, 0.22, 0, 0, 0, 0.22, -0.174122, 0.619416, -2.1022)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_head_grid")
 
@@ -272,7 +272,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.4505458, 0.9694128, -2.4343
 content_viewport_scene = ExtResource("44_l4aac")
 
 [node name="island" parent="." unique_id=1304383343 instance=ExtResource("37_82eun")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -42.440742)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0017240047, -0.009035349, -42.157425)
 
 [node name="islandcollision" type="Node" parent="island" unique_id=1618902482]
 script = ExtResource("49_collision")

@@ -1,0 +1,33 @@
+[gd_scene load_steps=3 format=3 uid="uid://canvas_cube_painter_viewport_001"]
+
+[ext_resource type="Script" path="res://src/ui/canvas_cube_painter_viewport_3d.gd" id="1_viewport"]
+[ext_resource type="Script" path="res://src/systems/canvas_cube_painter.gd" id="2_painter"]
+
+[node name="CanvasCubePainterViewport3D" type="SubViewportContainer"]
+stretch = true
+script = ExtResource("1_viewport")
+
+[node name="SubViewport" type="SubViewport" parent="."]
+handle_input_locally = false
+size = Vector2i(800, 600)
+render_target_update_mode = 4
+own_world_3d = true
+
+[node name="Camera3D" type="Camera3D" parent="SubViewport"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+cull_mask = 1
+fov = 60.0
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="SubViewport"]
+transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 3, 3)
+light_energy = 0.5
+light_cull_mask = 1
+
+[node name="CanvasCubePainter" type="Node3D" parent="SubViewport"]
+script = ExtResource("2_painter")
+canvas_resolution = 16
+pixel_perfect = true
+
+[node name="CurrentFaceMesh" type="MeshInstance3D" parent="SubViewport"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+layers = 1
