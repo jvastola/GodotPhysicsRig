@@ -14,7 +14,7 @@ enum LocomotionMode { DISABLED, HEAD_DIRECTION, HAND_DIRECTION, HEAD_DIRECTION_3
 @export var invert_locomotion_y: bool = false
 
 # === Turning Settings ===
-enum TurnMode { SNAP, SMOOTH }
+enum TurnMode { SNAP, SMOOTH, DISABLED }
 @export var turn_mode: TurnMode = TurnMode.SNAP
 @export var snap_turn_angle: float = 45.0  # Degrees per snap turn
 @export var smooth_turn_speed: float = 90.0  # Degrees per second
@@ -584,6 +584,11 @@ func _set_hand_state(hand: RigidBody3D, enabled: bool) -> void:
 func _handle_turning(delta: float) -> void:
 	"""Handle VR turning input from turn controller thumbstick"""
 	if not turn_controller:
+		return
+	
+	# Skip all turning when disabled
+	if turn_mode == TurnMode.DISABLED:
+		_smooth_input = 0.0
 		return
 	
 	# Disable turning when grip is held (if setting enabled)

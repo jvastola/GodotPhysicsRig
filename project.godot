@@ -51,7 +51,7 @@ version_control/autoload_on_startup=true
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot_android_webview/plugin.cfg")
+enabled=PackedStringArray("res://addons/godot-livekit/plugin.cfg", "res://addons/godot_android_webview/plugin.cfg")
 
 [input]
 

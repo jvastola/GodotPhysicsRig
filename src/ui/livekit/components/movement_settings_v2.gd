@@ -193,6 +193,7 @@ func _build_movement_tab(tabs: TabContainer):
 	turn_mode_btn = OptionButton.new()
 	turn_mode_btn.add_item("Snap")
 	turn_mode_btn.add_item("Smooth")
+	turn_mode_btn.add_item("Disabled")
 	turn_mode_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	turn_mode_btn.selected = movement_component.turn_mode if movement_component else defaults_snapshot["turn_mode"]
 	turn_mode_btn.item_selected.connect(func(index: int):

@@ -483,6 +483,7 @@ func _build_ui():
 	turn_mode_btn = OptionButton.new()
 	turn_mode_btn.add_item("Snap")
 	turn_mode_btn.add_item("Smooth")
+	turn_mode_btn.add_item("Disabled")
 	turn_mode_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	if movement_component:
 		turn_mode_btn.selected = movement_component.turn_mode
@@ -1449,7 +1450,7 @@ func _on_turn_mode_changed(index: int):
 	if movement_component:
 		var old_mode = movement_component.turn_mode
 		movement_component.turn_mode = index as PlayerMovementComponent.TurnMode
-		var names := ["Snap", "Smooth"]
+		var names := ["Snap", "Smooth", "Disabled"]
 		MovementSettingsPanel.record_toggle(
 			"Turn Mode",
 			names[old_mode] if old_mode < names.size() else str(old_mode),
@@ -2917,6 +2918,7 @@ func _update_turn_mode_ui():
 	if not turn_mode_btn:
 		return
 	var turn_mode = turn_mode_btn.selected
+	var is_disabled = turn_mode == PlayerMovementComponent.TurnMode.DISABLED
 	if snap_container:
 		snap_container.visible = turn_mode == PlayerMovementComponent.TurnMode.SNAP
 	if smooth_container:

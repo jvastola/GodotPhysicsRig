@@ -66,13 +66,54 @@ theme_override_font_sizes/font_size = 24
 text = "Window Title"
 vertical_alignment = 1
 
+[node name="BringCloseButton" type="Button" parent="HBoxContainer"]
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "Bring Close"
+theme_override_font_sizes/font_size = 32
+text = "👁"
+
+[node name="PinButton" type="Button" parent="HBoxContainer"]
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "Pin in Place"
+theme_override_font_sizes/font_size = 32
+text = "📌"
+
+[node name="DockHeadButton" type="Button" parent="HBoxContainer"]
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "Dock to Head"
+theme_override_font_sizes/font_size = 32
+text = "🎯"
+
+[node name="DockLeftButton" type="Button" parent="HBoxContainer"]
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "Dock Left"
+theme_override_font_sizes/font_size = 32
+text = "◀"
+
+[node name="DockRightButton" type="Button" parent="HBoxContainer"]
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "Dock Right"
+theme_override_font_sizes/font_size = 32
+text = "▶"
+
 [node name="CloseButton" type="Button" parent="HBoxContainer"]
-custom_minimum_size = Vector2(40, 40)
+custom_minimum_size = Vector2(50, 50)
 layout_mode = 2
 size_flags_vertical = 4
 theme_override_styles/normal = SubResource("StyleBoxFlat_close")
 theme_override_styles/hover = SubResource("StyleBoxFlat_close_hover")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_close_hover")
+theme_override_font_sizes/font_size = 32
 text = "✕"
 
 [node name="SpacerRight" type="Control" parent="HBoxContainer"]
