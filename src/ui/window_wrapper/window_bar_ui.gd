@@ -9,6 +9,7 @@ signal dock_left_pressed
 signal dock_right_pressed
 signal dock_head_pressed
 signal bring_close_pressed
+signal gaze_pressed
 
 @onready var title_label: Label = $HBoxContainer/TitleLabel
 @onready var close_button: Button = $HBoxContainer/CloseButton
@@ -17,6 +18,7 @@ signal bring_close_pressed
 @onready var dock_right_button: Button = $HBoxContainer/DockRightButton
 @onready var dock_head_button: Button = $HBoxContainer/DockHeadButton
 @onready var bring_close_button: Button = $HBoxContainer/BringCloseButton
+@onready var gaze_button: Button = $HBoxContainer/GazeButton
 
 func _ready() -> void:
     if close_button:
@@ -31,6 +33,8 @@ func _ready() -> void:
         dock_head_button.pressed.connect(func(): dock_head_pressed.emit())
     if bring_close_button:
         bring_close_button.pressed.connect(func(): bring_close_pressed.emit())
+    if gaze_button:
+        gaze_button.pressed.connect(func(): gaze_pressed.emit())
 
 func set_title(text: String) -> void:
     if title_label:
@@ -39,3 +43,7 @@ func set_title(text: String) -> void:
 func set_pin_state(is_pinned: bool) -> void:
     if pin_button:
         pin_button.text = "📍" if is_pinned else "📌"
+
+func set_gaze_active(is_active: bool) -> void:
+    if gaze_button:
+        gaze_button.modulate = Color(0.5, 1.0, 0.5) if is_active else Color.WHITE

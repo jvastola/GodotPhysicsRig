@@ -29,11 +29,16 @@ var _base_scale: Vector3 = Vector3.ONE
 var _target_scale: float = 1.0
 var _current_scale_factor: float = 1.0  # Tracked separately so basis operations don't corrupt it
 var _player_scale_multiplier: float = 1.0
+var _gaze_enabled: bool = false
+var _gaze_visual_line: MeshInstance3D = null
 
 func _ready() -> void:
 	# We don't need to be in "pointer_interactable" group specifically if the children proxy to us
 	# but it doesn't hurt.
 	add_to_group("pointer_interactable")
+	
+	# Ensure this runs AFTER hand tracking (usually priority 0) to prevent visual lag on docked panels
+	process_priority = 100
 	
 	_base_scale = scale
 	_update_player_scale()
@@ -130,7 +135,12 @@ func _setup_chrome() -> void:
 			_window_bar_ui.dock_head_pressed.connect(_on_dock_head_pressed)
 		if _window_bar_ui.has_signal("bring_close_pressed"):
 			_window_bar_ui.bring_close_pressed.connect(_on_bring_close_pressed)
+		if _window_bar_ui.has_signal("gaze_pressed"):
+			_window_bar_ui.gaze_pressed.connect(_on_gaze_pressed)
 		set_title(title)
+		
+	# Setup visual line
+	_setup_gaze_visual()
 		
 	# No extra Grip Area needed now!
 	
@@ -255,8 +265,111 @@ func _on_dock_head_pressed() -> void:
 func _on_bring_close_pressed() -> void:
 	_bring_close_to_player()
 
+func _on_gaze_pressed() -> void:
+	_gaze_enabled = not _gaze_enabled
+	if _window_bar_ui and _window_bar_ui.has_method("set_gaze_active"):
+		_window_bar_ui.set_gaze_active(_gaze_enabled)
+		
+	# If disabled, ensure visible
+	if not _gaze_enabled:
+		if _content_instance:
+			_content_instance.visible = true
+			if _content_instance.has_method("set_interactive"):
+				_content_instance.set_interactive(true)
+		
+		if _gaze_visual_line:
+			_gaze_visual_line.visible = false
+
+func _check_gaze_visibility() -> void:
+	if not _gaze_enabled:
+		return
+		
+	var camera = get_viewport().get_camera_3d()
+	if not camera:
+		return
+		
+	var forward = -camera.global_transform.basis.z
+	var to_panel = (global_position - camera.global_position).normalized()
+	
+	# Check 1: Player looking at panel
+	var looking_at_panel = forward.dot(to_panel) > 0.85
+	
+	# Check 2: Panel facing player (Alignment check)
+	# Panel forward is our global +Z? No, typically UI uses -Z or +Z depending on setup.
+	# WindowWrapper usually faces +Z towards user?
+	# In pointer_grab_set_distance we do look_at which sets -Z towards target.
+	# So +Z faces AWAY from target.
+	# Wait, look_at(target, UP) points -Z at target.
+	# If we want +Z (front) to face user, we look at "away".
+	# So +Z is panel forward.
+	var panel_forward = global_transform.basis.z.normalized() # Must normalize as scale affects basis length
+	var to_player = (camera.global_position - global_position).normalized()
+	# Relaxed threshold: 0.5 is 60 degrees. 0.7 is 45 degrees.
+	var panel_points_to_player = panel_forward.dot(to_player) > 0.6 
+	
+	# Strict AND: Must look at it AND it must be reachable/facing me
+	# Relaxed look check: 0.6 is ~53 degrees
+	var dot_look = forward.dot(to_panel)
+	if Engine.get_physics_frames() % 60 == 0 and _gaze_enabled:
+		print("WindowWrapper: Gaze Debug - LookDot:", dot_look, " FaceDot:", panel_forward.dot(to_player), " Visible:", is_visible)
+		
+	# Visibility Logic:
+	# 1. Strong Look (Dot > 0.85): I am looking directly at it -> Show it (even if skewed)
+	# 2. Weak Look (Dot > 0.6) AND Face (Dot > 0.4): I am looking somewhat at it AND it faces me (Beam) -> Show it
+	
+	var strong_look = dot_look > 0.85
+	var weak_look = dot_look > 0.6
+	var face = panel_points_to_player # threshold is 0.6
+	# User wants "pointed at player" to matter.
+	# Relax face threshold to 0.4 (~66 deg)
+	var weak_face = panel_forward.dot(to_player) > 0.4
+	
+	var is_visible = strong_look or (weak_look and weak_face)
+	
+	# Only hide content, keep bar visible
+	if _content_instance:
+		_content_instance.visible = is_visible
+		if _content_instance.has_method("set_interactive"):
+			_content_instance.set_interactive(is_visible)
+	
+	if _gaze_visual_line:
+		_gaze_visual_line.visible = true
+		var mat = _gaze_visual_line.material_override as StandardMaterial3D
+		if mat:
+			mat.albedo_color = Color(0.0, 1.0, 0.0, 0.8) if is_visible else Color(1.0, 0.0, 0.0, 0.3)
+
 
 # ---------- helpers ----------
+
+func _setup_gaze_visual() -> void:
+	if not _chrome_viewport_3d: return
+	
+	if _gaze_visual_line:
+		_gaze_visual_line.queue_free()
+		
+	_gaze_visual_line = MeshInstance3D.new()
+	_gaze_visual_line.name = "GazeVisualLine"
+	
+	# Create a thin line (cylinder source)
+	var mesh = CylinderMesh.new()
+	mesh.top_radius = 0.002
+	mesh.bottom_radius = 0.002
+	mesh.height = 1.0
+	_gaze_visual_line.mesh = mesh
+	
+	var mat = StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(1.0, 0.0, 0.0, 0.3)
+	mat.no_depth_test = true # Always visible
+	_gaze_visual_line.material_override = mat
+	
+	# Attach to chrome bar 
+	# Position: Center of bar, pointing outward (Z+)
+	# Cylinder is Y-up by default. We need to rotate it to point Z+.
+	_chrome_viewport_3d.add_child(_gaze_visual_line)
+	_gaze_visual_line.position = Vector3(0, 0, 0.5) # Center + half length forward
+	_gaze_visual_line.rotation_degrees.x = -90 # Point Z+
 
 func _get_controller_for_side(side: String) -> Node3D:
 	"""Find the XR controller node for the given side."""
@@ -384,6 +497,9 @@ func _bring_close_to_player() -> void:
 	_face_camera_from(global_position)
 
 func _process(delta: float) -> void:
+	# Update visibility based on gaze
+	_check_gaze_visibility()
+	
 	# Update player scale multiplier
 	_update_player_scale()
 	

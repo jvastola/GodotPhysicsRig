@@ -9,15 +9,18 @@ extends Node3D
 @export var debug_coordinates: bool = false        # Print UV/viewport coordinates for debugging
 @export var flip_v: bool = true                   # Flip V coordinate to match UI top-left origin
 
-@export_group("Resize Handles")
+@export_group("Border Highlight")
 @export var enable_resize_handles: bool = true
-@export var resize_handle_size: float = 0.06       # Handle sphere radius
-@export var resize_handle_offset: float = 0.08     # Distance outside panel corners
+@export var border_color: Color = Color(0.4, 0.6, 1.0, 0.3)
+@export var corner_highlight_color: Color = Color(1.0, 1.0, 1.0, 0.8)
+@export var border_width: float = 0.015          # Normalized (0-1)
+@export var border_gap: float = 0.04             # Gap between panel edge and border (meters)
+@export var corner_arc_length: float = 0.05       # UV length of corner anchor
+@export var corner_radius: float = 0.05           # UV radius
+@export var resize_corner_size: float = 0.025       # UV region size for detection
+
 @export var min_panel_size: Vector2 = Vector2(0.4, 0.3)  # Minimum quad dimensions
 @export var max_panel_size: Vector2 = Vector2(5.0, 4.0)  # Maximum quad dimensions
-@export var resize_handle_color: Color = Color(0.9, 0.95, 1.0, 0.7)
-@export var resize_handle_hover_color: Color = Color(1.0, 1.0, 1.0, 1.0)
-@export_flags_3d_physics var resize_handle_collision_layer: int = 1 << 5
 @export var enable_panel_grab: bool = true  # If false, this panel ignores pointer grab requests (for wrapper use)
 var grab_delegate: Node3D = null # If set, grab calls are forwarded here
 
@@ -31,18 +34,22 @@ var _last_mouse_pos: Vector2 = Vector2(-1, -1)
 var _is_hovering: bool = false
 var _is_pressed: bool = false
 
-# Resize handle state
-var _resize_handles: Array[Area3D] = []
-var _resize_handle_materials: Array[StandardMaterial3D] = []
-var _resize_handle_meshes: Array[MeshInstance3D] = []  # To toggle visibility
-var _resize_active_handle: Area3D = null
+# Border Highlight state
+var _border_mesh: MeshInstance3D = null
+var _border_material: ShaderMaterial = null
+var _resize_active_corner: int = -1 # 0=TL, 1=TR, 2=BR, 3=BL, -1=None
 var _resize_initial_quad_size: Vector2 = Vector2.ZERO
 var _resize_initial_grab_pos: Vector3 = Vector3.ZERO
 var _resize_anchor_corner: Vector3 = Vector3.ZERO  # Opposite corner in world space
+var _resize_grab_offset: Vector3 = Vector3.ZERO    # Offset from grab point to actual corner
+var _resize_pointer: Node3D = null
+var _resize_controller: XRController3D = null
+var _resize_action: String = ""
+var _resize_initial_transform: Transform3D = Transform3D()
 
 # Visibility state
 var _hovering_panel: bool = false
-var _hovered_handle_index: int = -1
+var _hovering_corner: int = -1
 
 signal panel_resized(new_quad_size: Vector2)
 
@@ -88,9 +95,11 @@ func _ready() -> void:
 		_static_body.collision_layer = _saved_static_body_layer
 		print("UIViewport3D: MeshInstance visible, StaticBody enabled")
 	
-	# Setup resize handles
+	# Setup border highlight
 	if enable_resize_handles:
-		_setup_resize_handles()
+		_setup_border_highlight()
+		# Initialize collision shape size with border expansion
+		_set_collision_shape_size(quad_size)
 	
 	print("UIViewport3D: _ready() complete")
 
@@ -130,8 +139,21 @@ func handle_pointer_event(event: Dictionary) -> void:
 	if debug_coordinates:
 		print("Hit: global=", hit_pos, " local=", local_hit, " uv=", uv)
 	
-	if uv.x < 0.0 or uv.x > 1.0 or uv.y < 0.0 or uv.y > 1.0:
-		# Hit outside viewport bounds
+	# Check bounds
+	var bounds_min = Vector2(0, 0)
+	var bounds_max = Vector2(1, 1)
+	
+	if enable_resize_handles:
+		# Map border size to UV space
+		# Border is constant world size, so UV size depends on quad_size
+		# Expand interaction area significantly (0.2m padding) to allow loose grabbing
+		var border_uv_w = (border_gap + 0.2) / quad_size.x
+		var border_uv_h = (border_gap + 0.2) / quad_size.y
+		bounds_min = Vector2(-border_uv_w, -border_uv_h)
+		bounds_max = Vector2(1.0 + border_uv_w, 1.0 + border_uv_h)
+	
+	if uv.x < bounds_min.x or uv.x > bounds_max.x or uv.y < bounds_min.y or uv.y > bounds_max.y:
+		# Hit outside valid interaction bounds
 		if _is_hovering:
 			_send_mouse_exit()
 		return
@@ -141,25 +163,42 @@ func handle_pointer_event(event: Dictionary) -> void:
 	if debug_coordinates and event_type == "press":
 		print("Viewport pos: ", viewport_pos)
 	
+	var corner: int = -1
+	if enable_resize_handles:
+		corner = _get_resize_corner(uv)
+		if corner != _hovering_corner:
+			_hovering_corner = corner
+			_update_border_corner_highlight(corner)
+
 	match event_type:
 		"enter", "hover":
 			_send_mouse_motion(viewport_pos)
 			_is_hovering = true
 			if not _hovering_panel:
 				_hovering_panel = true
-				_update_handle_visibility()
+				_update_border_hover(1.0)
 		"press":
 			_send_mouse_motion(viewport_pos)
-			_send_mouse_button(viewport_pos, true, event.get("action_just_pressed", false))
 			_is_pressed = true
+			
+			if enable_resize_handles and corner != -1 and event.get("action_just_pressed", false):
+				start_resize(corner, hit_pos, event.get("pointer"))
+			else:
+				_send_mouse_button(viewport_pos, true, event.get("action_just_pressed", false))
 		"hold":
-			_send_mouse_motion(viewport_pos)
-			if event.get("action_pressed", false) and not _is_pressed:
-				_send_mouse_button(viewport_pos, true, true)
-				_is_pressed = true
+			if is_resizing():
+				update_resize(hit_pos)
+			else:
+				_send_mouse_motion(viewport_pos)
+				if event.get("action_pressed", false) and not _is_pressed:
+					_send_mouse_button(viewport_pos, true, true)
+					_is_pressed = true
 		"release":
-			_send_mouse_motion(viewport_pos)
-			_send_mouse_button(viewport_pos, false, event.get("action_just_released", false))
+			if is_resizing():
+				end_resize()
+			else:
+				_send_mouse_motion(viewport_pos)
+				_send_mouse_button(viewport_pos, false, event.get("action_just_released", false))
 			_is_pressed = false
 		"secondary_press":
 			_send_mouse_motion(viewport_pos)
@@ -186,7 +225,11 @@ func handle_pointer_event(event: Dictionary) -> void:
 			_is_pressed = false
 			if _hovering_panel:
 				_hovering_panel = false
-				_update_handle_visibility()
+				_update_border_hover(0.0)
+				_hovering_corner = -1
+				_update_border_corner_highlight(-1)
+			if is_resizing():
+				end_resize()
 
 func _world_to_uv(local_pos: Vector3) -> Vector2:
 	# Convert mesh-local position to UV coordinates on the quad.
@@ -376,158 +419,192 @@ func get_grab_target() -> Node3D:
 
 
 # ============================================================================
-# RESIZE HANDLES (VisionOS/HorizonOS Style)
+# BORDER HIGHLIGHT & RESIZE (Horizon OS Style)
 # ============================================================================
 
-func _setup_resize_handles() -> void:
-	"""Create corner resize handles outside the panel bounds."""
-	# Corner indices: 0=TopLeft, 1=TopRight, 2=BottomRight, 3=BottomLeft
-	var corner_names := ["ResizeHandleTL", "ResizeHandleTR", "ResizeHandleBR", "ResizeHandleBL"]
+func _setup_border_highlight() -> void:
+	"""Create the border highlight overlay mesh."""
 	
-	for i in range(4):
-		var handle := Area3D.new()
-		handle.name = corner_names[i]
-		handle.collision_layer = resize_handle_collision_layer
-		handle.collision_mask = 0
-		handle.monitorable = false
-		
-		# Add to pointer interactable group
-		if pointer_group != StringName(""):
-			handle.add_to_group(pointer_group)
-		
-		# Store metadata for identification
-		handle.set_meta("is_resize_handle", true)
-		handle.set_meta("corner_index", i)
-		handle.set_meta("parent_viewport", self)
-		
-		# Create visual sphere
-		var handle_mesh := MeshInstance3D.new()
-		handle_mesh.name = "Visual"
-		var sphere := SphereMesh.new()
-		sphere.radius = resize_handle_size
-		sphere.height = resize_handle_size * 2.0
-		sphere.radial_segments = 12
-		sphere.rings = 6
-		handle_mesh.mesh = sphere
-		
-		# Create material
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = resize_handle_color
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.no_depth_test = true
-		mat.render_priority = 5
-		handle_mesh.material_override = mat
-		handle.add_child(handle_mesh)
-		_resize_handle_materials.append(mat)
-		_resize_handle_meshes.append(handle_mesh)
-		
-		# Create collision shape
-		var collision := CollisionShape3D.new()
-		collision.name = "Collision"
-		var sphere_shape := SphereShape3D.new()
-		sphere_shape.radius = resize_handle_size * 1.5  # Slightly larger for easier grabbing
-		collision.shape = sphere_shape
-		handle.add_child(collision)
-		
-		add_child(handle)
-		_resize_handles.append(handle)
+	var border_mesh := MeshInstance3D.new()
+	border_mesh.name = "BorderHighlight"
+	border_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	
-	# Position handles at corners
-	_update_resize_handle_positions()
+	var quad := QuadMesh.new()
+	# Make border mesh larger than content to draw border outside
+	quad.size = quad_size + Vector2(border_gap, border_gap) * 2.0
+	border_mesh.mesh = quad
 	
-	# Initial visibility update
-	_update_handle_visibility()
-
-
-func _update_handle_visibility() -> void:
-	"""Update visibility of resize handles based on hover/interaction state."""
-	# Only show if hovering the specific handle OR if resizing using that handle
-	# We ignore _hovering_panel for visibility now (handles hidden by default unless directly interacted with)
-	
-	var active_handle_index: int = -1
-	if is_resizing():
-		active_handle_index = get_resize_handle_corner_index(_resize_active_handle)
-	
-	for i in range(_resize_handle_meshes.size()):
-		var mesh = _resize_handle_meshes[i]
-		if mesh:
-			# Show if this specific handle is hovered OR if it is the active handle being dragged
-			var should_show: bool = (i == _hovered_handle_index) or (i == active_handle_index)
-			mesh.visible = should_show
-
-
-func _update_resize_handle_positions() -> void:
-	"""Position resize handles at the corners of the panel."""
-	if _resize_handles.size() != 4:
+	# Load shader
+	var shader = load("res://src/ui/shaders/panel_border_highlight.gdshader")
+	if not shader:
+		push_error("UIViewport3D: Could not load panel_border_highlight.gdshader")
 		return
+		
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	# Set initial uniforms
+	mat.set_shader_parameter("border_color", border_color)
+	mat.set_shader_parameter("corner_highlight_color", corner_highlight_color)
+	mat.set_shader_parameter("border_width", border_width)
+	mat.set_shader_parameter("corner_radius", corner_radius)
+	mat.set_shader_parameter("corner_arc_length", corner_arc_length)
+	mat.set_shader_parameter("aspect_ratio", quad.size.x / quad.size.y)
+	mat.set_shader_parameter("active_corner", -1)
+	mat.set_shader_parameter("hover_amount", 0.0)
 	
-	var half_w: float = quad_size.x * 0.5
-	var half_h: float = quad_size.y * 0.5
+	border_mesh.material_override = mat
+	_border_material = mat
+	_border_mesh = border_mesh
 	
-	# Corner positions in local space (panel lies on XY plane, facing +Z)
-	# Add offset to push handles outside the panel
-	var offset: float = resize_handle_offset
-	var corners := [
-		Vector3(-half_w - offset, half_h + offset, 0.0),   # Top-Left
-		Vector3(half_w + offset, half_h + offset, 0.0),    # Top-Right
-		Vector3(half_w + offset, -half_h - offset, 0.0),   # Bottom-Right
-		Vector3(-half_w - offset, -half_h - offset, 0.0),  # Bottom-Left
-	]
-	
-	for i in range(4):
-		_resize_handles[i].position = corners[i]
+	add_child(border_mesh)
+	# Position slightly in front of the content to avoid z-fighting
+	border_mesh.position.z = 0.002
 
+func _update_border_highlight_size() -> void:
+	"""Update the border mesh size and shader aspect ratio."""
+	if _border_mesh and _border_mesh.mesh is QuadMesh:
+		var b_size = quad_size + Vector2(border_gap, border_gap) * 2.0
+		_border_mesh.mesh.size = b_size
+		
+		if _border_material:
+			var aspect = b_size.x / b_size.y if b_size.y > 0 else 1.0
+			_border_material.set_shader_parameter("aspect_ratio", aspect)
+
+func _update_border_corner_highlight(corner_index: int) -> void:
+	# Don't update highlight if we are resizing (locks the active corner)
+	if is_resizing() and corner_index == -1:
+		return
+		
+	if _border_material:
+		_border_material.set_shader_parameter("active_corner", corner_index)
+
+func _update_border_hover(amount: float) -> void:
+	if _border_material:
+		# Tween this if we want smooth fade, but direct set is OK for now
+		_border_material.set_shader_parameter("hover_amount", amount)
+
+
+func _get_resize_corner(uv: Vector2) -> int:
+	"""Get the corner index from UV coordinates.
+	Returns 0=TL, 1=TR, 2=BR, 3=BL, -1=None"""
+	
+	# UV (0,0) is Top-Left in Godot QuadMesh
+	
+	# Check if within corner region
+	var size = resize_corner_size
+	
+	# Top-Left (0,0) - Check extended region
+	if uv.x < size and uv.y < size:
+		return 0
+	# Top-Right (1,0)
+	if uv.x > (1.0 - size) and uv.y < size:
+		return 1
+	# Bottom-Right (1,1)
+	if uv.x > (1.0 - size) and uv.y > (1.0 - size):
+		return 2
+	# Bottom-Left (0,1)
+	if uv.x < size and uv.y > (1.0 - size):
+		return 3
+		
+	return -1
 
 func _get_opposite_corner_index(corner_index: int) -> int:
-	"""Get the index of the diagonally opposite corner."""
 	# 0(TL) <-> 2(BR), 1(TR) <-> 3(BL)
 	return (corner_index + 2) % 4
 
-
 func _get_corner_world_position(corner_index: int) -> Vector3:
-	"""Get the world position of a panel corner (not the handle, the actual corner)."""
 	var half_w: float = quad_size.x * 0.5
 	var half_h: float = quad_size.y * 0.5
 	
+	# Local corners relative to center
+	# Y is UP in 3D, but UV Y is DOWN.
+	# Godot QuadMesh: +Y is Top? No, usually +Y is Top in 3D.
+	# Let's double check standard QuadMesh UV mapping.
+	# (0,0) UV -> (-0.5, 0.5) Local Pos (Top-Left)
+	# (1,1) UV -> (0.5, -0.5) Local Pos (Bottom-Right)
+	# So Top is +Y, Bottom is -Y. Left is -X, Right is +X.
+	
 	var local_corners := [
-		Vector3(-half_w, half_h, 0.0),   # Top-Left
-		Vector3(half_w, half_h, 0.0),    # Top-Right
-		Vector3(half_w, -half_h, 0.0),   # Bottom-Right
-		Vector3(-half_w, -half_h, 0.0),  # Bottom-Left
+		Vector3(-half_w, half_h, 0.0),   # 0: Top-Left
+		Vector3(half_w, half_h, 0.0),    # 1: Top-Right
+		Vector3(half_w, -half_h, 0.0),   # 2: Bottom-Right
+		Vector3(-half_w, -half_h, 0.0),  # 3: Bottom-Left
 	]
+	
+	# Check flip_v. If UI is flip_v, then UV (0,0) maps to...
+	# ui_viewport_3d flip_v=true by default.
+	# _world_to_uv handles the flip.
+	# Here we need physical world positions of the logical corners 0,1,2,3.
 	
 	return global_transform * local_corners[corner_index]
 
 
-func start_resize(corner_index: int, grab_world_pos: Vector3) -> void:
-	"""Start a resize operation from the specified corner."""
-	if corner_index < 0 or corner_index >= 4:
+func start_resize(corner_index: int, grab_world_pos: Vector3, pointer: Node3D = null) -> void:
+	if corner_index < 0 or corner_index > 3:
 		return
 	
-	_resize_active_handle = _resize_handles[corner_index] if corner_index < _resize_handles.size() else null
+	_resize_active_corner = corner_index
 	_resize_initial_quad_size = quad_size
 	_resize_initial_grab_pos = grab_world_pos
 	
-	# Get the opposite corner as anchor point
 	var opposite_index: int = _get_opposite_corner_index(corner_index)
 	_resize_anchor_corner = _get_corner_world_position(opposite_index)
+
+	# Calculate offset from grab pos to the actual corner position
+	var actual_corner_pos = _get_corner_world_position(corner_index)
+	var local_grab = global_transform.affine_inverse() * grab_world_pos
+	var local_corner = global_transform.affine_inverse() * actual_corner_pos
+	_resize_grab_offset = local_corner - local_grab
+
+	print("UIViewport3D: Started resize from corner ", corner_index)
 	
-	print("UIViewport3D: Started resize from corner ", corner_index, " anchor at corner ", opposite_index)
-	_update_handle_visibility()
+	_resize_initial_transform = global_transform
+	
+	# robust resize: capture pointer
+	if pointer:
+		_resize_pointer = pointer
+		_resize_action = pointer.get("interact_action") if "interact_action" in pointer else "trigger_click"
+		_resize_controller = _find_controller_for_pointer(pointer)
+		print("UIViewport3D: Robust resize setup - Pointer:", _resize_pointer, " Controller:", _resize_controller, " Action:", _resize_action)
+		set_process(true) # Enable processing to track resize
+	else:
+		print("UIViewport3D: Robust resize setup FAILED - No pointer passed!")
+	
+	if _border_material:
+		_border_material.set_shader_parameter("resize_progress", 1.0)
+		_border_material.set_shader_parameter("active_corner", corner_index)
 
-
-func update_resize(current_grab_pos: Vector3) -> void:
-	"""Update panel size based on current grab position."""
-	if not _resize_active_handle:
+func update_resize(current_pointer_pos: Vector3) -> void:
+	# Note: current_pointer_pos argument is legacy generic, we use _resize_pointer transform directly
+	if _resize_active_corner == -1 or not _resize_pointer:
 		return
+		
+	# Ray-Plane Intersection (Horizon OS style remote resize)
+	# Plane is defined by initial transform (so it stays stable during resize)
+	# Normal is +Z of the initial transform (assuming QuadMesh faces +Z)
+	var plane_normal = _resize_initial_transform.basis.z.normalized()
+	var plane_origin = _resize_initial_transform.origin
+	var plane = Plane(plane_normal, plane_origin.dot(plane_normal))
 	
-	# Calculate new corner position in panel's local space
-	var local_new_corner: Vector3 = global_transform.affine_inverse() * current_grab_pos
-	var local_anchor: Vector3 = global_transform.affine_inverse() * _resize_anchor_corner
+	# Pointer Ray
+	var ray_origin = _resize_pointer.global_position
+	var ray_dir = -_resize_pointer.global_transform.basis.z.normalized() # Pointer faces -Z
+	
+	var intersection = plane.intersects_ray(ray_origin, ray_dir)
+	
+	if intersection == null:
+		# Ray does not hit plane (pointing away), skip update to avoid jump
+		return
+		
+	var current_grab_pos = intersection
+	
+	# Calculate new corner position in panel's LOCAL space (relative to INITIAL transform)
+	var local_grab: Vector3 = _resize_initial_transform.affine_inverse() * current_grab_pos
+	# Apply initial offset to get where the corner should be
+	var local_new_corner: Vector3 = local_grab + _resize_grab_offset
+	var local_anchor: Vector3 = _resize_initial_transform.affine_inverse() * _resize_anchor_corner
 	
 	# Calculate new size based on distance from anchor to new corner
-	# The anchor stays fixed, new corner determines size
 	var delta: Vector3 = local_new_corner - local_anchor
 	var new_width: float = abs(delta.x)
 	var new_height: float = abs(delta.y)
@@ -536,20 +613,31 @@ func update_resize(current_grab_pos: Vector3) -> void:
 	new_width = clamp(new_width, min_panel_size.x, max_panel_size.x)
 	new_height = clamp(new_height, min_panel_size.y, max_panel_size.y)
 	
-	# Apply new size
+	if Engine.get_physics_frames() % 60 == 0:
+		print("UIViewport3D: Resize - Delta:", delta, " NewSize:", Vector2(new_width, new_height))
+		
 	set_panel_size(Vector2(new_width, new_height), _resize_anchor_corner)
 
-
 func end_resize() -> void:
-	"""End the current resize operation."""
-	if _resize_active_handle:
+	if _resize_active_corner != -1:
 		print("UIViewport3D: Ended resize, new size: ", quad_size)
-	_resize_active_handle = null
+	
+	_resize_active_corner = -1
 	_resize_initial_quad_size = Vector2.ZERO
 	_resize_initial_grab_pos = Vector3.ZERO
 	_resize_anchor_corner = Vector3.ZERO
-	_update_handle_visibility()
+	_resize_pointer = null
+	_resize_controller = null
+	set_process(false)
+	
+	# Reset collision shape (just to be safe, though not modifying it anymore)
+	_set_collision_shape_size(quad_size)
+	
+	if _border_material:
+		_border_material.set_shader_parameter("resize_progress", 0.0)
 
+func is_resizing() -> bool:
+	return _resize_active_corner != -1
 
 func set_panel_size(new_quad_size: Vector2, anchor_world_pos: Vector3 = Vector3.INF) -> void:
 	"""Set the panel size, optionally keeping a world position fixed as anchor."""
@@ -574,24 +662,24 @@ func set_panel_size(new_quad_size: Vector2, anchor_world_pos: Vector3 = Vector3.
 		quad_mesh.size = new_quad_size
 	
 	# Update collision shape
-	var collision_shape: CollisionShape3D = null
 	if _static_body:
-		collision_shape = _static_body.get_node_or_null("CollisionShape3D") as CollisionShape3D
-	if collision_shape and collision_shape.shape is BoxShape3D:
-		var box: BoxShape3D = collision_shape.shape as BoxShape3D
-		box.size = Vector3(new_quad_size.x, new_quad_size.y, 0.01)
+		var collision_shape = _static_body.get_node_or_null("CollisionShape3D") as CollisionShape3D
+		if collision_shape and collision_shape.shape is BoxShape3D:
+			var box: BoxShape3D = collision_shape.shape as BoxShape3D
+			box.size = Vector3(new_quad_size.x, new_quad_size.y, 0.01)
 	
 	# If we have an anchor point, adjust position so anchor stays fixed
 	if anchor_world_pos.is_finite():
 		# Calculate where the anchor should be in the NEW local space
 		var old_local_anchor: Vector3 = global_transform.affine_inverse() * anchor_world_pos
-		# The anchor was at a corner, figure out which quadrant
+		
+		# Determine corner signs relative to old center
+		# Note: offset logic relies on correct sign
 		var _half_w_old: float = old_quad_size.x * 0.5
 		var _half_h_old: float = old_quad_size.y * 0.5
 		var half_w_new: float = new_quad_size.x * 0.5
 		var half_h_new: float = new_quad_size.y * 0.5
 		
-		# Determine corner signs
 		var sign_x: float = sign(old_local_anchor.x) if abs(old_local_anchor.x) > 0.01 else -1.0
 		var sign_y: float = sign(old_local_anchor.y) if abs(old_local_anchor.y) > 0.01 else 1.0
 		
@@ -602,45 +690,66 @@ func set_panel_size(new_quad_size: Vector2, anchor_world_pos: Vector3 = Vector3.
 		var local_offset: Vector3 = old_local_anchor - new_local_anchor
 		global_position += global_transform.basis * local_offset
 	
-	# Update resize handle positions
-	_update_resize_handle_positions()
+	# Update border highlight size
+	_update_border_highlight_size()
 	
 	# Emit signal
 	panel_resized.emit(new_quad_size)
 
+func _set_collision_shape_size(size: Vector2) -> void:
+	if _static_body:
+		var collision_shape = _static_body.get_node_or_null("CollisionShape3D") as CollisionShape3D
+		if collision_shape and collision_shape.shape is BoxShape3D:
+			# Include border gap for interaction area
+			var total_size = size
+			if enable_resize_handles:
+				total_size += Vector2(border_gap, border_gap) * 2.0
+				# Add a bit extra padding for easier grabbing
+				total_size += Vector2(0.02, 0.02)
+				
+			collision_shape.shape.size = Vector3(total_size.x, total_size.y, 0.01)
 
-func set_resize_handle_highlight(corner_index: int, highlighted: bool) -> void:
-	"""Set the visual highlight state of a resize handle."""
-	if corner_index < 0 or corner_index >= _resize_handle_materials.size():
-		return
-	
-	var mat: StandardMaterial3D = _resize_handle_materials[corner_index]
-	if mat:
-		mat.albedo_color = resize_handle_hover_color if highlighted else resize_handle_color
-	
-	# Track if any handle is being hovered
-	if highlighted:
-		_hovered_handle_index = corner_index
-	elif _hovered_handle_index == corner_index:
-		# Only clear if we are unhighlighting the currently hovered one
-		_hovered_handle_index = -1
-	
-	_update_handle_visibility()
+func _process(delta: float) -> void:
+	if is_resizing() and _resize_pointer:
+		# Check if button released
+		var pressed = _is_action_pressed(_resize_controller, _resize_action)
+		# print("UIViewport3D: Resize update - Pressed:", pressed) # Uncomment if needed widely
+		if not pressed:
+			print("UIViewport3D: Robust resize released")
+			end_resize()
+			return
+			
+		# Update resize based on pointer position
+		update_resize(_resize_pointer.global_position)
 
+func _find_controller_for_pointer(ptr: Node) -> XRController3D:
+	var parent = ptr.get_parent()
+	while parent:
+		if parent is XRController3D:
+			return parent
+		parent = parent.get_parent()
+	return null
 
-func is_resizing() -> bool:
-	"""Returns true if currently in a resize operation."""
-	return _resize_active_handle != null
-
-
-func get_resize_handle_corner_index(handle: Node) -> int:
-	"""Get the corner index for a resize handle node, or -1 if not a valid handle."""
-	if not handle:
-		return -1
-	if not handle.has_meta("is_resize_handle"):
-		return -1
-	if not handle.has_meta("parent_viewport"):
-		return -1
-	if handle.get_meta("parent_viewport") != self:
-		return -1
-	return handle.get_meta("corner_index", -1)
+func _is_action_pressed(controller: XRController3D, action_name: String) -> bool:
+	if action_name == "": return false
+	# Check global Input action first (e.g. valid actions mapped in Project Settings)
+	if InputMap.has_action(action_name) and Input.is_action_pressed(action_name):
+		return true
+	# Check controller specific input
+	if controller:
+		# Direct check
+		if controller.is_button_pressed(action_name):
+			return true
+			
+		# Float check
+		if controller.get_float(action_name) > 0.1:
+			return true
+			
+		# Fallback for "trigger_click" vs "trigger" naming differences
+		if action_name == "trigger_click":
+			if controller.get_float("trigger") > 0.1:
+				return true
+			if controller.is_button_pressed("trigger"):
+				return true
+				
+	return false

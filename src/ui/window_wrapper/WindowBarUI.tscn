@@ -66,13 +66,21 @@ theme_override_font_sizes/font_size = 24
 text = "Window Title"
 vertical_alignment = 1
 
+[node name="GazeButton" type="Button" parent="HBoxContainer"]
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "Gaze Visibility"
+theme_override_font_sizes/font_size = 32
+text = "👁"
+
 [node name="BringCloseButton" type="Button" parent="HBoxContainer"]
 custom_minimum_size = Vector2(50, 50)
 layout_mode = 2
 size_flags_vertical = 4
 tooltip_text = "Bring Close"
 theme_override_font_sizes/font_size = 32
-text = "👁"
+text = "✨"
 
 [node name="PinButton" type="Button" parent="HBoxContainer"]
 custom_minimum_size = Vector2(50, 50)

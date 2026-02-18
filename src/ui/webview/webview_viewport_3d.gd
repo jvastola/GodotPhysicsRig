@@ -67,11 +67,25 @@ var _last_drag_pos: Vector2 = Vector2.ZERO
 var _is_dragging: bool = false
 var _accumulated_scroll: float = 0.0  # Accumulate small movements
 
+# Border Highlight
+@export_group("Border Highlight")
+@export var border_color: Color = Color(0.4, 0.6, 1.0, 0.3)
+@export var corner_highlight_color: Color = Color(1.0, 1.0, 1.0, 0.8)
+@export var border_width: float = 0.015          # Normalized (0-1)
+@export var border_gap: float = 0.04             # Gap between panel edge and border (meters)
+@export var corner_arc_length: float = 0.15       # UV length of corner anchor
+@export var corner_radius: float = 0.05           # UV radius
+
 # Resize state
 var _is_resizing: bool = false
 var _resize_start_scale: float = 1.0
 var _resize_start_distance: float = 0.0
 var _resize_corner: String = ""  # "bl", "br", "tl", "tr" for corners
+
+# Border Highlight state
+var _border_mesh: MeshInstance3D = null
+var _border_material: ShaderMaterial = null
+var _hovering_corner: String = ""
 
 
 func _ready() -> void:
@@ -98,6 +112,10 @@ func _ready() -> void:
 	
 	# Initialize the appropriate backend
 	_initialize_backend()
+	
+	# Setup border highlight
+	if enable_resize:
+		_setup_border_highlight()
 	
 	set_process_input(true)
 
@@ -422,10 +440,16 @@ func handle_pointer_event(event: Dictionary) -> void:
 	var is_on_url_bar: bool = viewport_pos.y < URL_BAR_HEIGHT
 	var corner := _get_resize_corner(uv)
 	
+	# Update border highlight
+	if enable_resize and corner != _hovering_corner:
+		_hovering_corner = corner
+		_update_border_corner_highlight(corner)
+	
 	match event_type:
 		"enter", "hover":
 			_send_mouse_motion(viewport_pos)
 			_is_hovering = true
+			_update_border_hover(1.0)
 		"press":
 			_send_mouse_motion(viewport_pos)
 			_is_pressed = true
@@ -508,6 +532,10 @@ func handle_pointer_event(event: Dictionary) -> void:
 		"exit":
 			_send_mouse_exit()
 			_is_hovering = false
+			_update_border_hover(0.0)
+			_hovering_corner = ""
+			_update_border_corner_highlight("")
+			
 			if _is_resizing:
 				_end_resize()
 			_is_dragging = false
@@ -547,6 +575,11 @@ func _start_resize(corner: String, pointer: Node3D) -> void:
 	_resize_start_scale = scale.x
 	_resize_start_distance = global_position.distance_to(pointer.global_position)
 	resize_started.emit()
+	
+	_set_resize_progress(1.0)
+	# Ensure corner is highlighted
+	_update_border_corner_highlight(corner)
+	
 	if debug_coordinates:
 		print("WebviewViewport3D: Resize started from corner ", corner)
 
@@ -566,6 +599,9 @@ func _end_resize() -> void:
 	_is_resizing = false
 	_resize_corner = ""
 	resize_ended.emit()
+	
+	_set_resize_progress(0.0)
+	
 	if debug_coordinates:
 		print("WebviewViewport3D: Resize ended, scale=", scale.x)
 
@@ -732,3 +768,65 @@ func pointer_grab_get_distance(pointer: Node3D) -> float:
 
 func pointer_grab_get_scale() -> float:
 	return scale.x
+
+
+# ============================================================================
+# BORDER HIGHLIGHT (Horizon OS Style)
+# ============================================================================
+
+func _setup_border_highlight() -> void:
+	var border_mesh := MeshInstance3D.new()
+	border_mesh.name = "BorderHighlight"
+	border_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	
+	var quad := QuadMesh.new()
+	# Make border mesh larger than content to draw border outside
+	quad.size = quad_size + Vector2(border_gap, border_gap) * 2.0
+	border_mesh.mesh = quad
+	
+	var shader = load("res://src/ui/shaders/panel_border_highlight.gdshader")
+	if not shader:
+		push_error("WebviewViewport3D: Could not load panel_border_highlight.gdshader")
+		return
+		
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	mat.set_shader_parameter("border_color", border_color)
+	mat.set_shader_parameter("corner_highlight_color", corner_highlight_color)
+	mat.set_shader_parameter("border_width", border_width)
+	mat.set_shader_parameter("corner_radius", corner_radius)
+	mat.set_shader_parameter("corner_arc_length", corner_arc_length)
+	mat.set_shader_parameter("aspect_ratio", quad.size.x / quad.size.y)
+	mat.set_shader_parameter("active_corner", -1)
+	mat.set_shader_parameter("hover_amount", 0.0)
+	
+	border_mesh.material_override = mat
+	_border_material = mat
+	_border_mesh = border_mesh
+	
+	add_child(border_mesh)
+	border_mesh.position.z = 0.002
+
+func _update_border_corner_highlight(corner_name: String) -> void:
+	# Don't update highlight if we are resizing (locks active corner)
+	if _is_resizing and corner_name == "":
+		return
+		
+	if not _border_material: return
+	
+	var index = -1
+	match corner_name:
+		"tl": index = 0
+		"tr": index = 1
+		"br": index = 2
+		"bl": index = 3
+	
+	_border_material.set_shader_parameter("active_corner", index)
+
+func _update_border_hover(amount: float) -> void:
+	if _border_material:
+		_border_material.set_shader_parameter("hover_amount", amount)
+
+func _set_resize_progress(progress: float) -> void:
+	if _border_material:
+		_border_material.set_shader_parameter("resize_progress", progress)
