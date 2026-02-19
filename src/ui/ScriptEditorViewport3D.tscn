@@ -1,7 +1,7 @@
-[gd_scene load_steps=7 format=3 uid="uid://script_editor_viewport3d"]
+[gd_scene format=3 uid="uid://bhiehdlinlhd6"]
 
-[ext_resource type="Script" path="res://src/ui/script_editor_viewport_3d.gd" id="1_script"]
-[ext_resource type="PackedScene" uid="uid://script_editor_ui" path="res://src/ui/ScriptEditorUI.tscn" id="2_ui"]
+[ext_resource type="Script" uid="uid://bcnsychgndgsg" path="res://src/ui/script_editor_viewport_3d.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://src/ui/ScriptEditorUI.tscn" id="2_ui"]
 
 [sub_resource type="ViewportTexture" id="ViewportTexture_editor"]
 viewport_path = NodePath("SubViewport")
@@ -18,24 +18,25 @@ size = Vector2(3.2, 2.4)
 [sub_resource type="BoxShape3D" id="BoxShape3D_editor"]
 size = Vector3(3.2, 2.4, 0.01)
 
-[node name="ScriptEditorViewport3D" type="Node3D"]
+[node name="ScriptEditorViewport3D" type="Node3D" unique_id=1504896043]
 script = ExtResource("1_script")
 
-[node name="SubViewport" type="SubViewport" parent="."]
+[node name="SubViewport" type="SubViewport" parent="." unique_id=937135241]
 transparent_bg = true
 size = Vector2i(800, 600)
 render_target_update_mode = 4
 
-[node name="ScriptEditorUI" parent="SubViewport" instance=ExtResource("2_ui")]
+[node name="ScriptEditorUI" parent="SubViewport" unique_id=2046213903 instance=ExtResource("2_ui")]
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=557887434]
+transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, 0, 0)
 material_override = SubResource("StandardMaterial3D_editor")
 cast_shadow = 0
 mesh = SubResource("QuadMesh_editor")
 
-[node name="StaticBody3D" type="StaticBody3D" parent="MeshInstance3D"]
+[node name="StaticBody3D" type="StaticBody3D" parent="MeshInstance3D" unique_id=352948939]
 collision_layer = 32
 collision_mask = 0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D/StaticBody3D"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D/StaticBody3D" unique_id=182245043]
 shape = SubResource("BoxShape3D_editor")

@@ -43,12 +43,13 @@ func _update_inventory() -> void:
 	
 	# Create slots for each item
 	var items = InventoryManager.inventory
-	for item in items:
-		var slot = _create_inventory_slot(item)
+	for item_name in items:
+		var item_count = items[item_name]
+		var slot = _create_inventory_slot(item_name, item_count)
 		inventory_grid.add_child(slot)
 
 
-func _create_inventory_slot(item_data: Dictionary) -> Panel:
+func _create_inventory_slot(item_name: String, item_count: int) -> Panel:
 	var slot = Panel.new()
 	slot.custom_minimum_size = Vector2(64, 64)
 	
@@ -56,19 +57,19 @@ func _create_inventory_slot(item_data: Dictionary) -> Panel:
 	slot.add_child(vbox)
 	
 	var item_label = Label.new()
-	item_label.text = item_data.get("id", "???")
+	item_label.text = item_name
 	item_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(item_label)
 	
 	var amount_label = Label.new()
-	amount_label.text = "x%d" % item_data.get("amount", 1)
+	amount_label.text = "x%d" % item_count
 	amount_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(amount_label)
 	
 	return slot
 
 
-func _on_inventory_changed(_items: Array) -> void:
+func _on_inventory_changed() -> void:
 	_update_inventory()
 
 

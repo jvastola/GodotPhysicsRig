@@ -1,0 +1,35 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://bvqm8x7y5n8hs"]
+
+[ext_resource type="Shader" uid="uid://c4aov13mxm0lj" path="res://src/demos/tools/shaders/plasma_spatial.gdshader" id="1_shader"]
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_1"]
+noise_type = 2
+frequency = 0.02
+fractal_octaves = 3
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_1"]
+noise = SubResource("FastNoiseLite_1")
+seamless = true
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_2"]
+noise_type = 3
+seed = 42
+frequency = 0.03
+fractal_octaves = 2
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_2"]
+width = 16
+height = 16
+noise = SubResource("FastNoiseLite_2")
+seamless = true
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_shader")
+shader_parameter/noise1 = SubResource("NoiseTexture2D_1")
+shader_parameter/noise2 = SubResource("NoiseTexture2D_2")
+shader_parameter/color1 = Color(1, 0, 0.5, 1)
+shader_parameter/color2 = Color(0, 0.5, 1, 1)
+shader_parameter/color3 = Color(0.5, 1, 0, 1)
+shader_parameter/warping_intensity = 0.5
+shader_parameter/warping_speed = 0.4190000199025

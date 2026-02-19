@@ -3,30 +3,11 @@
 [ext_resource type="Script" uid="uid://bicq4n54ve72" path="res://src/ui/player_hud.gd" id="1_script"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Panel"]
-bg_color = Color(0, 0, 0, 0.4)
+bg_color = Color(0, 0, 0, 0.85882354)
 corner_radius_top_left = 30
 corner_radius_top_right = 30
 corner_radius_bottom_right = 30
 corner_radius_bottom_left = 30
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_CompassOuter"]
-bg_color = Color(0.24313726, 1, 1, 0.08627451)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.2, 1, 1, 0.3647059)
-corner_radius_top_left = 200
-corner_radius_top_right = 200
-corner_radius_bottom_right = 200
-corner_radius_bottom_left = 200
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Tick"]
-bg_color = Color(1, 1, 1, 0.4117647)
-corner_radius_top_left = 1
-corner_radius_top_right = 1
-corner_radius_bottom_right = 1
-corner_radius_bottom_left = 1
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_HeartIcon"]
 bg_color = Color(1, 0.2, 0.2, 1)
@@ -107,6 +88,25 @@ corner_radius_top_right = 3
 corner_radius_bottom_right = 3
 corner_radius_bottom_left = 3
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_CompassOuter"]
+bg_color = Color(0.24313726, 1, 1, 0.08627451)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.2, 1, 1, 0.3647059)
+corner_radius_top_left = 200
+corner_radius_top_right = 200
+corner_radius_bottom_right = 200
+corner_radius_bottom_left = 200
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Tick"]
+bg_color = Color(1, 1, 1, 0.4117647)
+corner_radius_top_left = 1
+corner_radius_top_right = 1
+corner_radius_bottom_right = 1
+corner_radius_bottom_left = 1
+
 [node name="PlayerHUD" type="Control" unique_id=1525066474]
 layout_mode = 3
 anchors_preset = 15
@@ -132,224 +132,6 @@ offset_bottom = 225.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_Panel")
-
-[node name="CompassLayer" type="Control" parent="MainPanel" unique_id=359712098]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-
-[node name="CompassCircle" type="Panel" parent="MainPanel/CompassLayer" unique_id=1804791164]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 20.0
-offset_top = 20.0
-offset_right = -20.0
-offset_bottom = -20.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_CompassOuter")
-
-[node name="CompassPivot" type="Control" parent="MainPanel/CompassLayer" unique_id=1389378233]
-unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="LabelN" type="Label" parent="MainPanel/CompassLayer/CompassPivot" unique_id=1011096771]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -20.0
-offset_top = -190.0
-offset_right = 20.0
-offset_bottom = -150.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_colors/font_color = Color(0.8, 0.101960786, 0.101960786, 0.88235295)
-theme_override_font_sizes/font_size = 32
-text = "N"
-horizontal_alignment = 1
-
-[node name="LabelS" type="Label" parent="MainPanel/CompassLayer/CompassPivot" unique_id=883801100]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -20.0
-offset_top = 150.0
-offset_right = 20.0
-offset_bottom = 190.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 0.3)
-theme_override_font_sizes/font_size = 28
-text = "S"
-horizontal_alignment = 1
-
-[node name="LabelE" type="Label" parent="MainPanel/CompassLayer/CompassPivot" unique_id=381405413]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = 150.0
-offset_top = -20.0
-offset_right = 190.0
-offset_bottom = 20.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 0.3)
-theme_override_font_sizes/font_size = 28
-text = "E"
-horizontal_alignment = 1
-
-[node name="LabelW" type="Label" parent="MainPanel/CompassLayer/CompassPivot" unique_id=1173435298]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -190.0
-offset_top = -20.0
-offset_right = -150.0
-offset_bottom = 20.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 0.3)
-theme_override_font_sizes/font_size = 28
-text = "W"
-horizontal_alignment = 1
-
-[node name="TickContainer" type="Control" parent="MainPanel/CompassLayer" unique_id=452582879]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-grow_horizontal = 2
-grow_vertical = 2
-scale = Vector2(1.21, 1.21)
-
-[node name="Tick1" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=1869270766]
-layout_mode = 0
-offset_top = -160.0
-offset_right = 2.0
-offset_bottom = -152.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
-
-[node name="Tick2" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=680087317]
-layout_mode = 0
-offset_left = 80.0
-offset_top = -138.0
-offset_right = 82.0
-offset_bottom = -130.0
-rotation = 0.523598
-theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
-
-[node name="Tick3" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=29304740]
-layout_mode = 0
-offset_left = 138.0
-offset_top = -80.0
-offset_right = 140.0
-offset_bottom = -72.0
-rotation = 1.0472
-theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
-
-[node name="Tick4" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=1951305447]
-layout_mode = 0
-offset_left = 160.0
-offset_right = 162.0
-offset_bottom = 8.0
-rotation = 1.5708
-theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
-
-[node name="Tick5" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=1597280913]
-layout_mode = 0
-offset_left = 138.0
-offset_top = 80.0
-offset_right = 140.0
-offset_bottom = 88.0
-rotation = 2.0944
-theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
-
-[node name="Tick6" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=1676874514]
-layout_mode = 0
-offset_left = 80.0
-offset_top = 138.0
-offset_right = 82.0
-offset_bottom = 146.0
-rotation = 2.61799
-theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
-
-[node name="Tick7" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=768542497]
-layout_mode = 0
-offset_top = 160.0
-offset_right = 2.0
-offset_bottom = 168.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
-
-[node name="Tick8" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=2111105607]
-layout_mode = 0
-offset_left = -80.0
-offset_top = 138.0
-offset_right = -78.0
-offset_bottom = 146.0
-rotation = -2.61799
-theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
-
-[node name="Tick9" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=566029416]
-layout_mode = 0
-offset_left = -138.0
-offset_top = 80.0
-offset_right = -136.0
-offset_bottom = 88.0
-rotation = -2.0944
-theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
-
-[node name="Tick10" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=596108824]
-layout_mode = 0
-offset_left = -160.0
-offset_right = -158.0
-offset_bottom = 8.0
-rotation = -1.5708
-theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
-
-[node name="Tick11" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=1190677848]
-layout_mode = 0
-offset_left = -138.0
-offset_top = -80.0
-offset_right = -136.0
-offset_bottom = -72.0
-rotation = -1.0472
-theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
-
-[node name="Tick12" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=489507513]
-layout_mode = 0
-offset_left = -80.0
-offset_top = -138.0
-offset_right = -78.0
-offset_bottom = -130.0
-rotation = -0.523598
-theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
 
 [node name="ContentLayer" type="VBoxContainer" parent="MainPanel" unique_id=1479275466]
 layout_mode = 1
@@ -598,3 +380,221 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_Indicator")
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+
+[node name="CompassLayer" type="Control" parent="MainPanel" unique_id=359712098]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="CompassCircle" type="Panel" parent="MainPanel/CompassLayer" unique_id=1804791164]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_CompassOuter")
+
+[node name="CompassPivot" type="Control" parent="MainPanel/CompassLayer" unique_id=1389378233]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="LabelN" type="Label" parent="MainPanel/CompassLayer/CompassPivot" unique_id=1011096771]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -190.0
+offset_right = 20.0
+offset_bottom = -150.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.8, 0.101960786, 0.101960786, 0.88235295)
+theme_override_font_sizes/font_size = 32
+text = "N"
+horizontal_alignment = 1
+
+[node name="LabelS" type="Label" parent="MainPanel/CompassLayer/CompassPivot" unique_id=883801100]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = 150.0
+offset_right = 20.0
+offset_bottom = 190.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 0.3)
+theme_override_font_sizes/font_size = 28
+text = "S"
+horizontal_alignment = 1
+
+[node name="LabelE" type="Label" parent="MainPanel/CompassLayer/CompassPivot" unique_id=381405413]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = 150.0
+offset_top = -20.0
+offset_right = 190.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 0.3)
+theme_override_font_sizes/font_size = 28
+text = "E"
+horizontal_alignment = 1
+
+[node name="LabelW" type="Label" parent="MainPanel/CompassLayer/CompassPivot" unique_id=1173435298]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -190.0
+offset_top = -20.0
+offset_right = -150.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 0.3)
+theme_override_font_sizes/font_size = 28
+text = "W"
+horizontal_alignment = 1
+
+[node name="TickContainer" type="Control" parent="MainPanel/CompassLayer" unique_id=452582879]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+scale = Vector2(1.21, 1.21)
+
+[node name="Tick1" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=1869270766]
+layout_mode = 0
+offset_top = -160.0
+offset_right = 2.0
+offset_bottom = -152.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
+
+[node name="Tick2" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=680087317]
+layout_mode = 0
+offset_left = 80.0
+offset_top = -138.0
+offset_right = 82.0
+offset_bottom = -130.0
+rotation = 0.523598
+theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
+
+[node name="Tick3" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=29304740]
+layout_mode = 0
+offset_left = 138.0
+offset_top = -80.0
+offset_right = 140.0
+offset_bottom = -72.0
+rotation = 1.0472
+theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
+
+[node name="Tick4" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=1951305447]
+layout_mode = 0
+offset_left = 160.0
+offset_right = 162.0
+offset_bottom = 8.0
+rotation = 1.5708
+theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
+
+[node name="Tick5" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=1597280913]
+layout_mode = 0
+offset_left = 138.0
+offset_top = 80.0
+offset_right = 140.0
+offset_bottom = 88.0
+rotation = 2.0944
+theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
+
+[node name="Tick6" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=1676874514]
+layout_mode = 0
+offset_left = 80.0
+offset_top = 138.0
+offset_right = 82.0
+offset_bottom = 146.0
+rotation = 2.61799
+theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
+
+[node name="Tick7" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=768542497]
+layout_mode = 0
+offset_top = 160.0
+offset_right = 2.0
+offset_bottom = 168.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
+
+[node name="Tick8" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=2111105607]
+layout_mode = 0
+offset_left = -80.0
+offset_top = 138.0
+offset_right = -78.0
+offset_bottom = 146.0
+rotation = -2.61799
+theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
+
+[node name="Tick9" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=566029416]
+layout_mode = 0
+offset_left = -138.0
+offset_top = 80.0
+offset_right = -136.0
+offset_bottom = 88.0
+rotation = -2.0944
+theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
+
+[node name="Tick10" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=596108824]
+layout_mode = 0
+offset_left = -160.0
+offset_right = -158.0
+offset_bottom = 8.0
+rotation = -1.5708
+theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
+
+[node name="Tick11" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=1190677848]
+layout_mode = 0
+offset_left = -138.0
+offset_top = -80.0
+offset_right = -136.0
+offset_bottom = -72.0
+rotation = -1.0472
+theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
+
+[node name="Tick12" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=489507513]
+layout_mode = 0
+offset_left = -80.0
+offset_top = -138.0
+offset_right = -78.0
+offset_bottom = -130.0
+rotation = -0.523598
+theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")

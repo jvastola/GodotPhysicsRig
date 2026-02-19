@@ -23,6 +23,7 @@
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/TwoHandGrabCube.tscn" id="36_two_hand_cube"]
 [ext_resource type="PackedScene" uid="uid://bdgtb4clc5scx" path="res://island.tscn" id="37_82eun"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/WorldGrabSphere.tscn" id="38_world_grab_sphere"]
+[ext_resource type="Material" uid="uid://bekkfd16cqphx" path="res://src/demos/tools/materials/metal_pixel.tres" id="39_0bb85"]
 [ext_resource type="Script" uid="uid://om3k532gai8j" path="res://src/ui/ui_panel_manager.gd" id="39_ui_panel_manager"]
 [ext_resource type="PackedScene" uid="uid://cq0k3d4midg3s" path="res://src/objects/JoystickTool.tscn" id="39_wh2ee"]
 [ext_resource type="PackedScene" uid="uid://dj4y7k8m3nxq2" path="res://src/ui/InventoryUIViewport3D.tscn" id="40_0bb85"]
@@ -39,7 +40,8 @@
 [ext_resource type="Script" uid="uid://cfrhsl8g3fmpt" path="res://src/systems/mesh_collision_generator.gd" id="49_collision"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/ShapeTool.tscn" id="51_shape_tool"]
 [ext_resource type="Script" uid="uid://d2d0lk7frpl5n" path="res://src/objects/grabbables/MiningTool.gd" id="52_mining_tool"]
-[ext_resource type="PackedScene" path="res://src/objects/OreDeposit.tscn" id="53_ore_deposit"]
+[ext_resource type="PackedScene" uid="uid://b2mp18xsksksj" path="res://src/objects/OreDeposit.tscn" id="53_ore_deposit"]
+[ext_resource type="Material" uid="uid://bvqm8x7y5n8hs" path="res://src/demos/tools/materials/plasma.tres" id="54_plasma"]
 
 [sub_resource type="Environment" id="Environment_main"]
 fog_enabled = true
@@ -75,10 +77,16 @@ size = Vector3(0.45, 0.45, 0.45)
 [sub_resource type="BoxShape3D" id="BoxShape3D_body_grid"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0bb85"]
-size = Vector3(0.1, 1, 0.1)
+size = Vector3(0.05, 0.5, 0.05)
 
 [sub_resource type="BoxMesh" id="BoxMesh_d8ksm"]
-size = Vector3(0.1, 1, 0.1)
+material = ExtResource("39_0bb85")
+size = Vector3(0.05, 0.5, 0.05)
+
+[sub_resource type="BoxMesh" id="BoxMesh_plasma_subdivided"]
+subdivide_width = 8
+subdivide_height = 8
+subdivide_depth = 8
 
 [node name="MainScene33" type="Node3D" unique_id=1547683746]
 
@@ -189,7 +197,7 @@ rope_sag_factor = 0.005
 rope_sag_max = 0.5
 
 [node name="GridLineDisplay" parent="." unique_id=1041894421 instance=ExtResource("12_grid_display")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5116463, -4.495171, -8.524908)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5116463, -4.5200553, -8.591313)
 grid_size = 45
 height_noise_scale = 0.0
 zone1_distance = 8.0
@@ -296,7 +304,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.28916642, 0, -38.455387)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.25949258, 0, -38.708576)
 
 [node name="stick" type="RigidBody3D" parent="." unique_id=78102440 groups=["grabbable", "mining_tool"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.32582426, -35.550285)
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 2, 0.32582426, -35.550285)
 mass = 0.2
 gravity_scale = 0.3
 contact_monitor = true
@@ -309,17 +317,25 @@ save_id = "MiningTool"
 shape = SubResource("BoxShape3D_0bb85")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="stick" unique_id=1663568278]
+transform = Transform3D(1, 0, 0, 0, 0.8949733, -0.44611973, 0, 0.44611973, 0.8949733, 0, 0, 0)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_d8ksm")
 
 [node name="OreDeposit1" parent="." unique_id=1888582603 instance=ExtResource("53_ore_deposit")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0.5, -37)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0.040848136, -35.157143)
 
 [node name="OreDeposit2" parent="." unique_id=515782394 instance=ExtResource("53_ore_deposit")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.5, -36)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.387082, 0.5, -36.178154)
+ore_type = "plasma"
+
+[node name="MeshInstance3D" parent="OreDeposit2" index="1" unique_id=2025265480]
+material_override = ExtResource("54_plasma")
+mesh = SubResource("BoxMesh_plasma_subdivided")
 
 [node name="OreDeposit3" parent="." unique_id=1310738100 instance=ExtResource("53_ore_deposit")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0.5, -35)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.6202674, 0.5, -35)
 
 [node name="InventoryUIViewport3D" parent="." unique_id=1812015456 instance=ExtResource("40_0bb85")]
 transform = Transform3D(-0.9984447, 0, 0.05575188, 0, 1, 0, -0.05575188, 0, -0.9984447, -2.660949, 0.83622026, -36.651333)
+
+[editable path="OreDeposit2"]

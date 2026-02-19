@@ -465,6 +465,10 @@ func _setup_hit_sound() -> void:
 
 func _handle_hit_feedback(_body: Node) -> void:
 	"""Handle haptic and audio feedback when hitting an object"""
+	# Skip feedback if hitting an ore deposit (ore plays its own sound)
+	if _body.is_in_group("ore_deposit"):
+		return
+	
 	# Calculate impact velocity
 	var impact_velocity := _previous_velocity.length()
 	

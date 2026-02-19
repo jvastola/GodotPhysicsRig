@@ -1,36 +1,34 @@
-[gd_scene load_steps=4 format=3 uid="uid://ore_deposit"]
+[gd_scene format=3 uid="uid://b2mp18xsksksj"]
 
-[ext_resource type="Script" path="res://src/objects/OreDeposit.gd" id="1_ore_deposit"]
+[ext_resource type="Script" uid="uid://4hwhjjnuitmc" path="res://src/objects/OreDeposit.gd" id="1_ore_deposit"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_ore"]
-size = Vector3(1.0, 1.0, 1.0)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ore"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_iron"]
 albedo_color = Color(0.6, 0.5, 0.4, 1)
 metallic = 0.3
 roughness = 0.7
 
-[sub_resource type="BoxMesh" id="BoxMesh_ore"]
-material = SubResource("StandardMaterial3D_ore")
-size = Vector3(1.0, 1.0, 1.0)
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gold"]
+albedo_color = Color(1, 0.84, 0, 1)
+metallic = 0.9
+roughness = 0.2
+emission_enabled = true
+emission = Color(1, 0.84, 0, 1)
+emission_energy_multiplier = 0.2
 
-[node name="OreDeposit" type="StaticBody3D" groups=["ore_deposit"]]
-collision_layer = 1
+[sub_resource type="BoxMesh" id="BoxMesh_ore"]
+material = SubResource("StandardMaterial3D_iron")
+
+[node name="OreDeposit" type="StaticBody3D" unique_id=610573239 groups=["ore_deposit"]]
 collision_mask = 0
 script = ExtResource("1_ore_deposit")
-ore_type = "iron"
-max_health = 100.0
-loot_amount_min = 1
-loot_amount_max = 3
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=170601956]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
 shape = SubResource("BoxShape3D_ore")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=2025265480]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+cast_shadow = 0
 mesh = SubResource("BoxMesh_ore")
-
-[node name="Label3D" type="Label3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
-text = "Iron Ore"
-font_size = 24
-outline_size = 8

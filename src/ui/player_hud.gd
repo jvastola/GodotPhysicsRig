@@ -127,9 +127,9 @@ func _update_currencies() -> void:
 	if not InventoryManager:
 		return
 		
-	if gold_label: gold_label.text = "Gold: %d" % InventoryManager.get_currency("gold")
-	if gems_label: gems_label.text = "Gems: %d" % InventoryManager.get_currency("gems")
-	if tokens_label: tokens_label.text = "Tokens: %d" % InventoryManager.get_currency("tokens")
+	if gold_label: gold_label.text = "%d" % InventoryManager.get_currency("gold")
+	if gems_label: gems_label.text = "%d" % InventoryManager.get_currency("gems")
+	if tokens_label: tokens_label.text = "%d" % InventoryManager.get_currency("tokens")
 
 func _on_currency_changed(_type: String, _amount: int) -> void:
 	_update_currencies()

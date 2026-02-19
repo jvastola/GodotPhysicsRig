@@ -40,7 +40,7 @@ func _physics_process(delta: float) -> void:
 	_lifetime_timer += delta
 	if _lifetime_timer >= lifetime:
 		print("OreChunk: Despawning due to lifetime")
-		queue_free()
+		_despawn()
 		return
 	
 	# Fade out near end of lifetime
@@ -50,11 +50,20 @@ func _physics_process(delta: float) -> void:
 	
 	# Magnet effect - move toward player if nearby
 	if _player_body and is_instance_valid(_player_body) and not _collected:
-		var distance = global_position.distance_to(_player_body.global_position)
+		var target_pos = _player_body.global_position
+		var current_pos = global_position
+		var distance = current_pos.distance_to(target_pos)
+		
 		if distance < magnet_range:
-			var direction = (_player_body.global_position - global_position).normalized()
+			var direction = (target_pos - current_pos).normalized()
 			var speed = 5.0 * (1.0 - distance / magnet_range)  # Faster when closer
-			global_position += direction * speed * delta
+			
+			# If parent is RigidBody3D, apply force instead of direct position change
+			var parent_body = get_parent()
+			if parent_body is RigidBody3D:
+				parent_body.apply_central_force(direction * speed * 50.0)
+			else:
+				global_position += direction * speed * delta
 
 
 func _on_body_entered(body: Node3D) -> void:
@@ -88,8 +97,17 @@ func _collect() -> void:
 	# Play collection effect
 	_play_collection_effect()
 	
-	# Remove the chunk
-	queue_free()
+	# Remove the chunk (and parent if it's a RigidBody3D)
+	_despawn()
+
+
+func _despawn() -> void:
+	"""Remove the chunk and its parent if needed"""
+	var parent_body = get_parent()
+	if parent_body is RigidBody3D:
+		parent_body.queue_free()
+	else:
+		queue_free()
 
 
 func _play_collection_effect() -> void:

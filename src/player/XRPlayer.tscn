@@ -7,6 +7,7 @@
 [ext_resource type="Script" uid="uid://b0ncs507wux1w" path="res://src/player/desktop_controller.gd" id="4_desktop"]
 [ext_resource type="Script" uid="uid://deum3u4irqnyx" path="res://src/objects/watch_compass.gd" id="5_watch"]
 [ext_resource type="Script" uid="uid://u2otyj4gjtl2" path="res://src/player/hand_pointer.gd" id="6_pointer"]
+[ext_resource type="Material" uid="uid://bekkfd16cqphx" path="res://src/demos/tools/materials/metal_pixel.tres" id="7_tqmwh"]
 [ext_resource type="Material" uid="uid://cl3ucly7cjhvy" path="res://assets/wireframe-material.tres" id="7_xe8se"]
 [ext_resource type="PackedScene" path="res://src/ui/PlayerHUDViewport3D.tscn" id="10_vv0y5"]
 [ext_resource type="Script" uid="uid://bndx0a4k0k8hw" path="res://src/systems/voxel_chunk_manager.gd" id="11_2d0bc"]
@@ -32,6 +33,7 @@ material = ExtResource("3_yb8bw")
 size = Vector3(0.1, 0.1, 0.1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_watch_face"]
+material = ExtResource("7_tqmwh")
 size = Vector3(0.04, 0.004, 0.04)
 
 [sub_resource type="BoxMesh" id="BoxMesh_watch_needle"]

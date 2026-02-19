@@ -9,6 +9,9 @@ class_name OreDeposit
 @export var loot_amount_max: int = 3
 @export var respawn_time: float = 30.0  # Time to respawn after being mined
 @export var drop_loot: bool = true  # If false, adds directly to inventory
+@export var hand_damage_multiplier: float = 3.0  # Damage from hand hits
+@export var min_hand_velocity: float = 0.8  # Minimum hand velocity to damage
+@export var requires_tool: bool = true  # If true, can only be damaged by mining tools
 
 var current_health: float = 100.0
 var _mesh_instance: MeshInstance3D
@@ -18,6 +21,10 @@ var _health_label: Label3D
 var _is_depleted: bool = false
 var _respawn_timer: float = 0.0
 var _collision_shape: CollisionShape3D
+var _hit_sound: AudioStream
+var _failed_hit_sound: AudioStream
+var _last_hand_hit_time: float = 0.0
+const HAND_HIT_COOLDOWN: float = 0.2
 
 signal ore_depleted(ore_type: String, amount: int)
 signal ore_damaged(health_remaining: float)
@@ -28,8 +35,14 @@ func _ready() -> void:
 	current_health = max_health
 	add_to_group("ore_deposit")
 	
+	# Set requires_tool based on ore type
+	if ore_type == "iron":
+		requires_tool = true
+	elif ore_type == "gold" or ore_type == "plasma":
+		requires_tool = false
+	
 	# Set collision layer/mask for proper physics interaction
-	# Layer 1 (default) so the stick can collide with it
+	# Layer 1 (default) so hands and tools can collide with it
 	collision_layer = 1
 	collision_mask = 0  # Doesn't need to detect anything
 	
@@ -41,13 +54,43 @@ func _ready() -> void:
 	# Find collision shape
 	_collision_shape = _find_collision_shape(self)
 	
-	# Create audio player
+	# Create audio player and load sound
 	_create_audio_player()
+	_load_hit_sound()
+	_load_failed_hit_sound()
 	
 	# Create health label
 	_create_health_label()
 	
-	print("OreDeposit: Ready - Type: ", ore_type, " Health: ", max_health, " Collision Layer: ", collision_layer)
+	# Create detection area for hand collisions
+	_create_hand_detection_area()
+	
+	print("OreDeposit: Ready - Type: ", ore_type, " Health: ", max_health, " Requires Tool: ", requires_tool)
+
+
+func _create_hand_detection_area() -> void:
+	"""Create an Area3D to detect hand collisions"""
+	var detection_area = Area3D.new()
+	detection_area.name = "HandDetectionArea"
+	detection_area.collision_layer = 0
+	detection_area.collision_mask = 4  # Layer 3 (physics_hand is on layer 3/bit 4)
+	add_child(detection_area)
+	
+	# Copy the collision shape from the StaticBody3D
+	if _collision_shape and _collision_shape.shape:
+		var area_collision = CollisionShape3D.new()
+		area_collision.shape = _collision_shape.shape
+		area_collision.position = _collision_shape.position
+		area_collision.rotation = _collision_shape.rotation
+		area_collision.scale = _collision_shape.scale
+		detection_area.add_child(area_collision)
+		print("OreDeposit: Created hand detection area with shape")
+	else:
+		print("OreDeposit: WARNING - No collision shape found for hand detection!")
+	
+	# Connect to body entered signal
+	detection_area.body_entered.connect(_on_body_entered)
+	print("OreDeposit: Hand detection area ready, collision_mask: ", detection_area.collision_mask)
 
 
 func _physics_process(delta: float) -> void:
@@ -80,6 +123,28 @@ func _create_audio_player() -> void:
 	_audio_player.unit_size = 2.0
 
 
+func _load_hit_sound() -> void:
+	"""Load the appropriate hit sound based on ore type"""
+	var sound_path = "res://assets/audio/ironhit.ogg"
+	
+	if ResourceLoader.exists(sound_path):
+		_hit_sound = load(sound_path)
+		print("OreDeposit: Loaded hit sound from ", sound_path)
+	else:
+		push_warning("OreDeposit: Hit sound not found at ", sound_path)
+
+
+func _load_failed_hit_sound() -> void:
+	"""Load the failed hit sound (hitwood)"""
+	var sound_path = "res://assets/audio/hitwood.ogg"
+	
+	if ResourceLoader.exists(sound_path):
+		_failed_hit_sound = load(sound_path)
+		print("OreDeposit: Loaded failed hit sound from ", sound_path)
+	else:
+		push_warning("OreDeposit: Failed hit sound not found at ", sound_path)
+
+
 func _create_health_label() -> void:
 	"""Create a label showing health"""
 	_health_label = Label3D.new()
@@ -105,8 +170,18 @@ func _find_mesh_instance(node: Node) -> MeshInstance3D:
 	return null
 
 
-func take_mining_damage(damage: float, hit_position: Vector3) -> void:
-	"""Called by mining tools when they hit this ore"""
+func take_mining_damage(damage: float, hit_position: Vector3, impact_strength: float = 0.5, from_tool: bool = false) -> void:
+	"""Called by mining tools or hands when they hit this ore"""
+	if _is_depleted:
+		return
+	
+	# Check if this ore requires a tool
+	if requires_tool and not from_tool:
+		print("OreDeposit: ", ore_type, " requires a tool to mine!")
+		# Play a "clank" feedback sound to indicate it can't be broken
+		_play_failed_hit_sound(impact_strength)
+		return
+	
 	current_health -= damage
 	ore_damaged.emit(current_health)
 	
@@ -124,25 +199,72 @@ func take_mining_damage(damage: float, hit_position: Vector3) -> void:
 	_show_damage_effect(hit_position)
 	
 	# Play hit sound
-	_play_hit_sound()
+	_play_hit_sound(impact_strength)
 	
 	# Check if depleted
 	if current_health <= 0:
 		_on_depleted()
 
 
-func _play_hit_sound() -> void:
-	"""Play mining hit sound"""
-	if not _audio_player:
+func _play_failed_hit_sound(impact_strength: float = 0.5) -> void:
+	"""Play a sound when hitting ore that requires a tool"""
+	if not _audio_player or not _failed_hit_sound:
 		return
 	
-	# Create a rock hit sound (low frequency thud)
-	var stream = AudioStreamGenerator.new()
-	stream.mix_rate = 22050
-	stream.buffer_length = 0.15
+	_audio_player.stream = _failed_hit_sound
+	_audio_player.pitch_scale = randf_range(0.9, 1.1)
+	_audio_player.volume_db = lerpf(-12.0, 0.0, impact_strength)
+	_audio_player.play()
+
+
+func _on_body_entered(body: Node) -> void:
+	"""Handle collisions with hands or other bodies"""
+	print("OreDeposit: Body entered - ", body.name, " | Is physics_hand: ", body.is_in_group("physics_hand"))
 	
-	_audio_player.stream = stream
+	if _is_depleted:
+		print("OreDeposit: Ore is depleted, ignoring hit")
+		return
+	
+	# Check if it's a physics hand
+	if body.is_in_group("physics_hand"):
+		print("OreDeposit: Detected physics hand hit!")
+		_handle_hand_hit(body)
+
+
+func _handle_hand_hit(hand: RigidBody3D) -> void:
+	"""Handle damage from hand punching the ore"""
+	# Check cooldown
+	var current_time = Time.get_ticks_msec() / 1000.0
+	if current_time - _last_hand_hit_time < HAND_HIT_COOLDOWN:
+		return
+	
+	# Get hand velocity
+	var hand_velocity = hand.linear_velocity.length()
+	
+	# Check if velocity is high enough
+	if hand_velocity < min_hand_velocity:
+		return
+	
+	_last_hand_hit_time = current_time
+	
+	# Calculate damage based on impact velocity
+	var damage = hand_velocity * hand_damage_multiplier
+	var impact_strength = clampf((hand_velocity - min_hand_velocity) / 3.0, 0.0, 1.0)
+	
+	# Apply damage (from_tool = false since this is a hand)
+	take_mining_damage(damage, hand.global_position, impact_strength, false)
+	
+	print("OreDeposit: Hand hit with velocity ", hand_velocity, " dealing ", damage, " damage")
+
+
+func _play_hit_sound(impact_strength: float = 0.5) -> void:
+	"""Play mining hit sound"""
+	if not _audio_player or not _hit_sound:
+		return
+	
+	_audio_player.stream = _hit_sound
 	_audio_player.pitch_scale = randf_range(0.9, 1.1)  # Vary pitch slightly
+	_audio_player.volume_db = lerpf(-12.0, 0.0, impact_strength)
 	_audio_player.play()
 
 
@@ -219,6 +341,9 @@ func _on_depleted() -> void:
 	
 	print("OreDeposit: Depleted! Dropping ", loot_amount, " ", ore_type)
 	
+	# Award currency based on ore type
+	_award_currency()
+	
 	if drop_loot:
 		_drop_loot(loot_amount)
 	else:
@@ -232,6 +357,40 @@ func _on_depleted() -> void:
 	_is_depleted = true
 	_respawn_timer = 0.0
 	_hide_ore()
+
+
+func _award_currency() -> void:
+	"""Award currency when ore is mined"""
+	if not InventoryManager.instance:
+		return
+	
+	# Award different currencies based on ore type
+	match ore_type:
+		"iron":
+			# Iron gives tokens (yellow currency)
+			var token_amount = randi_range(5, 15)
+			InventoryManager.instance.add_item("tokens", token_amount)
+			print("OreDeposit: Awarded ", token_amount, " tokens for iron ore")
+		"gold":
+			# Gold gives gold currency
+			var gold_amount = randi_range(15, 30)
+			InventoryManager.instance.add_item("gold", gold_amount)
+			print("OreDeposit: Awarded ", gold_amount, " gold for gold ore")
+		"plasma":
+			# Plasma gives gems (blue currency)
+			var gem_amount = randi_range(10, 20)
+			InventoryManager.instance.add_item("gems", gem_amount)
+			print("OreDeposit: Awarded ", gem_amount, " gems for plasma ore")
+		"copper":
+			# Copper gives fewer tokens
+			var token_amount = randi_range(2, 8)
+			InventoryManager.instance.add_item("tokens", token_amount)
+			print("OreDeposit: Awarded ", token_amount, " tokens for copper ore")
+		_:
+			# Default: give tokens
+			var token_amount = randi_range(3, 10)
+			InventoryManager.instance.add_item("tokens", token_amount)
+			print("OreDeposit: Awarded ", token_amount, " tokens for ", ore_type, " ore")
 
 
 func _hide_ore() -> void:
@@ -338,29 +497,59 @@ func _drop_loot(amount: int) -> void:
 		)
 		loot.global_position = global_position + offset
 		
+		# Apply random impulse for scatter effect
+		if loot is RigidBody3D:
+			var impulse = Vector3(
+				randf_range(-1.5, 1.5),
+				randf_range(2.0, 4.0),
+				randf_range(-1.5, 1.5)
+			)
+			loot.apply_central_impulse(impulse)
+		
 		# Find player for magnet effect
 		var player = get_tree().get_first_node_in_group("player_body")
-		if player:
-			loot.set_player_reference(player)
+		if player and loot.has_node("PickupArea"):
+			var pickup_area = loot.get_node("PickupArea")
+			if pickup_area.has_method("set_player_reference"):
+				pickup_area.set_player_reference(player)
 
 
 func _create_loot_item() -> Node3D:
-	"""Create a loot item that can be picked up"""
+	"""Create a loot item that can be picked up with physics"""
 	# Load the OreChunk script
 	var OreChunkScript = load("res://src/objects/OreChunk.gd")
 	
-	var loot = Area3D.new()
+	# Use RigidBody3D for gravity and physics
+	var loot = RigidBody3D.new()
 	loot.name = ore_type + "_chunk"
-	loot.script = OreChunkScript
-	loot.set("ore_type", ore_type)
-	loot.set("amount", 1)
+	loot.mass = 0.5
+	loot.gravity_scale = 1.0
+	loot.collision_layer = 2  # Layer 2 for loot
+	loot.collision_mask = 1   # Collide with environment
+	
+	# Add Area3D as child for pickup detection
+	var pickup_area = Area3D.new()
+	pickup_area.name = "PickupArea"
+	pickup_area.script = OreChunkScript
+	pickup_area.set("ore_type", ore_type)
+	pickup_area.set("amount", 1)
+	pickup_area.collision_layer = 0
+	pickup_area.collision_mask = 1  # Detect player
+	loot.add_child(pickup_area)
+	
+	# Collision shape for physics
+	var physics_collision = CollisionShape3D.new()
+	var physics_shape = BoxShape3D.new()
+	physics_shape.size = Vector3(0.12, 0.12, 0.12)
+	physics_collision.shape = physics_shape
+	loot.add_child(physics_collision)
 	
 	# Collision shape for pickup detection
-	var collision = CollisionShape3D.new()
-	var shape = SphereShape3D.new()
-	shape.radius = 0.15
-	collision.shape = shape
-	loot.add_child(collision)
+	var pickup_collision = CollisionShape3D.new()
+	var pickup_shape = SphereShape3D.new()
+	pickup_shape.radius = 0.2
+	pickup_collision.shape = pickup_shape
+	pickup_area.add_child(pickup_collision)
 	
 	# Mesh
 	var mesh_inst = MeshInstance3D.new()
@@ -369,23 +558,49 @@ func _create_loot_item() -> Node3D:
 	mesh_inst.mesh = box_mesh
 	
 	# Material based on ore type
-	var mat = StandardMaterial3D.new()
 	match ore_type:
 		"iron":
+			var mat = StandardMaterial3D.new()
 			mat.albedo_color = Color(0.7, 0.7, 0.7)
 			mat.metallic = 0.8
+			mat.emission_enabled = true
+			mat.emission = mat.albedo_color * 0.3
+			mesh_inst.material_override = mat
 		"gold":
+			var mat = StandardMaterial3D.new()
 			mat.albedo_color = Color(1.0, 0.84, 0.0)
 			mat.metallic = 1.0
+			mat.emission_enabled = true
+			mat.emission = mat.albedo_color * 0.3
+			mesh_inst.material_override = mat
+		"plasma":
+			# Use the plasma shader material
+			var plasma_mat = load("res://src/demos/tools/materials/plasma.tres")
+			if plasma_mat:
+				mesh_inst.material_override = plasma_mat
+			else:
+				# Fallback to cyan glow
+				var mat = StandardMaterial3D.new()
+				mat.albedo_color = Color(0, 1, 1)
+				mat.metallic = 0.5
+				mat.emission_enabled = true
+				mat.emission = Color(0, 1, 1)
+				mat.emission_energy_multiplier = 2.0
+				mesh_inst.material_override = mat
 		"copper":
+			var mat = StandardMaterial3D.new()
 			mat.albedo_color = Color(0.72, 0.45, 0.2)
 			mat.metallic = 0.6
+			mat.emission_enabled = true
+			mat.emission = mat.albedo_color * 0.3
+			mesh_inst.material_override = mat
 		_:
+			var mat = StandardMaterial3D.new()
 			mat.albedo_color = Color(0.5, 0.5, 0.5)
+			mat.emission_enabled = true
+			mat.emission = mat.albedo_color * 0.3
+			mesh_inst.material_override = mat
 	
-	mat.emission_enabled = true
-	mat.emission = mat.albedo_color * 0.3
-	mesh_inst.material_override = mat
 	loot.add_child(mesh_inst)
 	
 	# Add label

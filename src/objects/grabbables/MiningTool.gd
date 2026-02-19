@@ -95,11 +95,14 @@ func _process_collision(body: Node, velocity: Vector3) -> void:
 	# Calculate damage based on impact velocity
 	var damage = impact_velocity * damage_multiplier
 	
+	# Calculate impact strength for sound/effects
+	var impact_strength = clampf((impact_velocity - min_damage_velocity) / 3.0, 0.0, 1.0)
+	
 	# Get collision point (approximate as body center)
 	var hit_position = body.global_position
 	
-	# Apply damage
-	body.take_mining_damage(damage, hit_position)
+	# Apply damage with impact strength (from_tool = true)
+	body.take_mining_damage(damage, hit_position, impact_strength, true)
 	_last_hit_time = current_time
 	
 	# Play feedback

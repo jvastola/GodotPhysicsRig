@@ -1,7 +1,7 @@
-[gd_scene load_steps=7 format=3 uid="uid://node_inspector_viewport3d"]
+[gd_scene format=3 uid="uid://bhnemd0un3wlh"]
 
 [ext_resource type="Script" uid="uid://crsjqmbeuq7db" path="res://src/ui/node_inspector_viewport_3d.gd" id="1_script"]
-[ext_resource type="PackedScene" uid="uid://node_inspector_ui" path="res://src/ui/NodeInspectorUI.tscn" id="2_ui"]
+[ext_resource type="PackedScene" path="res://src/ui/NodeInspectorUI.tscn" id="2_ui"]
 
 [sub_resource type="ViewportTexture" id="ViewportTexture_inspector"]
 viewport_path = NodePath("SubViewport")
@@ -18,24 +18,25 @@ size = Vector2(2, 2.4)
 [sub_resource type="BoxShape3D" id="BoxShape3D_inspector"]
 size = Vector3(2, 2.4, 0.01)
 
-[node name="NodeInspectorViewport3D" type="Node3D"]
+[node name="NodeInspectorViewport3D" type="Node3D" unique_id=1252807408]
 script = ExtResource("1_script")
 
-[node name="SubViewport" type="SubViewport" parent="."]
+[node name="SubViewport" type="SubViewport" parent="." unique_id=931447427]
 transparent_bg = true
 size = Vector2i(500, 600)
 render_target_update_mode = 4
 
-[node name="NodeInspectorUI" parent="SubViewport" instance=ExtResource("2_ui")]
+[node name="NodeInspectorUI" parent="SubViewport" unique_id=1515484751 instance=ExtResource("2_ui")]
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=611614395]
+transform = Transform3D(0.42, 0, 0, 0, 0.42, 0, 0, 0, 0.42, 0, 0, 0)
 material_override = SubResource("StandardMaterial3D_inspector")
 cast_shadow = 0
 mesh = SubResource("QuadMesh_inspector")
 
-[node name="StaticBody3D" type="StaticBody3D" parent="MeshInstance3D"]
+[node name="StaticBody3D" type="StaticBody3D" parent="MeshInstance3D" unique_id=969826920]
 collision_layer = 32
 collision_mask = 0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D/StaticBody3D"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D/StaticBody3D" unique_id=530376355]
 shape = SubResource("BoxShape3D_inspector")
