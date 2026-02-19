@@ -18,6 +18,7 @@
 [ext_resource type="Script" uid="uid://cdrcd8vcdgh73" path="res://src/player/components/desktop_interaction_component.gd" id="18_desktop_interaction"]
 [ext_resource type="PackedScene" uid="uid://beim5pnvstjcv" path="res://src/ui/WatchMenuViewport3D.tscn" id="18_watch_viewport"]
 
+
 [sub_resource type="BoxMesh" id="BoxMesh_xxbg3"]
 size = Vector3(0.3, 0.4, 0.2)
 

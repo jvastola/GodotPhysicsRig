@@ -1,0 +1,34 @@
+[gd_scene load_steps=5 format=3 uid="uid://mining_tool"]
+
+[ext_resource type="Script" path="res://src/objects/grabbables/MiningTool.gd" id="1_mining_tool"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_stick"]
+size = Vector3(0.05, 1.0, 0.05)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wood"]
+albedo_color = Color(0.55, 0.35, 0.2, 1)
+roughness = 0.8
+
+[sub_resource type="BoxMesh" id="BoxMesh_stick"]
+material = SubResource("StandardMaterial3D_wood")
+size = Vector3(0.05, 1.0, 0.05)
+
+[node name="MiningTool" type="RigidBody3D" groups=["grabbable", "mining_tool"]]
+mass = 0.2
+contact_monitor = true
+max_contacts_reported = 10
+script = ExtResource("1_mining_tool")
+grab_mode = 0
+save_id = "MiningTool"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_stick")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_stick")
+
+[node name="Label3D" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+text = "Mining Tool"
+font_size = 20
+outline_size = 6

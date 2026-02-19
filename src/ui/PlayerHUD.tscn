@@ -1,0 +1,248 @@
+[gd_scene load_steps=6 format=3 uid="uid://player_hud"]
+
+[ext_resource type="Script" path="res://src/ui/player_hud.gd" id="1_script"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Base"]
+bg_color = Color(0.05, 0.05, 0.07, 0.8)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.2, 0.2, 0.25, 1)
+corner_radius_top_left = 35
+corner_radius_top_right = 35
+corner_radius_bottom_right = 35
+corner_radius_bottom_left = 35
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Handle"]
+bg_color = Color(0.2, 0.5, 1.0, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Indicator"]
+bg_color = Color(0.3, 0.3, 0.3, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.1, 0.1, 0.1, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Panel"]
+bg_color = Color(0.0, 0.0, 0.0, 0.5)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[node name="PlayerHUD" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="BottomContainer" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -150.0
+grow_horizontal = 2
+grow_vertical = 0
+alignment = 1
+
+[node name="LeftSpacer" type="Control" parent="BottomContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="JoystickContainer" type="Control" parent="BottomContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(150, 150)
+
+[node name="JoystickBase" type="Panel" parent="BottomContainer/JoystickContainer"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -35.0
+offset_top = -35.0
+offset_right = 35.0
+offset_bottom = 35.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_Base")
+
+[node name="JoystickHandle" type="Panel" parent="BottomContainer/JoystickContainer/JoystickBase"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 27.0
+offset_top = 27.0
+offset_right = 43.0
+offset_bottom = 43.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_Handle")
+
+[node name="IndicatorGrid" type="GridContainer" parent="BottomContainer/JoystickContainer"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -60.0
+offset_top = -60.0
+offset_right = 60.0
+offset_bottom = 60.0
+grow_horizontal = 2
+grow_vertical = 2
+columns = 3
+
+[node name="Empty1" type="Control" parent="BottomContainer/JoystickContainer/IndicatorGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="IndicatorUp" type="Panel" parent="BottomContainer/JoystickContainer/IndicatorGrid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(20, 20)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+theme_override_styles/panel = SubResource("StyleBoxFlat_Indicator")
+
+[node name="Empty2" type="Control" parent="BottomContainer/JoystickContainer/IndicatorGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="IndicatorLeft" type="Panel" parent="BottomContainer/JoystickContainer/IndicatorGrid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(20, 20)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+theme_override_styles/panel = SubResource("StyleBoxFlat_Indicator")
+
+[node name="CenterEmpty" type="Control" parent="BottomContainer/JoystickContainer/IndicatorGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="IndicatorRight" type="Panel" parent="BottomContainer/JoystickContainer/IndicatorGrid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(20, 20)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+theme_override_styles/panel = SubResource("StyleBoxFlat_Indicator")
+
+[node name="Empty3" type="Control" parent="BottomContainer/JoystickContainer/IndicatorGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="IndicatorDown" type="Panel" parent="BottomContainer/JoystickContainer/IndicatorGrid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(20, 20)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+theme_override_styles/panel = SubResource("StyleBoxFlat_Indicator")
+
+[node name="Empty4" type="Control" parent="BottomContainer/JoystickContainer/IndicatorGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="StatsContainer" type="PanelContainer" parent="BottomContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_Panel")
+
+[node name="StatsLayout" type="HBoxContainer" parent="BottomContainer/StatsContainer"]
+layout_mode = 2
+alignment = 1
+
+[node name="VBoxStats" type="VBoxContainer" parent="BottomContainer/StatsContainer/StatsLayout"]
+layout_mode = 2
+theme_override_constants/separation = 5
+alignment = 1
+
+[node name="HealthLabel" type="Label" parent="BottomContainer/StatsContainer/StatsLayout/VBoxStats"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 20
+text = "HP: 100/100"
+horizontal_alignment = 1
+
+[node name="WeightLabel" type="Label" parent="BottomContainer/StatsContainer/StatsLayout/VBoxStats"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "Weight: 70.0 kg"
+horizontal_alignment = 1
+
+[node name="VSeparator" type="VSeparator" parent="BottomContainer/StatsContainer/StatsLayout"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="VBoxCurrencies" type="VBoxContainer" parent="BottomContainer/StatsContainer/StatsLayout"]
+layout_mode = 2
+theme_override_constants/separation = 5
+alignment = 1
+
+[node name="GoldLabel" type="Label" parent="BottomContainer/StatsContainer/StatsLayout/VBoxCurrencies"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.8, 0, 1)
+text = "Gold: 0"
+
+[node name="GemsLabel" type="Label" parent="BottomContainer/StatsContainer/StatsLayout/VBoxCurrencies"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0, 0.8, 1, 1)
+text = "Gems: 0"
+
+[node name="TokensLabel" type="Label" parent="BottomContainer/StatsContainer/StatsLayout/VBoxCurrencies"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.4, 1, 1)
+text = "Tokens: 0"
+
+[node name="ActionGrid" type="HBoxContainer" parent="BottomContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 2
+
+[node name="IconUndo" type="Label" parent="BottomContainer/ActionGrid"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "↩️"
+
+[node name="IconRedo" type="Label" parent="BottomContainer/ActionGrid"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "↪️"
+
+[node name="IconMagnet" type="Label" parent="BottomContainer/ActionGrid"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "🧲"
+
+[node name="RightSpacer" type="Control" parent="BottomContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(20, 0)

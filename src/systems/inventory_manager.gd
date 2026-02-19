@@ -1,84 +1,83 @@
 extends Node
 
-signal inventory_changed(items: Array)
+## Simple inventory system for collecting resources
+
+# Singleton instance
+static var instance: Node
+
+# Inventory storage: { "iron": 5, "gold": 2, etc. }
+var inventory: Dictionary = {}
+
+signal item_collected(item_type: String, amount: int, total: int)
+signal inventory_changed()
 signal currency_changed(type: String, amount: int)
 
-# List of all possible item resources, loaded at start
-var item_database: Dictionary = {}
-
-# Current inventory state (Array of Dictionaries: { "id": "item_id", "amount": 1 })
-var inventory: Array = []
 
 func _ready() -> void:
-	# Load inventory from save manager
-	load_inventory()
+	if instance == null:
+		instance = self
+	else:
+		queue_free()
+		return
 	
-	# Example: Load item database (in a real app, you might scan a folder)
-	# _load_item_database()
+	print("InventoryManager: Ready")
 
 
-func load_inventory() -> void:
-	# Assuming SaveManager is an autoload
-	if has_node("/root/SaveManager"):
-		var save_mgr = get_node("/root/SaveManager")
-		inventory = save_mgr.get_inventory()
-		emit_signal("inventory_changed", inventory)
-
-
-func save_inventory() -> void:
-	if has_node("/root/SaveManager"):
-		var save_mgr = get_node("/root/SaveManager")
-		save_mgr.save_inventory(inventory)
-
-
-func add_item(item_id: String, amount: int = 1) -> void:
-	# Check if item stacks
-	var added = false
+func add_item(item_type: String, amount: int = 1) -> void:
+	"""Add items to inventory"""
+	if not inventory.has(item_type):
+		inventory[item_type] = 0
 	
-	# Ideally check against database for max stack, but for now assume simple stacking
-	for slot in inventory:
-		if slot["id"] == item_id:
-			slot["amount"] += amount
-			added = true
-			break
+	inventory[item_type] += amount
+	var total = inventory[item_type]
 	
-	if not added:
-		inventory.append({ "id": item_id, "amount": amount })
+	print("InventoryManager: Collected ", amount, " ", item_type, " (Total: ", total, ")")
 	
-	save_inventory()
-	emit_signal("inventory_changed", inventory)
-	print("InventoryManager: Added ", amount, " of ", item_id)
+	item_collected.emit(item_type, amount, total)
+	inventory_changed.emit()
+	
+	if item_type in ["gold", "gems", "tokens"]:
+		currency_changed.emit(item_type, total)
 
 
-func remove_item(item_id: String, amount: int = 1) -> bool:
-	for i in range(inventory.size()):
-		if inventory[i]["id"] == item_id:
-			if inventory[i]["amount"] >= amount:
-				inventory[i]["amount"] -= amount
-				if inventory[i]["amount"] <= 0:
-					inventory.remove_at(i)
-				
-				save_inventory()
-				emit_signal("inventory_changed", inventory)
-				return true
-			break
-	return false
+func get_item_count(item_type: String) -> int:
+	"""Get count of a specific item"""
+	return inventory.get(item_type, 0)
 
 
-func has_item(item_id: String, amount: int = 1) -> bool:
-	for slot in inventory:
-		if slot["id"] == item_id:
-			return slot["amount"] >= amount
-	return false
+func has_item(item_type: String, amount: int = 1) -> bool:
+	"""Check if inventory has at least amount of item"""
+	return get_item_count(item_type) >= amount
 
 
-# Wrapper for currency to emit signals
-func add_currency(type: String, amount: int) -> void:
-	if has_node("/root/SaveManager"):
-		get_node("/root/SaveManager").add_currency(type, amount)
-		emit_signal("currency_changed", type, get_currency(type))
+func remove_item(item_type: String, amount: int = 1) -> bool:
+	"""Remove items from inventory, returns true if successful"""
+	if not has_item(item_type, amount):
+		return false
+	
+	inventory[item_type] -= amount
+	if inventory[item_type] <= 0:
+		inventory.erase(item_type)
+	
+	inventory_changed.emit()
+	
+	if item_type in ["gold", "gems", "tokens"]:
+		currency_changed.emit(item_type, inventory[item_type] if inventory.has(item_type) else 0)
+		
+	return true
 
-func get_currency(type: String) -> int:
-	if has_node("/root/SaveManager"):
-		return get_node("/root/SaveManager").get_currency(type)
-	return 0
+
+func clear_inventory() -> void:
+	"""Clear all items"""
+	inventory.clear()
+	inventory_changed.emit()
+
+
+func get_all_items() -> Dictionary:
+	"""Get a copy of the entire inventory"""
+	return inventory.duplicate()
+
+
+func get_currency(currency_type: String) -> int:
+	"""Helper to get currency amount"""
+	return get_item_count(currency_type)
