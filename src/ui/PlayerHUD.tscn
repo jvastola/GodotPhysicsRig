@@ -1,25 +1,99 @@
-[gd_scene load_steps=7 format=3 uid="uid://player_hud"]
+[gd_scene format=3 uid="uid://4oncbv4ubxgh"]
 
-[ext_resource type="Script" path="res://src/ui/player_hud.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://bicq4n54ve72" path="res://src/ui/player_hud.gd" id="1_script"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Base"]
-bg_color = Color(0.05, 0.05, 0.07, 0.8)
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Panel"]
+bg_color = Color(0, 0, 0, 0.4)
+corner_radius_top_left = 30
+corner_radius_top_right = 30
+corner_radius_bottom_right = 30
+corner_radius_bottom_left = 30
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_CompassOuter"]
+bg_color = Color(0.24313726, 1, 1, 0.08627451)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.2, 0.2, 0.25, 1)
-corner_radius_top_left = 25
-corner_radius_top_right = 25
-corner_radius_bottom_right = 25
-corner_radius_bottom_left = 25
+border_color = Color(0.2, 1, 1, 0.3647059)
+corner_radius_top_left = 200
+corner_radius_top_right = 200
+corner_radius_bottom_right = 200
+corner_radius_bottom_left = 200
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Handle"]
-bg_color = Color(0.2, 0.5, 1.0, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Tick"]
+bg_color = Color(1, 1, 1, 0.4117647)
+corner_radius_top_left = 1
+corner_radius_top_right = 1
+corner_radius_bottom_right = 1
+corner_radius_bottom_left = 1
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_HeartIcon"]
+bg_color = Color(1, 0.2, 0.2, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_WeightIcon"]
+bg_color = Color(0.6, 0.6, 0.7, 1)
+border_width_left = 1
+border_width_top = 4
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.3, 0.3, 0.35, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
 corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_GoldIcon"]
+bg_color = Color(1, 0.85, 0.1, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_GemIcon"]
+bg_color = Color(0.1, 0.9, 1, 1)
+skew = Vector2(0.2, 0)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_TokenIcon"]
+bg_color = Color(0.85, 0.5, 1, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Base"]
+bg_color = Color(1, 1, 1, 0.05)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 1, 1, 0.2)
+corner_radius_top_left = 30
+corner_radius_top_right = 30
+corner_radius_bottom_right = 30
+corner_radius_bottom_left = 30
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Handle"]
+bg_color = Color(0.2, 0.6, 1, 0.9)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 1, 1, 0.4)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+shadow_color = Color(0.2, 0.6, 1, 0.4)
+shadow_size = 8
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Indicator"]
 bg_color = Color(0.3, 0.3, 0.3, 1)
@@ -33,56 +107,7 @@ corner_radius_top_right = 3
 corner_radius_bottom_right = 3
 corner_radius_bottom_left = 3
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Panel"]
-bg_color = Color(0.0, 0.0, 0.0, 0.4)
-corner_radius_top_left = 30
-corner_radius_top_right = 30
-corner_radius_bottom_right = 30
-corner_radius_bottom_left = 30
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_CompassOuter"]
-bg_color = Color(1, 1, 1, 0.03)
-draw_center = false
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 1, 1, 0.1)
-corner_radius_top_left = 200
-corner_radius_top_right = 200
-corner_radius_bottom_right = 200
-corner_radius_bottom_left = 200
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_Tick"]
-bg_color = Color(1, 1, 1, 0.2)
-corner_radius_top_left = 1
-corner_radius_top_right = 1
-corner_radius_bottom_right = 1
-corner_radius_bottom_left = 1
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_GoldIcon"]
-bg_color = Color(1, 0.85, 0.1, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_GemIcon"]
-bg_color = Color(0.1, 0.9, 1, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-skew = Vector2(0.2, 0)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_TokenIcon"]
-bg_color = Color(0.85, 0.5, 1, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-
-[node name="PlayerHUD" type="Control"]
+[node name="PlayerHUD" type="Control" unique_id=1525066474]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -91,7 +116,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
 
-[node name="MainPanel" type="Panel" parent="."]
+[node name="MainPanel" type="Panel" parent="." unique_id=1752340586]
 clip_contents = true
 custom_minimum_size = Vector2(450, 450)
 layout_mode = 1
@@ -108,7 +133,7 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_Panel")
 
-[node name="CompassLayer" type="Control" parent="MainPanel"]
+[node name="CompassLayer" type="Control" parent="MainPanel" unique_id=359712098]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -117,7 +142,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="CompassCircle" type="Panel" parent="MainPanel/CompassLayer"]
+[node name="CompassCircle" type="Panel" parent="MainPanel/CompassLayer" unique_id=1804791164]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -130,7 +155,7 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_CompassOuter")
 
-[node name="CompassPivot" type="Control" parent="MainPanel/CompassLayer"]
+[node name="CompassPivot" type="Control" parent="MainPanel/CompassLayer" unique_id=1389378233]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 8
@@ -141,7 +166,7 @@ anchor_bottom = 0.5
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="LabelN" type="Label" parent="MainPanel/CompassLayer/CompassPivot"]
+[node name="LabelN" type="Label" parent="MainPanel/CompassLayer/CompassPivot" unique_id=1011096771]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -154,12 +179,12 @@ offset_right = 20.0
 offset_bottom = -150.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_colors/font_color = Color(0.8, 0.1, 0.1, 0.5)
+theme_override_colors/font_color = Color(0.8, 0.101960786, 0.101960786, 0.88235295)
 theme_override_font_sizes/font_size = 32
 text = "N"
 horizontal_alignment = 1
 
-[node name="LabelS" type="Label" parent="MainPanel/CompassLayer/CompassPivot"]
+[node name="LabelS" type="Label" parent="MainPanel/CompassLayer/CompassPivot" unique_id=883801100]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -177,7 +202,7 @@ theme_override_font_sizes/font_size = 28
 text = "S"
 horizontal_alignment = 1
 
-[node name="LabelE" type="Label" parent="MainPanel/CompassLayer/CompassPivot"]
+[node name="LabelE" type="Label" parent="MainPanel/CompassLayer/CompassPivot" unique_id=381405413]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -195,7 +220,7 @@ theme_override_font_sizes/font_size = 28
 text = "E"
 horizontal_alignment = 1
 
-[node name="LabelW" type="Label" parent="MainPanel/CompassLayer/CompassPivot"]
+[node name="LabelW" type="Label" parent="MainPanel/CompassLayer/CompassPivot" unique_id=1173435298]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -213,7 +238,7 @@ theme_override_font_sizes/font_size = 28
 text = "W"
 horizontal_alignment = 1
 
-[node name="TickContainer" type="Control" parent="MainPanel/CompassLayer"]
+[node name="TickContainer" type="Control" parent="MainPanel/CompassLayer" unique_id=452582879]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -222,15 +247,16 @@ anchor_right = 0.5
 anchor_bottom = 0.5
 grow_horizontal = 2
 grow_vertical = 2
+scale = Vector2(1.21, 1.21)
 
-[node name="Tick1" type="Panel" parent="MainPanel/CompassLayer/TickContainer"]
+[node name="Tick1" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=1869270766]
 layout_mode = 0
 offset_top = -160.0
 offset_right = 2.0
 offset_bottom = -152.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
 
-[node name="Tick2" type="Panel" parent="MainPanel/CompassLayer/TickContainer"]
+[node name="Tick2" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=680087317]
 layout_mode = 0
 offset_left = 80.0
 offset_top = -138.0
@@ -239,7 +265,7 @@ offset_bottom = -130.0
 rotation = 0.523598
 theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
 
-[node name="Tick3" type="Panel" parent="MainPanel/CompassLayer/TickContainer"]
+[node name="Tick3" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=29304740]
 layout_mode = 0
 offset_left = 138.0
 offset_top = -80.0
@@ -248,7 +274,7 @@ offset_bottom = -72.0
 rotation = 1.0472
 theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
 
-[node name="Tick4" type="Panel" parent="MainPanel/CompassLayer/TickContainer"]
+[node name="Tick4" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=1951305447]
 layout_mode = 0
 offset_left = 160.0
 offset_right = 162.0
@@ -256,7 +282,7 @@ offset_bottom = 8.0
 rotation = 1.5708
 theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
 
-[node name="Tick5" type="Panel" parent="MainPanel/CompassLayer/TickContainer"]
+[node name="Tick5" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=1597280913]
 layout_mode = 0
 offset_left = 138.0
 offset_top = 80.0
@@ -265,7 +291,7 @@ offset_bottom = 88.0
 rotation = 2.0944
 theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
 
-[node name="Tick6" type="Panel" parent="MainPanel/CompassLayer/TickContainer"]
+[node name="Tick6" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=1676874514]
 layout_mode = 0
 offset_left = 80.0
 offset_top = 138.0
@@ -274,14 +300,14 @@ offset_bottom = 146.0
 rotation = 2.61799
 theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
 
-[node name="Tick7" type="Panel" parent="MainPanel/CompassLayer/TickContainer"]
+[node name="Tick7" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=768542497]
 layout_mode = 0
 offset_top = 160.0
 offset_right = 2.0
 offset_bottom = 168.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
 
-[node name="Tick8" type="Panel" parent="MainPanel/CompassLayer/TickContainer"]
+[node name="Tick8" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=2111105607]
 layout_mode = 0
 offset_left = -80.0
 offset_top = 138.0
@@ -290,7 +316,7 @@ offset_bottom = 146.0
 rotation = -2.61799
 theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
 
-[node name="Tick9" type="Panel" parent="MainPanel/CompassLayer/TickContainer"]
+[node name="Tick9" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=566029416]
 layout_mode = 0
 offset_left = -138.0
 offset_top = 80.0
@@ -299,7 +325,7 @@ offset_bottom = 88.0
 rotation = -2.0944
 theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
 
-[node name="Tick10" type="Panel" parent="MainPanel/CompassLayer/TickContainer"]
+[node name="Tick10" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=596108824]
 layout_mode = 0
 offset_left = -160.0
 offset_right = -158.0
@@ -307,7 +333,7 @@ offset_bottom = 8.0
 rotation = -1.5708
 theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
 
-[node name="Tick11" type="Panel" parent="MainPanel/CompassLayer/TickContainer"]
+[node name="Tick11" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=1190677848]
 layout_mode = 0
 offset_left = -138.0
 offset_top = -80.0
@@ -316,7 +342,7 @@ offset_bottom = -72.0
 rotation = -1.0472
 theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
 
-[node name="Tick12" type="Panel" parent="MainPanel/CompassLayer/TickContainer"]
+[node name="Tick12" type="Panel" parent="MainPanel/CompassLayer/TickContainer" unique_id=489507513]
 layout_mode = 0
 offset_left = -80.0
 offset_top = -138.0
@@ -325,7 +351,7 @@ offset_bottom = -130.0
 rotation = -0.523598
 theme_override_styles/panel = SubResource("StyleBoxFlat_Tick")
 
-[node name="ContentLayer" type="VBoxContainer" parent="MainPanel"]
+[node name="ContentLayer" type="VBoxContainer" parent="MainPanel" unique_id=1479275466]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -338,34 +364,69 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 20
 
-[node name="TopRow" type="HBoxContainer" parent="MainPanel/ContentLayer"]
+[node name="TopRow" type="HBoxContainer" parent="MainPanel/ContentLayer" unique_id=1745839516]
 layout_mode = 2
 alignment = 2
 
-[node name="StatsVBox" type="VBoxContainer" parent="MainPanel/ContentLayer/TopRow"]
+[node name="StatsVBox" type="VBoxContainer" parent="MainPanel/ContentLayer/TopRow" unique_id=1920210781]
 layout_mode = 2
+theme_override_constants/separation = 5
 
-[node name="HealthLabel" type="Label" parent="MainPanel/ContentLayer/TopRow/StatsVBox"]
+[node name="HealthBox" type="HBoxContainer" parent="MainPanel/ContentLayer/TopRow/StatsVBox" unique_id=1373039851]
+layout_mode = 2
+alignment = 2
+
+[node name="HealthLabel" type="Label" parent="MainPanel/ContentLayer/TopRow/StatsVBox/HealthBox" unique_id=1010386726]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.35, 0.35, 1)
 theme_override_font_sizes/font_size = 32
-text = "HP: 100/100"
+text = "100/100"
 horizontal_alignment = 2
 
-[node name="WeightLabel" type="Label" parent="MainPanel/ContentLayer/TopRow/StatsVBox"]
+[node name="HeartIconPivot" type="Control" parent="MainPanel/ContentLayer/TopRow/StatsVBox/HealthBox" unique_id=731319840]
+custom_minimum_size = Vector2(25, 25)
+layout_mode = 2
+
+[node name="HeartIcon" type="Panel" parent="MainPanel/ContentLayer/TopRow/StatsVBox/HealthBox/HeartIconPivot" unique_id=2145432793]
+custom_minimum_size = Vector2(14, 14)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -7.0
+offset_top = -7.0
+offset_right = 7.0
+offset_bottom = 7.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_HeartIcon")
+
+[node name="WeightBox" type="HBoxContainer" parent="MainPanel/ContentLayer/TopRow/StatsVBox" unique_id=1091043007]
+layout_mode = 2
+alignment = 2
+
+[node name="WeightLabel" type="Label" parent="MainPanel/ContentLayer/TopRow/StatsVBox/WeightBox" unique_id=2125296332]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.4, 0.85, 1, 1)
-theme_override_font_sizes/font_size = 28
-text = "Weight: 70.0 kg"
+theme_override_font_sizes/font_size = 24
+text = "70.0 kg"
 horizontal_alignment = 2
 
-[node name="MiddleSpacer" type="Control" parent="MainPanel/ContentLayer"]
+[node name="WeightIcon" type="Panel" parent="MainPanel/ContentLayer/TopRow/StatsVBox/WeightBox" unique_id=663449357]
+custom_minimum_size = Vector2(18, 14)
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_styles/panel = SubResource("StyleBoxFlat_WeightIcon")
+
+[node name="MiddleSpacer" type="Control" parent="MainPanel/ContentLayer" unique_id=1180672884]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="CurrencyCenterBox" type="VBoxContainer" parent="MainPanel/ContentLayer/MiddleSpacer"]
+[node name="CurrencyCenterBox" type="VBoxContainer" parent="MainPanel/ContentLayer/MiddleSpacer" unique_id=12375079]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -381,73 +442,73 @@ grow_vertical = 2
 theme_override_constants/separation = 10
 alignment = 1
 
-[node name="GoldBox" type="HBoxContainer" parent="MainPanel/ContentLayer/MiddleSpacer/CurrencyCenterBox"]
+[node name="GoldBox" type="HBoxContainer" parent="MainPanel/ContentLayer/MiddleSpacer/CurrencyCenterBox" unique_id=1737311671]
 layout_mode = 2
 theme_override_constants/separation = 10
 alignment = 1
 
-[node name="Icon" type="Panel" parent="MainPanel/ContentLayer/MiddleSpacer/CurrencyCenterBox/GoldBox"]
+[node name="Icon" type="Panel" parent="MainPanel/ContentLayer/MiddleSpacer/CurrencyCenterBox/GoldBox" unique_id=768065657]
 custom_minimum_size = Vector2(20, 20)
 layout_mode = 2
 size_flags_vertical = 4
 theme_override_styles/panel = SubResource("StyleBoxFlat_GoldIcon")
 
-[node name="GoldLabel" type="Label" parent="MainPanel/ContentLayer/MiddleSpacer/CurrencyCenterBox/GoldBox"]
+[node name="GoldLabel" type="Label" parent="MainPanel/ContentLayer/MiddleSpacer/CurrencyCenterBox/GoldBox" unique_id=2021635867]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.85, 0.1, 1)
 theme_override_font_sizes/font_size = 24
-text = "Gold: 2,500"
+text = "2,500"
 
-[node name="GemsBox" type="HBoxContainer" parent="MainPanel/ContentLayer/MiddleSpacer/CurrencyCenterBox"]
+[node name="GemsBox" type="HBoxContainer" parent="MainPanel/ContentLayer/MiddleSpacer/CurrencyCenterBox" unique_id=789676262]
 layout_mode = 2
 theme_override_constants/separation = 10
 alignment = 1
 
-[node name="Icon" type="Panel" parent="MainPanel/ContentLayer/MiddleSpacer/CurrencyCenterBox/GemsBox"]
+[node name="Icon" type="Panel" parent="MainPanel/ContentLayer/MiddleSpacer/CurrencyCenterBox/GemsBox" unique_id=1824781786]
 custom_minimum_size = Vector2(16, 20)
 layout_mode = 2
 size_flags_vertical = 4
 theme_override_styles/panel = SubResource("StyleBoxFlat_GemIcon")
 
-[node name="GemsLabel" type="Label" parent="MainPanel/ContentLayer/MiddleSpacer/CurrencyCenterBox/GemsBox"]
+[node name="GemsLabel" type="Label" parent="MainPanel/ContentLayer/MiddleSpacer/CurrencyCenterBox/GemsBox" unique_id=209043408]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.1, 0.9, 1, 1)
 theme_override_font_sizes/font_size = 24
-text = "Gems: 150"
+text = "150"
 
-[node name="TokensBox" type="HBoxContainer" parent="MainPanel/ContentLayer/MiddleSpacer/CurrencyCenterBox"]
+[node name="TokensBox" type="HBoxContainer" parent="MainPanel/ContentLayer/MiddleSpacer/CurrencyCenterBox" unique_id=552094351]
 layout_mode = 2
 theme_override_constants/separation = 10
 alignment = 1
 
-[node name="Icon" type="Panel" parent="MainPanel/ContentLayer/MiddleSpacer/CurrencyCenterBox/TokensBox"]
+[node name="Icon" type="Panel" parent="MainPanel/ContentLayer/MiddleSpacer/CurrencyCenterBox/TokensBox" unique_id=554938574]
 custom_minimum_size = Vector2(20, 20)
 layout_mode = 2
 size_flags_vertical = 4
 theme_override_styles/panel = SubResource("StyleBoxFlat_TokenIcon")
 
-[node name="TokensLabel" type="Label" parent="MainPanel/ContentLayer/MiddleSpacer/CurrencyCenterBox/TokensBox"]
+[node name="TokensLabel" type="Label" parent="MainPanel/ContentLayer/MiddleSpacer/CurrencyCenterBox/TokensBox" unique_id=483103776]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.85, 0.5, 1, 1)
 theme_override_font_sizes/font_size = 24
-text = "Tokens: 10"
+text = "10"
 
-[node name="BottomRow" type="HBoxContainer" parent="MainPanel/ContentLayer"]
+[node name="BottomRow" type="HBoxContainer" parent="MainPanel/ContentLayer" unique_id=1290754181]
 layout_mode = 2
 alignment = 2
 
-[node name="BottomRowSpacer" type="Control" parent="MainPanel/ContentLayer/BottomRow"]
+[node name="BottomRowSpacer" type="Control" parent="MainPanel/ContentLayer/BottomRow" unique_id=1021092161]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="JoystickContainer" type="Control" parent="MainPanel/ContentLayer/BottomRow"]
+[node name="JoystickContainer" type="Control" parent="MainPanel/ContentLayer/BottomRow" unique_id=227963630]
 custom_minimum_size = Vector2(100, 100)
 layout_mode = 2
 
-[node name="JoystickBase" type="Panel" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer"]
+[node name="JoystickBase" type="Panel" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer" unique_id=68451366]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 8
@@ -463,7 +524,7 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_Base")
 
-[node name="JoystickHandle" type="Panel" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/JoystickBase"]
+[node name="JoystickHandle" type="Panel" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/JoystickBase" unique_id=858818239]
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 19.0
@@ -472,7 +533,7 @@ offset_right = 31.0
 offset_bottom = 31.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_Handle")
 
-[node name="IndicatorGrid" type="GridContainer" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer"]
+[node name="IndicatorGrid" type="GridContainer" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer" unique_id=401185895]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -481,12 +542,12 @@ grow_horizontal = 2
 grow_vertical = 2
 columns = 3
 
-[node name="E1" type="Control" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/IndicatorGrid"]
+[node name="E1" type="Control" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/IndicatorGrid" unique_id=1083842712]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="IndicatorUp" type="Panel" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/IndicatorGrid"]
+[node name="IndicatorUp" type="Panel" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/IndicatorGrid" unique_id=1751760443]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(14, 14)
 layout_mode = 2
@@ -494,12 +555,12 @@ size_flags_horizontal = 4
 size_flags_vertical = 4
 theme_override_styles/panel = SubResource("StyleBoxFlat_Indicator")
 
-[node name="E2" type="Control" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/IndicatorGrid"]
+[node name="E2" type="Control" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/IndicatorGrid" unique_id=994105747]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="IndicatorLeft" type="Panel" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/IndicatorGrid"]
+[node name="IndicatorLeft" type="Panel" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/IndicatorGrid" unique_id=1174900790]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(14, 14)
 layout_mode = 2
@@ -507,12 +568,12 @@ size_flags_horizontal = 4
 size_flags_vertical = 4
 theme_override_styles/panel = SubResource("StyleBoxFlat_Indicator")
 
-[node name="E3" type="Control" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/IndicatorGrid"]
+[node name="E3" type="Control" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/IndicatorGrid" unique_id=2073547959]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="IndicatorRight" type="Panel" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/IndicatorGrid"]
+[node name="IndicatorRight" type="Panel" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/IndicatorGrid" unique_id=1374759604]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(14, 14)
 layout_mode = 2
@@ -520,12 +581,12 @@ size_flags_horizontal = 4
 size_flags_vertical = 4
 theme_override_styles/panel = SubResource("StyleBoxFlat_Indicator")
 
-[node name="E4" type="Control" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/IndicatorGrid"]
+[node name="E4" type="Control" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/IndicatorGrid" unique_id=2081370163]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="IndicatorDown" type="Panel" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/IndicatorGrid"]
+[node name="IndicatorDown" type="Panel" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/IndicatorGrid" unique_id=741434399]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(14, 14)
 layout_mode = 2
@@ -533,7 +594,7 @@ size_flags_horizontal = 4
 size_flags_vertical = 4
 theme_override_styles/panel = SubResource("StyleBoxFlat_Indicator")
 
-[node name="E5" type="Control" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/IndicatorGrid"]
+[node name="E5" type="Control" parent="MainPanel/ContentLayer/BottomRow/JoystickContainer/IndicatorGrid" unique_id=942272539]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
