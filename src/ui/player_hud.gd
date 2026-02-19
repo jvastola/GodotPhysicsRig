@@ -16,8 +16,11 @@ extends Control
 @onready var gems_label: Label = %GemsLabel
 @onready var tokens_label: Label = %TokensLabel
 
+# Compass
+@onready var compass_pivot: Control = %CompassPivot
+
 # Settings
-@export var joystick_max_distance: float = 35.0
+@export var joystick_max_distance: float = 25.0
 @export var joystick_activation_threshold: float = 0.5
 @export var active_color: Color = Color(0.2, 1.0, 0.2, 1.0)
 @export var inactive_color: Color = Color(0.3, 0.3, 0.3, 1.0)
@@ -26,12 +29,16 @@ extends Control
 var health: float = 100.0
 var max_health: float = 100.0
 var player_body: RigidBody3D
+var player_camera: Camera3D
 
 func _ready() -> void:
-	# Find player body for weight
+	# Find player components
 	var player = get_tree().get_first_node_in_group("xr_player")
-	if player and player.has_node("PlayerBody"):
-		player_body = player.get_node("PlayerBody")
+	if player:
+		if player.has_node("PlayerBody"):
+			player_body = player.get_node("PlayerBody")
+		if player.has_node("PlayerBody/XROrigin3D/XRCamera3D"):
+			player_camera = player.get_node("PlayerBody/XROrigin3D/XRCamera3D")
 	
 	# Connect to InventoryManager
 	if InventoryManager:
@@ -43,8 +50,33 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_process_joystick()
+	_update_compass()
 	if player_body:
-		_update_stats() # Update weight/health continuously or optimize? continuous is fine for now.
+		_update_stats()
+
+func _update_compass() -> void:
+	if not compass_pivot:
+		return
+		
+	# The PlayerHUD script is on a Control inside a SubViewport.
+	# The SubViewport is inside a PlayerHUDViewport3D (Node3D).
+	var hud_root = get_parent()
+	if hud_root and hud_root.name == "SubViewport":
+		hud_root = hud_root.get_parent()
+	
+	if not hud_root or not hud_root is Node3D:
+		return
+
+	# Global North is along -Z
+	var north_global = Vector3(0, 0, -1)
+	
+	# Rotate North into the HUD's local space
+	var north_local = hud_root.global_transform.basis.inverse() * north_global
+	
+	# atan2(x, y) gives angle where 0 is 'Up'
+	var angle = atan2(north_local.x, north_local.y)
+	
+	compass_pivot.rotation = angle
 
 func _process_joystick() -> void:
 	# Find movement controller (usually left)

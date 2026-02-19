@@ -8,6 +8,7 @@
 [ext_resource type="Script" uid="uid://deum3u4irqnyx" path="res://src/objects/watch_compass.gd" id="5_watch"]
 [ext_resource type="Script" uid="uid://u2otyj4gjtl2" path="res://src/player/hand_pointer.gd" id="6_pointer"]
 [ext_resource type="Material" uid="uid://cl3ucly7cjhvy" path="res://assets/wireframe-material.tres" id="7_xe8se"]
+[ext_resource type="PackedScene" path="res://src/ui/PlayerHUDViewport3D.tscn" id="10_vv0y5"]
 [ext_resource type="Script" uid="uid://bndx0a4k0k8hw" path="res://src/systems/voxel_chunk_manager.gd" id="11_2d0bc"]
 [ext_resource type="Script" uid="uid://dr821xg418lpi" path="res://src/player/components/player_movement_component.gd" id="12_movement"]
 [ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://src/systems/grid_painter.gd" id="13_grid_painter"]
@@ -17,7 +18,6 @@
 [ext_resource type="Script" uid="uid://ni7m2frmfnh7" path="res://src/player/components/hand_movement_component.gd" id="17_hand_movement"]
 [ext_resource type="Script" uid="uid://cdrcd8vcdgh73" path="res://src/player/components/desktop_interaction_component.gd" id="18_desktop_interaction"]
 [ext_resource type="PackedScene" uid="uid://beim5pnvstjcv" path="res://src/ui/WatchMenuViewport3D.tscn" id="18_watch_viewport"]
-
 
 [sub_resource type="BoxMesh" id="BoxMesh_xxbg3"]
 size = Vector3(0.3, 0.4, 0.2)
@@ -117,16 +117,19 @@ ray_length = 1.0
 show_line = false
 show_hitpoint = false
 
+[node name="PlayerHUDViewport3D" parent="PlayerBody/XROrigin3D/LeftController/Watch" unique_id=1836078463 instance=ExtResource("10_vv0y5")]
+transform = Transform3D(0.1, 0, 0, 0, -4.371139e-09, 0.1, 0, -0.1, -4.371139e-09, 0, 0, 0)
+
 [node name="UIViewportWatch" parent="PlayerBody/XROrigin3D/LeftController/Watch" unique_id=766114696 instance=ExtResource("18_watch_viewport")]
 transform = Transform3D(0.12, 0, 0, 0, 0.055748, 0.106271, 0, -0.106271, 0.055748, 0, 0.058575, -0.118114)
 
 [node name="WatchFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch" unique_id=1295475450]
+transform = Transform3D(0.99999964, 1.13670915e-14, -1.7763568e-14, -2.3092649e-14, 1, 4.4703484e-07, 0, -4.4703484e-07, 1, -5.1195637e-17, -0.0040805195, 1.8241344e-09)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_watch_face")
 
 [node name="Needle" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch" unique_id=473872773]
-transform = Transform3D(0.02, 0, 0, 0, 0.002, 0, 0, 0, 0.002, 0, 0.00955808, 0)
-visible = false
+transform = Transform3D(1.134, 0, 0, 0, 0.168, 0, 0, 0, 0.168, 0, 0.00955808, 0)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_watch_needle")
 

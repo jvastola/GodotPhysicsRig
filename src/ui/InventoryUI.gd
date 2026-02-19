@@ -74,4 +74,3 @@ func _on_inventory_changed(_items: Array) -> void:
 
 func _on_currency_changed(_type: String, _amount: int) -> void:
 	_update_currency()
-

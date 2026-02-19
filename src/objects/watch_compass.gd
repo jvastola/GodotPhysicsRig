@@ -24,6 +24,11 @@ extends Node3D
 @export var needle_only_on_player_hit: bool = true
 @export var player_group: StringName = &"player"
 
+@export_group("Look Interaction")
+@export var looked_at_scale: float = 1.5
+@export var scale_smoothing: float = 10.0
+@export var joystick_threshold: float = 0.5
+
 @onready var _needle: MeshInstance3D = get_node_or_null(needle_node_path) as MeshInstance3D
 @onready var _watch_face: MeshInstance3D = get_node_or_null(watch_face_node_path) as MeshInstance3D
 @onready var _raycast: RayCast3D = get_node_or_null(raycast_node_path) as RayCast3D
@@ -32,6 +37,9 @@ extends Node3D
 @onready var _ui_viewport: Node = get_node_or_null(ui_viewport_node_path) as Node
 
 var _ray_mesh: ImmediateMesh
+var _hit_player := false
+var _manual_ui_visible := false
+var _base_scale := Vector3.ONE
 
 func _ready() -> void:
 	if _raycast:
@@ -58,6 +66,15 @@ func _ready() -> void:
 	# is true, start hidden until the ray hits the player.
 	if _needle:
 		_needle.visible = not needle_only_on_player_hit
+	
+	_base_scale = scale
+	
+	# Ensure UI is hidden initially
+	if _ui_viewport:
+		if _ui_viewport.has_method("set_interactive"):
+			_ui_viewport.set_interactive(false)
+		else:
+			_ui_viewport.visible = false
 
 func _process(delta: float) -> void:
 	# Always show the watch face and needle; update needle orientation every frame
@@ -105,7 +122,29 @@ func _process(delta: float) -> void:
 	gtf.basis = Basis(out_quat)
 	_needle.global_transform = gtf
 
-	# done
+	# Handle watch scaling when looked at
+	var target_scale_val = looked_at_scale if _hit_player else 1.0
+	var target_scale_vec = _base_scale * target_scale_val
+	scale = scale.lerp(target_scale_vec, scale_smoothing * delta)
+	
+	# Handle joystick toggle for UI
+	if _hit_player:
+		var controller = get_parent() as XRController3D
+		if controller:
+			var joy = controller.get_vector2("primary")
+			if joy.x > joystick_threshold:
+				_manual_ui_visible = true
+	else:
+		# Reset session state when not looking
+		_manual_ui_visible = false
+
+	# Update UI Viewport visibility
+	if _ui_viewport:
+		var should_be_visible = _hit_player and _manual_ui_visible
+		if _ui_viewport.has_method("set_interactive"):
+			_ui_viewport.set_interactive(should_be_visible)
+		else:
+			_ui_viewport.visible = should_be_visible
 
 func _physics_process(_delta: float) -> void:
 	# Perform raycast and visual updates in the physics step to access space state safely
@@ -147,16 +186,11 @@ func _update_ray_visual(axis_world: Vector3) -> void:
 
 	# Needle visibility: enable when the ray hits the player if the toggle is set,
 	# otherwise keep the needle visible normally.
+	_hit_player = hit_player # Always update for scaling/joystick logic
+	
 	if _needle:
 		if needle_only_on_player_hit:
 			_needle.visible = hit_player
-			# Also toggle the watch UI viewport the same way as the needle.
-			# Use the viewport's API when available so we can also disable collisions
-			if _ui_viewport:
-				if _ui_viewport.has_method("set_interactive"):
-					_ui_viewport.call_deferred("set_interactive", hit_player)
-				else:
-					_ui_viewport.visible = hit_player
 		else:
 			_needle.visible = true
 
