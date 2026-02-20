@@ -36,6 +36,7 @@ var session: Dictionary = {}
 var is_authenticated: bool = false
 var device_id: String = ""
 var local_user_id: String = ""  # Our own user ID from Nakama
+var display_name: String = ""  # Our display name from Nakama account
 
 # Match data
 var current_match_id: String = ""
@@ -518,6 +519,10 @@ func _on_http_request_completed(result: int, response_code: int, _headers: Packe
 		print("NakamaManager: Authentication successful!")
 		print("NakamaManager: User ID: ", local_user_id)
 		print("NakamaManager: Token: ", session.token.substr(0, 20), "...")
+		
+		# Fetch account info to get display_name
+		_fetch_account()
+		
 		authenticated.emit(session)
 		
 		# Auto-connect WebSocket after authentication
@@ -588,3 +593,87 @@ func _on_match_list_http_completed(result: int, response_code: int, _headers: Pa
 	if matches.size() > 0:
 		print("NakamaManager: First match: ", matches[0])
 	match_list_received.emit(matches)
+
+
+# ============================================================================
+# Account / Display Name
+# ============================================================================
+
+## Fetch account info from Nakama to get display_name
+func _fetch_account() -> void:
+	if not is_authenticated or not session:
+		return
+	
+	var account_http = HTTPRequest.new()
+	account_http.timeout = 10.0
+	add_child(account_http)
+	account_http.request_completed.connect(_on_account_fetched.bind(account_http))
+	
+	var url = _get_nakama_url() + "/v2/account"
+	var headers = [
+		"Authorization: Bearer " + session.token
+	]
+	
+	var err = account_http.request(url, headers, HTTPClient.METHOD_GET)
+	if err != OK:
+		push_error("NakamaManager: Failed to fetch account: ", err)
+		account_http.queue_free()
+
+
+func _on_account_fetched(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray, http_node: HTTPRequest) -> void:
+	http_node.queue_free()
+	
+	if result != HTTPRequest.RESULT_SUCCESS or response_code != 200:
+		print("NakamaManager: Could not fetch account (result: %d, code: %d)" % [result, response_code])
+		return
+	
+	var json = JSON.new()
+	if json.parse(body.get_string_from_utf8()) != OK:
+		return
+	
+	var data = json.get_data()
+	var user = data.get("user", {})
+	var fetched_name = user.get("display_name", "")
+	if not fetched_name.is_empty():
+		display_name = fetched_name
+		print("NakamaManager: Display name from account: ", display_name)
+	else:
+		print("NakamaManager: No display name set in account")
+
+
+## Update display name on Nakama (persists across sessions)
+func update_display_name(new_name: String) -> void:
+	if not is_authenticated or not session:
+		push_warning("NakamaManager: Cannot update display name - not authenticated")
+		return
+	
+	display_name = new_name
+	
+	var update_http = HTTPRequest.new()
+	update_http.timeout = 10.0
+	add_child(update_http)
+	update_http.request_completed.connect(_on_display_name_updated.bind(update_http))
+	
+	var url = _get_nakama_url() + "/v2/account"
+	var body_json = JSON.stringify({
+		"display_name": new_name
+	})
+	var headers = [
+		"Content-Type: application/json",
+		"Authorization: Bearer " + session.token
+	]
+	
+	var err = update_http.request(url, headers, HTTPClient.METHOD_PUT, body_json)
+	if err != OK:
+		push_error("NakamaManager: Failed to update display name: ", err)
+		update_http.queue_free()
+
+
+func _on_display_name_updated(result: int, response_code: int, _headers: PackedStringArray, _body: PackedByteArray, http_node: HTTPRequest) -> void:
+	http_node.queue_free()
+	
+	if result == HTTPRequest.RESULT_SUCCESS and response_code == 200:
+		print("NakamaManager: Display name updated to: ", display_name)
+	else:
+		push_warning("NakamaManager: Failed to update display name (result: %d, code: %d)" % [result, response_code])
+

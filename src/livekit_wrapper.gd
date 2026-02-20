@@ -173,7 +173,6 @@ func connect_to_room(url: String, token: String) -> void:
 ## Disconnect from the current room
 func disconnect_from_room() -> void:
 	_log_info("Disconnecting from room")
-	_current_room = ""
 	
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
@@ -182,6 +181,15 @@ func disconnect_from_room() -> void:
 	else:
 		if _rust_manager:
 			_rust_manager.disconnect_from_room()
+
+	# Force local cleanup regardless of signal delivery
+	if _is_connected:
+		_is_connected = false
+		_current_room = ""
+		_metrics["last_disconnect_msec"] = Time.get_ticks_msec()
+		_emit_metrics()
+		_log_info("Room disconnected (local cleanup)")
+		room_disconnected.emit()
 
 
 ## Send data to all participants
@@ -415,7 +423,10 @@ func _on_room_connected() -> void:
 
 
 func _on_room_disconnected() -> void:
+	if not _is_connected:
+		return  # Already cleaned up (e.g. from disconnect_from_room)
 	_is_connected = false
+	_current_room = ""
 	_metrics["last_disconnect_msec"] = Time.get_ticks_msec()
 	_emit_metrics()
 	_log_info("Room disconnected")

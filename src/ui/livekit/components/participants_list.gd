@@ -11,37 +11,42 @@ signal participant_muted(identity: String, muted: bool)
 @onready var list_container: VBoxContainer = $VBox/ScrollContainer/ParticipantList
 
 # State
-var participants: Dictionary = {} # identity -> { player, level, level_bar, muted, volume, pos_label }
+var participants: Dictionary = {} # identity -> { player, level, level_bar, muted, volume, status_dot, name_label }
 var participant_usernames: Dictionary = {} # identity -> display name
 var audio_playback_enabled: bool = false
 
+# Avatar color palette — vibrant, distinct colors for each participant
+const AVATAR_COLORS = [
+	Color(0.35, 0.55, 0.95),  # Blue
+	Color(0.45, 0.78, 0.45),  # Green
+	Color(0.90, 0.45, 0.45),  # Red
+	Color(0.85, 0.65, 0.30),  # Orange
+	Color(0.70, 0.45, 0.85),  # Purple
+	Color(0.40, 0.80, 0.80),  # Teal
+	Color(0.90, 0.55, 0.70),  # Pink
+	Color(0.65, 0.75, 0.35),  # Lime
+]
+
 
 func _process(delta):
-	# Update participant levels and positions
+	# Update participant levels and connection status
 	for p_id in participants:
 		var p_data = participants[p_id]
 		
-		# Decay level
+		# Decay audio level
 		p_data["level"] = lerp(float(p_data["level"]), 0.0, 10.0 * delta)
 		
-		if p_data.has("level_bar") and p_data["level_bar"]:
+		# Update level bar
+		if p_data.has("level_bar") and p_data["level_bar"] and is_instance_valid(p_data["level_bar"]):
 			p_data["level_bar"].value = p_data["level"] * 100
 		
-		# Update position label from NetworkPlayer
-		if p_data.get("pos_label"):
+		# Update connection status dot
+		if p_data.get("status_dot") and is_instance_valid(p_data["status_dot"]):
 			var network_player = _find_network_player(p_id)
 			if network_player:
-				var head = network_player.get_node_or_null("Head")
-				if head:
-					var pos = head.global_position
-					p_data["pos_label"].text = "Pos: (%.1f, %.1f, %.1f)" % [pos.x, pos.y, pos.z]
-					p_data["pos_label"].modulate = Color.GREEN
-				else:
-					p_data["pos_label"].text = "Pos: No Head"
-					p_data["pos_label"].modulate = Color.ORANGE
+				p_data["status_dot"].color = Color(0.30, 0.85, 0.40)  # Green — connected
 			else:
-				p_data["pos_label"].text = "Pos: --"
-				p_data["pos_label"].modulate = Color.RED
+				p_data["status_dot"].color = Color(0.50, 0.50, 0.50)  # Gray — not found
 
 
 func add_participant(identity: String):
@@ -55,7 +60,8 @@ func add_participant(identity: String):
 		"level_bar": null,
 		"muted": false,
 		"volume": 1.0,
-		"pos_label": null
+		"status_dot": null,
+		"name_label": null,
 	}
 	print("ParticipantsList: Added ", identity)
 	_rebuild_list()
@@ -67,7 +73,7 @@ func remove_participant(identity: String):
 		return
 	
 	var p_data = participants[identity]
-	if p_data.get("player"):
+	if p_data.get("player") and is_instance_valid(p_data["player"]):
 		p_data["player"].queue_free()
 	
 	participants.erase(identity)
@@ -78,6 +84,12 @@ func remove_participant(identity: String):
 func set_participant_username(identity: String, username: String):
 	"""Set display name for a participant"""
 	participant_usernames[identity] = username
+	# Update name_label in-place if it exists (avoids full rebuild flicker)
+	if participants.has(identity):
+		var p_data = participants[identity]
+		if p_data.get("name_label") and is_instance_valid(p_data["name_label"]):
+			p_data["name_label"].text = username
+			return
 	_rebuild_list()
 
 
@@ -108,7 +120,7 @@ func process_audio_frame(identity: String, frame: PackedVector2Array):
 	
 	# Play audio if enabled and not muted
 	var player = p_data["player"]
-	if player and not p_data["muted"] and audio_playback_enabled:
+	if player and is_instance_valid(player) and not p_data["muted"] and audio_playback_enabled:
 		var playback = player.get_stream_playback()
 		if playback:
 			var vol = p_data.get("volume", 1.0)
@@ -148,7 +160,7 @@ func clear():
 	"""Clear all participants"""
 	for p_id in participants:
 		var p_data = participants[p_id]
-		if p_data.get("player"):
+		if p_data.get("player") and is_instance_valid(p_data["player"]):
 			p_data["player"].queue_free()
 	
 	participants.clear()
@@ -174,80 +186,103 @@ func _rebuild_list():
 
 
 func _create_participant_row(identity: String, p_data: Dictionary) -> PanelContainer:
-	"""Create a UI row for a participant"""
+	"""Create a modern UI card for a participant"""
 	var row_panel = PanelContainer.new()
 	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.15, 0.17, 0.22)
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_right = 8
-	style.corner_radius_bottom_left = 8
-	style.content_margin_left = 10
-	style.content_margin_right = 10
-	style.content_margin_top = 8
-	style.content_margin_bottom = 8
+	style.bg_color = Color(0.13, 0.15, 0.20)
+	style.corner_radius_top_left = 10
+	style.corner_radius_top_right = 10
+	style.corner_radius_bottom_right = 10
+	style.corner_radius_bottom_left = 10
+	style.border_width_bottom = 1
+	style.border_color = Color(0.20, 0.22, 0.28)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 10
+	style.content_margin_bottom = 10
 	row_panel.add_theme_stylebox_override("panel", style)
 	
-	var hbox = HBoxContainer.new()
-	hbox.add_theme_constant_override("separation", 15)
-	row_panel.add_child(hbox)
+	# Main vertical layout: top row (info + controls) and bottom (level bar)
+	var main_vbox = VBoxContainer.new()
+	main_vbox.add_theme_constant_override("separation", 8)
+	row_panel.add_child(main_vbox)
 	
-	# Avatar
-	var avatar = ColorRect.new()
-	avatar.custom_minimum_size = Vector2(40, 40)
-	avatar.color = Color(0.3, 0.5, 0.9)
-	avatar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	# Top row: avatar + info + controls
+	var top_row = HBoxContainer.new()
+	top_row.add_theme_constant_override("separation", 12)
+	main_vbox.add_child(top_row)
+	
+	# --- Avatar circle ---
+	var display_name = participant_usernames.get(identity, identity)
+	var avatar_idx = identity.hash() % AVATAR_COLORS.size()
+	var avatar_color = AVATAR_COLORS[avatar_idx]
+	
+	var avatar_container = PanelContainer.new()
+	avatar_container.custom_minimum_size = Vector2(42, 42)
+	var avatar_style = StyleBoxFlat.new()
+	avatar_style.bg_color = avatar_color
+	avatar_style.corner_radius_top_left = 21
+	avatar_style.corner_radius_top_right = 21
+	avatar_style.corner_radius_bottom_right = 21
+	avatar_style.corner_radius_bottom_left = 21
+	avatar_container.add_theme_stylebox_override("panel", avatar_style)
+	avatar_container.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	
 	var letter = Label.new()
-	letter.text = identity.substr(0, 1).to_upper()
+	letter.text = display_name.substr(0, 1).to_upper()
 	letter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	letter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	letter.anchors_preset = Control.PRESET_FULL_RECT
 	letter.add_theme_font_size_override("font_size", 20)
-	avatar.add_child(letter)
-	hbox.add_child(avatar)
+	letter.add_theme_color_override("font_color", Color.WHITE)
+	letter.anchors_preset = Control.PRESET_FULL_RECT
+	avatar_container.add_child(letter)
+	top_row.add_child(avatar_container)
 	
-	# Info column
+	# --- Info column (name + subtitle) ---
 	var info_vbox = VBoxContainer.new()
 	info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hbox.add_child(info_vbox)
+	info_vbox.add_theme_constant_override("separation", 2)
+	top_row.add_child(info_vbox)
 	
-	# Name
+	# Name row: status dot + display name
+	var name_row = HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 6)
+	info_vbox.add_child(name_row)
+	
+	# Connection status dot
+	var status_dot = ColorRect.new()
+	status_dot.custom_minimum_size = Vector2(8, 8)
+	status_dot.color = Color(0.50, 0.50, 0.50)  # Gray = not yet connected
+	status_dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	name_row.add_child(status_dot)
+	p_data["status_dot"] = status_dot
+	
+	# Display name (bold, large)
 	var name_label = Label.new()
-	var display_name = participant_usernames.get(identity, identity)
 	name_label.text = display_name
-	name_label.add_theme_font_size_override("font_size", 18)
-	info_vbox.add_child(name_label)
+	name_label.add_theme_font_size_override("font_size", 16)
+	name_label.add_theme_color_override("font_color", Color(0.93, 0.93, 0.95))
+	name_row.add_child(name_label)
+	p_data["name_label"] = name_label
 	
-	# Details row
-	var details = HBoxContainer.new()
-	details.add_theme_constant_override("separation", 10)
-	info_vbox.add_child(details)
+	# Subtitle: truncated identity (UUID)
+	if display_name != identity:
+		var subtitle = Label.new()
+		var short_id = identity.substr(0, 8) + "…" if identity.length() > 8 else identity
+		subtitle.text = short_id
+		subtitle.add_theme_font_size_override("font_size", 11)
+		subtitle.add_theme_color_override("font_color", Color(0.45, 0.47, 0.55))
+		info_vbox.add_child(subtitle)
 	
-	# Position label
-	var pos_label = Label.new()
-	pos_label.text = "Pos: --"
-	pos_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	pos_label.add_theme_font_size_override("font_size", 12)
-	details.add_child(pos_label)
-	p_data["pos_label"] = pos_label
-	
-	# Level bar
-	var level_bar = ProgressBar.new()
-	level_bar.custom_minimum_size = Vector2(60, 8)
-	level_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	level_bar.show_percentage = false
-	details.add_child(level_bar)
-	p_data["level_bar"] = level_bar
-	
-	# Controls
+	# --- Controls column (volume + mute) ---
 	var controls = HBoxContainer.new()
-	controls.add_theme_constant_override("separation", 5)
-	details.add_child(controls)
+	controls.add_theme_constant_override("separation", 6)
+	controls.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top_row.add_child(controls)
 	
 	# Volume slider
 	var vol_slider = HSlider.new()
-	vol_slider.custom_minimum_size = Vector2(80, 0)
+	vol_slider.custom_minimum_size = Vector2(70, 0)
 	vol_slider.min_value = 0.0
 	vol_slider.max_value = 2.0
 	vol_slider.step = 0.1
@@ -261,10 +296,40 @@ func _create_participant_row(identity: String, p_data: Dictionary) -> PanelConta
 	mute_btn.text = "🔇" if p_data["muted"] else "🔊"
 	mute_btn.toggle_mode = true
 	mute_btn.button_pressed = p_data["muted"]
-	mute_btn.custom_minimum_size = Vector2(30, 30)
-	mute_btn.add_theme_font_size_override("font_size", 12)
+	mute_btn.custom_minimum_size = Vector2(34, 34)
+	mute_btn.add_theme_font_size_override("font_size", 14)
+	var mute_style = StyleBoxFlat.new()
+	mute_style.bg_color = Color(0.20, 0.22, 0.28)
+	mute_style.corner_radius_top_left = 6
+	mute_style.corner_radius_top_right = 6
+	mute_style.corner_radius_bottom_right = 6
+	mute_style.corner_radius_bottom_left = 6
+	mute_btn.add_theme_stylebox_override("normal", mute_style)
 	mute_btn.pressed.connect(_on_mute_pressed.bind(identity, mute_btn))
 	controls.add_child(mute_btn)
+	
+	# --- Audio level bar (full width, at bottom of card) ---
+	var level_bar = ProgressBar.new()
+	level_bar.custom_minimum_size = Vector2(0, 4)
+	level_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	level_bar.show_percentage = false
+	# Style the level bar
+	var bar_bg_style = StyleBoxFlat.new()
+	bar_bg_style.bg_color = Color(0.10, 0.11, 0.14)
+	bar_bg_style.corner_radius_top_left = 2
+	bar_bg_style.corner_radius_top_right = 2
+	bar_bg_style.corner_radius_bottom_right = 2
+	bar_bg_style.corner_radius_bottom_left = 2
+	level_bar.add_theme_stylebox_override("background", bar_bg_style)
+	var bar_fill_style = StyleBoxFlat.new()
+	bar_fill_style.bg_color = Color(0.30, 0.75, 0.45)
+	bar_fill_style.corner_radius_top_left = 2
+	bar_fill_style.corner_radius_top_right = 2
+	bar_fill_style.corner_radius_bottom_right = 2
+	bar_fill_style.corner_radius_bottom_left = 2
+	level_bar.add_theme_stylebox_override("fill", bar_fill_style)
+	main_vbox.add_child(level_bar)
+	p_data["level_bar"] = level_bar
 	
 	return row_panel
 

@@ -126,6 +126,13 @@ func _on_disconnect_requested():
 	_set_status("Disconnected")
 	connection_panel.set_connected(false)
 	participants_list.clear()
+	
+	# Clean up voice component audio players
+	var xr_player = get_tree().get_first_node_in_group("xr_player")
+	if not xr_player:
+		xr_player = get_tree().root.find_child("XRPlayer", true, false)
+	if xr_player and xr_player.get("voice_component"):
+		xr_player.voice_component.cleanup()
 
 
 func _on_auto_connect_requested():
@@ -151,10 +158,16 @@ func _on_auto_connect_requested():
 
 
 func _on_username_changed(new_name: String):
+	# Sync to LiveKit metadata so other participants see it
 	if livekit_manager and livekit_manager.is_room_connected():
 		var metadata = JSON.stringify({"username": new_name})
 		livekit_manager.set_metadata(metadata)
-		print("✅ Username updated: ", new_name)
+		print("✅ Username updated in LiveKit: ", new_name)
+	
+	# Sync to Nakama so it persists across sessions
+	if NakamaManager and NakamaManager.is_authenticated:
+		NakamaManager.update_display_name(new_name)
+		print("✅ Username synced to Nakama: ", new_name)
 
 
 # === Audio Settings Handlers ===

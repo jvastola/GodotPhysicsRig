@@ -66,6 +66,12 @@ func _set_defaults():
 	# Default to local LiveKit server
 	server_entry.text = "ws://158.101.21.99:7880"
 	token_entry.text = ""
+	
+	# Try to auto-populate username from Nakama display name
+	if NakamaManager and not NakamaManager.display_name.is_empty():
+		local_username = NakamaManager.display_name
+		username_entry.text = local_username
+		print("ConnectionPanel: Auto-populated username from Nakama: ", local_username)
 
 
 func _on_connect_pressed():

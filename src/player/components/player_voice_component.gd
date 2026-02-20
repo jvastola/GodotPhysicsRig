@@ -83,6 +83,10 @@ func _connect_livekit_signals() -> void:
 	if livekit_manager.has_signal("audio_frame_received"):
 		livekit_manager.audio_frame_received.connect(_on_audio_frame)
 	
+	# Connect room disconnect for full cleanup
+	if livekit_manager.has_signal("room_disconnected"):
+		livekit_manager.room_disconnected.connect(_on_room_disconnected)
+	
 	print("PlayerVoiceComponent: Connected to LiveKit signals")
 
 
@@ -141,11 +145,19 @@ func _on_participant_left(identity: String) -> void:
 	if remote_players.has(identity):
 		var player_data = remote_players[identity]
 		
-		# Clean up audio player
-		if player_data["audio_player"]:
+		# Clean up audio player (may already be freed if NetworkPlayer was despawned)
+		if player_data["audio_player"] and is_instance_valid(player_data["audio_player"]):
 			player_data["audio_player"].queue_free()
 		
 		remote_players.erase(identity)
+		_logged_missing_players.erase(identity)
+		_logged_missing_players.erase(identity + "_spatial")
+
+
+func _on_room_disconnected() -> void:
+	"""Clean up all remote audio state when disconnected from room"""
+	print("PlayerVoiceComponent: Room disconnected, cleaning up all remote audio")
+	cleanup()
 
 
 func _on_audio_frame(peer_id: String, frame: PackedVector2Array) -> void:
@@ -164,6 +176,15 @@ func _on_audio_frame(peer_id: String, frame: PackedVector2Array) -> void:
 	
 	var player_data = remote_players[peer_id]
 	
+	# Validate cached player_node is still alive (may have been freed by network component)
+	if player_data["player_node"] and not is_instance_valid(player_data["player_node"]):
+		player_data["player_node"] = null
+		player_data["audio_player"] = null  # was a child of the player_node
+	
+	# Validate audio_player is still alive
+	if player_data["audio_player"] and not is_instance_valid(player_data["audio_player"]):
+		player_data["audio_player"] = null
+	
 	# Find the NetworkPlayer for this participant if we haven't yet
 	if not player_data["player_node"]:
 		player_data["player_node"] = _find_network_player(peer_id)
@@ -175,7 +196,7 @@ func _on_audio_frame(peer_id: String, frame: PackedVector2Array) -> void:
 		_create_spatial_audio_player(peer_id, player_data["player_node"])
 	
 	# Push audio data to the spatial audio player
-	if player_data["audio_player"]:
+	if player_data["audio_player"] and is_instance_valid(player_data["audio_player"]):
 		var audio_player = player_data["audio_player"]
 		var playback = audio_player.get_stream_playback()
 		
@@ -305,10 +326,11 @@ func cleanup() -> void:
 	"""Clean up all audio players and resources"""
 	for peer_id in remote_players.keys():
 		var player_data = remote_players[peer_id]
-		if player_data["audio_player"]:
+		if player_data["audio_player"] and is_instance_valid(player_data["audio_player"]):
 			player_data["audio_player"].queue_free()
 	
 	remote_players.clear()
+	_logged_missing_players.clear()
 	
 	if microphone_player:
 		microphone_player.queue_free()
