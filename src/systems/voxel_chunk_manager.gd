@@ -157,11 +157,13 @@ func remove_voxel(world_pos: Vector3, sync_network: bool = true) -> void:
 ## Handle voxel placement from network (don't re-sync)
 func _on_network_voxel_placed(world_pos: Vector3, color: Color) -> void:
 	add_voxel(world_pos, color, false)
+	update_dirty_chunks()
 
 
 ## Handle voxel removal from network (don't re-sync)
 func _on_network_voxel_removed(world_pos: Vector3) -> void:
 	remove_voxel(world_pos, false)
+	update_dirty_chunks()
 
 
 ## Get all voxel positions (for syncing to new clients)
@@ -577,7 +579,7 @@ func _flush_voxel_queue() -> void:
 		
 	# Send batch
 	nakama_manager.send_match_state(
-		8, # VOXEL_BATCH
+		NakamaManager.MatchOpCode.VOXEL_BATCH,
 		{"updates": _voxel_queue.duplicate()}
 	)
 	

@@ -814,7 +814,7 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 	# but to avoid circular dependency issues during load, we'll use the integer values
 	# defined in NakamaManager (VOXEL_PLACE = 5, VOXEL_REMOVE = 6)
 	
-	elif op_code == 5: # VOXEL_PLACE
+	elif op_code == NakamaManager.MatchOpCode.VOXEL_PLACE:
 		if data is Dictionary and data.has("pos") and data.has("color"):
 			var pos_str = data["pos"]
 			var color_str = data["color"]
@@ -826,13 +826,13 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 			voxel_placed_network.emit(pos, color)
 			print("NetworkManager (Nakama): Voxel placed at ", pos, " by ", peer_id)
 			
-	elif op_code == 6: # VOXEL_REMOVE
+	elif op_code == NakamaManager.MatchOpCode.VOXEL_REMOVE:
 		if data is Dictionary and data.has("pos"):
 			var pos = _parse_vector3(data["pos"])
 			voxel_removed_network.emit(pos)
 			print("NetworkManager (Nakama): Voxel removed at ", pos, " by ", peer_id)
 			
-	elif op_code == 8: # VOXEL_BATCH
+	elif op_code == NakamaManager.MatchOpCode.VOXEL_BATCH:
 		if data is Dictionary and data.has("updates") and data["updates"] is Array:
 			for update in data["updates"]:
 				var type = update.get("t", 0) # 0=place, 1=remove
