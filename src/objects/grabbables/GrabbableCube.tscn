@@ -21,13 +21,13 @@ max_contacts_reported = 4
 script = ExtResource(1)
 groups = ["grabbable"]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="GrabbableCube"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("BoxShape3D_cube")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="GrabbableCube"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
 mesh = SubResource("BoxMesh_cube")
 
-[node name="Label3D" type="Label3D" parent="GrabbableCube"]
+[node name="Label3D" type="Label3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
 text = "Anchor Grab"
 font_size = 24

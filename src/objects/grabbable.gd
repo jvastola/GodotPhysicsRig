@@ -191,8 +191,10 @@ func _on_interactable_selected(interactor: BaseInteractor) -> void:
 
 func _on_interactable_deselected(_interactor: BaseInteractor) -> void:
 	"""Called when an interactor deselects this grabbable"""
-	# Release if we're grabbed
-	if is_grabbed:
+	# Release if we're grabbed, but NOT if we're in desktop grab mode
+	# DesktopInteractionComponent reparents objects to the camera, which can trigger
+	# deselection signals that we want to ignore while held.
+	if is_grabbed and not is_desktop_grabbed:
 		release()
 
 
