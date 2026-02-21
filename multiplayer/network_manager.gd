@@ -699,9 +699,6 @@ func release_object(object_id: String, final_pos: Vector3, final_rot: Quaternion
 
 func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion, rel_pos: Variant = null, rel_rot: Variant = null) -> void:
 	"""Send continuous update for an object while it is being held"""
-	# ENet RPC (Basic position/rotation sync)
-	rpc_id(0, "_on_network_sync", object_id, {"position": pos, "rotation": rot.get_euler()})
-	
 	# Nakama state broadcast
 	if use_nakama and NakamaManager:
 		var update_data = {
@@ -717,7 +714,7 @@ func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion, rel
 			update_data["rel_rot"] = _quat_to_dict(rel_rot)
 			
 		NakamaManager.send_match_state(NakamaManager.MatchOpCode.OBJECT_UPDATE, update_data)
-	# Only send RPC if we have a valid connection
+	# Only send RPC if we have a valid connection (ENet)
 	elif multiplayer.multiplayer_peer and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
 		_sync_grabbed_object.rpc_id(0, object_id, pos, rot)
 
