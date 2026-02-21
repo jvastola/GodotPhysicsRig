@@ -258,6 +258,7 @@ func _spawn_remote_player(peer_id: Variant) -> void:
 	
 	# Add to scene
 	get_tree().root.add_child(remote_player)
+	remote_player.add_to_group("network_players")
 	remote_players[peer_id] = remote_player
 	
 	print("PlayerNetworkComponent: Spawned remote player ", peer_id)

@@ -697,20 +697,25 @@ func release_object(object_id: String, final_pos: Vector3, final_rot: Quaternion
 	print("NetworkManager: Released object ", object_id)
 
 
-func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion) -> void:
-	"""Update grabbed object position (called frequently while holding)"""
-	if not grabbed_objects.has(object_id):
-		return
+func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion, rel_pos: Variant = null, rel_rot: Variant = null) -> void:
+	"""Send continuous update for an object while it is being held"""
+	# ENet RPC (Basic position/rotation sync)
+	rpc_id(0, "_on_network_sync", object_id, {"position": pos, "rotation": rot.get_euler()})
 	
-	grabbed_objects[object_id].position = pos
-	grabbed_objects[object_id].rotation = rot
-	
+	# Nakama state broadcast
 	if use_nakama and NakamaManager:
 		var update_data = {
 			"object_id": object_id,
 			"pos": _vec3_to_dict(pos),
 			"rot": _quat_to_dict(rot),
 		}
+		
+		# Include relative offsets if they changed (e.g. desktop distance/rotation)
+		if rel_pos != null and rel_pos is Vector3:
+			update_data["rel_pos"] = _vec3_to_dict(rel_pos)
+		if rel_rot != null and rel_rot is Quaternion:
+			update_data["rel_rot"] = _quat_to_dict(rel_rot)
+			
 		NakamaManager.send_match_state(NakamaManager.MatchOpCode.OBJECT_UPDATE, update_data)
 	# Only send RPC if we have a valid connection
 	elif multiplayer.multiplayer_peer and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:

@@ -391,6 +391,9 @@ func _physics_process(_delta: float) -> void:
 		
 		# For desktop grab, skip VR-specific validation and positioning
 		if is_desktop_grabbed:
+			# Update relative offsets for network sync (DesktopInteractionComponent modifies position/rotation)
+			remote_grab_offset_pos = position
+			remote_grab_offset_rot = quaternion
 			return
 			
 		# If hand is invalid, auto-release
@@ -628,6 +631,13 @@ func _attach_to_remote_player(peer_id: String, hand_name: String, rel_pos: Vecto
 
 func _on_network_sync(data: Dictionary) -> void:
 	"""Receive position update for this object from network"""
+	
+	# Update relative offsets if provided (e.g. desktop distance/rotation changes)
+	if data.has("rel_pos"):
+		remote_grab_offset_pos = data["rel_pos"]
+	if data.has("rel_rot"):
+		remote_grab_offset_rot = data["rel_rot"]
+		
 	# Ignore direct position/rotation syncs if we're actively attached to a moving hand
 	if is_instance_valid(remote_grab_hand):
 		return
@@ -724,20 +734,32 @@ func desktop_grab(grabber: Node) -> void:
 	if network_component:
 		network_component.set_network_owner(true)
 		network_component.set_grabbed(true)
-		# For desktop grab, the object is placed in front of the camera (head)
-		# So we pass "desktop" to signify it should attach to the network player's head
-		var head = get_viewport().get_camera_3d()
-		var rel_pos = Vector3.ZERO
-		var rel_rot = Quaternion.IDENTITY
-		if head:
-			var head_inv = head.global_transform.affine_inverse()
-			var rel_tf = head_inv * global_transform
-			rel_pos = rel_tf.origin
-			rel_rot = rel_tf.basis.get_rotation_quaternion()
+		
+		# For desktop grab, the object is placed in a slot in front of the camera (head)
+		# We need to pass the target slot offset rather than current world offset,
+		# because current world offset might be "on the ground" before reparenting.
+		var slot_offset = Vector3.ZERO
+		if desktop_grabber and desktop_grabber.has_method("_get_held_item"):
+			# Try to determine which slot we went into
+			if desktop_grabber.get("_left_held_item") == self:
+				slot_offset = desktop_grabber.get("left_slot_offset")
+				# Correct for distance
+				slot_offset.z = -desktop_grabber.get("_left_hold_distance")
+			else:
+				slot_offset = desktop_grabber.get("right_slot_offset")
+				# Correct for distance
+				slot_offset.z = -desktop_grabber.get("_right_hold_distance")
+		else:
+			# Fallback default
+			slot_offset = Vector3(0.4, -0.2, -0.6)
+			
+		# Store as our local "remote grab offset" so process_network_sync can pick it up
+		remote_grab_offset_pos = slot_offset
+		remote_grab_offset_rot = quaternion
 		
 		# Only send network grab if we successfully got ownership
 		if is_grabbed:
-			network_component.notify_grab(save_id, "desktop", rel_pos, rel_rot)
+			network_component.notify_grab(save_id, "desktop", remote_grab_offset_pos, remote_grab_offset_rot)
 
 
 func desktop_release() -> void:
