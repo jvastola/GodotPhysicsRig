@@ -41,6 +41,11 @@ var original_collision_mask: int = 0
 # Components
 var network_component: GrabbableNetworkComponent
 
+# Remote grab state (for smooth interpolation to remote player hands)
+var remote_grab_hand: Node3D = null
+var remote_grab_offset_pos: Vector3 = Vector3.ZERO
+var remote_grab_offset_rot: Quaternion = Quaternion.IDENTITY
+
 signal grabbed(hand: RigidBody3D)
 signal released()
 
@@ -370,6 +375,13 @@ func release() -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	# Keep object smoothed to remote player's hand if grabbed remotely
+	if is_instance_valid(remote_grab_hand):
+		# Interpolate global transform to match remote hand with grabbing offset
+		var target_transform = remote_grab_hand.global_transform * Transform3D(Basis(remote_grab_offset_rot), remote_grab_offset_pos)
+		global_transform = global_transform.interpolate_with(target_transform, 15.0 * _delta)
+		return
+		
 	# When grabbed, object is frozen and moves with hand automatically as child
 	# No need to update position - it's part of the hand's rigid body now
 	if is_grabbed:
@@ -550,19 +562,76 @@ func _save_grab_state(hand: RigidBody3D) -> void:
 	)
 
 
-func _on_network_grab(_peer_id: int) -> void:
+func _on_network_grab(peer_id: String, hand_name: String, rel_pos: Vector3, rel_rot: Quaternion) -> void:
 	"""Handle another player grabbing this object"""
 	# Make object semi-transparent to show it's grabbed by someone else
 	_set_remote_grabbed_visual(true)
+	freeze = true
+	collision_layer = 0
+	collision_mask = 0
+	
+	# Try to find the remote player's hand to attach to visually
+	_attach_to_remote_player(peer_id, hand_name, rel_pos, rel_rot)
 
 
-func _on_network_release(_peer_id: int) -> void:
+func _on_network_release(_peer_id: String) -> void:
 	"""Handle another player releasing this object"""
 	_set_remote_grabbed_visual(false)
+	freeze = false
+	collision_layer = original_collision_layer
+	collision_mask = original_collision_mask
+	remote_grab_hand = null
+
+
+func _attach_to_remote_player(peer_id: String, hand_name: String, rel_pos: Vector3, rel_rot: Quaternion) -> void:
+	# Clear existing
+	remote_grab_hand = null
+	
+	# Find the NetworkPlayer instance matching this peer_id
+	var players_node = get_tree().get_first_node_in_group("network_players")
+	if not players_node:
+		var root = get_node_or_null("/root/Main/Players")
+		if root: players_node = root
+	
+	var target_player = null
+	if players_node:
+		for child in players_node.get_children():
+			if child.has_method("get_peer_id"):
+				# some versions might use int vs string
+				if str(child.get("peer_id")) == str(peer_id):
+					target_player = child
+					break
+			elif "peer_id" in child and str(child.peer_id) == str(peer_id):
+				target_player = child
+				break
+
+	if target_player:
+		# Found the player. Use the indicated hand (or head for desktop)
+		var hand_node = null
+		if "left" in hand_name.to_lower() and target_player.get("left_hand_visual"):
+			hand_node = target_player.left_hand_visual
+		elif "right" in hand_name.to_lower() and target_player.get("right_hand_visual"):
+			hand_node = target_player.right_hand_visual
+		elif "desktop" in hand_name.to_lower() and target_player.get("head_visual"):
+			hand_node = target_player.head_visual
+		else:
+			# Fallback if specific hand wasn't found
+			hand_node = target_player.get("right_hand_visual")
+			if not hand_node: hand_node = target_player.get("head_visual")
+		
+		if hand_node:
+			remote_grab_hand = hand_node
+			remote_grab_offset_pos = rel_pos
+			remote_grab_offset_rot = rel_rot
+			print("Grabbable: Visually attached to remote player ", peer_id, " hand: ", hand_name)
 
 
 func _on_network_sync(data: Dictionary) -> void:
 	"""Receive position update for this object from network"""
+	# Ignore direct position/rotation syncs if we're actively attached to a moving hand
+	if is_instance_valid(remote_grab_hand):
+		return
+		
 	# Smoothly interpolate to network position
 	if data.has("position"):
 		var target_pos = data["position"]
@@ -650,6 +719,25 @@ func desktop_grab(grabber: Node) -> void:
 	# Emit grabbed signal with null hand (desktop has no physics hand)
 	# Tools should check for null hand and handle desktop mode appropriately
 	grabbed.emit(null)
+	
+	# Notify network of desktop pickup
+	if network_component:
+		network_component.set_network_owner(true)
+		network_component.set_grabbed(true)
+		# For desktop grab, the object is placed in front of the camera (head)
+		# So we pass "desktop" to signify it should attach to the network player's head
+		var head = get_viewport().get_camera_3d()
+		var rel_pos = Vector3.ZERO
+		var rel_rot = Quaternion.IDENTITY
+		if head:
+			var head_inv = head.global_transform.affine_inverse()
+			var rel_tf = head_inv * global_transform
+			rel_pos = rel_tf.origin
+			rel_rot = rel_tf.basis.get_rotation_quaternion()
+		
+		# Only send network grab if we successfully got ownership
+		if is_grabbed:
+			network_component.notify_grab(save_id, "desktop", rel_pos, rel_rot)
 
 
 func desktop_release() -> void:

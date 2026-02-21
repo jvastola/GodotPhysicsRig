@@ -1,8 +1,8 @@
 class_name GrabbableNetworkComponent
 extends Node
 
-signal network_grab(peer_id: int)
-signal network_release(peer_id: int)
+signal network_grab(peer_id: String, hand_name: String, rel_pos: Vector3, rel_rot: Quaternion)
+signal network_release(peer_id: String)
 signal network_sync(data: Dictionary)
 
 var network_manager: Node = null
@@ -29,13 +29,13 @@ func set_grabbed(grabbed: bool) -> void:
 func set_network_owner(is_owner: bool) -> void:
 	is_network_owner = is_owner
 
-func notify_grab(p_save_id: String) -> void:
+func notify_grab(p_save_id: String, hand_name: String = "", rel_pos: Vector3 = Vector3.ZERO, rel_rot: Quaternion = Quaternion.IDENTITY) -> void:
 	if network_manager and is_network_owner:
-		network_manager.grab_object(p_save_id)
+		network_manager.grab_object(p_save_id, hand_name, rel_pos, rel_rot)
 
-func notify_release(p_save_id: String, position: Vector3, rotation: Quaternion) -> void:
+func notify_release(p_save_id: String, position: Vector3, rotation: Quaternion, lin_vel: Vector3 = Vector3.ZERO, ang_vel: Vector3 = Vector3.ZERO) -> void:
 	if network_manager and is_network_owner:
-		network_manager.release_object(p_save_id, position, rotation)
+		network_manager.release_object(p_save_id, position, rotation, lin_vel, ang_vel)
 
 func process_network_sync(delta: float) -> void:
 	# Update network position if we own this object (with delta compression)
@@ -75,7 +75,7 @@ func _setup_network_sync() -> void:
 	print("GrabbableNetworkComponent: ", save_id, " network sync initialized")
 
 func _on_network_grab(object_id: String, peer_id: int) -> void:
-	"""Handle another player grabbing this object"""
+	"""Handle another player grabbing this object via ENet P2P (legacy)"""
 	if object_id != save_id:
 		return
 	
@@ -86,7 +86,7 @@ func _on_network_grab(object_id: String, peer_id: int) -> void:
 	print("GrabbableNetworkComponent: ", save_id, " grabbed by remote player ", peer_id)
 	is_network_owner = false
 	
-	network_grab.emit(peer_id)
+	network_grab.emit(str(peer_id), "", Vector3.ZERO, Quaternion.IDENTITY)
 
 func _on_nakama_match_state(sender_id: String, op_code: int, data: Variant) -> void:
 	"""Handle incoming Nakama match state"""
@@ -106,8 +106,16 @@ func _on_nakama_match_state(sender_id: String, op_code: int, data: Variant) -> v
 		NakamaManager.MatchOpCode.GRAB_OBJECT:
 			print("GrabbableNetworkComponent: ", save_id, " grabbed by Nakama peer ", sender_id)
 			is_network_owner = false
-			# We use a hash of the string for the int peer_id signal
-			network_grab.emit(sender_id.hash())
+			
+			var hand_name = data.get("hand_name", "")
+			var rel_pos = Vector3.ZERO
+			if data.has("rel_pos"):
+				rel_pos = _parse_vector3(data["rel_pos"])
+			var rel_rot = Quaternion.IDENTITY
+			if data.has("rel_rot"):
+				rel_rot = _parse_quaternion(data["rel_rot"])
+			
+			network_grab.emit(sender_id, hand_name, rel_pos, rel_rot)
 			
 		NakamaManager.MatchOpCode.RELEASE_OBJECT:
 			print("GrabbableNetworkComponent: ", save_id, " released by Nakama peer ", sender_id)
@@ -128,7 +136,7 @@ func _on_nakama_match_state(sender_id: String, op_code: int, data: Variant) -> v
 				network_sync.emit(sync_data)
 			
 			is_network_owner = false
-			network_release.emit(sender_id.hash())
+			network_release.emit(sender_id)
 			
 		NakamaManager.MatchOpCode.OBJECT_UPDATE:
 			if is_network_owner or is_grabbed:
@@ -143,7 +151,7 @@ func _on_nakama_match_state(sender_id: String, op_code: int, data: Variant) -> v
 			network_sync.emit(sync_data)
 
 func _on_network_release(object_id: String, peer_id: int) -> void:
-	"""Handle another player releasing this object"""
+	"""Handle another player releasing this object via ENet P2P (legacy)"""
 	if object_id != save_id:
 		return
 	
@@ -153,7 +161,7 @@ func _on_network_release(object_id: String, peer_id: int) -> void:
 	
 	print("GrabbableNetworkComponent: ", save_id, " released by remote player ", peer_id)
 	
-	network_release.emit(peer_id)
+	network_release.emit(str(peer_id))
 
 func _on_network_sync(object_id: String, data: Dictionary) -> void:
 	"""Receive position update for this object from network"""

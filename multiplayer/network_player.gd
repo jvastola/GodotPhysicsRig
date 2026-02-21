@@ -42,6 +42,9 @@ func _ready() -> void:
 	_create_name_label()
 	# Voice player creation removed - now handled by PlayerVoiceComponent
 
+func get_peer_id() -> String:
+	return str(peer_id)
+
 
 func _process(delta: float) -> void:
 	_interpolate_transforms(delta)

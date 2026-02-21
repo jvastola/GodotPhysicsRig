@@ -522,6 +522,14 @@ func _dict_to_vec3(d: Dictionary) -> Vector3:
 	return Vector3(d.get("x", 0), d.get("y", 0), d.get("z", 0))
 
 
+func _quat_to_dict(q: Quaternion) -> Dictionary:
+	return {"x": snappedf(q.x, 0.001), "y": snappedf(q.y, 0.001), "z": snappedf(q.z, 0.001), "w": snappedf(q.w, 0.001)}
+
+
+func _dict_to_quat(d: Dictionary) -> Quaternion:
+	return Quaternion(d.get("x", 0), d.get("y", 0), d.get("z", 0), d.get("w", 1))
+
+
 func _handle_nakama_avatar_data(sender_id: String, data: Dictionary) -> void:
 	"""Handle incoming avatar texture data from Nakama"""
 	if data.is_empty():
@@ -640,31 +648,49 @@ func get_player_avatar_texture(peer_id: Variant) -> ImageTexture:
 # Grabbable Object Sync
 # ============================================================================
 
-func grab_object(object_id: String) -> void:
+func grab_object(object_id: String, hand_name: String = "", rel_pos: Vector3 = Vector3.ZERO, rel_rot: Quaternion = Quaternion.IDENTITY) -> void:
 	"""Notify network that we grabbed an object"""
 	var peer_id = multiplayer.get_unique_id()
 	grabbed_objects[object_id] = {
 		"owner_peer_id": peer_id,
 		"is_grabbed": true,
 		"position": Vector3.ZERO,
-		"rotation": Quaternion.IDENTITY
+		"rotation": Quaternion.IDENTITY,
+		"hand_name": hand_name
 	}
 	
-	if multiplayer.multiplayer_peer:
+	if use_nakama and NakamaManager:
+		var grab_data = {
+			"object_id": object_id,
+			"hand_name": hand_name,
+			"rel_pos": _vec3_to_dict(rel_pos),
+			"rel_rot": _quat_to_dict(rel_rot) # need a new dict helper for this
+		}
+		NakamaManager.send_match_state(NakamaManager.MatchOpCode.GRAB_OBJECT, grab_data)
+	elif multiplayer.multiplayer_peer:
 		_notify_grab.rpc_id(0, object_id, peer_id)
 	
 	grabbable_grabbed.emit(object_id, peer_id)
 	print("NetworkManager: Grabbed object ", object_id)
 
 
-func release_object(object_id: String, final_pos: Vector3, final_rot: Quaternion) -> void:
+func release_object(object_id: String, final_pos: Vector3, final_rot: Quaternion, lin_vel: Vector3 = Vector3.ZERO, ang_vel: Vector3 = Vector3.ZERO) -> void:
 	"""Notify network that we released an object"""
 	var peer_id = multiplayer.get_unique_id()
 	
 	if grabbed_objects.has(object_id):
 		grabbed_objects.erase(object_id)
 	
-	if multiplayer.multiplayer_peer:
+	if use_nakama and NakamaManager:
+		var release_data = {
+			"object_id": object_id,
+			"pos": _vec3_to_dict(final_pos),
+			"rot": _quat_to_dict(final_rot),
+			"lin_vel": _vec3_to_dict(lin_vel),
+			"ang_vel": _vec3_to_dict(ang_vel)
+		}
+		NakamaManager.send_match_state(NakamaManager.MatchOpCode.RELEASE_OBJECT, release_data)
+	elif multiplayer.multiplayer_peer:
 		_notify_release.rpc_id(0, object_id, peer_id, final_pos, final_rot)
 	
 	grabbable_released.emit(object_id, peer_id)
@@ -679,8 +705,15 @@ func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion) -> 
 	grabbed_objects[object_id].position = pos
 	grabbed_objects[object_id].rotation = rot
 	
+	if use_nakama and NakamaManager:
+		var update_data = {
+			"object_id": object_id,
+			"pos": _vec3_to_dict(pos),
+			"rot": _quat_to_dict(rot),
+		}
+		NakamaManager.send_match_state(NakamaManager.MatchOpCode.OBJECT_UPDATE, update_data)
 	# Only send RPC if we have a valid connection
-	if multiplayer.multiplayer_peer and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+	elif multiplayer.multiplayer_peer and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
 		_sync_grabbed_object.rpc_id(0, object_id, pos, rot)
 
 
