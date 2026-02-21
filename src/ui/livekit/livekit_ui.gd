@@ -18,7 +18,8 @@ var current_room_name: String:
 		_update_room_name_label()
 
 # Status label
-@onready var status_label: Label = $CenterContainer/MainCard/Margin/VBox/Header/StatusLabel
+@onready var status_label: Label = $Margin/VBox/TitleRow/StatusLabel
+@onready var close_button: Button = $Margin/VBox/TitleRow/CloseButton
 
 # Preloaded component scenes
 const ConnectionPanelScene = preload("res://src/ui/livekit/components/ConnectionPanel.tscn")
@@ -28,6 +29,10 @@ const ParticipantsListScene = preload("res://src/ui/livekit/components/Participa
 
 func _ready():
 	print("=== LiveKit UI Coordinator Ready ===")
+	
+	# Connect close button
+	if close_button:
+		close_button.pressed.connect(func(): visible = false)
 	
 	# Get LiveKitWrapper autoload
 	livekit_manager = get_node_or_null("/root/LiveKitWrapper")
@@ -54,8 +59,8 @@ func _ready():
 
 func _setup_components():
 	# Get container references
-	var left_column = $CenterContainer/MainCard/Margin/VBox/Content/LeftColumn
-	var right_column = $CenterContainer/MainCard/Margin/VBox/Content/RightColumn
+	var left_column = $Margin/VBox/Content/LeftColumn
+	var right_column = $Margin/VBox/Content/RightColumn
 	
 	# Clear existing children in left column (except separators)
 	for child in left_column.get_children():
@@ -216,14 +221,26 @@ func _on_room_connected():
 	_set_status("✅ Connected" + (" to: " + room_name if not room_name.is_empty() else ""))
 	connection_panel.set_connected(true, room_name)
 	
-	# Add local participant
-	participants_list.add_participant("You (local)")
+	# Broadcast our local metadata so others see our username instead of UUID
+	var initial_name = connection_panel.local_username
+	if livekit_manager.has_method("set_metadata") and not initial_name.is_empty():
+		var metadata = JSON.stringify({"username": initial_name})
+		livekit_manager.set_metadata(metadata)
+		print("✅ Initial metadata (username) broadcasted: ", initial_name)
+	
+	# Add local participant to the list using our actual identity and name
+	var my_identity = livekit_manager.get_local_identity()
+	participants_list.add_participant(my_identity)
+	
+	# And immediately set our display name
+	var display_name = initial_name if not initial_name.is_empty() else "You (local)"
+	participants_list.set_participant_username(my_identity, display_name + " (You)")
 	
 	# Query existing participants
 	if livekit_manager.has_method("get_participant_identities"):
 		var existing = livekit_manager.get_participant_identities()
 		for identity in existing:
-			if not identity.is_empty():
+			if not identity.is_empty() and identity != my_identity:
 				participants_list.add_participant(identity)
 
 

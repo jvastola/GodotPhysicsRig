@@ -1,98 +1,72 @@
-[gd_scene load_steps=4 format=3 uid="uid://8qfn1v423ubr"]
+[gd_scene load_steps=2 format=3 uid="uid://8qfn1v423ubr"]
 
 [ext_resource type="Script" path="res://src/ui/livekit/livekit_ui.gd" id="1_coord"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
-bg_color = Color(0.094, 0.098, 0.114, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]
-bg_color = Color(0.133, 0.141, 0.169, 1)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
-shadow_color = Color(0, 0, 0, 0.2)
-shadow_size = 10
-shadow_offset = Vector2(0, 4)
-
-[node name="LiveKitUI" type="Control"]
-layout_mode = 3
+[node name="LiveKitUI" type="PanelContainer"]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_type_variation = &"Panel"
 script = ExtResource("1_coord")
 
-[node name="Background" type="Panel" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_bg")
-
-[node name="CenterContainer" type="CenterContainer" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="MainCard" type="PanelContainer" parent="CenterContainer"]
-custom_minimum_size = Vector2(750, 550)
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_card")
-
-[node name="Margin" type="MarginContainer" parent="CenterContainer/MainCard"]
+[node name="Margin" type="MarginContainer" parent="."]
 layout_mode = 2
 theme_override_constants/margin_left = 24
 theme_override_constants/margin_top = 24
 theme_override_constants/margin_right = 24
 theme_override_constants/margin_bottom = 24
 
-[node name="VBox" type="VBoxContainer" parent="CenterContainer/MainCard/Margin"]
+[node name="VBox" type="VBoxContainer" parent="Margin"]
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="Header" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/VBox"]
+[node name="TitleRow" type="HBoxContainer" parent="Margin/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="Title" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Header"]
+[node name="TitleLabel" type="Label" parent="Margin/VBox/TitleRow"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_colors/font_color = Color(0.8, 0.95, 1, 1)
 theme_override_font_sizes/font_size = 24
-text = "🎙️ LiveKit Voice Chat"
+text = "🎙️ LiveKit Spatial Audio"
 
-[node name="StatusLabel" type="Label" parent="CenterContainer/MainCard/Margin/VBox/Header"]
+[node name="StatusLabel" type="Label" parent="Margin/VBox/TitleRow"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
 theme_override_font_sizes/font_size = 14
 text = "Initializing..."
 horizontal_alignment = 2
 
-[node name="HSeparator" type="HSeparator" parent="CenterContainer/MainCard/Margin/VBox"]
+[node name="CloseButton" type="Button" parent="Margin/VBox/TitleRow"]
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "✕"
+tooltip_text = "Close panel"
+
+[node name="HSeparator" type="HSeparator" parent="Margin/VBox"]
 layout_mode = 2
 
-[node name="Content" type="HBoxContainer" parent="CenterContainer/MainCard/Margin/VBox"]
+[node name="Content" type="HBoxContainer" parent="Margin/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 24
 
-[node name="LeftColumn" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content"]
+[node name="LeftColumn" type="VBoxContainer" parent="Margin/VBox/Content"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 0.45
 theme_override_constants/separation = 16
 
-[node name="VSeparator" type="VSeparator" parent="CenterContainer/MainCard/Margin/VBox/Content"]
+[node name="VSeparator" type="VSeparator" parent="Margin/VBox/Content"]
 layout_mode = 2
 
-[node name="RightColumn" type="VBoxContainer" parent="CenterContainer/MainCard/Margin/VBox/Content"]
+[node name="RightColumn" type="VBoxContainer" parent="Margin/VBox/Content"]
 custom_minimum_size = Vector2(320, 0)
 layout_mode = 2
 size_flags_horizontal = 3

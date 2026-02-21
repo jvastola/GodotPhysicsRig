@@ -676,4 +676,3 @@ func _on_display_name_updated(result: int, response_code: int, _headers: PackedS
 		print("NakamaManager: Display name updated to: ", display_name)
 	else:
 		push_warning("NakamaManager: Failed to update display name (result: %d, code: %d)" % [result, response_code])
-
