@@ -48,9 +48,9 @@ enum EditSelectionType {
 @export var color_paint_default: Color = Color(1.0, 1.0, 1.0, 1.0)
 @export var color_edge_highlight: Color = Color(1.0, 0.6, 0.0, 1.0) # Orange for edges
 @export var color_face_highlight: Color = Color(1.0, 0.9, 0.2, 0.4) # Semi-transparent yellow for faces
-@export var color_apply_material: Color = Color(0.8, 0.2, 0.8) # Purple for apply material mode
-@export var color_extrude: Color = Color(1.0, 0.0, 1.0) # Magenta for extrude
-@export var color_convert_volume: Color = Color(0.2, 1.0, 0.8) # Cyan-ish for volume conversion
+@export var color_apply_material: Color = Color(0.7, 0.3, 1.0) # Purple
+@export var color_extrude: Color = Color(1.0, 0.2, 0.9) # Pink/Magenta
+@export var color_convert_volume: Color = Color(0.2, 1.0, 0.8) # Hidden for now
 
 # State
 static var instance: PolyTool
@@ -142,7 +142,7 @@ var _mode_select_modes: Array[ToolMode] = []
 var _is_selecting_mode: bool = false
 var _mode_select_radius: float = 0.12
 var _mode_select_height: float = 0.02
-const _MODE_ORDER := [ToolMode.PLACE, ToolMode.EDIT, ToolMode.EXTRUDE, ToolMode.REMOVE, ToolMode.CONNECT, ToolMode.PAINT, ToolMode.APPLY_MATERIAL, ToolMode.LAYER, ToolMode.SELECT, ToolMode.CONVERT_VOLUME]
+const _MODE_ORDER := [ToolMode.PLACE, ToolMode.EDIT, ToolMode.EXTRUDE, ToolMode.REMOVE, ToolMode.CONNECT, ToolMode.PAINT, ToolMode.APPLY_MATERIAL, ToolMode.LAYER, ToolMode.SELECT]
 var _mode_labels: Array[MeshInstance3D] = []
 const POOL_TYPE := "poly_tool"
 
@@ -154,7 +154,7 @@ var _prev_grip_pressed: bool = false
 # Performance Optimizations
 const GRID_CELL_SIZE: float = 0.1
 const VISIBILITY_UPDATE_INTERVAL: int = 3
-const MAX_VISIBLE_POINTS: int = 10
+const MAX_VISIBLE_POINTS: int = 20
 
 var _spatial_grid: Dictionary = {} # Vector3i -> Array[int]
 var _point_to_triangles: Dictionary = {} # int -> Array[int]
@@ -192,20 +192,17 @@ func _rebuild_point_to_triangles() -> void:
 				_point_to_triangles[p_idx].append(i)
 
 func _get_nearest_k_points(pos: Vector3, k: int) -> Array[int]:
-	var center_cell := _get_cell_key(pos)
 	var candidates: Array[int] = []
+	var pts = _points
 	
-	for dx in range(-1, 2):
-		for dy in range(-1, 2):
-			for dz in range(-1, 2):
-				var key := center_cell + Vector3i(dx, dy, dz)
-				if _spatial_grid.has(key):
-					candidates.append_array(_spatial_grid[key])
-	
-	if candidates.is_empty():
+	if pts.is_empty():
 		return []
 		
-	var pts = _points
+	# Since max_points is small (128), we can just iterate all of them to find the true closest points
+	# as requested by the user ("show the closest points even if they are far away").
+	for i in pts.size():
+		candidates.append(i)
+	
 	candidates.sort_custom(func(a, b):
 		return pts[a].distance_squared_to(pos) < pts[b].distance_squared_to(pos))
 			
@@ -236,6 +233,9 @@ func add_new_layer(layer_name: String = "") -> void:
 func remove_active_layer() -> void:
 	_remove_active_layer()
 
+# UI instance
+var _local_ui: Node3D = null
+
 func get_layers() -> Array[PolyLayer]:
 	return _layers
 
@@ -248,6 +248,7 @@ func _ready() -> void:
 	
 	_create_initial_layer()
 	_create_non_layer_visuals()
+	_setup_local_ui()
 	
 	grabbed.connect(_on_grabbed)
 	released.connect(_on_released)
@@ -309,6 +310,17 @@ func _add_layer(layer_name: String = "") -> PolyLayer:
 	
 	_layers.append(layer)
 	return layer
+
+func _setup_local_ui() -> void:
+	var ui_scene = load("res://src/ui/PolyToolViewport3D.tscn")
+	if ui_scene:
+		_local_ui = ui_scene.instantiate()
+		add_child(_local_ui)
+		_local_ui.visible = false
+		_local_ui.scale = Vector3.ONE * 0.15 # Scale down for tool
+		_local_ui.position = Vector3(0, 0.15, -0.05) # Position above the tool
+		# Ensure it faces a good direction (might need adjustment)
+		_local_ui.rotation_degrees = Vector3(0, 180, 0) # Face towards the player
 
 func _create_non_layer_visuals() -> void:
 	_tip = get_node_or_null("Tip")
@@ -445,6 +457,22 @@ func _physics_process(delta: float) -> void:
 	# Selection Visuals
 	_update_selection_visuals()
 	_update_volume_selection_visuals()
+	
+	# Design: Animate orb and tip
+	if is_instance_valid(_orb):
+		_orb.rotate_y(delta * 2.5)
+		_orb.position.y = 0.003 * sin(Time.get_ticks_msec() * 0.004)
+		
+		# Pulsing emission
+		var pulse = (sin(Time.get_ticks_msec() * 0.008) * 0.5 + 0.5) * 2.0 + 1.0
+		if _orb_material:
+			_orb_material.emission_energy_multiplier = pulse
+			
+	if is_instance_valid(_tip):
+		var tip_mesh = _tip.get_node_or_null("TipMesh") as MeshInstance3D
+		if tip_mesh and tip_mesh.material_override is StandardMaterial3D:
+			var mat = tip_mesh.material_override as StandardMaterial3D
+			mat.emission_energy_multiplier = (sin(Time.get_ticks_msec() * 0.008) * 0.5 + 0.5) * 4.0 + 2.0
 
 func _handle_input() -> void:
 	var trigger = _is_trigger_pressed()
@@ -455,11 +483,10 @@ func _handle_input() -> void:
 		_prev_grip_pressed = grip
 		return
 	
-	# Grip: Move PolyToolUI in front of player
+	# Grip: Toggle local UI visibility
 	if grip and not _prev_grip_pressed:
-		var manager = UIPanelManager.find()
-		if manager:
-			manager.open_panel("PolyToolViewport3D")
+		if is_instance_valid(_local_ui):
+			_local_ui.visible = not _local_ui.visible
 	
 	# Grip holds (menu mode)
 	if grip:

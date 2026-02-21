@@ -6,28 +6,46 @@
 radius = 0.02
 height = 0.2
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_body"]
-albedo_color = Color(0.25, 0.25, 0.3, 1)
-metallic = 0.5
-roughness = 0.3
+[sub_resource type="StandardMaterial3D" id="Material_Handle"]
+albedo_color = Color(0.15, 0.16, 0.18, 1)
+metallic = 1.0
+roughness = 0.25
+rim_enabled = true
+rim = 0.5
 
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_body"]
-material = SubResource("StandardMaterial3D_body")
-radius = 0.02
-height = 0.2
+[sub_resource type="CylinderMesh" id="Mesh_Handle"]
+material = SubResource("Material_Handle")
+top_radius = 0.015
+bottom_radius = 0.018
+height = 0.18
+radial_segments = 8
+rings = 1
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tip"]
-albedo_color = Color(0.8, 0.8, 0.8, 1)
+[sub_resource type="StandardMaterial3D" id="Material_Accent"]
+albedo_color = Color(0.2, 0.4, 1.0, 1)
 emission_enabled = true
-emission = Color(0.8, 0.8, 0.8, 1)
-emission_energy_multiplier = 0.5
+emission = Color(0.2, 0.4, 1, 1)
+emission_energy_multiplier = 2.0
 
-[sub_resource type="SphereMesh" id="SphereMesh_tip"]
-material = SubResource("StandardMaterial3D_tip")
-radius = 0.02
-height = 0.04
-radial_segments = 12
-rings = 6
+[sub_resource type="TorusMesh" id="Mesh_Accent"]
+material = SubResource("Material_Accent")
+inner_radius = 0.018
+outer_radius = 0.02
+ring_segments = 6
+rings = 12
+
+[sub_resource type="StandardMaterial3D" id="Material_Tip"]
+transparency = 1
+albedo_color = Color(0.3, 0.7, 1.0, 0.6)
+emission_enabled = true
+emission = Color(0.2, 0.5, 1.0, 1)
+emission_energy_multiplier = 4.0
+metallic = 0.5
+roughness = 0.1
+
+[sub_resource type="PrismMesh" id="Mesh_Tip"]
+material = SubResource("Material_Tip")
+size = Vector3(0.01, 0.04, 0.01)
 
 [node name="PolyTool" type="RigidBody3D"]
 mass = 0.25
@@ -50,18 +68,22 @@ color_mesh = Color(0.8, 0.8, 0.8, 0.5)
 shape = SubResource("CapsuleShape3D_body")
 
 [node name="BodyMesh" type="MeshInstance3D" parent="."]
-mesh = SubResource("CapsuleMesh_body")
+mesh = SubResource("Mesh_Handle")
+
+[node name="AccentRing" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.07, 0)
+mesh = SubResource("Mesh_Accent")
 
 [node name="Tip" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.107, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.09, 0)
 
 [node name="TipMesh" type="MeshInstance3D" parent="Tip"]
-mesh = SubResource("SphereMesh_tip")
+transform = Transform3D(1, 0, 0, 0, -1, 8.74228e-08, 0, -8.74228e-08, -1, 0, 0.02, 0)
+mesh = SubResource("Mesh_Tip")
 
 [node name="Label3D" type="Label3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.22, 0)
-text = "Poly Tool
-Grip: Cycle Mode
-Trigger: Action"
+visible = false
+text = "Poly Tool"
 font_size = 16
 outline_size = 6
