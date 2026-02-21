@@ -201,7 +201,13 @@ func _physics_process(delta: float) -> void:
 	if not is_instance_valid(_voxel_manager):
 		_find_voxel_manager()
 	
-	if not is_grabbed or not is_instance_valid(grabbing_hand):
+	if not is_grabbed:
+		_set_visuals_visible(false)
+		return
+	
+	# In VR mode, we need a valid grabbing_hand. 
+	# In desktop mode, we might be parented directly to the camera without a physics hand.
+	if not is_desktop_grabbed and not is_instance_valid(grabbing_hand):
 		_set_visuals_visible(false)
 		return
 	
@@ -237,6 +243,10 @@ func _ensure_visuals_in_tree() -> void:
 
 
 func _process_input(delta: float) -> void:
+	if is_desktop_grabbed:
+		_process_desktop_input(delta)
+		return
+
 	var controller = _get_controller()
 	if not controller:
 		return
@@ -280,6 +290,45 @@ func _process_input(delta: float) -> void:
 	# Voxel size adjustment (thumbstick X while holding grip)
 	if grip_pressed and abs(axis_input.x) > ray_deadzone:
 		_adjust_voxel_size(axis_input.x * delta)
+
+
+func _process_desktop_input(delta: float) -> void:
+	# Desktop input handling
+	_is_remove_mode = Input.is_action_pressed("grip_click") # Usually Right Click
+	
+	var trigger_pressed = Input.is_action_pressed("trigger_click") # Usually Left Click
+	
+	if trigger_pressed and not _was_trigger_pressed:
+		if _has_hit or always_show_indicator:
+			if _is_remove_mode:
+				_remove_voxel()
+			else:
+				_place_voxel()
+	
+	_was_trigger_pressed = trigger_pressed
+	
+	# Ray length adjustment with mouse wheel (handled via action in project.godot or checking events)
+	# Since project.godot doesn't have wheel actions, we'll check for them here or rely on desktop interaction
+	if Input.is_action_just_pressed("ui_text_scroll_up"):
+		_adjust_ray_length(1.0, delta)
+	elif Input.is_action_just_pressed("ui_text_scroll_down"):
+		_adjust_ray_length(-1.0, delta)
+	
+	# Voxel size cycling with keys
+	if Input.is_action_just_pressed("ui_right"):
+		cycle_voxel_size_preset(true)
+	elif Input.is_action_just_pressed("ui_left"):
+		cycle_voxel_size_preset(false)
+
+
+func _adjust_ray_length(direction: float, delta: float) -> void:
+	ray_length = clamp(
+		ray_length + direction * ray_length_adjust_speed * delta * 5.0, # Faster response for discrete steps
+		ray_length_min,
+		ray_length_max
+	)
+	if raycast:
+		raycast.target_position = Vector3(0, 0, -ray_length)
 
 
 func _get_controller() -> XRController3D:
