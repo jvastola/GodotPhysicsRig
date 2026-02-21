@@ -95,93 +95,41 @@ func _setup_network_sync() -> void:
 	
 	print("GrabbableNetworkComponent: ", save_id, " network sync initialized")
 
-func _on_network_grab(object_id: String, peer_id: int) -> void:
-	"""Handle another player grabbing this object via ENet P2P (legacy)"""
+func _on_network_grab(object_id: String, peer_id: Variant, hand_name: String = "", rel_pos: Vector3 = Vector3.ZERO, rel_rot: Quaternion = Quaternion.IDENTITY) -> void:
+	"""Handle another player grabbing this object"""
 	if object_id != save_id:
 		return
 	
 	# Don't process our own grabs
-	if network_manager and peer_id == network_manager.get_multiplayer_id():
+	var is_local := false
+	if network_manager:
+		if network_manager.use_nakama:
+			is_local = (str(peer_id) == network_manager.get_nakama_user_id())
+		else:
+			is_local = (str(peer_id) == str(network_manager.get_multiplayer_id()))
+			
+	if is_local:
 		return
 	
 	print("GrabbableNetworkComponent: ", save_id, " grabbed by remote player ", peer_id)
 	is_network_owner = false
 	
-	network_grab.emit(str(peer_id), "", Vector3.ZERO, Quaternion.IDENTITY)
+	network_grab.emit(str(peer_id), hand_name, rel_pos, rel_rot)
 
-func _on_nakama_match_state(sender_id: String, op_code: int, data: Variant) -> void:
-	"""Handle incoming Nakama match state"""
-	if not NakamaManager:
-		return
-		
-	# Filter for this object
-	# Data should be a dictionary for grabbable events
-	if not data is Dictionary:
-		return
-		
-	if data.get("object_id") != save_id:
-		return
-	
-	# Map Nakama op codes to local actions
-	match op_code:
-		NakamaManager.MatchOpCode.GRAB_OBJECT:
-			print("GrabbableNetworkComponent: ", save_id, " grabbed by Nakama peer ", sender_id)
-			is_network_owner = false
-			
-			var hand_name = data.get("hand_name", "")
-			var rel_pos = Vector3.ZERO
-			if data.has("rel_pos"):
-				rel_pos = _parse_vector3(data["rel_pos"])
-			var rel_rot = Quaternion.IDENTITY
-			if data.has("rel_rot"):
-				rel_rot = _parse_quaternion(data["rel_rot"])
-			
-			network_grab.emit(sender_id, hand_name, rel_pos, rel_rot)
-			
-		NakamaManager.MatchOpCode.RELEASE_OBJECT:
-			print("GrabbableNetworkComponent: ", save_id, " released by Nakama peer ", sender_id)
-			
-			# Sync final position/rotation from data
-			var sync_data = {} # Initialize sync_data here
-			if data.has("pos"):
-				sync_data["position"] = _parse_vector3(data["pos"])
-			if data.has("rot"):
-				sync_data["rotation"] = _parse_quaternion(data["rot"])
-			if data.has("lin_vel"):
-				sync_data["linear_velocity"] = _parse_vector3(data["lin_vel"])
-			if data.has("ang_vel"):
-				sync_data["angular_velocity"] = _parse_vector3(data["ang_vel"])
-			
-			# Only emit sync if there's actual data to sync
-			if not sync_data.is_empty():
-				network_sync.emit(sync_data)
-			
-			is_network_owner = false
-			network_release.emit(sender_id)
-			
-		NakamaManager.MatchOpCode.OBJECT_UPDATE:
-			if is_network_owner or is_grabbed:
-				return
-				
-			var sync_data = {}
-			if data.has("pos"):
-				sync_data["position"] = _parse_vector3(data["pos"])
-			if data.has("rot"):
-				sync_data["rotation"] = _parse_quaternion(data["rot"])
-			if data.has("rel_pos"):
-				sync_data["rel_pos"] = _parse_vector3(data["rel_pos"])
-			if data.has("rel_rot"):
-				sync_data["rel_rot"] = _parse_quaternion(data["rel_rot"])
-			
-			network_sync.emit(sync_data)
-
-func _on_network_release(object_id: String, peer_id: int) -> void:
-	"""Handle another player releasing this object via ENet P2P (legacy)"""
+func _on_network_release(object_id: String, peer_id: Variant) -> void:
+	"""Handle another player releasing this object"""
 	if object_id != save_id:
 		return
 	
 	# Don't process our own releases
-	if network_manager and peer_id == network_manager.get_multiplayer_id():
+	var is_local := false
+	if network_manager:
+		if network_manager.use_nakama:
+			is_local = (str(peer_id) == network_manager.get_nakama_user_id())
+		else:
+			is_local = (str(peer_id) == str(network_manager.get_multiplayer_id()))
+			
+	if is_local:
 		return
 	
 	print("GrabbableNetworkComponent: ", save_id, " released by remote player ", peer_id)

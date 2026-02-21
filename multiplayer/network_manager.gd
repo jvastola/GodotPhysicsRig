@@ -41,8 +41,8 @@ var local_player_info: Dictionary = {
 
 # Grabbable sync
 var grabbed_objects: Dictionary = {} # object_id -> {owner_peer_id, position, rotation, is_grabbed}
-signal grabbable_grabbed(object_id: String, peer_id: int)
-signal grabbable_released(object_id: String, peer_id: int)
+signal grabbable_grabbed(object_id: String, peer_id: Variant, hand_name: String, rel_pos: Vector3, rel_rot: Quaternion)
+signal grabbable_released(object_id: String, peer_id: Variant)
 signal grabbable_sync_update(object_id: String, data: Dictionary)
 
 # Avatar signals
@@ -664,13 +664,13 @@ func grab_object(object_id: String, hand_name: String = "", rel_pos: Vector3 = V
 			"object_id": object_id,
 			"hand_name": hand_name,
 			"rel_pos": _vec3_to_dict(rel_pos),
-			"rel_rot": _quat_to_dict(rel_rot) # need a new dict helper for this
+			"rel_rot": _quat_to_dict(rel_rot)
 		}
 		NakamaManager.send_match_state(NakamaManager.MatchOpCode.GRAB_OBJECT, grab_data)
 	elif multiplayer.multiplayer_peer:
-		_notify_grab.rpc_id(0, object_id, peer_id)
+		_notify_grab.rpc_id(0, object_id, peer_id, hand_name, rel_pos, rel_rot)
 	
-	grabbable_grabbed.emit(object_id, peer_id)
+	grabbable_grabbed.emit(object_id, peer_id, hand_name, rel_pos, rel_rot)
 	print("NetworkManager: Grabbed object ", object_id)
 
 
@@ -720,15 +720,16 @@ func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion, rel
 
 
 @rpc("reliable", "call_remote", "any_peer")
-func _notify_grab(object_id: String, peer_id: int) -> void:
+func _notify_grab(object_id: String, peer_id: int, hand_name: String = "", rel_pos: Vector3 = Vector3.ZERO, rel_rot: Quaternion = Quaternion.IDENTITY) -> void:
 	"""Receive notification that someone grabbed an object"""
 	grabbed_objects[object_id] = {
 		"owner_peer_id": peer_id,
 		"is_grabbed": true,
 		"position": Vector3.ZERO,
-		"rotation": Quaternion.IDENTITY
+		"rotation": Quaternion.IDENTITY,
+		"hand_name": hand_name
 	}
-	grabbable_grabbed.emit(object_id, peer_id)
+	grabbable_grabbed.emit(object_id, peer_id, hand_name, rel_pos, rel_rot)
 
 
 @rpc("reliable", "call_remote", "any_peer")
@@ -944,7 +945,11 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 			
 	elif op_code == NakamaManager.MatchOpCode.GRAB_OBJECT:
 		if data is Dictionary and data.has("object_id"):
-			grabbable_grabbed.emit(data["object_id"], peer_id)
+			var object_id = data["object_id"]
+			var hand_name = data.get("hand_name", "")
+			var rel_pos = _parse_vector3(data.get("rel_pos", {}))
+			var rel_rot = _parse_quaternion(data.get("rel_rot", {}))
+			grabbable_grabbed.emit(object_id, peer_id, hand_name, rel_pos, rel_rot)
 			
 	elif op_code == NakamaManager.MatchOpCode.RELEASE_OBJECT:
 		if data is Dictionary and data.has("object_id"):
