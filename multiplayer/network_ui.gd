@@ -15,6 +15,7 @@ var virtual_keyboard: Node = null
 @onready var player_list_label: Label = $Panel/VBoxContainer/PlayerListLabel
 @onready var voice_button: Button = $Panel/VBoxContainer/FeaturesContainer/VoiceButton
 @onready var avatar_button: Button = $Panel/VBoxContainer/FeaturesContainer/AvatarButton
+@onready var spawn_button: Button = $Panel/VBoxContainer/FeaturesContainer/SpawnButton
 
 # Room browser
 @onready var refresh_button: Button = $Panel/VBoxContainer/RoomListHeaderContainer/RefreshButton
@@ -64,6 +65,7 @@ func _ready() -> void:
 	disconnect_button.pressed.connect(_on_disconnect_pressed)
 	voice_button.pressed.connect(_on_voice_pressed)
 	avatar_button.pressed.connect(_on_avatar_pressed)
+	spawn_button.pressed.connect(_on_spawn_pressed)
 	keyboard_button.pressed.connect(_on_keyboard_button_pressed)
 	refresh_button.pressed.connect(_on_refresh_rooms_pressed)
 	
@@ -277,6 +279,29 @@ func _on_avatar_pressed() -> void:
 		avatar_button.text = "Send Avatar"
 	else:
 		print("NetworkUI: XRPlayer not found or doesn't have send_avatar_texture method")
+
+
+func _on_spawn_pressed() -> void:
+	if not network_manager:
+		return
+		
+	# Spawn a cube 2 meters in front of the player
+	var spawn_pos = Vector3.ZERO
+	var player = network_manager.local_player
+	if not player:
+		# Search for it
+		player = get_tree().get_first_node_in_group("player")
+		
+	if player:
+		# Place 2 meters in front of player's face
+		var forward = -player.global_transform.basis.z.normalized()
+		spawn_pos = player.global_position + forward * 2.0 + Vector3.UP * 0.5
+	else:
+		# Fallback to origin
+		spawn_pos = Vector3(0, 1.5, 0)
+	
+	network_manager.spawn_network_object("res://src/objects/grabbables/GrabbableCube.tscn", spawn_pos)
+	print("NetworkUI: Spawning networked object at ", spawn_pos)
 
 
 

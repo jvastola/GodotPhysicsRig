@@ -57,7 +57,8 @@ enum MatchOpCode {
 	VOXEL_REMOVE = 6,
 	VOXEL_BATCH = 8,
 	VOICE_DATA = 7,
-	AVATAR_DATA = 9
+	AVATAR_DATA = 9,
+	SPAWN_OBJECT = 10
 }
 
 

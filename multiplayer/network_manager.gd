@@ -767,6 +767,61 @@ func get_object_owner(object_id: String) -> int:
 
 
 # ============================================================================
+# Networked Object Spawning
+# ============================================================================
+
+func spawn_network_object(scene_path: String, position: Vector3) -> void:
+	"""Spawn an object on all connected clients"""
+	var object_id = "obj_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000)
+	
+	if use_nakama and NakamaManager:
+		var spawn_data = {
+			"scene_path": scene_path,
+			"pos": _vec3_to_dict(position),
+			"object_id": object_id
+		}
+		NakamaManager.send_match_state(NakamaManager.MatchOpCode.SPAWN_OBJECT, spawn_data)
+		# Also spawn locally
+		_do_spawn_object(scene_path, position, object_id)
+	elif multiplayer.multiplayer_peer:
+		# Call on all clients (including local)
+		_spawn_object_remote.rpc(scene_path, position, object_id)
+
+
+@rpc("reliable", "call_local", "any_peer")
+func _spawn_object_remote(scene_path: String, position: Vector3, object_id: String) -> void:
+	"""RPC to spawn object on all clients"""
+	_do_spawn_object(scene_path, position, object_id)
+
+
+func _do_spawn_object(scene_path: String, position: Vector3, object_id: String) -> void:
+	"""Internal helper to instantiate and add object to scene"""
+	var scene = load(scene_path)
+	if not scene:
+		push_error("NetworkManager: Failed to load scene for spawning: " + scene_path)
+		return
+		
+	var instance = scene.instantiate()
+	if not instance:
+		push_error("NetworkManager: Failed to instantiate scene: " + scene_path)
+		return
+		
+	instance.name = object_id
+	if instance.has_method("set"):
+		instance.set("save_id", object_id)
+		
+	# Add to current world
+	var world = get_tree().current_scene
+	if world:
+		world.add_child(instance)
+		if instance is Node3D:
+			instance.global_position = position
+		print("NetworkManager: Spawned object ", object_id, " at ", position)
+	else:
+		push_error("NetworkManager: No current scene to spawn object into")
+
+
+# ============================================================================
 # Voxel Build Sync
 # ============================================================================
 
@@ -879,6 +934,38 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 				elif type == 1: # Remove
 					voxel_removed_network.emit(pos)
 			print("NetworkManager (Nakama): Processed voxel batch of size ", data["updates"].size(), " from ", peer_id)
+			
+	elif op_code == NakamaManager.MatchOpCode.SPAWN_OBJECT:
+		if data is Dictionary and data.has("scene_path") and data.has("pos") and data.has("object_id"):
+			var scene_path = data["scene_path"]
+			var pos = _parse_vector3(data["pos"])
+			var object_id = data["object_id"]
+			_do_spawn_object(scene_path, pos, object_id)
+			
+	elif op_code == NakamaManager.MatchOpCode.GRAB_OBJECT:
+		if data is Dictionary and data.has("object_id"):
+			grabbable_grabbed.emit(data["object_id"], peer_id)
+			
+	elif op_code == NakamaManager.MatchOpCode.RELEASE_OBJECT:
+		if data is Dictionary and data.has("object_id"):
+			var object_id = data["object_id"]
+			grabbable_released.emit(object_id, peer_id)
+			if data.has("pos") and data.has("rot"):
+				grabbable_sync_update.emit(object_id, {
+					"position": _parse_vector3(data["pos"]),
+					"rotation": _parse_quaternion(data["rot"])
+				})
+				
+	elif op_code == NakamaManager.MatchOpCode.OBJECT_UPDATE:
+		if data is Dictionary and data.has("object_id") and data.has("pos") and data.has("rot"):
+			var object_id = data["object_id"]
+			var sync_data = {
+				"position": _parse_vector3(data["pos"]),
+				"rotation": _parse_quaternion(data["rot"])
+			}
+			if data.has("rel_pos"): sync_data["rel_pos"] = _parse_vector3(data["rel_pos"])
+			if data.has("rel_rot"): sync_data["rel_rot"] = _parse_quaternion(data["rel_rot"])
+			grabbable_sync_update.emit(object_id, sync_data)
 
 
 func _parse_vector3(data) -> Vector3:
@@ -902,6 +989,14 @@ func _parse_color(data) -> Color:
 	elif data is Dictionary:
 		return Color(data.get("r", 1), data.get("g", 1), data.get("b", 1), data.get("a", 1))
 	return Color.WHITE
+
+
+func _parse_quaternion(data) -> Quaternion:
+	if data is Quaternion:
+		return data
+	elif data is Dictionary:
+		return Quaternion(data.get("x", 0), data.get("y", 0), data.get("z", 0), data.get("w", 1))
+	return Quaternion.IDENTITY
 
 
 # ============================================================================

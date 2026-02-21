@@ -154,6 +154,13 @@ theme_override_colors/font_color = Color(0.8, 0.5, 1, 1)
 theme_override_font_sizes/font_size = 14
 text = "👤 Avatar"
 
+[node name="SpawnButton" type="Button" parent="Panel/VBoxContainer/FeaturesContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.1, 0.8, 0.8, 1)
+theme_override_font_sizes/font_size = 14
+text = "📦 Spawn"
+
 [node name="HSeparator4" type="HSeparator" parent="Panel/VBoxContainer"]
 layout_mode = 2
 
