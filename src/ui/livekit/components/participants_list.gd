@@ -121,7 +121,7 @@ func update_audio_level(identity: String, level: float):
 func process_audio_frame(identity: String, frame: PackedVector2Array):
 	"""Process incoming audio frame for a participant"""
 	if not participants.has(identity):
-		add_participant(identity)
+		return # Do not recreate ghost participants from late audio frames
 	
 	var p_data = participants[identity]
 	

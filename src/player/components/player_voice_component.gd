@@ -187,9 +187,16 @@ func _on_audio_frame(peer_id: String, frame: PackedVector2Array) -> void:
 	
 	# Find the NetworkPlayer for this participant if we haven't yet
 	if not player_data["player_node"]:
-		player_data["player_node"] = _find_network_player(peer_id)
-		if player_data["player_node"]:
-			print("✅ PlayerVoiceComponent: Found NetworkPlayer for ", peer_id, ": ", player_data["player_node"].name)
+		var now = Time.get_ticks_msec() / 1000.0
+		var search_key = peer_id + "_search"
+		
+		# Rate-limit full scene tree searches for missing players to 1 per second
+		if not _logged_missing_players.has(search_key) or (now - _logged_missing_players[search_key]) > 1.0:
+			_logged_missing_players[search_key] = now
+			
+			player_data["player_node"] = _find_network_player(peer_id)
+			if player_data["player_node"]:
+				print("✅ PlayerVoiceComponent: Found NetworkPlayer for ", peer_id, ": ", player_data["player_node"].name)
 	
 	# Create spatial audio player if needed
 	if not player_data["audio_player"] and player_data["player_node"]:

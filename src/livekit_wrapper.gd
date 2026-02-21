@@ -313,11 +313,11 @@ func set_metadata(metadata: String) -> void:
 		if _android_plugin:
 			_android_plugin.setMetadata(metadata)
 	else:
-		if _rust_manager and _rust_manager.has_method("set_username"):
+		if _rust_manager and _rust_manager.has_method("update_username"):
 			# Rust uses username as metadata
 			var parsed = JSON.parse_string(metadata)
 			if parsed and parsed.has("username"):
-				_rust_manager.set_username(parsed.username)
+				_rust_manager.update_username(parsed.username)
 
 
 ## Check if currently connected to a room
