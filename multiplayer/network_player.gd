@@ -202,6 +202,13 @@ func _update_label_position() -> void:
 		label_3d.global_position = head_visual.global_position + Vector3(0, 0.3, 0)
 
 
+## Set the display name directly on the 3D label
+func set_player_name(new_name: String) -> void:
+	if label_3d:
+		label_3d.text = new_name
+		print("NetworkPlayer: Set name to ", new_name)
+
+
 
 ## Apply avatar textures to player meshes
 func apply_avatar_textures(textures_data: Dictionary) -> void:

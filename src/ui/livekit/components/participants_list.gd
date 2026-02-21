@@ -40,13 +40,20 @@ func _process(delta):
 		if p_data.has("level_bar") and p_data["level_bar"] and is_instance_valid(p_data["level_bar"]):
 			p_data["level_bar"].value = p_data["level"] * 100
 		
-		# Update connection status dot
+		# Update connection status dot and sync name
 		if p_data.get("status_dot") and is_instance_valid(p_data["status_dot"]):
 			var network_player = _find_network_player(p_id)
 			if network_player:
 				p_data["status_dot"].color = Color(0.30, 0.85, 0.40)  # Green — connected
+				
+				# Sync the name to the 3D player if we haven't yet
+				if not p_data.get("name_synced", false) and participant_usernames.has(p_id):
+					if network_player.has_method("set_player_name"):
+						network_player.set_player_name(participant_usernames[p_id])
+						p_data["name_synced"] = true
 			else:
 				p_data["status_dot"].color = Color(0.50, 0.50, 0.50)  # Gray — not found
+				p_data["name_synced"] = false # Reset if player disappears
 
 
 func add_participant(identity: String):
@@ -62,6 +69,7 @@ func add_participant(identity: String):
 		"volume": 1.0,
 		"status_dot": null,
 		"name_label": null,
+		"name_synced": false,
 	}
 	print("ParticipantsList: Added ", identity)
 	_rebuild_list()
@@ -84,6 +92,17 @@ func remove_participant(identity: String):
 func set_participant_username(identity: String, username: String):
 	"""Set display name for a participant"""
 	participant_usernames[identity] = username
+	
+	# Sync the name down to the 3D player model in the world
+	var network_player = _find_network_player(identity)
+	if network_player and network_player.has_method("set_player_name"):
+		network_player.set_player_name(username)
+		if participants.has(identity):
+			participants[identity]["name_synced"] = true
+	else:
+		if participants.has(identity):
+			participants[identity]["name_synced"] = false
+		
 	# Update name_label in-place if it exists (avoids full rebuild flicker)
 	if participants.has(identity):
 		var p_data = participants[identity]
