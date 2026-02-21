@@ -498,7 +498,8 @@ func _generate_livekit_token(participant_id: String, room_name: String) -> Strin
 			"room": room_name,
 			"roomJoin": true,
 			"canPublish": true,
-			"canSubscribe": true
+			"canSubscribe": true,
+			"canUpdateOwnMetadata": true
 		}
 	}
 	

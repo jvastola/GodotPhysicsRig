@@ -57,11 +57,16 @@ func _process(delta):
 
 
 func add_participant(identity: String):
-	"""Add a participant to the list"""
-	if participants.has(identity):
-		return
+	"""Add a new participant to the list or update their base identity"""
+	var display_name = identity
 	
-	participants[identity] = {
+	# If participant already exists (e.g., from an early metadata event), preserve their name
+	if participants.has(identity) and participant_usernames.has(identity):
+		display_name = participant_usernames[identity]
+	else:
+		participant_usernames[identity] = identity
+	
+	var p_data = {
 		"player": null,
 		"level": 0.0,
 		"level_bar": null,

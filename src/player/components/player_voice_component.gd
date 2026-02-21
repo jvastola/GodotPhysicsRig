@@ -202,7 +202,7 @@ func _on_audio_frame(peer_id: String, frame: PackedVector2Array) -> void:
 	if not player_data["audio_player"] and player_data["player_node"]:
 		_create_spatial_audio_player(peer_id, player_data["player_node"])
 	
-	# Push audio data to the spatial audio player
+	# Push audio data to the spatial audio player ONLY if it's securely attached to a body
 	if player_data["audio_player"] and is_instance_valid(player_data["audio_player"]):
 		var audio_player = player_data["audio_player"]
 		var playback = audio_player.get_stream_playback()
@@ -210,7 +210,8 @@ func _on_audio_frame(peer_id: String, frame: PackedVector2Array) -> void:
 		if playback:
 			playback.push_buffer(frame)
 	else:
-		# Rate-limited logging for missing spatial player
+		# Fast-fail the audio playback if Nakama hasn't spawned the NetworkPlayer body yet.
+		# Rate-limited logging for missing spatial player during the grace/reconnect period.
 		if frame.size() > 0:
 			var now = Time.get_ticks_msec() / 1000.0
 			var log_key = peer_id + "_spatial"

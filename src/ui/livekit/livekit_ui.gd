@@ -249,7 +249,11 @@ func _on_room_disconnected():
 	current_room_name = ""
 	_set_status("Disconnected")
 	connection_panel.set_connected(false)
-	participants_list.clear()
+	
+	# Force wipe the entire participant UI list so ghosts from ungraceful
+	# disconnects don't bleed into the next reconnect attempt
+	if participants_list and is_instance_valid(participants_list):
+		participants_list.clear()
 
 
 func _on_participant_joined(identity: String, _name: String = ""):
