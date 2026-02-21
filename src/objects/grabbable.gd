@@ -420,6 +420,7 @@ func _physics_process(_delta: float) -> void:
 			return
 		
 		# Validate first collision shape still exists and is a child of hand
+		if not is_instance_valid(grabbed_collision_shapes[0]) or grabbed_collision_shapes[0].get_parent() != grabbing_hand:
 			is_grabbed = false
 			_set_original_visuals_visible(true)
 			freeze = false
