@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://bvxqw8n4j7m3p"]
 
-[ext_resource type="Script" path="res://multiplayer/network_player.gd" id="1"]
+[ext_resource type="Script" path="res://multiplayer/client/scripts/network_player.gd" id="1"]
 
 [node name="NetworkPlayer" type="Node3D"]
 script = ExtResource("1")

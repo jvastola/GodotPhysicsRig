@@ -17,7 +17,7 @@ docker-compose up -d
 ### 2. Open the Test Scene
 
 In Godot:
-- Navigate to `res://multiplayer/nakama_test.tscn`
+- Navigate to `res://multiplayer/client/scenes/nakama_test.tscn`
 - Open the scene
 - Press F6 to run
 

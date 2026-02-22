@@ -1,6 +1,6 @@
 [gd_resource type="ShaderMaterial" format=3 uid="uid://bvqm8x7y5n8hs"]
 
-[ext_resource type="Shader" path="res://src/demos/tools/shaders/plasma_spatial.gdshader" id="1_shader"]
+[ext_resource type="Shader" uid="uid://c4aov13mxm0lj" path="res://src/demos/tools/shaders/plasma_spatial.gdshader" id="1_shader"]
 
 [sub_resource type="FastNoiseLite" id="FastNoiseLite_1"]
 noise_type = 2

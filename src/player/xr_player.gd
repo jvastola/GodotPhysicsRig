@@ -28,7 +28,7 @@ extends Node3D
 @onready var body_mesh: MeshInstance3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea/BodyMesh
 
 # Hand Tracking
-const CAPSULE_MATERIAL = preload("res://capsule_material.tres")
+const CAPSULE_MATERIAL = preload("res://assets/materials/capsule_material.tres")
 
 @onready var left_hand_ray_cast: RayCast3D = $PlayerBody/XROrigin3D/LeftController/RayCast3D
 @onready var left_hand_tracker_node: XRNode3D = $PlayerBody/XROrigin3D/LeftHandTracker

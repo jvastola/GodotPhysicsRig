@@ -1,7 +1,7 @@
 [gd_scene load_steps=7 format=3 uid="uid://b8k3v2oax4mjw"]
 
-[ext_resource type="Script" path="res://multiplayer/network_ui_viewport_3d.gd" id="1_script"]
-[ext_resource type="PackedScene" uid="uid://cr7v4m2k8w5fx" path="res://multiplayer/NetworkUI.tscn" id="2_network_ui"]
+[ext_resource type="Script" path="res://multiplayer/client/scripts/network_ui_viewport_3d.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://cr7v4m2k8w5fx" path="res://multiplayer/client/scenes/NetworkUI.tscn" id="2_network_ui"]
 
 [sub_resource type="ViewportTexture" id="ViewportTexture_network_ui"]
 viewport_path = NodePath("SubViewport")

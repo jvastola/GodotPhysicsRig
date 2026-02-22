@@ -10,7 +10,7 @@
 [ext_resource type="Script" uid="uid://dacfvlwh7dwcm" path="res://src/objects/viewport_mirror.gd" id="8_viewport_mirror"]
 [ext_resource type="PackedScene" uid="uid://bhun80s4vlhet" path="res://src/objects/RotatingObject.tscn" id="9_rotating"]
 [ext_resource type="Script" uid="uid://b3e1iih2vth83" path="res://src/systems/grid_painter.gd" id="10_grid_painter"]
-[ext_resource type="PackedScene" uid="uid://b8k3v2oax4mjw" path="res://multiplayer/NetworkUIViewport3D.tscn" id="11_network_ui"]
+[ext_resource type="PackedScene" uid="uid://b8k3v2oax4mjw" path="res://multiplayer/client/scenes/NetworkUIViewport3D.tscn" id="11_network_ui"]
 [ext_resource type="Script" uid="uid://b8r57aadml1x5" path="res://src/debug/inventory_debug.gd" id="12_inventory_debug"]
 
 [sub_resource type="Environment" id="Environment_main"]

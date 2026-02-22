@@ -5,7 +5,7 @@ signal player_connected(peer_id: Variant)
 signal player_disconnected(peer_id: Variant)
 signal avatar_texture_received(peer_id: Variant)
 
-const NETWORK_PLAYER_SCENE = preload("res://multiplayer/NetworkPlayer.tscn")
+const NETWORK_PLAYER_SCENE = preload("res://multiplayer/client/scenes/NetworkPlayer.tscn")
 
 var network_manager: Node = null
 var remote_players: Dictionary = {} # peer_id (Variant) -> NetworkPlayer instance
@@ -66,7 +66,7 @@ func _on_local_match_joined(_match_id: String) -> void:
 
 func _update_networking(delta: float) -> void:
 	"""Send player transform updates to network and update remote players"""
-	if not network_manager or not network_manager.multiplayer.multiplayer_peer:
+	if not network_manager or not network_manager.use_nakama:
 		return
 	
 	# Throttle updates to update_rate

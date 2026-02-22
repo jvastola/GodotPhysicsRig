@@ -17,6 +17,7 @@ mono_crash.*.json
 icon.svg.import
 editor_data/
 bin/
+build/
 logs/
 user://
 .DS_Store
@@ -35,10 +36,6 @@ addons/godot-xr-tools/
 godot-livekit
 addons/godotopenxrvendors/
 
-# Keystores (sensitive - covered by android/keystore/ rule above)
-# *.keystore
-# *.jks
-
 # Sentry
 !addons/sentry/bin/
 
@@ -51,8 +48,7 @@ addons/godotopenxrvendors/
 local.properties
 
 # Temporary scripts
-add_jitpack.py
-create_local_prop.py
+*.py
 
 # LiveKit agent
 livekit-agent/.env
@@ -86,4 +82,13 @@ asset-server/node_modules/
 asset-server/uploads/
 asset-server/.env
 asset-server/package-lock.json
-android/build - Copy
+
+# General Node.js
+**/node_modules/
+**/dist/
+**/.env.local
+**/.env.*.local
+
+# Multiplayer Servers
+multiplayer/servers/nakama/data/
+multiplayer/servers/nakama/logs/

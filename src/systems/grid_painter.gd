@@ -13,7 +13,7 @@ const SURFACE_BODY := "body"
 @export var load_for_player: bool = true
 @export var link_hands: bool = true
 @export var player_target_name: String = "LeftHandMesh"
-@export var hand_material_base: Material = preload("res://world_grab_demo/ghost_hand.tres")
+@export var hand_material_base: Material = preload("res://src/demos/world_grab/ghost_hand.tres")
 
 @export_subgroup("Hands")
 @export_node_path("MeshInstance3D") var left_hand_target: NodePath = NodePath("PlayerBody/XROrigin3D/LeftController/LeftHandMesh")

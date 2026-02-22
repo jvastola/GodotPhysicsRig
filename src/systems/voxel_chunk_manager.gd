@@ -119,9 +119,6 @@ func add_voxel(world_pos: Vector3, color: Color = Color.WHITE, sync_network: boo
 		if network_manager and network_manager.get("use_nakama") and nakama_manager:
 			# Queue for Nakama batching
 			_queue_voxel_update(0, world_pos, color)
-		elif network_manager and network_manager.has_method("sync_voxel_placed"):
-			# Send via ENet
-			network_manager.sync_voxel_placed(world_pos, color)
 	
 	voxel_placed.emit(world_pos, color)
 
@@ -143,9 +140,6 @@ func remove_voxel(world_pos: Vector3, sync_network: bool = true) -> void:
 			if network_manager and network_manager.get("use_nakama") and nakama_manager:
 				# Queue for Nakama batching
 				_queue_voxel_update(1, world_pos)
-			elif network_manager and network_manager.has_method("sync_voxel_removed"):
-				# Send via ENet
-				network_manager.sync_voxel_removed(world_pos)
 		
 		voxel_removed.emit(world_pos)
 		

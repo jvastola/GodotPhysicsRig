@@ -4,10 +4,7 @@ extends Control
 @onready var host_button: Button = $Panel/VBoxContainer/ButtonsContainer/HostButton
 @onready var join_button: Button = $Panel/VBoxContainer/ButtonsContainer/JoinButton
 @onready var disconnect_button: Button = $Panel/VBoxContainer/DisconnectButton
-@onready var address_input: LineEdit = get_node_or_null("Panel/VBoxContainer/AddressInput")
 @onready var room_code_input: LineEdit = $Panel/VBoxContainer/RoomCodeInput
-@onready var port_input: LineEdit = $Panel/VBoxContainer/PortInput
-@onready var use_room_code_check: CheckButton = get_node_or_null("Panel/VBoxContainer/UseRoomCodeCheck")
 @onready var keyboard_button: Button = $Panel/VBoxContainer/KeyboardButton
 
 var virtual_keyboard: Node = null
@@ -75,7 +72,6 @@ func _ready() -> void:
 	network_manager.connection_succeeded.connect(_on_connection_succeeded)
 	network_manager.connection_failed.connect(_on_connection_failed)
 	network_manager.server_disconnected.connect(_on_server_disconnected)
-	network_manager.room_code_generated.connect(_on_room_code_generated)
 	
 	# Connect Nakama signals
 	nakama_manager.authenticated.connect(_on_nakama_authenticated)
@@ -86,7 +82,6 @@ func _ready() -> void:
 	nakama_manager.match_list_received.connect(_on_nakama_match_list_received)
 	
 	# Set defaults
-	port_input.text = "7777"
 	if room_code_input:
 		room_code_input.text = ""
 		room_code_input.placeholder_text = "Match ID"
@@ -216,8 +211,6 @@ func _on_connection_failed() -> void:
 	host_button.disabled = false
 	join_button.disabled = false
 
-	port_input.editable = true
-
 
 func _on_server_disconnected() -> void:
 	status_label.text = "Server disconnected"
@@ -225,18 +218,16 @@ func _on_server_disconnected() -> void:
 	join_button.disabled = false
 	disconnect_button.disabled = true
 
-	port_input.editable = true
-
 
 func _update_status() -> void:
-	if not network_manager or not network_manager.peer:
+	if not network_manager or not network_manager.use_nakama:
 		status_label.text = "Not connected"
 		return
 	
 	if network_manager.is_server():
-		status_label.text = "Hosting (ID: " + str(network_manager.get_multiplayer_id()) + ")"
+		status_label.text = "Match Authority (ID: " + network_manager.get_multiplayer_id().substr(0, 8) + ")"
 	else:
-		status_label.text = "Connected (ID: " + str(network_manager.get_multiplayer_id()) + ")"
+		status_label.text = "Connected (ID: " + network_manager.get_multiplayer_id().substr(0, 8) + ")"
 
 
 func _update_player_list() -> void:
@@ -249,12 +240,7 @@ func _update_player_list() -> void:
 	if player_count > 0:
 		player_list_label.text += "\n"
 		for peer_id in network_manager.players.keys():
-			# Support both int (ENet) and String (Nakama) peer IDs
-			var is_local = false
-			if network_manager.use_nakama:
-				is_local = (str(peer_id) == network_manager.get_nakama_user_id())
-			else:
-				is_local = (str(peer_id) == str(network_manager.get_multiplayer_id()))
+			var is_local = (str(peer_id) == network_manager.get_nakama_user_id())
 			
 			var marker = " (You)" if is_local else ""
 			var display_id = str(peer_id).substr(0, 8) if peer_id is String else str(peer_id)
@@ -362,12 +348,6 @@ func _on_keyboard_text_submitted(code: String) -> void:
 
 
 
-func _on_room_code_generated(code: String) -> void:
-	if room_code_input:
-		room_code_input.text = code
-		room_code_input.editable = false
-	status_label.text = "Room Code: " + code + " (Share this!)"
-	print("NetworkUI: Room code generated: ", code)
 
 
 # ============================================================================
@@ -507,7 +487,7 @@ func _update_network_stats_visibility() -> void:
 
 func _on_network_stats_updated(stats: Dictionary) -> void:
 	"""Handle network stats update from NetworkManager"""
-	if not network_manager or not network_manager.peer:
+	if not network_manager:
 		return
 	
 	# Update ping label

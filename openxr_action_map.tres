@@ -200,42 +200,6 @@ binding_path = "/user/hand/right/output/haptic"
 interaction_profile_path = "/interaction_profiles/khr/simple_controller"
 bindings = [SubResource("OpenXRIPBinding_r3qn1"), SubResource("OpenXRIPBinding_n01b8"), SubResource("OpenXRIPBinding_pjtev"), SubResource("OpenXRIPBinding_nqyri"), SubResource("OpenXRIPBinding_86uui"), SubResource("OpenXRIPBinding_nrtxc"), SubResource("OpenXRIPBinding_qovyo"), SubResource("OpenXRIPBinding_d6uso"), SubResource("OpenXRIPBinding_hvi7v"), SubResource("OpenXRIPBinding_7dxun"), SubResource("OpenXRIPBinding_rp8ih"), SubResource("OpenXRIPBinding_0uca0"), SubResource("OpenXRIPBinding_rjtq8"), SubResource("OpenXRIPBinding_lce2q")]
 
-[sub_resource type="OpenXRIPBinding" id="OpenXRIPBinding_qqulg"]
-action = SubResource("OpenXRAction_oi0ij")
-binding_path = "/user/hand/left/input/aim/pose"
-
-[sub_resource type="OpenXRIPBinding" id="OpenXRIPBinding_o1jns"]
-action = SubResource("OpenXRAction_oi0ij")
-binding_path = "/user/hand/right/input/aim/pose"
-
-[sub_resource type="OpenXRIPBinding" id="OpenXRIPBinding_jb8rd"]
-action = SubResource("OpenXRAction_m08eo")
-binding_path = "/user/hand/left/input/aim/pose"
-
-[sub_resource type="OpenXRIPBinding" id="OpenXRIPBinding_mob2x"]
-action = SubResource("OpenXRAction_m08eo")
-binding_path = "/user/hand/right/input/aim/pose"
-
-[sub_resource type="OpenXRIPBinding" id="OpenXRIPBinding_x2m78"]
-action = SubResource("OpenXRAction_c4j1d")
-binding_path = "/user/hand/left/input/grip/pose"
-
-[sub_resource type="OpenXRIPBinding" id="OpenXRIPBinding_4yx5x"]
-action = SubResource("OpenXRAction_c4j1d")
-binding_path = "/user/hand/right/input/grip/pose"
-
-[sub_resource type="OpenXRIPBinding" id="OpenXRIPBinding_lf38q"]
-action = SubResource("OpenXRAction_sopde")
-binding_path = "/user/hand/left/input/grip_surface/pose"
-
-[sub_resource type="OpenXRIPBinding" id="OpenXRIPBinding_ru5ja"]
-action = SubResource("OpenXRAction_sopde")
-binding_path = "/user/hand/right/input/grip_surface/pose"
-
-[sub_resource type="OpenXRInteractionProfile" id="OpenXRInteractionProfile_rdsma"]
-interaction_profile_path = "/interaction_profiles/ext/hand_interaction_ext"
-bindings = [SubResource("OpenXRIPBinding_qqulg"), SubResource("OpenXRIPBinding_o1jns"), SubResource("OpenXRIPBinding_jb8rd"), SubResource("OpenXRIPBinding_mob2x"), SubResource("OpenXRIPBinding_x2m78"), SubResource("OpenXRIPBinding_4yx5x"), SubResource("OpenXRIPBinding_lf38q"), SubResource("OpenXRIPBinding_ru5ja")]
-
 [sub_resource type="OpenXRIPBinding" id="OpenXRIPBinding_oc_aim_l"]
 action = SubResource("OpenXRAction_m08eo")
 binding_path = "/user/hand/left/input/aim/pose"
@@ -362,4 +326,4 @@ bindings = [SubResource("OpenXRIPBinding_oc_aim_l"), SubResource("OpenXRIPBindin
 
 [resource]
 action_sets = [SubResource("OpenXRActionSet_ngwcy")]
-interaction_profiles = [SubResource("OpenXRInteractionProfile_ckeh6"), SubResource("OpenXRInteractionProfile_rdsma"), SubResource("OpenXRInteractionProfile_oculus")]
+interaction_profiles = [SubResource("OpenXRInteractionProfile_ckeh6"), SubResource("OpenXRInteractionProfile_oculus")]

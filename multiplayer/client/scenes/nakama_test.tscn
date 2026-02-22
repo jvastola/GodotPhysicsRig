@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://cilwacmlp8b3k"]
 
-[ext_resource type="Script" uid="uid://p58dkx16gglx" path="res://multiplayer/nakama_test.gd" id="1_nakama_test"]
+[ext_resource type="Script" uid="uid://p58dkx16gglx" path="res://multiplayer/client/scripts/nakama_test.gd" id="1_nakama_test"]
 
 [node name="NakamaTest" type="Node"]
 script = ExtResource("1_nakama_test")

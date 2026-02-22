@@ -1,9 +1,0 @@
-# Nakama data
-data/postgres/
-data/*.db
-
-# Logs
-*.log
-
-# Environment
-.env

@@ -1,6 +1,6 @@
-[gd_scene format=3 uid="uid://dsqqsvu7vsf06"]
+[gd_scene load_steps=4 format=3 uid="uid://cr7v4m2k8w5fx"]
 
-[ext_resource type="Script" path="res://multiplayer/network_ui.gd" id="1"]
+[ext_resource type="Script" path="res://multiplayer/client/scripts/network_ui.gd" id="1"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 bg_color = Color(0.1, 0.1, 0.12, 0.95)
@@ -21,7 +21,7 @@ bg_color = Color(0.2, 0.4, 0.7, 0.3)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
 
-[node name="NetworkUI" type="Control" unique_id=1031404754]
+[node name="NetworkUI" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -30,7 +30,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
 
-[node name="Panel" type="Panel" parent="." unique_id=1425314271]
+[node name="Panel" type="Panel" parent="."]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -45,7 +45,7 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
 
-[node name="HeaderPanel" type="Panel" parent="Panel" unique_id=570579865]
+[node name="HeaderPanel" type="Panel" parent="Panel"]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
@@ -53,7 +53,7 @@ offset_bottom = 60.0
 grow_horizontal = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_header")
 
-[node name="TitleLabel" type="Label" parent="Panel/HeaderPanel" unique_id=243225524]
+[node name="TitleLabel" type="Label" parent="Panel/HeaderPanel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -66,7 +66,7 @@ text = "🌐 NAKAMA MULTIPLAYER"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="VBoxContainer" type="VBoxContainer" parent="Panel" unique_id=94214910]
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -79,7 +79,7 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 12
 
-[node name="StatusLabel" type="Label" parent="Panel/VBoxContainer" unique_id=256959518]
+[node name="StatusLabel" type="Label" parent="Panel/VBoxContainer"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 0.85, 1, 1)
 theme_override_font_sizes/font_size = 14
@@ -87,84 +87,84 @@ text = "Not connected"
 horizontal_alignment = 1
 autowrap_mode = 2
 
-[node name="HSeparator1" type="HSeparator" parent="Panel/VBoxContainer" unique_id=1064460541]
+[node name="HSeparator1" type="HSeparator" parent="Panel/VBoxContainer"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="RoomCodeInput" type="LineEdit" parent="Panel/VBoxContainer" unique_id=906347497]
+[node name="RoomCodeInput" type="LineEdit" parent="Panel/VBoxContainer"]
 layout_mode = 2
 theme_override_colors/font_placeholder_color = Color(0.5, 0.5, 0.6, 1)
 theme_override_font_sizes/font_size = 16
 placeholder_text = "Enter Match ID..."
-alignment = 1
 max_length = 64
+alignment = 1
 caret_blink = true
 
-[node name="KeyboardButton" type="Button" parent="Panel/VBoxContainer" unique_id=1099948188]
+[node name="KeyboardButton" type="Button" parent="Panel/VBoxContainer"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.8, 0.9, 1, 1)
 theme_override_font_sizes/font_size = 14
 text = "⌨️ Open Keyboard"
 
-[node name="HSeparator2" type="HSeparator" parent="Panel/VBoxContainer" unique_id=1593920427]
+[node name="HSeparator2" type="HSeparator" parent="Panel/VBoxContainer"]
 layout_mode = 2
 
-[node name="ButtonsContainer" type="HBoxContainer" parent="Panel/VBoxContainer" unique_id=1611321250]
+[node name="ButtonsContainer" type="HBoxContainer" parent="Panel/VBoxContainer"]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="HostButton" type="Button" parent="Panel/VBoxContainer/ButtonsContainer" unique_id=1628389845]
+[node name="HostButton" type="Button" parent="Panel/VBoxContainer/ButtonsContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.2, 1, 0.4, 1)
 theme_override_font_sizes/font_size = 16
 text = "🎮 Host"
 
-[node name="JoinButton" type="Button" parent="Panel/VBoxContainer/ButtonsContainer" unique_id=1807423893]
+[node name="JoinButton" type="Button" parent="Panel/VBoxContainer/ButtonsContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.4, 0.8, 1, 1)
 theme_override_font_sizes/font_size = 16
 text = "🔗 Join"
 
-[node name="DisconnectButton" type="Button" parent="Panel/VBoxContainer" unique_id=1145277681]
+[node name="DisconnectButton" type="Button" parent="Panel/VBoxContainer"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.4, 0.4, 1)
 theme_override_font_sizes/font_size = 14
 text = "⏏️ Disconnect"
 
-[node name="HSeparator3" type="HSeparator" parent="Panel/VBoxContainer" unique_id=808886207]
+[node name="HSeparator3" type="HSeparator" parent="Panel/VBoxContainer"]
 layout_mode = 2
 
-[node name="FeaturesContainer" type="HBoxContainer" parent="Panel/VBoxContainer" unique_id=500870769]
+[node name="FeaturesContainer" type="HBoxContainer" parent="Panel/VBoxContainer"]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="VoiceButton" type="Button" parent="Panel/VBoxContainer/FeaturesContainer" unique_id=1365812671]
+[node name="VoiceButton" type="Button" parent="Panel/VBoxContainer/FeaturesContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(1, 0.8, 0.3, 1)
 theme_override_font_sizes/font_size = 14
 text = "🎤 Voice"
 
-[node name="AvatarButton" type="Button" parent="Panel/VBoxContainer/FeaturesContainer" unique_id=1960833127]
+[node name="AvatarButton" type="Button" parent="Panel/VBoxContainer/FeaturesContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.8, 0.5, 1, 1)
 theme_override_font_sizes/font_size = 14
 text = "👤 Avatar"
 
-[node name="SpawnButton" type="Button" parent="Panel/VBoxContainer/FeaturesContainer" unique_id=598244948]
+[node name="SpawnButton" type="Button" parent="Panel/VBoxContainer/FeaturesContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.1, 0.8, 0.8, 1)
 theme_override_font_sizes/font_size = 14
 text = "📦 Spawn"
 
-[node name="HSeparator4" type="HSeparator" parent="Panel/VBoxContainer" unique_id=455895928]
+[node name="HSeparator4" type="HSeparator" parent="Panel/VBoxContainer"]
 layout_mode = 2
 
-[node name="PlayerListLabel" type="Label" parent="Panel/VBoxContainer" unique_id=563810949]
+[node name="PlayerListLabel" type="Label" parent="Panel/VBoxContainer"]
 custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.85, 0.9, 1, 1)
@@ -172,38 +172,38 @@ theme_override_font_sizes/font_size = 13
 text = "Players: 0"
 vertical_alignment = 1
 
-[node name="HSeparator5" type="HSeparator" parent="Panel/VBoxContainer" unique_id=862743441]
+[node name="HSeparator5" type="HSeparator" parent="Panel/VBoxContainer"]
 layout_mode = 2
 
-[node name="RoomListHeaderContainer" type="HBoxContainer" parent="Panel/VBoxContainer" unique_id=1016279407]
+[node name="RoomListHeaderContainer" type="HBoxContainer" parent="Panel/VBoxContainer"]
 layout_mode = 2
 
-[node name="RoomListLabel" type="Label" parent="Panel/VBoxContainer/RoomListHeaderContainer" unique_id=840462658]
+[node name="RoomListLabel" type="Label" parent="Panel/VBoxContainer/RoomListHeaderContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.8, 0.9, 1, 1)
 theme_override_font_sizes/font_size = 14
 text = "📡 Available Rooms"
 
-[node name="RefreshButton" type="Button" parent="Panel/VBoxContainer/RoomListHeaderContainer" unique_id=50933565]
+[node name="RefreshButton" type="Button" parent="Panel/VBoxContainer/RoomListHeaderContainer"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 1, 0.8, 1)
 theme_override_font_sizes/font_size = 12
 text = "🔄"
 
-[node name="RoomListScroll" type="ScrollContainer" parent="Panel/VBoxContainer" unique_id=1915784851]
+[node name="RoomListScroll" type="ScrollContainer" parent="Panel/VBoxContainer"]
 custom_minimum_size = Vector2(0, 100)
 layout_mode = 2
 size_flags_vertical = 3
 horizontal_scroll_mode = 0
 
-[node name="RoomListVBox" type="VBoxContainer" parent="Panel/VBoxContainer/RoomListScroll" unique_id=1922478502]
+[node name="RoomListVBox" type="VBoxContainer" parent="Panel/VBoxContainer/RoomListScroll"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 5
 
-[node name="PortInput" type="LineEdit" parent="Panel/VBoxContainer" unique_id=278192204]
+[node name="PortInput" type="LineEdit" parent="Panel/VBoxContainer"]
 visible = false
 layout_mode = 2
 placeholder_text = "Port"

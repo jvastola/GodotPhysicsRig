@@ -1,0 +1,518 @@
+extends Node
+## NetworkManager - Handles all network connections and player management via Nakama
+## Singleton autoload that manages Nakama match state, player spawning, and network events
+
+signal player_connected(peer_id: String)
+signal player_disconnected(peer_id: String)
+signal connection_failed()
+signal connection_succeeded()
+signal server_disconnected()
+signal send_local_avatar()
+
+# Nakama is now the exclusive networking backend
+var use_nakama: bool = true
+
+# Room data
+var players: Dictionary = {} # user_id String -> player_info Dictionary
+var local_player: Node3D = null
+
+# Player info structure
+var local_player_info: Dictionary = {
+	"name": "Player",
+	"head_position": Vector3.ZERO,
+	"head_rotation": Vector3.ZERO,
+	"left_hand_position": Vector3.ZERO,
+	"left_hand_rotation": Vector3.ZERO,
+	"right_hand_position": Vector3.ZERO,
+	"right_hand_rotation": Vector3.ZERO,
+	"player_scale": Vector3.ONE,
+	"avatar_texture_data": PackedByteArray()
+}
+
+# Grabbable sync
+var grabbed_objects: Dictionary = {} # object_id -> {owner_peer_id, position, rotation, is_grabbed}
+signal grabbable_grabbed(object_id: String, peer_id: String, hand_name: String, rel_pos: Vector3, rel_rot: Quaternion)
+signal grabbable_released(object_id: String, peer_id: String)
+signal grabbable_sync_update(object_id: String, data: Dictionary)
+
+# Avatar signals
+signal avatar_texture_received(peer_id: String)
+
+# Voxel sync signals
+signal voxel_placed_network(world_pos: Vector3, color: Color)
+signal voxel_removed_network(world_pos: Vector3)
+
+# Voice chat
+var voice_enabled: bool = false # Handled by LiveKit but kept for signal logic
+
+# Connection quality monitoring
+enum ConnectionQuality {
+	EXCELLENT,  # < 50ms ping
+	GOOD,       # 50-100ms ping
+	FAIR,       # 100-200ms ping
+	POOR        # > 200ms ping
+}
+
+var network_stats: Dictionary = {
+	"ping_ms": 0.0,
+	"bandwidth_up": 0.0,  # KB/s
+	"bandwidth_down": 0.0,  # KB/s
+	"packet_loss": 0.0,  # percentage
+	"connection_quality": ConnectionQuality.GOOD
+}
+
+var _ping_check_interval: float = 1.0
+var _monitor_timer: Timer = null
+var _metrics := {
+	"connect_attempts": 0,
+	"connect_successes": 0,
+	"connect_failures": 0,
+	"last_connect_start_msec": 0,
+	"last_connect_latency_ms": 0,
+	"disconnects": 0,
+	"reconnect_attempts": 0,
+	"send_failures": 0,
+	"last_send_failure": ""
+}
+
+signal connection_quality_changed(quality: ConnectionQuality)
+signal network_stats_updated(stats: Dictionary)
+signal metrics_updated(metrics: Dictionary)
+
+# Push-to-talk
+enum VoiceMode {
+	ALWAYS_ON,
+	PUSH_TO_TALK,
+	VOICE_ACTIVATED
+}
+
+var voice_mode: VoiceMode = VoiceMode.PUSH_TO_TALK
+var push_to_talk_key: Key = KEY_SPACE
+var is_push_to_talk_pressed: bool = false
+
+# Reconnection
+var connection_timeout: float = 10.0
+var _last_server_response_time: float = 0.0
+
+
+func _ready() -> void:
+	# Initialize network stats monitoring
+	_last_server_response_time = Time.get_ticks_msec() / 1000.0
+	
+	# Setup Nakama signals (deferred to ensure NakamaManager autoload is ready)
+	call_deferred("_setup_nakama_integration")
+	
+	# Timer-based connection monitoring
+	_monitor_timer = Timer.new()
+	_monitor_timer.wait_time = _ping_check_interval
+	_monitor_timer.one_shot = false
+	_monitor_timer.autostart = false
+	add_child(_monitor_timer)
+	_monitor_timer.timeout.connect(_on_monitor_timeout)
+	set_process(false)
+	_update_monitoring_state()
+
+
+func _setup_nakama_integration() -> void:
+	"""Connect to NakamaManager signals"""
+	if NakamaManager:
+		if not NakamaManager.match_joined.is_connected(_on_nakama_match_joined):
+			NakamaManager.match_joined.connect(_on_nakama_match_joined)
+		if not NakamaManager.match_left.is_connected(_on_nakama_match_left):
+			NakamaManager.match_left.connect(_on_nakama_match_left)
+		if not NakamaManager.match_presence.is_connected(_on_nakama_match_presence):
+			NakamaManager.match_presence.connect(_on_nakama_match_presence)
+		if not NakamaManager.match_state_received.is_connected(_on_nakama_match_state_received):
+			NakamaManager.match_state_received.connect(_on_nakama_match_state_received)
+		print("NetworkManager: Nakama integration initialized")
+
+
+## Disconnect from network
+func disconnect_from_network() -> void:
+	if NakamaManager:
+		NakamaManager.leave_match()
+	players.clear()
+	print("Disconnected from network")
+
+
+## Check if we are the "authority" (Nakama matches are usually hostless relay, 
+## but we can treat the player with the lowest ID as authority for some tasks)
+func is_server() -> bool:
+	if not use_nakama or (players.is_empty() and get_nakama_user_id().is_empty()):
+		return true
+	
+	var my_id = get_nakama_user_id()
+	var all_ids = players.keys()
+	if not my_id.is_empty() and not all_ids.has(my_id):
+		all_ids.append(my_id)
+	all_ids.sort()
+	
+	return all_ids[0] == my_id
+
+
+## Get our multiplayer ID (Always string user ID for Nakama)
+func get_multiplayer_id() -> String:
+	return get_nakama_user_id()
+
+
+## Get our Nakama User ID
+func get_nakama_user_id() -> String:
+	if NakamaManager:
+		return NakamaManager.local_user_id
+	return ""
+
+
+## Register the local player node
+func _register_local_player() -> void:
+	var my_id = get_nakama_user_id()
+	if not my_id.is_empty():
+		players[my_id] = local_player_info.duplicate(true)
+		print("Local player registered with ID: ", my_id)
+
+
+## Update local player transform data (called by XRPlayer every frame)
+func update_local_player_transform(head_pos: Vector3, head_rot: Vector3, 
+		left_pos: Vector3, left_rot: Vector3, 
+		right_pos: Vector3, right_rot: Vector3,
+		scale: Vector3) -> void:
+	
+	local_player_info.head_position = head_pos
+	local_player_info.head_rotation = head_rot
+	local_player_info.left_hand_position = left_pos
+	local_player_info.left_hand_rotation = left_rot
+	local_player_info.right_hand_position = right_pos
+	local_player_info.right_hand_rotation = right_rot
+	local_player_info.player_scale = scale
+	
+	# Update our entry in players dictionary
+	var my_id = get_nakama_user_id()
+	if not my_id.is_empty():
+		players[my_id] = local_player_info.duplicate(true)
+		
+		# Send via Nakama
+		var transform_data = {
+			"hp": _vec3_to_dict(head_pos),
+			"hr": _vec3_to_dict(head_rot),
+			"lp": _vec3_to_dict(left_pos),
+			"lr": _vec3_to_dict(left_rot),
+			"rp": _vec3_to_dict(right_pos),
+			"rr": _vec3_to_dict(right_rot),
+			"s": _vec3_to_dict(scale)
+		}
+		NakamaManager.send_match_state(NakamaManager.MatchOpCode.PLAYER_TRANSFORM, transform_data)
+
+
+# ============================================================================
+# Nakama Event Callbacks
+# ============================================================================
+
+func _on_nakama_match_joined(match_id: String) -> void:
+	print("NetworkManager: Joined Nakama match: ", match_id)
+	
+	# Reset state
+	players.clear()
+	grabbed_objects.clear()
+	
+	# Register ourselves
+	_register_local_player()
+	
+	# Notify listeners
+	connection_succeeded.emit()
+	
+	# Trigger avatar send after a short delay
+	await get_tree().create_timer(0.5).timeout
+	send_local_avatar.emit()
+	_update_monitoring_state()
+
+func _on_nakama_match_left() -> void:
+	print("NetworkManager: Left Nakama match")
+	players.clear()
+	grabbed_objects.clear()
+	server_disconnected.emit()
+	_update_monitoring_state()
+
+func _on_nakama_match_presence(joins: Array, leaves: Array) -> void:
+	var my_id = get_nakama_user_id()
+	
+	for join in joins:
+		var user_id = join.get("user_id", "")
+		if user_id.is_empty() or user_id == my_id:
+			continue
+		
+		print("NetworkManager: Nakama player joined: ", user_id)
+		players[user_id] = local_player_info.duplicate(true)
+		player_connected.emit(user_id)
+		
+	for leave in leaves:
+		var user_id = leave.get("user_id", "")
+		if user_id != my_id and not user_id.is_empty():
+			print("NetworkManager: Nakama player left: ", user_id)
+			if players.has(user_id):
+				players.erase(user_id)
+			player_disconnected.emit(user_id)
+
+
+func _handle_nakama_player_transform(sender_id: String, data: Dictionary) -> void:
+	if not players.has(sender_id):
+		players[sender_id] = local_player_info.duplicate(true)
+	
+	var p = players[sender_id]
+	if data.has("hp"): p.head_position = _dict_to_vec3(data.hp)
+	if data.has("hr"): p.head_rotation = _dict_to_vec3(data.hr)
+	if data.has("lp"): p.left_hand_position = _dict_to_vec3(data.lp)
+	if data.has("lr"): p.left_hand_rotation = _dict_to_vec3(data.lr)
+	if data.has("rp"): p.right_hand_position = _dict_to_vec3(data.rp)
+	if data.has("rr"): p.right_hand_rotation = _dict_to_vec3(data.rr)
+	if data.has("s"): p.player_scale = _dict_to_vec3(data.s)
+
+
+func _vec3_to_dict(v: Vector3) -> Dictionary:
+	return {"x": snappedf(v.x, 0.001), "y": snappedf(v.y, 0.001), "z": snappedf(v.z, 0.001)}
+
+func _dict_to_vec3(d: Dictionary) -> Vector3:
+	return Vector3(d.get("x", 0), d.get("y", 0), d.get("z", 0))
+
+func _quat_to_dict(q: Quaternion) -> Dictionary:
+	return {"x": snappedf(q.x, 0.001), "y": snappedf(q.y, 0.001), "z": snappedf(q.z, 0.001), "w": snappedf(q.w, 0.001)}
+
+func _dict_to_quat(d: Dictionary) -> Quaternion:
+	return Quaternion(d.get("x", 0), d.get("y", 0), d.get("z", 0), d.get("w", 1))
+
+
+func _handle_nakama_avatar_data(sender_id: String, data: Dictionary) -> void:
+	if data.is_empty(): return
+	if not players.has(sender_id): players[sender_id] = local_player_info.duplicate(true)
+	if not players[sender_id].has("avatar_textures"): players[sender_id].avatar_textures = {}
+	
+	for surface_name in data:
+		var texture_base64 = data[surface_name]
+		var texture_data = Marshalls.base64_to_raw(texture_base64)
+		players[sender_id].avatar_textures[surface_name] = texture_data
+	
+	avatar_texture_received.emit(sender_id)
+
+
+# ============================================================================
+# Avatar Texture Sync
+# ============================================================================
+
+func set_local_avatar_textures(textures: Dictionary) -> void:
+	var avatar_data = {}
+	for surface_name in textures:
+		var texture: ImageTexture = textures[surface_name]
+		var image = texture.get_image()
+		var texture_data = image.save_png_to_buffer()
+		avatar_data[surface_name] = Marshalls.raw_to_base64(texture_data)
+	
+	if NakamaManager:
+		NakamaManager.send_match_state(NakamaManager.MatchOpCode.AVATAR_DATA, avatar_data)
+
+
+func get_player_avatar_texture(peer_id: String) -> ImageTexture:
+	if not players.has(peer_id): return null
+	var texture_data = players[peer_id].get("avatar_texture_data", PackedByteArray())
+	if texture_data.size() == 0: return null
+	
+	var image = Image.new()
+	if image.load_png_from_buffer(texture_data) != OK: return null
+	return ImageTexture.create_from_image(image)
+
+
+# ============================================================================
+# Grabbable Object Sync
+# ============================================================================
+
+func grab_object(object_id: String, hand_name: String = "", rel_pos: Vector3 = Vector3.ZERO, rel_rot: Quaternion = Quaternion.IDENTITY) -> void:
+	var my_id = get_nakama_user_id()
+	grabbed_objects[object_id] = {
+		"owner_peer_id": my_id,
+		"is_grabbed": true,
+		"hand_name": hand_name
+	}
+	
+	var grab_data = {
+		"object_id": object_id,
+		"hand_name": hand_name,
+		"rel_pos": _vec3_to_dict(rel_pos),
+		"rel_rot": _quat_to_dict(rel_rot)
+	}
+	NakamaManager.send_match_state(NakamaManager.MatchOpCode.GRAB_OBJECT, grab_data)
+	grabbable_grabbed.emit(object_id, my_id, hand_name, rel_pos, rel_rot)
+
+
+func release_object(object_id: String, final_pos: Vector3, final_rot: Quaternion, lin_vel: Vector3 = Vector3.ZERO, ang_vel: Vector3 = Vector3.ZERO) -> void:
+	var my_id = get_nakama_user_id()
+	if grabbed_objects.has(object_id): grabbed_objects.erase(object_id)
+	
+	var release_data = {
+		"object_id": object_id,
+		"pos": _vec3_to_dict(final_pos),
+		"rot": _quat_to_dict(final_rot),
+		"lin_vel": _vec3_to_dict(lin_vel),
+		"ang_vel": _vec3_to_dict(ang_vel)
+	}
+	NakamaManager.send_match_state(NakamaManager.MatchOpCode.RELEASE_OBJECT, release_data)
+	grabbable_released.emit(object_id, my_id)
+
+
+func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion, rel_pos: Variant = null, rel_rot: Variant = null) -> void:
+	var update_data = {
+		"object_id": object_id,
+		"pos": _vec3_to_dict(pos),
+		"rot": _quat_to_dict(rot),
+	}
+	if rel_pos is Vector3: update_data["rel_pos"] = _vec3_to_dict(rel_pos)
+	if rel_rot is Quaternion: update_data["rel_rot"] = _quat_to_dict(rel_rot)
+		
+	NakamaManager.send_match_state(NakamaManager.MatchOpCode.OBJECT_UPDATE, update_data)
+
+
+func is_object_grabbed_by_other(object_id: String) -> bool:
+	if not grabbed_objects.has(object_id): return false
+	var owner_id = grabbed_objects[object_id].get("owner_peer_id", "")
+	return owner_id != get_nakama_user_id() and not owner_id.is_empty()
+
+func get_object_owner(object_id: String) -> String:
+	return grabbed_objects[object_id].get("owner_peer_id", "") if grabbed_objects.has(object_id) else ""
+
+
+# ============================================================================
+# Networked Object Spawning
+# ============================================================================
+
+func spawn_network_object(scene_path: String, position: Vector3) -> void:
+	var object_id = "obj_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000)
+	var spawn_data = {
+		"scene_path": scene_path,
+		"pos": _vec3_to_dict(position),
+		"object_id": object_id
+	}
+	NakamaManager.send_match_state(NakamaManager.MatchOpCode.SPAWN_OBJECT, spawn_data)
+	_do_spawn_object(scene_path, position, object_id)
+
+
+func _do_spawn_object(scene_path: String, position: Vector3, object_id: String) -> void:
+	var scene = load(scene_path)
+	if not scene: return
+	
+	var instance = scene.instantiate()
+	instance.name = object_id
+	if instance.has_method("set"): instance.set("save_id", object_id)
+		
+	var world = get_tree().current_scene
+	if world:
+		world.add_child(instance)
+		if instance is Node3D: instance.global_position = position
+		print("NetworkManager: Spawned object ", object_id, " at ", position)
+
+
+# ============================================================================
+# Voxel Build Sync
+# ============================================================================
+
+func sync_voxel_placed(world_pos: Vector3, color: Color) -> void:
+	var data = {
+		"pos": _vec3_to_dict(world_pos),
+		"color": {"r": color.r, "g": color.g, "b": color.b, "a": color.a}
+	}
+	NakamaManager.send_match_state(NakamaManager.MatchOpCode.VOXEL_PLACE, data)
+	print("NetworkManager: Voxel placement sent via Nakama")
+
+func sync_voxel_removed(world_pos: Vector3) -> void:
+	var data = {"pos": _vec3_to_dict(world_pos)}
+	NakamaManager.send_match_state(NakamaManager.MatchOpCode.VOXEL_REMOVE, data)
+	print("NetworkManager: Voxel removal sent via Nakama")
+
+
+# ============================================================================
+# Nakama State Handling
+# ============================================================================
+
+func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Variant) -> void:
+	if op_code == NakamaManager.MatchOpCode.PLAYER_TRANSFORM:
+		_handle_nakama_player_transform(peer_id, data)
+	elif op_code == NakamaManager.MatchOpCode.AVATAR_DATA:
+		_handle_nakama_avatar_data(peer_id, data)
+	elif op_code == NakamaManager.MatchOpCode.VOXEL_PLACE:
+		if data is Dictionary and data.has("pos"):
+			var pos = _parse_vector3(data.pos)
+			var color = _parse_color(data.get("color", Color.WHITE))
+			voxel_placed_network.emit(pos, color)
+	elif op_code == NakamaManager.MatchOpCode.VOXEL_REMOVE:
+		if data is Dictionary and data.has("pos"):
+			voxel_removed_network.emit(_parse_vector3(data.pos))
+	elif op_code == NakamaManager.MatchOpCode.SPAWN_OBJECT:
+		if data is Dictionary and data.has("scene_path") and data.has("pos") and data.has("object_id"):
+			_do_spawn_object(data.scene_path, _parse_vector3(data.pos), data.object_id)
+	elif op_code == NakamaManager.MatchOpCode.GRAB_OBJECT:
+		if data is Dictionary and data.has("object_id"):
+			grabbable_grabbed.emit(data.object_id, peer_id, data.get("hand_name", ""), _parse_vector3(data.get("rel_pos", {})), _parse_quaternion(data.get("rel_rot", {})))
+	elif op_code == NakamaManager.MatchOpCode.RELEASE_OBJECT:
+		if data is Dictionary and data.has("object_id"):
+			grabbable_released.emit(data.object_id, peer_id)
+			if data.has("pos"): 
+				grabbable_sync_update.emit(data.object_id, {
+					"position": _parse_vector3(data.pos), 
+					"rotation": _parse_quaternion(data.get("rot", {}))
+				})
+	elif op_code == NakamaManager.MatchOpCode.OBJECT_UPDATE:
+		if data is Dictionary and data.has("object_id") and data.has("pos") and data.has("rot"):
+			var sync_data = {"position": _parse_vector3(data.pos), "rotation": _parse_quaternion(data.rot)}
+			if data.has("rel_pos"): sync_data["rel_pos"] = _parse_vector3(data.rel_pos)
+			if data.has("rel_rot"): sync_data["rel_rot"] = _parse_quaternion(data.rel_rot)
+			grabbable_sync_update.emit(data.object_id, sync_data)
+
+
+func _parse_vector3(data) -> Vector3:
+	if data is Vector3: return data
+	if data is Dictionary: return Vector3(data.get("x", 0), data.get("y", 0), data.get("z", 0))
+	return Vector3.ZERO
+
+func _parse_color(data) -> Color:
+	if data is Color: return data
+	if data is Dictionary: return Color(data.get("r", 1), data.get("g", 1), data.get("b", 1), data.get("a", 1))
+	return Color.WHITE
+
+func _parse_quaternion(data) -> Quaternion:
+	if data is Quaternion: return data
+	if data is Dictionary: return Quaternion(data.get("x", 0), data.get("y", 0), data.get("z", 0), data.get("w", 1))
+	return Quaternion.IDENTITY
+
+
+# ============================================================================
+# Monitoring
+# ============================================================================
+
+func _on_monitor_timeout() -> void:
+	if not _is_connection_active():
+		_update_monitoring_state()
+		return
+	
+	# Simulate stats for Nakama
+	network_stats["ping_ms"] = randf_range(40.0, 100.0)
+	network_stats_updated.emit(network_stats.duplicate())
+
+func _is_connection_active() -> bool:
+	return use_nakama and NakamaManager and NakamaManager.is_socket_connected
+
+func _update_monitoring_state() -> void:
+	if _monitor_timer:
+		var should_run := _is_connection_active()
+		_monitor_timer.paused = not should_run
+		if should_run: _monitor_timer.start()
+		else: _monitor_timer.stop()
+	set_process(voice_mode == VoiceMode.PUSH_TO_TALK and _is_connection_active())
+
+func get_network_stats() -> Dictionary: return network_stats.duplicate()
+func get_metrics() -> Dictionary: return _metrics.duplicate()
+func get_connection_quality() -> ConnectionQuality: return network_stats["connection_quality"]
+func get_connection_quality_string() -> String: return "Good" # Placeholder
+
+func set_voice_activation_mode(mode: VoiceMode) -> void: voice_mode = mode
+func set_push_to_talk_key(key: Key) -> void: push_to_talk_key = key
+func is_voice_transmitting() -> bool:
+	if not voice_enabled: return false
+	match voice_mode:
+		VoiceMode.ALWAYS_ON: return true
+		VoiceMode.PUSH_TO_TALK: return is_push_to_talk_pressed
+	return false

@@ -9,7 +9,7 @@ Replaced LAN-only room codes with HTTP-based global matchmaking system.
 - HTTPRequest client mode: Query remote matchmaking servers
 - TCPServer hosting mode: Run as standalone matchmaking server
 - JSON API endpoints:
-  - `POST /room` - Register room with code, IP, port, host name
+  - `POST /room` - Register room with code, host name
   - `GET /room/{code}` - Lookup room by 6-char code
   - `DELETE /room/{code}` - Unregister room
   - `GET /rooms` - List all active rooms
@@ -19,7 +19,7 @@ Replaced LAN-only room codes with HTTP-based global matchmaking system.
 **Modified:** `multiplayer/network_manager.gd`
 - Added matchmaking integration in `_setup_matchmaking()`
 - Rooms auto-register with matchmaking server when created
-- `join_by_room_code()` queries matchmaking server for room IP/port
+- `join_by_room_code()` queries matchmaking server for room details
 - Auto-unregister room from matchmaking on disconnect
 - Signal handlers: `_on_matchmaking_room_found()`, `_on_matchmaking_room_registered()`
 
@@ -92,7 +92,7 @@ New clients now see all existing voxels immediately upon joining.
    - Calls `network_manager.join_by_room_code(code)`
    - Matchmaking sends `GET http://server:8080/room/{code}`
    - Server responds with `{ip, port, host_name}` if found
-   - Client connects to returned IP:port via ENet
+   - Client connects to match via Nakama relay
 
 3. **Host disconnects:**
    - Calls `matchmaking.unregister_room(code)`

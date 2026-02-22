@@ -844,15 +844,15 @@ func _cmd_viewport(_args: Array) -> String:
 
 
 func _cmd_network(_args: Array) -> String:
-	var lines: PackedStringArray = ["=== Network ==="]
+	var lines: PackedStringArray = ["=== Network (Nakama) ==="]
 	
-	var mp := get_tree().get_multiplayer()
-	if mp and mp.multiplayer_peer and mp.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_DISCONNECTED:
-		lines.append("Connected: Yes")
-		lines.append("Peer ID: %d" % mp.get_unique_id())
-		lines.append("Is Server: %s" % str(mp.is_server()))
+	var nm := get_node_or_null("/root/NakamaManager")
+	if nm and nm.get("is_in_match"):
+		lines.append("Status: Connected")
+		lines.append("Match ID: %s" % str(nm.get("match_id")))
+		lines.append("User ID: %s" % str(nm.get("user_id")).substr(0, 12))
 	else:
-		lines.append("Connected: No")
+		lines.append("Status: DisCONNECTED")
 	
 	return "\n".join(lines)
 

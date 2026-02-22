@@ -20,7 +20,7 @@ NakamaManager is already added to your project as an autoload. It will automatic
 
 ### 3. Test the Integration
 
-Create a test scene (`res://multiplayer/nakama_test.tscn`) with `nakama_test.gd` attached:
+Create a test scene (`res://multiplayer/client/scenes/nakama_test.tscn`) with `nakama_test.gd` attached:
 
 **Or add to any existing script:**
 ```gdscript

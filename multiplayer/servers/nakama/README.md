@@ -79,7 +79,7 @@ await nakama.join_match("ROOM_CODE")
 
 ### Local Development
 
-Default configuration in [`data/local.yml`](file:///Users/johnnyvastola/GodotPhysicsRig/nakama/data/local.yml):
+Default configuration in `data/local.yml`:
 - Max 8 players per match (configurable)
 - 2-hour session expiry
 - Debug logging enabled
@@ -141,13 +141,12 @@ func _on_match_state(peer_id, op_code, data):
         update_remote_player(peer_id, data)
 ```
 
-## Migration from P2P
+## Integration
+The system is fully integrated via the [`network_manager.gd`](../multiplayer/network_manager.gd) singleton.
 
-Your existing [`network_manager.gd`](file:///Users/johnnyvastola/GodotPhysicsRig/multiplayer/network_manager.gd) still works! You can:
-
-1. **Use Nakama only** - Set `use_nakama = true`
-2. **Use ENet only** - Set `use_nakama = false` (current behavior)
-3. **Use both** - Test and compare side-by-side
+1. **Authentication**: Handled automatically via Device ID on start.
+2. **Persistence**: Player data and world state are synced via Nakama Match State.
+3. **Relay**: High-frequency transform updates use op-codes for low-latency relay.
 
 ## Scaling
 
@@ -163,7 +162,7 @@ Your existing [`network_manager.gd`](file:///Users/johnnyvastola/GodotPhysicsRig
 - **50k+ users**: Deploy in multiple regions (US, EU, Asia)
 - **Cost**: ~$1000-2000/month
 
-See [`SCALING_GUIDE.md`](file:///Users/johnnyvastola/GodotPhysicsRig/nakama/SCALING_GUIDE.md) for details.
+See `SCALING_GUIDE.md` for details.
 
 ## Troubleshooting
 
@@ -226,4 +225,4 @@ docker-compose up -d
 If you encounter issues:
 1. Check the admin console for errors
 2. Review server logs: `docker-compose logs nakama`
-3. See migration guide: [`MIGRATION_GUIDE.md`](file:///Users/johnnyvastola/GodotPhysicsRig/nakama/MIGRATION_GUIDE.md)
+3. See migration guide: `MIGRATION_GUIDE.md`

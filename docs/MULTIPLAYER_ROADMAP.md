@@ -27,11 +27,11 @@ Transform the VR physics rig into a multiplayer experience with synchronized pla
 ### 1.1 Network Architecture Setup
 
 **Technology Choices:**
-- **High-Level Multiplayer (ENet)**: Godot's built-in networking for reliable connections
-- **Alternative**: WebRTC for peer-to-peer (better for small groups, no server cost)
-- **Server Architecture**: Authoritative server model vs peer-to-peer
+- **High-Level Multiplayer (Nakama)**: Scalable cloud relay for all real-time state.
+- **Voice System**: LiveKit (integrated with Nakama room logic).
+- **Server Architecture**: Nakama Match State Relay.
 
-**Recommended**: Start with Godot's High-Level Multiplayer API (ENet) for simplicity
+**Status**: Consolidated on Nakama for production-grade scalability and cross-platform support.
 
 **Files to Create:**
 ```
@@ -42,17 +42,17 @@ network_config.gd           # Configuration/constants
 ```
 
 **Implementation Steps:**
-1. Create NetworkManager singleton
-2. Implement server hosting
-3. Implement client connection
-4. Handle peer connections/disconnections
+1. Configure NakamaManager singleton
+2. Implement match creation (Host)
+3. Implement match joining (Join via ID/Browser)
+4. Handle player join/leave via Nakama callbacks
 5. Implement basic lobby system
 
 **Key Features:**
-- Server browser or direct IP connection
-- Peer connection callbacks
-- Player ID management
-- Basic error handling
+- Room Browser (Match Listing)
+- Match ID sharing
+- Persistent User IDs (UUID)
+- Automatic authentication
 
 ### 1.2 Player Position Synchronization
 
@@ -353,9 +353,9 @@ lag_simulator.gd           # Artificial latency/packet loss
 ### Network Protocol
 
 **Transport Layer:**
-- ENet (TCP-like + UDP-like hybrid)
-- Reliable for: State changes, events, voice
-- Unreliable for: Position updates (high frequency)
+- WebSocket (TLS) for Nakama relay
+- Reliable: State changes, events (voxels, grabs)
+- Unreliable (Op-code): Position updates (high frequency)
 
 **Message Types:**
 ```gdscript
