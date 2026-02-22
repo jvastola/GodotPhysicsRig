@@ -49,6 +49,15 @@ static var instance: PanelContainer = null
 
 
 func _ready() -> void:
+	# SECURE COMPONENT: Disable debug console in production
+	if not OS.is_debug_build():
+		visible = false
+		queue_free()
+		return
+	if not FeatureFlags.is_enabled("debug_console") if FeatureFlags.has_method("is_enabled") else false:
+		visible = false
+		return
+
 	instance = self
 	AppLogger.apply_project_setting_default()
 	

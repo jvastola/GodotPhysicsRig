@@ -189,17 +189,24 @@ func update_local_player_transform(head_pos: Vector3, head_rot: Vector3,
 	if not my_id.is_empty():
 		players[my_id] = local_player_info.duplicate(true)
 		
-		# Send via Nakama
+		# SECURE COMPONENT: Rate limiting (e.g., 20Hz by default, adjustable)
+		var now = Time.get_ticks_msec()
+		if now - _metrics.get("last_transform_send_time", 0) < 50: # 20Hz max
+			return
+		_metrics["last_transform_send_time"] = now
+		
+		# SECURE COMPONENT: Binary serialization using var_to_bytes
 		var transform_data = {
-			"hp": _vec3_to_dict(head_pos),
-			"hr": _vec3_to_dict(head_rot),
-			"lp": _vec3_to_dict(left_pos),
-			"lr": _vec3_to_dict(left_rot),
-			"rp": _vec3_to_dict(right_pos),
-			"rr": _vec3_to_dict(right_rot),
-			"s": _vec3_to_dict(scale)
+			"hp": head_pos,
+			"hr": head_rot,
+			"lp": left_pos,
+			"lr": left_rot,
+			"rp": right_pos,
+			"rr": right_rot,
+			"s": scale
 		}
-		NakamaManager.send_match_state(NakamaManager.MatchOpCode.PLAYER_TRANSFORM, transform_data)
+		var binary_data = var_to_bytes(transform_data)
+		NakamaManager.send_match_state(NakamaManager.MatchOpCode.PLAYER_TRANSFORM, binary_data)
 
 
 # ============================================================================
@@ -296,12 +303,31 @@ func _handle_nakama_avatar_data(sender_id: String, data: Dictionary) -> void:
 # Avatar Texture Sync
 # ============================================================================
 
+# SECURE COMPONENT: Payload validation constants (Issue #4)
+const MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024  # 2MB total
+const MAX_AVATAR_DIMENSION = 512  # pixels
+
 func set_local_avatar_textures(textures: Dictionary) -> void:
+	var total_bytes = 0
 	var avatar_data = {}
+	
 	for surface_name in textures:
 		var texture: ImageTexture = textures[surface_name]
 		var image = texture.get_image()
+		
+		# SECURE COMPONENT: Validate dimensions
+		if image.get_width() > MAX_AVATAR_DIMENSION or \
+		   image.get_height() > MAX_AVATAR_DIMENSION:
+			push_error("NetworkManager: Avatar texture too large: ", surface_name, " (", image.get_width(), "x", image.get_height(), ")")
+			continue
+		
 		var texture_data = image.save_png_to_buffer()
+		total_bytes += texture_data.size()
+		
+		if total_bytes > MAX_AVATAR_SIZE_BYTES:
+			push_error("NetworkManager: Total avatar size exceeds limit (2MB)")
+			return
+		
 		avatar_data[surface_name] = Marshalls.raw_to_base64(texture_data)
 	
 	if NakamaManager:
@@ -358,13 +384,15 @@ func release_object(object_id: String, final_pos: Vector3, final_rot: Quaternion
 func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion, rel_pos: Variant = null, rel_rot: Variant = null) -> void:
 	var update_data = {
 		"object_id": object_id,
-		"pos": _vec3_to_dict(pos),
-		"rot": _quat_to_dict(rot),
+		"pos": pos,
+		"rot": rot,
 	}
-	if rel_pos is Vector3: update_data["rel_pos"] = _vec3_to_dict(rel_pos)
-	if rel_rot is Quaternion: update_data["rel_rot"] = _quat_to_dict(rel_rot)
-		
-	NakamaManager.send_match_state(NakamaManager.MatchOpCode.OBJECT_UPDATE, update_data)
+	if rel_pos is Vector3: update_data["rel_pos"] = rel_pos
+	if rel_rot is Quaternion: update_data["rel_rot"] = rel_rot
+	
+	# SECURE COMPONENT: Binary serialization
+	var binary_data = var_to_bytes(update_data)
+	NakamaManager.send_match_state(NakamaManager.MatchOpCode.OBJECT_UPDATE, binary_data)
 
 
 func is_object_grabbed_by_other(object_id: String) -> bool:
@@ -416,7 +444,7 @@ func sync_voxel_placed(world_pos: Vector3, color: Color) -> void:
 		"color": {"r": color.r, "g": color.g, "b": color.b, "a": color.a}
 	}
 	NakamaManager.send_match_state(NakamaManager.MatchOpCode.VOXEL_PLACE, data)
-	print("NetworkManager: Voxel placement sent via Nakama")
+	print("NetworkManager: Voxel placement sent via Nakama (JSON for Authority)")
 
 func sync_voxel_removed(world_pos: Vector3) -> void:
 	var data = {"pos": _vec3_to_dict(world_pos)}
@@ -429,38 +457,73 @@ func sync_voxel_removed(world_pos: Vector3) -> void:
 # ============================================================================
 
 func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Variant) -> void:
+	# SECURE COMPONENT: Basic Authority Validation
+	# Check if another peer is trying to spoof our local player state
+	if peer_id == get_nakama_user_id() and peer_id != "":
+		push_warning("NetworkManager: Received match state for local player from remote! Possible spoofing attempt.")
+		return
+
 	if op_code == NakamaManager.MatchOpCode.PLAYER_TRANSFORM:
-		_handle_nakama_player_transform(peer_id, data)
+		if data is PackedByteArray:
+			var binary_data = bytes_to_var(data)
+			if binary_data is Dictionary:
+				_handle_nakama_player_transform(peer_id, binary_data)
+		else:
+			_handle_nakama_player_transform(peer_id, data)
+			
 	elif op_code == NakamaManager.MatchOpCode.AVATAR_DATA:
 		_handle_nakama_avatar_data(peer_id, data)
 	elif op_code == NakamaManager.MatchOpCode.VOXEL_PLACE:
-		if data is Dictionary and data.has("pos"):
-			var pos = _parse_vector3(data.pos)
-			var color = _parse_color(data.get("color", Color.WHITE))
+		var place_data = data
+		if data is PackedByteArray: place_data = bytes_to_var(data)
+		
+		if place_data is Dictionary and place_data.has("pos"):
+			var pos = _parse_vector3(place_data.pos)
+			var color = _parse_color(place_data.get("color", Color.WHITE))
 			voxel_placed_network.emit(pos, color)
+			
 	elif op_code == NakamaManager.MatchOpCode.VOXEL_REMOVE:
-		if data is Dictionary and data.has("pos"):
-			voxel_removed_network.emit(_parse_vector3(data.pos))
+		var remove_data = data
+		if data is PackedByteArray: remove_data = bytes_to_var(data)
+		
+		if remove_data is Dictionary and remove_data.has("pos"):
+			voxel_removed_network.emit(_parse_vector3(remove_data.pos))
+			
 	elif op_code == NakamaManager.MatchOpCode.SPAWN_OBJECT:
-		if data is Dictionary and data.has("scene_path") and data.has("pos") and data.has("object_id"):
-			_do_spawn_object(data.scene_path, _parse_vector3(data.pos), data.object_id)
+		var spawn_data = data
+		if data is PackedByteArray: spawn_data = bytes_to_var(data)
+		
+		if spawn_data is Dictionary and spawn_data.has("scene_path") and spawn_data.has("pos") and spawn_data.has("object_id"):
+			_do_spawn_object(spawn_data.scene_path, _parse_vector3(spawn_data.pos), spawn_data.object_id)
+			
 	elif op_code == NakamaManager.MatchOpCode.GRAB_OBJECT:
-		if data is Dictionary and data.has("object_id"):
-			grabbable_grabbed.emit(data.object_id, peer_id, data.get("hand_name", ""), _parse_vector3(data.get("rel_pos", {})), _parse_quaternion(data.get("rel_rot", {})))
+		var grab_data = data
+		if data is PackedByteArray: grab_data = bytes_to_var(data)
+		
+		if grab_data is Dictionary and grab_data.has("object_id"):
+			grabbable_grabbed.emit(grab_data.object_id, peer_id, grab_data.get("hand_name", ""), _parse_vector3(grab_data.get("rel_pos", {})), _parse_quaternion(grab_data.get("rel_rot", {})))
+			
 	elif op_code == NakamaManager.MatchOpCode.RELEASE_OBJECT:
-		if data is Dictionary and data.has("object_id"):
-			grabbable_released.emit(data.object_id, peer_id)
-			if data.has("pos"): 
-				grabbable_sync_update.emit(data.object_id, {
-					"position": _parse_vector3(data.pos), 
-					"rotation": _parse_quaternion(data.get("rot", {}))
+		var release_data = data
+		if data is PackedByteArray: release_data = bytes_to_var(data)
+		
+		if release_data is Dictionary and release_data.has("object_id"):
+			grabbable_released.emit(release_data.object_id, peer_id)
+			if release_data.has("pos"): 
+				grabbable_sync_update.emit(release_data.object_id, {
+					"position": _parse_vector3(release_data.pos), 
+					"rotation": _parse_quaternion(release_data.get("rot", {}))
 				})
 	elif op_code == NakamaManager.MatchOpCode.OBJECT_UPDATE:
-		if data is Dictionary and data.has("object_id") and data.has("pos") and data.has("rot"):
-			var sync_data = {"position": _parse_vector3(data.pos), "rotation": _parse_quaternion(data.rot)}
-			if data.has("rel_pos"): sync_data["rel_pos"] = _parse_vector3(data.rel_pos)
-			if data.has("rel_rot"): sync_data["rel_rot"] = _parse_quaternion(data.rel_rot)
-			grabbable_sync_update.emit(data.object_id, sync_data)
+		var update_data = data
+		if data is PackedByteArray:
+			update_data = bytes_to_var(data)
+			
+		if update_data is Dictionary and update_data.has("object_id") and update_data.has("pos") and update_data.has("rot"):
+			var sync_data = {"position": _parse_vector3(update_data.pos), "rotation": _parse_quaternion(update_data.rot)}
+			if update_data.has("rel_pos"): sync_data["rel_pos"] = _parse_vector3(update_data.rel_pos)
+			if update_data.has("rel_rot"): sync_data["rel_rot"] = _parse_quaternion(update_data.rel_rot)
+			grabbable_sync_update.emit(update_data.object_id, sync_data)
 
 
 func _parse_vector3(data) -> Vector3:

@@ -18,6 +18,8 @@ signal match_list_received(matches)
 var nakama_host: String = "158.101.21.99"  # Oracle Cloud server
 var nakama_port: int = 7350
 var nakama_server_key: String = "defaultkey"
+# Default to non-SSL; common development Nakama instances run on 7350 without TLS.
+# Set this to true (and port 7443) for production servers with proper certificates.
 var nakama_use_ssl: bool = false
 
 # HTTP client for REST API
@@ -63,6 +65,19 @@ enum MatchOpCode {
 
 
 func _ready() -> void:
+	# Load settings from ConfigManager
+	if has_node("/root/ConfigManager"):
+		var cm = get_node("/root/ConfigManager")
+		nakama_host = cm.get_value("nakama_host", nakama_host)
+		nakama_port = cm.get_value("nakama_port", nakama_port)
+		nakama_server_key = cm.get_value("nakama_server_key", nakama_server_key)
+		nakama_use_ssl = cm.get_value("nakama_use_ssl", nakama_use_ssl)
+		print("NakamaManager: Settings loaded from ConfigManager")
+	# Ensure port/protocol consistency – the default TLS port is 7443
+	if nakama_use_ssl and nakama_port == 7350:
+		push_warning("NakamaManager: SSL enabled but port is 7350 – switching to 7443 automatically")
+		nakama_port = 7443
+
 	# Create HTTP client with timeout
 	http_client = HTTPRequest.new()
 	http_client.timeout = 10.0  # 10 second timeout
@@ -150,7 +165,7 @@ func authenticate_device() -> void:
 		await get_tree().process_frame
 	
 	print("NakamaManager: Authenticating with device ID...")
-	print("NakamaManager: Target URL: http://%s:%d" % [nakama_host, nakama_port])
+	print("NakamaManager: Target URL: %s" % _get_nakama_url())
 	
 	_do_authenticate_request()
 
@@ -185,33 +200,48 @@ func connect_socket() -> void:
 		return
 	
 	var ws_url = _get_websocket_url()
-	var err = socket.connect_to_url(ws_url)
-	
-	if err != OK:
-		push_error("NakamaManager: Failed to connect WebSocket: ", err)
-		return
-	
 	print("NakamaManager: Connecting WebSocket to ", ws_url)
+	var err = socket.connect_to_url(ws_url)
+	if err != OK:
+		push_error("NakamaManager: Failed to initiate WebSocket connection: ", err)
+		return
+	# Note: mbedtls handshake errors for websockets are logged internally; if they occur
+	# the WebSocket will close and _process will eventually emit connection_lost.
+	# We could add a timer or callback for failure, but for now the retry logic in auth
+	# will diagnose via HTTP error messages.
 
 
-## Create a new match
-func create_match() -> void:
+## Create a new match (Relay by default)
+func create_match(is_authoritative: bool = true) -> void:
 	if not is_socket_connected:
 		push_error("NakamaManager: Socket not connected")
 		return
 	
-	var match_label = _generate_room_code()
-	
-	# Send match create request via WebSocket
+	if is_authoritative:
+		create_authoritative_match("world_match")
+		return
+
+	# Fallback to relay match
 	var envelope = {
 		"match_create": {}
 	}
 	_send_socket_message(envelope)
-	
-	# DON'T set current_match_id here - wait for server response
-	# This prevents the race condition where join_match guard clause fails
-	# The ID will be set in _handle_match_created when we get the actual match ID
-	print("NakamaManager: Creating match with label: ", match_label)
+	print("NakamaManager: Creating relay match")
+
+
+## Create an authoritative match using a server-side module
+func create_authoritative_match(module_name: String) -> void:
+	if not is_socket_connected:
+		push_error("NakamaManager: Socket not connected")
+		return
+		
+	var envelope = {
+		"match_create": {
+			"name": module_name
+		}
+	}
+	_send_socket_message(envelope)
+	print("NakamaManager: Creating authoritative match using module: ", module_name)
 
 
 ## Join a match by ID
@@ -291,6 +321,8 @@ func list_matches(_min_players: int = 0, _max_players: int = 10, limit: int = 20
 
 
 ## Send match state to other players
+const MAX_PAYLOAD_SIZE_BYTES = 1024 * 1024 # 1MB limit for match data
+
 func send_match_state(op_code: int, data: Variant) -> void:
 	if current_match_id.is_empty():
 		return
@@ -302,11 +334,21 @@ func send_match_state(op_code: int, data: Variant) -> void:
 	
 	# Optimize: If data is already bytes, skip JSON serialization
 	if data is PackedByteArray:
+		# SECURE COMPONENT: Check raw payload size
+		if data.size() > MAX_PAYLOAD_SIZE_BYTES:
+			push_error("NakamaManager: Binary payload too large (", data.size(), " bytes)")
+			return
 		data_base64 = Marshalls.raw_to_base64(data)
 	else:
 		# Encode data as JSON then base64 (Nakama protocol requirement)
 		var json_data = JSON.stringify(data)
 		var data_bytes = json_data.to_utf8_buffer()
+		
+		# SECURE COMPONENT: Check serialized payload size
+		if data_bytes.size() > MAX_PAYLOAD_SIZE_BYTES:
+			push_error("NakamaManager: JSON payload too large (", data_bytes.size(), " bytes)")
+			return
+			
 		data_base64 = Marshalls.raw_to_base64(data_bytes)
 	
 	var envelope = {
@@ -409,14 +451,20 @@ func _handle_match_data(match_data_msg: Dictionary) -> void:
 	var data_base64 = match_data_msg.get("data", "")
 	var sender_id = match_data_msg.get("presence", {}).get("user_id", "")
 	
-	# Decode base64 then parse JSON
 	# Decode base64 to raw bytes
 	var data_bytes = Marshalls.base64_to_raw(data_base64)
 	
 	var data = null
 	
-	# For voice data, we want the raw bytes (it's already compressed audio)
-	if op_code == MatchOpCode.VOICE_DATA:
+	# Performance optimization: Skip JSON parsing for high-frequency binary opcodes
+	# These will be decoded using bytes_to_var() in NetworkManager
+	var is_binary_op = (
+		op_code == MatchOpCode.PLAYER_TRANSFORM or 
+		op_code == MatchOpCode.OBJECT_UPDATE or
+		op_code == MatchOpCode.VOICE_DATA
+	)
+	
+	if is_binary_op:
 		data = data_bytes
 	else:
 		# For other op codes, parse as JSON
@@ -440,6 +488,10 @@ func _get_nakama_url() -> String:
 
 
 func _get_websocket_url() -> String:
+	# mirror same protocol/port consistency logic as HTTP
+	if nakama_use_ssl and nakama_port == 7350:
+		push_warning("NakamaManager: SSL websocket requested on port 7350 – switching to 7443")
+		nakama_port = 7443
 	var protocol = "wss" if nakama_use_ssl else "ws"
 	var token = session.get("token", "")
 	return "%s://%s:%d/ws?token=%s" % [protocol, nakama_host, nakama_port, token]
@@ -474,9 +526,21 @@ func _on_http_request_completed(result: int, response_code: int, _headers: Packe
 	var result_name = result_names.get(result, "UNKNOWN")
 	
 	if result != HTTPRequest.RESULT_SUCCESS:
-		print("NakamaManager: HTTP request failed: %d (%s) to %s:%d" % [result, result_name, nakama_host, nakama_port])
+		print("NakamaManager: HTTP request failed: %d (%s) to %s" % [result, result_name, _get_nakama_url()])
 		
-		# Retry logic for connection errors
+		# special-case TLS handshake failure when user accidentally tried SSL on a non‑TLS port
+		if result == HTTPRequest.RESULT_TLS_HANDSHAKE_ERROR:
+			if nakama_use_ssl:
+				push_warning("NakamaManager: TLS handshake failed, disabling SSL and retrying using http")
+				nakama_use_ssl = false
+				# adjust default port if still the common 7350
+				if nakama_port == 7443:
+					nakama_port = 7350
+				_auth_retry_count = 0
+				_do_authenticate_request()
+				return
+		
+		# Retry logic for other connection errors
 		if _auth_retry_count < _auth_max_retries:
 			_auth_retry_count += 1
 			print("NakamaManager: Retrying authentication (%d/%d) in %.1fs..." % [_auth_retry_count, _auth_max_retries, _auth_retry_delay])
@@ -519,7 +583,10 @@ func _on_http_request_completed(result: int, response_code: int, _headers: Packe
 			
 		print("NakamaManager: Authentication successful!")
 		print("NakamaManager: User ID: ", local_user_id)
-		print("NakamaManager: Token: ", session.token.substr(0, 20), "...")
+		
+		# SECURE COMPONENT: Redact token in logs
+		var redacted_token = session.token.substr(0, 4) + "..." + session.token.substr(session.token.length() - 4)
+		print("NakamaManager: Token: ", redacted_token)
 		
 		# Fetch account info to get display_name
 		_fetch_account()

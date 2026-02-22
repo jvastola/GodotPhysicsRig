@@ -5,6 +5,12 @@ extends Node
 
 
 func _input(event: InputEvent) -> void:
+	# SECURE COMPONENT: Disable debug tools in production
+	if not OS.is_debug_build():
+		return
+	if not FeatureFlags.is_enabled(FeatureFlags.DEBUG_INVENTORY_TOOLS):
+		return
+		
 	if not event is InputEventKey or not event.pressed:
 		return
 	

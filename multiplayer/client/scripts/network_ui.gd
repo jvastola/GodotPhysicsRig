@@ -364,7 +364,11 @@ func _on_nakama_authenticated(session: Dictionary) -> void:
 
 func _on_nakama_auth_failed(error: String) -> void:
 	push_error("NetworkUI: Nakama authentication failed: ", error)
-	status_label.text = "Auth failed: " + error
+	# Give helpful hint when handshake problems occur
+	var hint = ""
+	if "TLS_HANDSHAKE" in error or "handshake" in error.to_lower():
+		hint = " (check nakama_use_ssl flag and port/configuration)"
+	status_label.text = "Auth failed: " + error + hint
 	host_button.disabled = true
 	join_button.disabled = true
 

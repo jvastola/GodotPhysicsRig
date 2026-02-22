@@ -43,16 +43,25 @@ func _maybe_flush_save(reason: String = "") -> void:
 
 
 func save_game_state() -> void:
-	"""Write current save data to disk"""
-	var json_string := JSON.stringify(_save_data, "\t")
-	if _write_atomic(json_string):
+	"""Write current save data to disk with integrity signature"""
+	var json_string := JSON.stringify(_save_data)
+	
+	# SECURE COMPONENT: Sign the data to detect tampering (Issue #7)
+	var signature = _generate_signature(json_string)
+	var final_payload = {
+		"data": _save_data,
+		"signature": signature
+	}
+	
+	var final_json = JSON.stringify(final_payload, "\t")
+	if _write_atomic(final_json):
 		_save_dirty = false
 		_autosave_timer = 0.0
-		print("SaveManager: Game state saved to ", SAVE_FILE_PATH)
+		print("SaveManager: Game state saved with integrity signature")
 
 
 func load_game_state() -> void:
-	"""Load save data from disk"""
+	"""Load save data from disk and verify integrity"""
 	if not FileAccess.file_exists(SAVE_FILE_PATH):
 		print("SaveManager: No save file found, starting fresh")
 		_save_data = {}
@@ -67,14 +76,43 @@ func load_game_state() -> void:
 		var parse_result := json.parse(json_string)
 		
 		if parse_result == OK:
-			_save_data = json.data
-			print("SaveManager: Loaded save data: ", _save_data.keys())
+			var payload = json.data
+			if payload is Dictionary and payload.has("data") and payload.has("signature"):
+				var actual_data = payload["data"]
+				var provided_signature = payload["signature"]
+				var data_string = JSON.stringify(actual_data)
+				
+				# SECURE COMPONENT: Verify signature
+				if _generate_signature(data_string) == provided_signature:
+					_save_data = actual_data
+					print("SaveManager: Loaded and verified save data")
+				else:
+					push_error("SaveManager: SAVE DATA TAMPERING DETECTED! Signature mismatch.")
+					# In a real game, you might want to revert to a cloud backup
+					# For now, we'll clear sensitive fields or start fresh
+					_save_data = {}
+					_save_dirty = true
+			else:
+				# Legacy format or corrupted
+				push_warning("SaveManager: Save file format is legacy or corrupted. Attempting migration.")
+				_save_data = payload if payload is Dictionary else {}
+				_save_dirty = true
 		else:
-			push_error("SaveManager: Failed to parse save file at line ", json.get_error_line(), ": ", json.get_error_message())
+			push_error("SaveManager: Failed to parse save file: ", json.get_error_line(), ": ", json.get_error_message())
 			_save_data = {}
 	else:
 		push_error("SaveManager: Failed to read save file: ", FileAccess.get_open_error())
 		_save_data = {}
+
+
+func _generate_signature(data_string: String) -> String:
+	# Use a secret key from ConfigManager
+	var secret = "rig_development_secret" # Default
+	if has_node("/root/ConfigManager"):
+		secret = get_node("/root/ConfigManager").get_value("save_signing_secret", secret)
+	
+	# Simple SHA-256 HMAC-style signature
+	return (data_string + secret).sha256_text()
 
 
 # Write JSON atomically: write to temp, flush, then rename over the real file.
