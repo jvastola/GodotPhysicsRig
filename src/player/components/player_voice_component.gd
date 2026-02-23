@@ -27,6 +27,14 @@ var player_scene_root: Node = null # Reference to find NetworkPlayers in scene
 var _logged_missing_players: Dictionary = {} # peer_id -> last_log_time
 const LOG_COOLDOWN_SEC: float = 10.0 # Only log once per 10 seconds per peer
 
+# Android fallback spatialization (distance-based per-participant volume)
+var _android_spatial_enabled: bool = false
+var _android_spatial_accum: float = 0.0
+var _android_last_volumes: Dictionary = {} # identity -> float
+const ANDROID_SPATIAL_UPDATE_INTERVAL: float = 0.12
+const ANDROID_SPATIAL_MAX_DISTANCE: float = 20.0
+const ANDROID_SPATIAL_VOLUME_EPSILON: float = 0.03
+
 
 func setup(p_livekit_manager: Node) -> void:
 	"""Initialize voice component with LiveKit manager"""
@@ -35,6 +43,12 @@ func setup(p_livekit_manager: Node) -> void:
 	if livekit_manager:
 		_setup_microphone()
 		_connect_livekit_signals()
+		_android_spatial_enabled = (
+			OS.get_name() == "Android" and
+			livekit_manager.has_method("set_participant_volume")
+		)
+		if _android_spatial_enabled:
+			print("PlayerVoiceComponent: Android spatial fallback enabled (distance attenuation)")
 		print("PlayerVoiceComponent: Setup with LiveKit manager")
 	else:
 		push_warning("PlayerVoiceComponent: No LiveKit manager provided")
@@ -103,14 +117,20 @@ func toggle_voice_chat(enabled: bool) -> void:
 
 
 func _process(_delta: float) -> void:
-	"""Capture and send audio to LiveKit"""
-	if not voice_enabled or not livekit_manager or not capture_effect:
+	"""Capture and send mic audio; on Android also update distance-based remote volumes."""
+	if not livekit_manager:
 		return
-	
+
 	# Check if LiveKit is connected
 	if not livekit_manager.has_method("is_room_connected") or not livekit_manager.is_room_connected():
 		return
-	
+
+	if _android_spatial_enabled:
+		_update_android_spatial_audio(_delta)
+
+	if not voice_enabled or not capture_effect:
+		return
+
 	# Capture audio and push to LiveKit
 	if capture_effect.can_get_buffer(BUFFER_SIZE):
 		var buffer = capture_effect.get_buffer(BUFFER_SIZE)
@@ -152,6 +172,7 @@ func _on_participant_left(identity: String) -> void:
 		remote_players.erase(identity)
 		_logged_missing_players.erase(identity)
 		_logged_missing_players.erase(identity + "_spatial")
+		_android_last_volumes.erase(identity)
 
 
 func _on_room_disconnected() -> void:
@@ -251,6 +272,70 @@ func _find_network_player(peer_id: String) -> Node:
 	return null
 
 
+func _update_android_spatial_audio(delta: float) -> void:
+	"""Android fallback: adjust each remote participant volume by distance."""
+	_android_spatial_accum += delta
+	if _android_spatial_accum < ANDROID_SPATIAL_UPDATE_INTERVAL:
+		return
+	_android_spatial_accum = 0.0
+
+	# Ensure we track all currently connected remote identities.
+	if livekit_manager.has_method("get_participant_identities"):
+		var ids: PackedStringArray = livekit_manager.get_participant_identities()
+		for id in ids:
+			if not remote_players.has(id):
+				remote_players[id] = {
+					"player_node": null,
+					"audio_player": null
+				}
+
+	var listener_pos := _get_listener_position()
+
+	for peer_id in remote_players.keys():
+		var player_data: Dictionary = remote_players[peer_id]
+		var player_node: Node = player_data.get("player_node")
+
+		if not player_node or not is_instance_valid(player_node):
+			player_node = _find_network_player(str(peer_id))
+			player_data["player_node"] = player_node
+
+		if not player_node or not is_instance_valid(player_node):
+			continue
+
+		var remote_pos := _get_remote_audio_position(player_node)
+		var distance := listener_pos.distance_to(remote_pos)
+		var volume := _distance_to_android_volume(distance)
+		var key := str(peer_id)
+		var prev := _android_last_volumes.get(key, -1.0)
+
+		if absf(volume - float(prev)) >= ANDROID_SPATIAL_VOLUME_EPSILON:
+			livekit_manager.set_participant_volume(key, volume)
+			_android_last_volumes[key] = volume
+
+
+func _get_listener_position() -> Vector3:
+	var xr_player := get_parent()
+	if xr_player and xr_player.has_method("get_camera_position"):
+		return xr_player.get_camera_position()
+	return global_position
+
+
+func _get_remote_audio_position(network_player: Node) -> Vector3:
+	var head := network_player.get_node_or_null("Head") as Node3D
+	if head:
+		return head.global_position
+	if network_player is Node3D:
+		return (network_player as Node3D).global_position
+	return Vector3.ZERO
+
+
+func _distance_to_android_volume(distance: float) -> float:
+	var t := clampf(distance / ANDROID_SPATIAL_MAX_DISTANCE, 0.0, 1.0)
+	var linear := 1.0 - t
+	# Square for a more natural falloff.
+	return linear * linear
+
+
 func _get_all_network_players(node: Node) -> Array:
 	"""Recursively find all NetworkPlayer nodes in the scene"""
 	var players = []
@@ -339,6 +424,7 @@ func cleanup() -> void:
 	
 	remote_players.clear()
 	_logged_missing_players.clear()
+	_android_last_volumes.clear()
 	
 	if microphone_player:
 		microphone_player.queue_free()

@@ -43,6 +43,12 @@ addons/godotopenxrvendors/
 .gradle/
 **/gradle/wrapper/gradle-wrapper.jar
 **/build/
+!tools/build/
+!tools/build/*.sh
+!tools/build/*.ps1
+!tools/build/*.bat
+!tools/build/buildandroid
+tools/build/build_quest.bat
 
 # Local configuration
 local.properties

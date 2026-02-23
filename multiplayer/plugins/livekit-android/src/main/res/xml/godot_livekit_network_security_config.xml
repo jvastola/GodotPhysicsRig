@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Allow ws:// signaling when LiveKit is exposed without TLS. -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
+

@@ -24,7 +24,9 @@
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
-	<application>
+	<application
+		android:usesCleartextTraffic="true"
+		android:networkSecurityConfig="@xml/godot_livekit_network_security_config">
 		<!-- LiveKit audio service for background playback -->
 		<service
 			android:name="io.livekit.android.audio.AudioService"
