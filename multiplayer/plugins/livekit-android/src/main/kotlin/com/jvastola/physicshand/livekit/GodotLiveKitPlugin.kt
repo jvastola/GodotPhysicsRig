@@ -115,6 +115,11 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
 
     @UsedByGodot
     fun sendData(data: ByteArray, topic: String) {
+        sendDataReliable(data, topic)
+    }
+
+    @UsedByGodot
+    fun sendDataReliable(data: ByteArray, topic: String) {
         scope.launch {
             room?.localParticipant?.publishData(
                 data,
@@ -125,18 +130,29 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
     }
 
     @UsedByGodot
-    fun sendDataTo(data: ByteArray, identity: String, topic: String) {
-         scope.launch {
-            val participant = room?.remoteParticipants?.values?.find { it.identity?.value == identity }
-            if (participant != null && participant.identity != null) {
-                 room?.localParticipant?.publishData(
-                    data,
-                    DataPublishReliability.RELIABLE,
-                    topic,
-                    listOf(participant.identity!!)
-                )
-            }
+    fun sendDataUnreliable(data: ByteArray, topic: String) {
+        scope.launch {
+            room?.localParticipant?.publishData(
+                data,
+                DataPublishReliability.LOSSY,
+                topic
+            )
         }
+    }
+
+    @UsedByGodot
+    fun sendDataTo(data: ByteArray, identity: String, topic: String) {
+        sendDataToReliable(data, identity, topic)
+    }
+
+    @UsedByGodot
+    fun sendDataToReliable(data: ByteArray, identity: String, topic: String) {
+        publishDataToIdentity(data, identity, topic, DataPublishReliability.RELIABLE)
+    }
+
+    @UsedByGodot
+    fun sendDataToUnreliable(data: ByteArray, identity: String, topic: String) {
+        publishDataToIdentity(data, identity, topic, DataPublishReliability.LOSSY)
     }
 
     @UsedByGodot
@@ -145,6 +161,25 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
         android.util.Log.d("GodotLiveKit", "setAudioEnabled: $enabled, isMuted: $isMuted")
         scope.launch {
             room?.localParticipant?.setMicrophoneEnabled(enabled)
+        }
+    }
+
+    private fun publishDataToIdentity(
+        data: ByteArray,
+        identity: String,
+        topic: String,
+        reliability: DataPublishReliability
+    ) {
+        scope.launch {
+            val participant = room?.remoteParticipants?.values?.find { it.identity?.value == identity }
+            if (participant != null && participant.identity != null) {
+                room?.localParticipant?.publishData(
+                    data,
+                    reliability,
+                    topic,
+                    listOf(participant.identity!!)
+                )
+            }
         }
     }
 

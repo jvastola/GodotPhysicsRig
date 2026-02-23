@@ -36,6 +36,7 @@ signal participant_joined(identity: String, name: String)
 signal participant_left(identity: String)
 signal participant_metadata_changed(identity: String, metadata: String)
 signal data_received(sender_identity: String, data: String)
+signal data_packet_received(sender_identity: String, payload: PackedByteArray, topic: String, reliable: bool)
 signal track_subscribed(participant_identity: String, track_sid: String)
 signal track_unsubscribed(participant_identity: String, track_sid: String)
 signal audio_track_published()
@@ -196,18 +197,7 @@ func disconnect_from_room() -> void:
 ## @param data: The string data to send
 ## @param reliable: Whether to send reliably (default true)
 func send_data(data: String, _reliable: bool = true) -> void:
-	var reliable := _reliable
-	if current_platform == Platform.ANDROID:
-		if _android_plugin:
-			var bytes = data.to_utf8_buffer()
-			_send_bytes_android(bytes, "", reliable)
-		else:
-			_record_send_failure("android_plugin_missing")
-	else:
-		if _rust_manager:
-			_send_data_rust(data, reliable)
-		else:
-			_record_send_failure("rust_manager_missing")
+	send_text_topic(data, "", _reliable)
 
 
 ## Send data to a specific participant
@@ -215,19 +205,50 @@ func send_data(data: String, _reliable: bool = true) -> void:
 ## @param identity: Target participant identity
 ## @param reliable: Whether to send reliably
 func send_data_to(data: String, identity: String, _reliable: bool = true) -> void:
-	var reliable := _reliable
+	send_text_topic_to(data, identity, "", _reliable)
+
+
+## Phase 3 packet-level API: send UTF-8 text with optional topic/reliability.
+func send_text_topic(data: String, topic: String = "", reliable: bool = true) -> void:
+	send_packet(data.to_utf8_buffer(), topic, reliable)
+
+
+## Phase 3 packet-level API: send UTF-8 text to one participant.
+func send_text_topic_to(data: String, identity: String, topic: String = "", reliable: bool = true) -> void:
+	send_packet_to(data.to_utf8_buffer(), identity, topic, reliable)
+
+
+## Phase 3 packet-level API: send binary payload to all participants.
+func send_packet(payload: PackedByteArray, topic: String = "", reliable: bool = true) -> void:
 	if current_platform == Platform.ANDROID:
 		if _android_plugin:
-			var bytes = data.to_utf8_buffer()
-			_send_bytes_android(bytes, "", reliable, identity)
+			_send_bytes_android(payload, topic, reliable)
 		else:
 			_record_send_failure("android_plugin_missing")
 	else:
 		if _rust_manager:
-			_send_data_rust(data, reliable, identity)
+			_send_packet_rust(payload, topic, reliable)
 		else:
 			_record_send_failure("rust_manager_missing")
 
+
+## Phase 3 packet-level API: send binary payload to one participant.
+func send_packet_to(payload: PackedByteArray, identity: String, topic: String = "", reliable: bool = true) -> void:
+	if current_platform == Platform.ANDROID:
+		if _android_plugin:
+			_send_bytes_android(payload, topic, reliable, identity)
+		else:
+			_record_send_failure("android_plugin_missing")
+	else:
+		if _rust_manager:
+			_send_packet_rust(payload, topic, reliable, identity)
+		else:
+			_record_send_failure("rust_manager_missing")
+
+
+## Convenience JSON sender for control-plane messages.
+func send_json_packet(payload: Dictionary, topic: String = "", reliable: bool = true) -> void:
+	send_packet(JSON.stringify(payload).to_utf8_buffer(), topic, reliable)
 
 # Internal: route data send to Android plugin with best-effort reliability handling.
 func _send_bytes_android(bytes: PackedByteArray, topic: String, reliable: bool, identity: String = "") -> void:
@@ -276,6 +297,30 @@ func _send_data_rust(data: String, reliable: bool, identity: String = "") -> voi
 		return
 	if _rust_manager.has_method("send_chat_message"):
 		_rust_manager.call("send_chat_message", data)
+
+
+func _send_packet_rust(payload: PackedByteArray, topic: String, reliable: bool, identity: String = "") -> void:
+	if not _rust_manager:
+		return
+	var payload_str := payload.get_string_from_utf8()
+	var wants_target := identity != ""
+	if wants_target and _rust_manager.has_method("send_data_to"):
+		_rust_manager.call("send_data_to", payload_str, identity, reliable)
+		return
+	if reliable:
+		if _rust_manager.has_method("send_reliable_data"):
+			_rust_manager.call("send_reliable_data", payload_str)
+			return
+	else:
+		if _rust_manager.has_method("send_unreliable_data"):
+			_rust_manager.call("send_unreliable_data", payload_str)
+			return
+	if _rust_manager.has_method("send_data"):
+		_rust_manager.call("send_data", payload_str, reliable)
+		return
+	# Topic is currently advisory until Rust plugin adds topic-aware methods.
+	if topic != "":
+		_log_warn("Rust backend topic passthrough pending plugin update", topic)
 
 
 ## Publish the local microphone audio track
@@ -476,15 +521,10 @@ func _on_participant_name_changed_rust(identity: String, username: String) -> vo
 
 
 func _on_data_received(sender_identity: String, data, topic: String = "") -> void:
-	# Handle both String and PackedByteArray data from different platforms
-	var data_str: String
-	if data is PackedByteArray:
-		data_str = (data as PackedByteArray).get_string_from_utf8()
-	elif data is String:
-		data_str = data
-	else:
-		data_str = str(data)
-	_log_debug("Data received", [sender_identity, data_str.left(100), topic])
+	var payload := _coerce_payload_bytes(data)
+	var data_str := _coerce_payload_string(data)
+	_log_debug("Data received", [sender_identity, data_str.left(100), topic, payload.size()])
+	data_packet_received.emit(sender_identity, payload, topic, true)
 	data_received.emit(sender_identity, data_str)
 
 
@@ -513,9 +553,26 @@ func _on_audio_frame(peer_id: String, frame: PackedVector2Array) -> void:
 
 
 func _on_chat_message(sender: String, message: String, timestamp: int) -> void:
-	# Also emit as data_received for compatibility
+	# Also emit packet + legacy string signals for compatibility.
+	data_packet_received.emit(sender, message.to_utf8_buffer(), "chat", true)
 	data_received.emit(sender, message)
 	chat_message_received.emit(sender, message, timestamp)
+
+
+func _coerce_payload_bytes(data: Variant) -> PackedByteArray:
+	if data is PackedByteArray:
+		return data
+	if data is String:
+		return (data as String).to_utf8_buffer()
+	return str(data).to_utf8_buffer()
+
+
+func _coerce_payload_string(data: Variant) -> String:
+	if data is PackedByteArray:
+		return (data as PackedByteArray).get_string_from_utf8()
+	if data is String:
+		return data
+	return str(data)
 
 func _exit_tree() -> void:
 	# During app shutdown, avoid calling Android plugin methods which can cause
