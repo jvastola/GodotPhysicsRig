@@ -12,6 +12,7 @@ signal ownership_request_received(object_id: String, requester_id: String)
 signal ownership_changed(object_id: String, new_owner_id: String, previous_owner_id: String)
 signal snapshot_reconstructed(snapshot_id: String, object_count: int)
 signal network_object_despawn_requested(object_id: String)
+signal object_property_updated(object_id: String, property_name: String, value: Variant, sender_peer_id: String)
 
 # Nakama is now the exclusive networking backend
 var use_nakama: bool = true
@@ -105,7 +106,16 @@ var _last_server_response_time: float = 0.0
 var _snapshot_buffers: Dictionary = {} # snapshot_id -> {total_chunks:int, chunks:Dictionary, from_peer_id:String}
 const SNAPSHOT_CHUNK_SIZE: int = 20
 const LIVEKIT_TOPIC_REP_OBJECT := "rep/object"
+const LIVEKIT_TOPIC_REP_TRANSFORM := "rep/transform"
+const LIVEKIT_TOPIC_REP_PROPERTY := "rep/property"
 var _livekit_wrapper: Node = null
+var _replication_manifests: Dictionary = {
+	"default": {
+		"high_rate_unreliable": ["transform"],
+		"reliable_on_change": ["material", "collision_enabled", "mesh_variant", "visible", "persist_mode"],
+		"snapshot_only": []
+	}
+}
 
 
 func _ready() -> void:
@@ -263,6 +273,22 @@ func update_local_player_transform(head_pos: Vector3, head_rot: Vector3,
 			"rr": right_rot,
 			"s": scale
 		}
+
+		if _can_use_livekit_realtime():
+			var packet = {
+				"packet_type": "player_transform",
+				"sender_id": my_id,
+				"hp": _vec3_to_dict(head_pos),
+				"hr": _vec3_to_dict(head_rot),
+				"lp": _vec3_to_dict(left_pos),
+				"lr": _vec3_to_dict(left_rot),
+				"rp": _vec3_to_dict(right_pos),
+				"rr": _vec3_to_dict(right_rot),
+				"s": _vec3_to_dict(scale)
+			}
+			_livekit_wrapper.send_json_packet(packet, LIVEKIT_TOPIC_REP_TRANSFORM, false)
+			return
+
 		var binary_data = var_to_bytes(transform_data)
 		NakamaManager.send_match_state(NakamaManager.MatchOpCode.PLAYER_TRANSFORM, binary_data)
 
@@ -449,6 +475,8 @@ func _ensure_object_registry(object_id: String) -> Dictionary:
 			"persist_mode": "transient_held",
 			"manifest_id": "",
 			"seq": 0,
+			"property_seq": 0,
+			"properties": {},
 			"scene_path": "",
 			"position": _vec3_to_dict(Vector3.ZERO),
 			"rotation": _quat_to_dict(Quaternion.IDENTITY),
@@ -648,6 +676,7 @@ func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion, rel
 
 	if _can_use_livekit_realtime():
 		var packet = {
+			"packet_type": "object_update",
 			"object_id": object_id,
 			"pos": _vec3_to_dict(pos),
 			"rot": _quat_to_dict(rot),
@@ -680,6 +709,61 @@ func set_object_persist_mode(object_id: String, persist_mode: String) -> void:
 	var node := get_tree().current_scene.get_node_or_null(object_id) if get_tree().current_scene else null
 	if node and node.has_method("set_release_persist_mode"):
 		node.call("set_release_persist_mode", persist_mode)
+
+
+func register_replication_manifest(manifest_id: String, manifest: Dictionary) -> void:
+	if manifest_id.is_empty():
+		return
+	_replication_manifests[manifest_id] = manifest.duplicate(true)
+
+
+func get_replication_manifest(manifest_id: String = "default") -> Dictionary:
+	if _replication_manifests.has(manifest_id):
+		return _replication_manifests[manifest_id]
+	return _replication_manifests.get("default", {}).duplicate(true)
+
+
+func set_object_manifest_id(object_id: String, manifest_id: String) -> void:
+	if object_id.is_empty() or manifest_id.is_empty():
+		return
+	_update_object_registry_state(object_id, {"manifest_id": manifest_id})
+
+
+func replicate_object_property(object_id: String, property_name: String, value: Variant, reliable: bool = true) -> void:
+	if object_id.is_empty() or property_name.is_empty():
+		return
+	var my_id := get_nakama_user_id()
+	if my_id.is_empty():
+		return
+	var state := _ensure_object_registry(object_id)
+	var active_owner: String = state.get("held_by", state.get("owner_id", ""))
+	if not active_owner.is_empty() and active_owner != my_id:
+		return
+	var prop_seq: int = int(state.get("property_seq", 0)) + 1
+	_update_object_registry_state(object_id, {
+		"property_seq": prop_seq,
+		"properties": _merge_object_property_map(state.get("properties", {}), property_name, value)
+	})
+	var packet = {
+		"packet_type": "object_property_update",
+		"object_id": object_id,
+		"property_name": property_name,
+		"value": value,
+		"sender_id": my_id,
+		"property_seq": prop_seq
+	}
+	if _can_use_livekit_realtime():
+		_livekit_wrapper.send_json_packet(packet, LIVEKIT_TOPIC_REP_PROPERTY, reliable)
+		return
+	NakamaManager.send_match_state(NakamaManager.MatchOpCode.OBJECT_PROPERTY_UPDATE, packet)
+
+
+func _merge_object_property_map(current: Variant, property_name: String, value: Variant) -> Dictionary:
+	var properties: Dictionary = {}
+	if current is Dictionary:
+		properties = (current as Dictionary).duplicate(true)
+	properties[property_name] = value
+	return properties
 
 
 # ============================================================================
@@ -863,6 +947,12 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 				"rotation": update_data.rot
 			})
 			grabbable_sync_update.emit(update_data.object_id, sync_data)
+	elif op_code == NakamaManager.MatchOpCode.OBJECT_PROPERTY_UPDATE:
+		var prop_data = data
+		if data is PackedByteArray:
+			prop_data = bytes_to_var(data)
+		if prop_data is Dictionary:
+			_apply_property_update(peer_id, prop_data)
 	elif op_code == NakamaManager.MatchOpCode.OWNERSHIP_REQUEST:
 		if data is Dictionary:
 			_handle_ownership_request(peer_id, data)
@@ -914,8 +1004,6 @@ func _can_use_livekit_realtime() -> bool:
 
 
 func _on_livekit_data_packet_received(sender_identity: String, payload: PackedByteArray, topic: String, _reliable: bool) -> void:
-	if topic != LIVEKIT_TOPIC_REP_OBJECT:
-		return
 	var my_id := get_nakama_user_id()
 	if sender_identity == my_id:
 		return
@@ -923,7 +1011,12 @@ func _on_livekit_data_packet_received(sender_identity: String, payload: PackedBy
 	var parsed = JSON.parse_string(data_str)
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return
-	_apply_livekit_object_update(sender_identity, parsed)
+	if topic == LIVEKIT_TOPIC_REP_OBJECT:
+		_apply_livekit_object_update(sender_identity, parsed)
+	elif topic == LIVEKIT_TOPIC_REP_TRANSFORM:
+		_apply_livekit_player_transform(sender_identity, parsed)
+	elif topic == LIVEKIT_TOPIC_REP_PROPERTY:
+		_apply_property_update(sender_identity, parsed)
 
 
 func _on_livekit_data_received_legacy(sender_identity: String, data: String) -> void:
@@ -934,9 +1027,17 @@ func _on_livekit_data_received_legacy(sender_identity: String, data: String) -> 
 	if sender_identity == my_id:
 		return
 	var parsed = JSON.parse_string(data)
-	if typeof(parsed) != TYPE_DICTIONARY or not parsed.has("object_id"):
+	if typeof(parsed) != TYPE_DICTIONARY:
 		return
-	_apply_livekit_object_update(sender_identity, parsed)
+	var packet_type: String = parsed.get("packet_type", "")
+	if packet_type == "object_property_update":
+		_apply_property_update(sender_identity, parsed)
+	elif packet_type == "object_update":
+		_apply_livekit_object_update(sender_identity, parsed)
+	elif packet_type == "player_transform" or parsed.has("hp"):
+		_apply_livekit_player_transform(sender_identity, parsed)
+	elif parsed.has("object_id") and parsed.has("pos") and parsed.has("rot"):
+		_apply_livekit_object_update(sender_identity, parsed)
 
 
 func _apply_livekit_object_update(sender_identity: String, update_data: Dictionary) -> void:
@@ -955,6 +1056,44 @@ func _apply_livekit_object_update(sender_identity: String, update_data: Dictiona
 		"rotation": update_data.rot
 	})
 	grabbable_sync_update.emit(object_id, sync_data)
+
+
+func _apply_livekit_player_transform(sender_identity: String, data: Dictionary) -> void:
+	if sender_identity.is_empty():
+		return
+	if not players.has(sender_identity):
+		players[sender_identity] = local_player_info.duplicate(true)
+	var p = players[sender_identity]
+	if data.has("hp"): p.head_position = _dict_to_vec3(data.hp)
+	if data.has("hr"): p.head_rotation = _dict_to_vec3(data.hr)
+	if data.has("lp"): p.left_hand_position = _dict_to_vec3(data.lp)
+	if data.has("lr"): p.left_hand_rotation = _dict_to_vec3(data.lr)
+	if data.has("rp"): p.right_hand_position = _dict_to_vec3(data.rp)
+	if data.has("rr"): p.right_hand_rotation = _dict_to_vec3(data.rr)
+	if data.has("s"): p.player_scale = _dict_to_vec3(data.s)
+
+
+func _apply_property_update(sender_identity: String, data: Dictionary) -> void:
+	if not data.has("object_id") or not data.has("property_name"):
+		return
+	var object_id: String = String(data.get("object_id", ""))
+	var property_name: String = String(data.get("property_name", ""))
+	if object_id.is_empty() or property_name.is_empty():
+		return
+	var state := _ensure_object_registry(object_id)
+	var active_owner: String = state.get("held_by", state.get("owner_id", ""))
+	if not active_owner.is_empty() and active_owner != sender_identity:
+		return
+	var incoming_seq: int = int(data.get("property_seq", 0))
+	var current_seq: int = int(state.get("property_seq", 0))
+	if incoming_seq > 0 and incoming_seq < current_seq:
+		return
+	var value: Variant = data.get("value", null)
+	_update_object_registry_state(object_id, {
+		"property_seq": maxi(incoming_seq, current_seq + 1),
+		"properties": _merge_object_property_map(state.get("properties", {}), property_name, value)
+	})
+	object_property_updated.emit(object_id, property_name, value, sender_identity)
 
 
 func request_room_snapshot() -> void:

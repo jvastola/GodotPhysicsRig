@@ -27,13 +27,20 @@ Prepare a stable contract for moving realtime replication traffic from Nakama re
   - `sendData(...)` delegates to reliable
   - `sendDataTo(...)` delegates to reliable targeted send
 
-## Rust Plugin Work Needed (Next)
-- Add GDExtension methods to match wrapper assumptions:
-  - `send_reliable_data(data: GString)`
-  - `send_unreliable_data(data: GString)`
-  - `send_data_to(data: GString, identity: GString, reliable: bool)`
-- Emit inbound data with sender + payload + topic equivalent.
-- If binary payload support is added in Rust, update wrapper fallback that currently UTF-8 encodes payload.
+## Rust Plugin Surface (Implemented Locally)
+- File: `multiplayer/plugins/godot-livekit/rust/src/livekit_client.rs`
+- Added user-data publish methods:
+  - `send_reliable_data(...)`
+  - `send_unreliable_data(...)`
+  - `send_data_to(...)`
+  - topic-aware variants:
+    - `send_reliable_data_topic(...)`
+    - `send_unreliable_data_topic(...)`
+    - `send_data_to_topic(...)`
+- Added inbound data signal:
+  - `data_received(sender_identity, payload, topic)`
+- Switched desktop data path from chat fallback to `LocalParticipant.publish_data(DataPacket)` for replication traffic.
+- Note: this plugin path is currently ignored by top-level git (`multiplayer/plugins/godot-livekit`), so plugin changes are local unless the plugin repo is committed separately.
 
 ## Topic Conventions (Proposed)
 - `rep/transform` high-rate unreliable
@@ -45,20 +52,19 @@ Prepare a stable contract for moving realtime replication traffic from Nakama re
 ## Validation Plan Before Full Phase 3
 1. Android: verify all four send methods are callable from Godot and reach remote peer.
 2. Wrapper: verify `data_packet_received` includes non-empty topic on Android path.
-3. Rust desktop: verify fallback methods still send/receive with current plugin.
+3. Rust desktop: verify native data methods send/receive and topic is preserved.
 4. Mixed test: keep Nakama control-plane active while mirroring one replication topic over LiveKit.
 
 ## Android/Desktop Parity Matrix (Pre-Phase-3 Gate)
 - `Connect/disconnect room`: Android ✅ / Desktop ✅
-- `Reliable broadcast send`: Android ✅ (`sendDataReliable`) / Desktop ✅ (`send_reliable_data` scaffold)
-- `Unreliable broadcast send`: Android ✅ (`sendDataUnreliable`) / Desktop ⚠️ currently aliases reliable/chat fallback
-- `Reliable targeted send`: Android ✅ (`sendDataToReliable`) / Desktop ⚠️ currently broadcast fallback
-- `Unreliable targeted send`: Android ✅ (`sendDataToUnreliable`) / Desktop ⚠️ currently broadcast fallback
-- `Inbound topic preserved`: Android ✅ (RoomEvent.DataReceived topic) / Desktop ⚠️ pending native data event export
-- `Wrapper packet signal`: Android ✅ / Desktop ⚠️ currently compatibility path only
+- `Reliable broadcast send`: Android ✅ (`sendDataReliable`) / Desktop ✅ (`send_reliable_data`)
+- `Unreliable broadcast send`: Android ✅ (`sendDataUnreliable`) / Desktop ✅ (`send_unreliable_data`)
+- `Reliable targeted send`: Android ✅ (`sendDataToReliable`) / Desktop ✅ (`send_data_to`)
+- `Unreliable targeted send`: Android ✅ (`sendDataToUnreliable`) / Desktop ✅ (`send_data_to` with `reliable=false`)
+- `Inbound topic preserved`: Android ✅ (RoomEvent.DataReceived topic) / Desktop ✅ (RoomEvent::DataReceived topic)
+- `Wrapper packet signal`: Android ✅ / Desktop ✅ (`src/livekit_wrapper.gd` now wires Rust `data_received`)
 
 ## Parity Requirements Before Phase 3 Full Cutover
-1. Rust plugin emits native `data_received(identity, payload, topic)` signal.
-2. Rust plugin differentiates reliable vs unreliable publish.
-3. Rust plugin supports targeted data publish.
-4. Wrapper marks `reliable` accurately on receive path for both platforms.
+1. Run desktop Rust build in an environment with network access to LiveKit WebRTC artifact host.
+2. Run Android plugin build on a machine with a JDK installed.
+3. Optional: add receive-path reliability metadata to wrapper signal for exact parity with send-path reliability controls.

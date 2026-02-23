@@ -141,6 +141,8 @@ func _connect_rust_signals() -> void:
 	_rust_manager.connect("participant_joined", _on_participant_joined_rust)
 	_rust_manager.connect("participant_left", _on_participant_left)
 	_rust_manager.connect("participant_name_changed", _on_participant_name_changed_rust)
+	if _rust_manager.has_signal("data_received"):
+		_rust_manager.connect("data_received", _on_data_received)
 	_rust_manager.connect("on_audio_frame", _on_audio_frame)
 	_rust_manager.connect("chat_message_received", _on_chat_message)
 
@@ -304,23 +306,30 @@ func _send_packet_rust(payload: PackedByteArray, topic: String, reliable: bool, 
 		return
 	var payload_str := payload.get_string_from_utf8()
 	var wants_target := identity != ""
-	if wants_target and _rust_manager.has_method("send_data_to"):
-		_rust_manager.call("send_data_to", payload_str, identity, reliable)
-		return
+	if wants_target:
+		if _rust_manager.has_method("send_data_to_topic"):
+			_rust_manager.call("send_data_to_topic", payload_str, identity, reliable, topic)
+			return
+		if _rust_manager.has_method("send_data_to"):
+			_rust_manager.call("send_data_to", payload_str, identity, reliable)
+			return
 	if reliable:
+		if _rust_manager.has_method("send_reliable_data_topic"):
+			_rust_manager.call("send_reliable_data_topic", payload_str, topic)
+			return
 		if _rust_manager.has_method("send_reliable_data"):
 			_rust_manager.call("send_reliable_data", payload_str)
 			return
 	else:
+		if _rust_manager.has_method("send_unreliable_data_topic"):
+			_rust_manager.call("send_unreliable_data_topic", payload_str, topic)
+			return
 		if _rust_manager.has_method("send_unreliable_data"):
 			_rust_manager.call("send_unreliable_data", payload_str)
 			return
 	if _rust_manager.has_method("send_data"):
 		_rust_manager.call("send_data", payload_str, reliable)
 		return
-	# Topic is currently advisory until Rust plugin adds topic-aware methods.
-	if topic != "":
-		_log_warn("Rust backend topic passthrough pending plugin update", topic)
 
 
 ## Publish the local microphone audio track
