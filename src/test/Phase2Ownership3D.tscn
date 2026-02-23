@@ -1,0 +1,133 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://src/test/phase2_ownership_3d.gd" id="1_script"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_1"]
+size = Vector2(18, 12)
+
+[node name="Phase2Ownership3D" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+position = Vector3(0, 7.5, 11.5)
+rotation_degrees = Vector3(-33, 0, 0)
+current = true
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+position = Vector3(0, 7, 6)
+rotation_degrees = Vector3(-40, -20, 0)
+
+[node name="Ground" type="MeshInstance3D" parent="."]
+mesh = SubResource("PlaneMesh_1")
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="UI" type="Control" parent="CanvasLayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Panel" type="Panel" parent="CanvasLayer/UI"]
+layout_mode = 1
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 470.0
+offset_bottom = 620.0
+mouse_filter = 0
+
+[node name="VBox" type="VBoxContainer" parent="CanvasLayer/UI/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Title" type="Label" parent="CanvasLayer/UI/Panel/VBox"]
+layout_mode = 2
+text = "Phase2 Ownership 3D Test"
+
+[node name="Hint" type="Label" parent="CanvasLayer/UI/Panel/VBox"]
+layout_mode = 2
+text = "Host in one instance. Join from second. Click-drag cubes on plane z=0."
+autowrap_mode = 2
+
+[node name="StatusLabel" type="Label" parent="CanvasLayer/UI/Panel/VBox"]
+layout_mode = 2
+text = "status"
+autowrap_mode = 2
+
+[node name="MatchLabel" type="Label" parent="CanvasLayer/UI/Panel/VBox"]
+layout_mode = 2
+text = "match=-"
+autowrap_mode = 2
+
+[node name="PeersLabel" type="Label" parent="CanvasLayer/UI/Panel/VBox"]
+layout_mode = 2
+text = "players=0"
+
+[node name="ObjectsLabel" type="Label" parent="CanvasLayer/UI/Panel/VBox"]
+layout_mode = 2
+text = "registry_objects=0"
+
+[node name="ButtonsRow" type="HBoxContainer" parent="CanvasLayer/UI/Panel/VBox"]
+layout_mode = 2
+
+[node name="HostButton" type="Button" parent="CanvasLayer/UI/Panel/VBox/ButtonsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Host"
+
+[node name="LeaveButton" type="Button" parent="CanvasLayer/UI/Panel/VBox/ButtonsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Leave"
+
+[node name="SnapshotButton" type="Button" parent="CanvasLayer/UI/Panel/VBox/ButtonsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Request Snapshot"
+
+[node name="JoinRow" type="HBoxContainer" parent="CanvasLayer/UI/Panel/VBox"]
+layout_mode = 2
+
+[node name="MatchIDInput" type="LineEdit" parent="CanvasLayer/UI/Panel/VBox/JoinRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Paste Match ID"
+
+[node name="JoinButton" type="Button" parent="CanvasLayer/UI/Panel/VBox/JoinRow"]
+layout_mode = 2
+text = "Join"
+
+[node name="SpawnRow" type="HBoxContainer" parent="CanvasLayer/UI/Panel/VBox"]
+layout_mode = 2
+
+[node name="SpawnPlacedButton" type="Button" parent="CanvasLayer/UI/Panel/VBox/SpawnRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Spawn placed_room"
+
+[node name="SpawnSavedButton" type="Button" parent="CanvasLayer/UI/Panel/VBox/SpawnRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Spawn placed_saved"
+
+[node name="SpawnTransientButton" type="Button" parent="CanvasLayer/UI/Panel/VBox/SpawnRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Spawn transient_held"
+
+[node name="LogOutput" type="TextEdit" parent="CanvasLayer/UI/Panel/VBox"]
+custom_minimum_size = Vector2(0, 320)
+layout_mode = 2
+size_flags_vertical = 3
+editable = false

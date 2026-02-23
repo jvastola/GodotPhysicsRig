@@ -169,6 +169,10 @@ func get_stable_network_id() -> String:
 	return get_nakama_user_id()
 
 
+func get_host_peer_id() -> String:
+	return _get_host_peer_id()
+
+
 ## Register the local player node
 func _register_local_player() -> void:
 	var my_id = get_nakama_user_id()
@@ -503,18 +507,6 @@ func _handle_ownership_request(sender_id: String, data: Dictionary) -> void:
 			"rel_rot": data.get("rel_rot", _quat_to_dict(Quaternion.IDENTITY)),
 			"seq": state.get("seq", 0)
 		}
-		grabbed_objects[object_id] = {
-			"owner_peer_id": requester_id,
-			"is_grabbed": true,
-			"hand_name": grant_data.get("hand_name", "")
-		}
-		grabbable_grabbed.emit(
-			object_id,
-			requester_id,
-			grant_data.get("hand_name", ""),
-			_parse_vector3(grant_data.get("rel_pos", {})),
-			_parse_quaternion(grant_data.get("rel_rot", {}))
-		)
 		NakamaManager.send_match_state(NakamaManager.MatchOpCode.OWNERSHIP_GRANTED, grant_data)
 		return
 
@@ -528,8 +520,7 @@ func _handle_ownership_request(sender_id: String, data: Dictionary) -> void:
 	NakamaManager.send_match_state(NakamaManager.MatchOpCode.OWNERSHIP_DENIED, deny_data)
 
 
-func _handle_ownership_granted(sender_id: String, data: Dictionary) -> void:
-	_set_host_peer_id(sender_id)
+func _handle_ownership_granted(_sender_id: String, data: Dictionary) -> void:
 	var object_id: String = data.get("object_id", "")
 	if object_id.is_empty():
 		return
@@ -557,8 +548,7 @@ func _handle_ownership_granted(sender_id: String, data: Dictionary) -> void:
 	)
 
 
-func _handle_ownership_denied(sender_id: String, data: Dictionary) -> void:
-	_set_host_peer_id(sender_id)
+func _handle_ownership_denied(_sender_id: String, data: Dictionary) -> void:
 	var requester_id: String = data.get("requester_id", "")
 	if requester_id != get_nakama_user_id():
 		return
@@ -567,7 +557,6 @@ func _handle_ownership_denied(sender_id: String, data: Dictionary) -> void:
 
 
 func _handle_ownership_released(sender_id: String, data: Dictionary) -> void:
-	_set_host_peer_id(sender_id)
 	var object_id: String = data.get("object_id", "")
 	if object_id.is_empty():
 		return
@@ -659,37 +648,45 @@ func set_object_persist_mode(object_id: String, persist_mode: String) -> void:
 	if object_id.is_empty() or persist_mode.is_empty():
 		return
 	_update_object_registry_state(object_id, {"persist_mode": persist_mode})
+	var node := get_tree().current_scene.get_node_or_null(object_id) if get_tree().current_scene else null
+	if node and node.has_method("set_release_persist_mode"):
+		node.call("set_release_persist_mode", persist_mode)
 
 
 # ============================================================================
 # Networked Object Spawning
 # ============================================================================
 
-func spawn_network_object(scene_path: String, position: Vector3) -> void:
+func spawn_network_object(scene_path: String, position: Vector3) -> String:
+	return spawn_network_object_with_mode(scene_path, position, "placed_room")
+
+
+func spawn_network_object_with_mode(scene_path: String, position: Vector3, persist_mode: String = "placed_room", manifest_id: String = "default") -> String:
 	var object_id = "obj_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000)
 	var spawn_data = {
 		"scene_path": scene_path,
 		"pos": _vec3_to_dict(position),
 		"object_id": object_id,
 		"owner_id": get_nakama_user_id(),
-		"persist_mode": "placed_room",
-		"manifest_id": "default"
+		"persist_mode": persist_mode,
+		"manifest_id": manifest_id
 	}
 	NakamaManager.send_match_state(NakamaManager.MatchOpCode.SPAWN_OBJECT, spawn_data)
-	_do_spawn_object(scene_path, position, object_id)
+	_do_spawn_object(scene_path, position, object_id, persist_mode)
 	_update_object_registry_state(object_id, {
 		"scene_path": scene_path,
 		"position": _vec3_to_dict(position),
 		"owner_id": get_nakama_user_id(),
 		"held_by": "",
 		"placed": true,
-		"persist_mode": "placed_room",
-		"manifest_id": "default",
+		"persist_mode": persist_mode,
+		"manifest_id": manifest_id,
 		"spawned_by": get_nakama_user_id()
 	})
+	return object_id
 
 
-func _do_spawn_object(scene_path: String, position: Vector3, object_id: String) -> void:
+func _do_spawn_object(scene_path: String, position: Vector3, object_id: String, persist_mode: String = "") -> void:
 	var scene = load(scene_path)
 	if not scene: return
 	
@@ -700,7 +697,12 @@ func _do_spawn_object(scene_path: String, position: Vector3, object_id: String) 
 	var world = get_tree().current_scene
 	if world:
 		world.add_child(instance)
-		if instance is Node3D: instance.global_position = position
+		if instance is Node3D:
+			instance.global_position = position
+		elif instance is Node2D:
+			instance.global_position = Vector2(position.x, position.y)
+		if not persist_mode.is_empty() and instance.has_method("set_release_persist_mode"):
+			instance.call("set_release_persist_mode", persist_mode)
 		print("NetworkManager: Spawned object ", object_id, " at ", position)
 
 
@@ -764,7 +766,12 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 		if data is PackedByteArray: spawn_data = bytes_to_var(data)
 		
 		if spawn_data is Dictionary and spawn_data.has("scene_path") and spawn_data.has("pos") and spawn_data.has("object_id"):
-			_do_spawn_object(spawn_data.scene_path, _parse_vector3(spawn_data.pos), spawn_data.object_id)
+			_do_spawn_object(
+				spawn_data.scene_path,
+				_parse_vector3(spawn_data.pos),
+				spawn_data.object_id,
+				spawn_data.get("persist_mode", "placed_room")
+			)
 			_update_object_registry_state(spawn_data.object_id, {
 				"scene_path": spawn_data.scene_path,
 				"position": spawn_data.get("pos", _vec3_to_dict(Vector3.ZERO)),
@@ -981,7 +988,7 @@ func _apply_snapshot_object_state(object_state: Dictionary) -> void:
 	var existing := get_tree().current_scene.get_node_or_null(object_id) if get_tree().current_scene else null
 	if existing:
 		return
-	_do_spawn_object(path, pos, object_id)
+	_do_spawn_object(path, pos, object_id, object_state.get("persist_mode", "placed_room"))
 
 
 func _handle_peer_disconnect_objects(peer_id: String) -> void:
