@@ -400,14 +400,22 @@ func _handle_nakama_player_transform(sender_id: String, data: Dictionary) -> voi
 func _vec3_to_dict(v: Vector3) -> Dictionary:
 	return {"x": snappedf(v.x, 0.001), "y": snappedf(v.y, 0.001), "z": snappedf(v.z, 0.001)}
 
-func _dict_to_vec3(d: Dictionary) -> Vector3:
-	return Vector3(d.get("x", 0), d.get("y", 0), d.get("z", 0))
+func _dict_to_vec3(d: Variant) -> Vector3:
+	if d is Vector3:
+		return d
+	if d is Dictionary:
+		return Vector3(d.get("x", 0), d.get("y", 0), d.get("z", 0))
+	return Vector3.ZERO
 
 func _quat_to_dict(q: Quaternion) -> Dictionary:
 	return {"x": snappedf(q.x, 0.001), "y": snappedf(q.y, 0.001), "z": snappedf(q.z, 0.001), "w": snappedf(q.w, 0.001)}
 
-func _dict_to_quat(d: Dictionary) -> Quaternion:
-	return Quaternion(d.get("x", 0), d.get("y", 0), d.get("z", 0), d.get("w", 1))
+func _dict_to_quat(d: Variant) -> Quaternion:
+	if d is Quaternion:
+		return d
+	if d is Dictionary:
+		return Quaternion(d.get("x", 0), d.get("y", 0), d.get("z", 0), d.get("w", 1))
+	return Quaternion.IDENTITY
 
 
 func _handle_nakama_avatar_data(sender_id: String, data: Dictionary) -> void:
