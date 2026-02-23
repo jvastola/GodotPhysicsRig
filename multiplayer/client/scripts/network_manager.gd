@@ -1093,7 +1093,27 @@ func _apply_property_update(sender_identity: String, data: Dictionary) -> void:
 		"property_seq": maxi(incoming_seq, current_seq + 1),
 		"properties": _merge_object_property_map(state.get("properties", {}), property_name, value)
 	})
+	_apply_network_property_to_node(object_id, property_name, value)
 	object_property_updated.emit(object_id, property_name, value, sender_identity)
+
+
+func _apply_network_property_to_node(object_id: String, property_name: String, value: Variant) -> void:
+	if object_id.is_empty() or property_name.is_empty():
+		return
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	var node := scene.get_node_or_null(object_id)
+	if node == null:
+		return
+	if node.has_method("apply_network_property_update"):
+		node.call("apply_network_property_update", property_name, value)
+		return
+	var normalized := NodePath(property_name)
+	if node.has_method("set_indexed"):
+		node.call("set_indexed", normalized, value)
+		return
+	node.set(property_name, value)
 
 
 func request_room_snapshot() -> void:
