@@ -20,9 +20,16 @@
   - Oracle smoke test (success): `/v2/rpc/livekit_token` returned JWT + `ws_url`.
 - In progress:
   - Move Oracle Lua module from host data path to tracked + automated deploy path.
-  - Replace hardcoded key/secret in Lua with secure secret source compatible with runtime.
-- Not started:
-  - Ownership protocol, snapshot flow, asset server room save APIs, LiveKit wrapper/datachannel work.
+  - Asset server room save APIs.
+  - LiveKit wrapper/datachannel work.
+- Completed:
+  - Replaced hardcoded key/secret in Lua with env-driven runtime config (`LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_WS_URL`).
+  - Phase 2 scaffolding in client:
+    - ownership request/grant/deny/release opcodes and handlers
+    - host-side object registry (`room_object_registry`)
+    - oldest-presence host tracking + stable network ID helper
+    - snapshot request/chunk/done handshake with chunked reconstruction
+    - disconnect cleanup rules for `transient_held` vs placed objects
 
 ## Critical Findings To Fix First
 1. LiveKit API keys/secrets are embedded in client scripts.
