@@ -13,6 +13,7 @@ signal ownership_changed(object_id: String, new_owner_id: String, previous_owner
 signal snapshot_reconstructed(snapshot_id: String, object_count: int)
 signal network_object_despawn_requested(object_id: String)
 signal object_property_updated(object_id: String, property_name: String, value: Variant, sender_peer_id: String)
+signal player_name_updated(peer_id: String, display_name: String)
 
 # Nakama is now the exclusive networking backend
 var use_nakama: bool = true
@@ -24,6 +25,7 @@ var local_player: Node3D = null
 var _presence_join_order: Dictionary = {} # user_id -> join order
 var _join_order_counter: int = 0
 var _host_peer_id: String = ""
+var peer_display_names: Dictionary = {} # peer_id -> display name
 
 # Player info structure
 var local_player_info: Dictionary = {
@@ -124,6 +126,8 @@ var _replication_manifests: Dictionary = {
 
 
 func _ready() -> void:
+	if NakamaManager and not NakamaManager.display_name.is_empty():
+		local_player_info.name = NakamaManager.display_name
 	use_livekit_data_replication = ProjectSettings.get_setting("network/use_livekit_data_replication", false)
 	# Initialize network stats monitoring
 	_last_server_response_time = Time.get_ticks_msec() / 1000.0
@@ -205,13 +209,80 @@ func get_host_peer_id() -> String:
 	return _get_host_peer_id()
 
 
+func get_peer_display_name(peer_id: String) -> String:
+	if peer_display_names.has(peer_id):
+		return String(peer_display_names[peer_id])
+	if players.has(peer_id):
+		var p = players[peer_id]
+		if p is Dictionary and p.has("name") and not String(p.name).is_empty():
+			return String(p.name)
+	return ""
+
+
+func set_peer_display_name(peer_id: String, display_name: String, broadcast: bool = false) -> void:
+	_set_peer_display_name(peer_id, display_name, broadcast)
+
+
+func set_local_display_name(display_name: String, broadcast: bool = true) -> void:
+	var my_id := get_nakama_user_id()
+	if my_id.is_empty():
+		return
+	local_player_info.name = display_name
+	_set_peer_display_name(my_id, display_name, broadcast)
+
+
+func _resolve_local_display_name() -> String:
+	if NakamaManager and not NakamaManager.display_name.is_empty():
+		return NakamaManager.display_name
+	return String(local_player_info.get("name", "Player"))
+
+
+func _set_peer_display_name(peer_id: String, display_name: String, broadcast: bool) -> void:
+	if peer_id.is_empty() or display_name.is_empty():
+		return
+	peer_display_names[peer_id] = display_name
+	if players.has(peer_id):
+		var p = players[peer_id].duplicate(true)
+		p["name"] = display_name
+		players[peer_id] = p
+	elif peer_id == get_nakama_user_id():
+		local_player_info.name = display_name
+	player_name_updated.emit(peer_id, display_name)
+	if broadcast and NakamaManager:
+		NakamaManager.send_match_state(NakamaManager.MatchOpCode.PLAYER_NAME_UPDATE, {
+			"peer_id": peer_id,
+			"display_name": display_name
+		})
+
+
 ## Register the local player node
 func _register_local_player() -> void:
 	var my_id = get_nakama_user_id()
 	if not my_id.is_empty():
+		var local_name := _resolve_local_display_name()
+		local_player_info.name = local_name
 		players[my_id] = local_player_info.duplicate(true)
+		_set_peer_display_name(my_id, local_name, false)
 		_assign_join_order_if_missing(my_id)
 		print("Local player registered with ID: ", my_id)
+
+
+func _make_default_remote_player_info(peer_id: String) -> Dictionary:
+	var info := {
+		"name": "Player",
+		"head_position": Vector3.ZERO,
+		"head_rotation": Vector3.ZERO,
+		"left_hand_position": Vector3.ZERO,
+		"left_hand_rotation": Vector3.ZERO,
+		"right_hand_position": Vector3.ZERO,
+		"right_hand_rotation": Vector3.ZERO,
+		"player_scale": Vector3.ONE,
+		"avatar_texture_data": PackedByteArray()
+	}
+	var known_name := get_peer_display_name(peer_id)
+	if not known_name.is_empty():
+		info["name"] = known_name
+	return info
 
 
 func _assign_join_order_if_missing(peer_id: String) -> void:
@@ -314,16 +385,18 @@ func _on_nakama_match_joined(match_id: String) -> void:
 	_join_order_counter = 0
 	_host_peer_id = ""
 	_snapshot_buffers.clear()
+	peer_display_names.clear()
 
 	# Seed known peers from match-join presences before registering ourselves.
 	if NakamaManager:
 		for peer_id in NakamaManager.match_peers.keys():
 			if not peer_id.is_empty():
-				players[peer_id] = local_player_info.duplicate(true)
+				players[peer_id] = _make_default_remote_player_info(peer_id)
 				_assign_join_order_if_missing(peer_id)
 	
 	# Register ourselves
 	_register_local_player()
+	set_local_display_name(local_player_info.name, true)
 	if NakamaManager and NakamaManager.match_peers.is_empty():
 		_set_host_peer_id(get_nakama_user_id())
 	else:
@@ -348,6 +421,7 @@ func _on_nakama_match_left() -> void:
 	_presence_join_order.clear()
 	_host_peer_id = ""
 	_snapshot_buffers.clear()
+	peer_display_names.clear()
 	server_disconnected.emit()
 	_update_monitoring_state()
 
@@ -360,7 +434,7 @@ func _on_nakama_match_presence(joins: Array, leaves: Array) -> void:
 			continue
 		
 		print("NetworkManager: Nakama player joined: ", user_id)
-		players[user_id] = local_player_info.duplicate(true)
+		players[user_id] = _make_default_remote_player_info(user_id)
 		_assign_join_order_if_missing(user_id)
 		if _host_peer_id.is_empty():
 			_set_host_peer_id(_get_host_peer_id())
@@ -374,6 +448,8 @@ func _on_nakama_match_presence(joins: Array, leaves: Array) -> void:
 			print("NetworkManager: Nakama player left: ", user_id)
 			if players.has(user_id):
 				players.erase(user_id)
+			if peer_display_names.has(user_id):
+				peer_display_names.erase(user_id)
 			if _presence_join_order.has(user_id):
 				_presence_join_order.erase(user_id)
 			if user_id == _host_peer_id:
@@ -385,7 +461,7 @@ func _on_nakama_match_presence(joins: Array, leaves: Array) -> void:
 
 func _handle_nakama_player_transform(sender_id: String, data: Dictionary) -> void:
 	if not players.has(sender_id):
-		players[sender_id] = local_player_info.duplicate(true)
+		players[sender_id] = _make_default_remote_player_info(sender_id)
 	
 	var p = players[sender_id]
 	if data.has("hp"): p.head_position = _dict_to_vec3(data.hp)
@@ -420,7 +496,7 @@ func _dict_to_quat(d: Variant) -> Quaternion:
 
 func _handle_nakama_avatar_data(sender_id: String, data: Dictionary) -> void:
 	if data.is_empty(): return
-	if not players.has(sender_id): players[sender_id] = local_player_info.duplicate(true)
+	if not players.has(sender_id): players[sender_id] = _make_default_remote_player_info(sender_id)
 	if not players[sender_id].has("avatar_textures"): players[sender_id].avatar_textures = {}
 	
 	for surface_name in data:
@@ -1081,6 +1157,15 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 			prop_data = bytes_to_var(data)
 		if prop_data is Dictionary:
 			_apply_property_update(peer_id, prop_data)
+	elif op_code == NakamaManager.MatchOpCode.PLAYER_NAME_UPDATE:
+		var name_data = data
+		if data is PackedByteArray:
+			name_data = bytes_to_var(data)
+		if name_data is Dictionary:
+			var updated_peer_id := String(name_data.get("peer_id", peer_id))
+			var display_name := String(name_data.get("display_name", ""))
+			if not updated_peer_id.is_empty() and not display_name.is_empty():
+				_set_peer_display_name(updated_peer_id, display_name, false)
 	elif op_code == NakamaManager.MatchOpCode.OWNERSHIP_REQUEST:
 		if data is Dictionary:
 			_handle_ownership_request(peer_id, data)
@@ -1190,7 +1275,7 @@ func _apply_livekit_player_transform(sender_identity: String, data: Dictionary) 
 	if sender_identity.is_empty():
 		return
 	if not players.has(sender_identity):
-		players[sender_identity] = local_player_info.duplicate(true)
+		players[sender_identity] = _make_default_remote_player_info(sender_identity)
 	var p = players[sender_identity]
 	if data.has("hp"): p.head_position = _dict_to_vec3(data.hp)
 	if data.has("hr"): p.head_rotation = _dict_to_vec3(data.hr)

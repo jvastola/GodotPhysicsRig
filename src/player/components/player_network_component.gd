@@ -47,6 +47,8 @@ func _setup_networking() -> void:
 	network_manager.player_disconnected.connect(_on_player_disconnected)
 	network_manager.avatar_texture_received.connect(_on_avatar_texture_received)
 	network_manager.send_local_avatar.connect(send_avatar_texture)
+	if network_manager.has_signal("player_name_updated"):
+		network_manager.player_name_updated.connect(_on_player_name_updated)
 	
 	# Connect to NakamaManager match_joined to send avatar when we join a room
 	var nakama_manager = get_node_or_null("/root/NakamaManager")
@@ -140,6 +142,11 @@ func _update_remote_players() -> void:
 		# Update remote player transforms
 		if remote_players.has(peer_id):
 			remote_players[peer_id].update_from_network_data(player_data)
+			var remote_name := ""
+			if network_manager.has_method("get_peer_display_name"):
+				remote_name = network_manager.get_peer_display_name(str(peer_id))
+			if not remote_name.is_empty() and remote_players[peer_id].has_method("set_player_name"):
+				remote_players[peer_id].set_player_name(remote_name)
 
 func _despawn_remote_player(peer_id: Variant) -> void:
 	"""Remove a remote player's visual representation"""
@@ -262,9 +269,22 @@ func _spawn_remote_player(peer_id: Variant) -> void:
 	remote_players[peer_id] = remote_player
 	
 	print("PlayerNetworkComponent: Spawned remote player ", peer_id)
+
+	var remote_name := ""
+	if network_manager and network_manager.has_method("get_peer_display_name"):
+		remote_name = network_manager.get_peer_display_name(str(peer_id))
+	if not remote_name.is_empty() and remote_player.has_method("set_player_name"):
+		remote_player.set_player_name(remote_name)
 	
 	# Try to apply their avatar texture
 	call_deferred("_apply_remote_avatar", peer_id)
+
+
+func _on_player_name_updated(peer_id: String, display_name: String) -> void:
+	if display_name.is_empty():
+		return
+	if remote_players.has(peer_id) and remote_players[peer_id].has_method("set_player_name"):
+		remote_players[peer_id].set_player_name(display_name)
 
 func _apply_remote_avatar(peer_id: Variant) -> void:
 	"""Apply avatar texture to a remote player"""

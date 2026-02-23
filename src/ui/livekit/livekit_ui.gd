@@ -174,6 +174,10 @@ func _on_auto_connect_requested():
 
 
 func _on_username_changed(new_name: String):
+	var network_manager = get_node_or_null("/root/NetworkManager")
+	if network_manager and network_manager.has_method("set_local_display_name"):
+		network_manager.set_local_display_name(new_name, true)
+
 	# Sync to LiveKit metadata so other participants see it
 	if livekit_manager and livekit_manager.is_room_connected():
 		var metadata = JSON.stringify({"username": new_name})
@@ -251,6 +255,9 @@ func _sync_local_identity_and_metadata_after_connect(initial_name: String) -> vo
 
 	var display_name = initial_name if not initial_name.is_empty() else "You"
 	participants_list.set_participant_username(my_identity, display_name + " (You)")
+	var network_manager = get_node_or_null("/root/NetworkManager")
+	if network_manager and network_manager.has_method("set_local_display_name") and not initial_name.is_empty():
+		network_manager.set_local_display_name(initial_name, true)
 
 	if livekit_manager and livekit_manager.has_method("set_metadata") and not initial_name.is_empty():
 		var metadata = JSON.stringify({"username": initial_name})
@@ -294,6 +301,9 @@ func _on_participant_metadata_changed(identity: String, metadata: String):
 	var data = JSON.parse_string(metadata)
 	if data and data.has("username"):
 		participants_list.set_participant_username(identity, data.username)
+		var network_manager = get_node_or_null("/root/NetworkManager")
+		if network_manager and network_manager.has_method("set_peer_display_name"):
+			network_manager.set_peer_display_name(identity, String(data.username), false)
 
 
 func _on_error(msg: String):
