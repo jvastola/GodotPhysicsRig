@@ -405,6 +405,11 @@ func get_participant_identities() -> PackedStringArray:
 			var csv = _android_plugin.getParticipantIdentities()  # camelCase for Android plugin
 			if csv != "":
 				result = PackedStringArray(csv.split(","))
+	else:
+		if _rust_manager and _rust_manager.has_method("get_participant_identities"):
+			var csv = _rust_manager.get_participant_identities()
+			if csv != "":
+				result = PackedStringArray(String(csv).split(","))
 	
 	return result
 

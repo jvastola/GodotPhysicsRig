@@ -231,24 +231,33 @@ func _on_room_connected():
 	
 	_set_status("✅ Connected" + (" to: " + room_name if not room_name.is_empty() else ""))
 	connection_panel.set_connected(true, room_name)
-	
-	# Broadcast our local metadata so others see our username instead of UUID
 	var initial_name = connection_panel.local_username
-	if livekit_manager.has_method("set_metadata") and not initial_name.is_empty():
+	call_deferred("_sync_local_identity_and_metadata_after_connect", initial_name)
+
+
+func _sync_local_identity_and_metadata_after_connect(initial_name: String) -> void:
+	# Retry briefly to avoid race where room_connected fires before backend state is fully ready.
+	var my_identity := ""
+	for _i in range(6):
+		if livekit_manager and livekit_manager.has_method("get_local_identity"):
+			my_identity = String(livekit_manager.get_local_identity())
+		if not my_identity.is_empty() and my_identity != "local":
+			break
+		await get_tree().create_timer(0.2).timeout
+
+	if my_identity.is_empty():
+		my_identity = "local"
+	participants_list.add_participant(my_identity)
+
+	var display_name = initial_name if not initial_name.is_empty() else "You"
+	participants_list.set_participant_username(my_identity, display_name + " (You)")
+
+	if livekit_manager and livekit_manager.has_method("set_metadata") and not initial_name.is_empty():
 		var metadata = JSON.stringify({"username": initial_name})
 		livekit_manager.set_metadata(metadata)
 		print("✅ Initial metadata (username) broadcasted: ", initial_name)
-	
-	# Add local participant to the list using our actual identity and name
-	var my_identity = livekit_manager.get_local_identity()
-	participants_list.add_participant(my_identity)
-	
-	# And immediately set our display name
-	var display_name = initial_name if not initial_name.is_empty() else "You (local)"
-	participants_list.set_participant_username(my_identity, display_name + " (You)")
-	
-	# Query existing participants
-	if livekit_manager.has_method("get_participant_identities"):
+
+	if livekit_manager and livekit_manager.has_method("get_participant_identities"):
 		var existing = livekit_manager.get_participant_identities()
 		for identity in existing:
 			if not identity.is_empty() and identity != my_identity:

@@ -58,6 +58,10 @@ func _process(delta):
 
 func add_participant(identity: String):
 	"""Add a new participant to the list or update their base identity"""
+	if identity.is_empty():
+		return
+	if participants.has(identity):
+		return
 	var display_name = identity
 	
 	# If participant already exists (e.g., from an early metadata event), preserve their name
@@ -76,6 +80,7 @@ func add_participant(identity: String):
 		"name_label": null,
 		"name_synced": false,
 	}
+	participants[identity] = p_data
 	print("ParticipantsList: Added ", identity)
 	_rebuild_list()
 
