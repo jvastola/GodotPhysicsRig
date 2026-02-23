@@ -13,29 +13,42 @@
 
 ## Execution Status (2026-02-23)
 - Completed:
-  - Client no longer signs LiveKit tokens in UI/gameplay scripts.
-  - Client now requests `livekit_token` from Nakama (`NakamaManager.request_livekit_token`).
-  - Nakama RPC request body shape fixed for Lua runtime (`JSON string`, not object).
-  - Oracle Nakama updated with `livekit_token` Lua module and validated by smoke test.
-  - Oracle smoke test (success): `/v2/rpc/livekit_token` returned JWT + `ws_url`.
+  - Client no longer signs LiveKit tokens; token issuance is Nakama RPC-based.
+  - Oracle Nakama `livekit_token` RPC validated by smoke test.
+  - Host authority scaffolding in client:
+    - oldest-presence host tracking
+    - ownership request/grant/deny/release flow
+    - room object registry with persist mode + sequence
+    - late-join snapshot request/chunk/done reconstruction
+    - disconnect cleanup for transient vs placed objects
+  - LiveKit replication scaffolding in client:
+    - topic-based routing for `rep/object`, `rep/transform`, `rep/property`
+    - legacy JSON fallback parsing path preserved
+  - 20Hz replication policy implemented in client:
+    - player transforms: 20Hz
+    - held-object transforms: 20Hz
+  - Property replication scaffolding implemented:
+    - manifest dictionary registration/getters
+    - owner-checked property replication API
+    - property sequence handling + stale-drop protection
+    - scene-node property apply hook (`apply_network_property_update`) and fallback setters
 - In progress:
-  - Move Oracle Lua module from host data path to tracked + automated deploy path.
-  - Asset server room save APIs.
-  - LiveKit wrapper/datachannel work.
-- Completed:
-  - Replaced hardcoded key/secret in Lua with env-driven runtime config (`LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_WS_URL`).
-  - Phase 2 scaffolding in client:
-    - ownership request/grant/deny/release opcodes and handlers
-    - host-side object registry (`room_object_registry`)
-    - oldest-presence host tracking + stable network ID helper
-    - snapshot request/chunk/done handshake with chunked reconstruction
-    - disconnect cleanup rules for `transient_held` vs placed objects
+  - Full LiveKit-first cutover (currently mixed path with Nakama fallback for safety).
+  - Asset server room save/load APIs for `placed_saved` persistence across restarts.
+  - Build/release parity pipeline for Android + desktop LiveKit plugins.
+- Blocked in current local environment:
+  - Rust plugin build: WebRTC artifact download DNS failure.
+  - Android plugin build: missing local JDK runtime.
 
-## Critical Findings To Fix First
-1. LiveKit API keys/secrets are embedded in client scripts.
-2. `match_handler.lua` opcode map does not match `multiplayer/client/scripts/nakama_manager.gd`.
-3. Ownership and grab locks are still partly client-trusted.
-4. LiveKit wrapper currently stringifies inbound data and drops channel/topic.
+## Current Risk Register (Systems View)
+1. Plugin release pipeline risk:
+  - Android and Rust plugin binaries cannot be validated in this local environment due to JDK/network prerequisites.
+2. Dual-path complexity risk:
+  - Mixed Nakama + LiveKit replication path is safer short-term but increases behavioral drift risk.
+3. Authority hardening gap:
+  - Client ignores non-owner updates, but full server-side authoritative validation for all object/property mutations is still partial.
+4. Persistence completion gap:
+  - `placed_saved` persistence contract is scaffolded client-side but not yet fully implemented in asset-server APIs + migrations.
 
 ---
 
@@ -125,6 +138,17 @@
   - `send_data_to(data: GString, identity: GString, reliable: bool)`
 - Emit `data_received(identity, payload, topic)` equivalent via wrapper contract.
 
+### 3.4 Current implementation notes
+- Implemented in main client:
+  - `src/livekit_wrapper.gd` now consumes Rust `data_received` and uses topic-aware send methods when available.
+  - `multiplayer/client/scripts/network_manager.gd` now routes:
+    - `rep/transform` for player state
+    - `rep/object` for held object movement
+    - `rep/property` for reliable on-change object properties
+- Implemented in plugin repo (`multiplayer/plugins/godot-livekit`):
+  - Rust plugin now uses LiveKit `publish_data(DataPacket)` instead of chat fallback.
+  - Rust plugin emits `data_received(sender, payload, topic)` from `RoomEvent::DataReceived`.
+
 ---
 
 ## Phase 4 - Property Manifest + Rates
@@ -136,10 +160,18 @@
   - `snapshot_only`
 
 ### 4.2 Rate tiers (20-player target)
-- Player head/hands: 15 Hz unreliable
+- Player head/hands: 20 Hz unreliable
 - Held object transform: 20 Hz unreliable
 - Idle/far objects: 2-5 Hz or event-only
 - Enforce seq numbers and stale packet drops.
+
+### 4.3 Current implementation notes
+- Implemented:
+  - Manifest dictionary scaffolding in `network_manager.gd`.
+  - `replicate_object_property(...)` API with ownership check + seq progression.
+  - Property updates applied to spawned nodes directly.
+- Next:
+  - Add per-manifest scheduling (high-rate / reliable-on-change / snapshot-only) and distance-based downshifting for idle/far objects.
 
 ---
 
@@ -170,6 +202,14 @@
 - Save only `placed_saved` object graph + manifests + durable properties.
 - Exclude transient held state.
 
+### 6.3 Acceptance criteria
+- Saving a room and restarting reconstructs:
+  - object spawn list
+  - ownership baseline (host-owned placed state)
+  - manifest IDs
+  - persisted property map values
+- Transient held objects are not restored after restart.
+
 ---
 
 ## Oracle Deployment Runbook
@@ -194,6 +234,27 @@
 - Disconnect cleanup obeys persist policy.
 - Mid-session join reconstructs room state correctly.
 - Save Room then restart restores `placed_saved` objects.
+- Player and held-object realtime replication remain capped at 20Hz under load.
+
+---
+
+## Next Steps (Continued Development)
+1. Build parity gate:
+  - Resolve local JDK install for Android plugin build.
+  - Build Rust plugin in environment with network access to WebRTC artifact host.
+  - Publish plugin repo changes and tag reproducible binaries.
+2. Runtime verification gate:
+  - 2-instance soak test (desktop/desktop), then desktop/android, then 6-peer room.
+  - Validate ownership contention, release/regrab loop, and late-join snapshots.
+3. Scheduler/rate-control gate:
+  - Add manifest-driven scheduler to enforce tiering beyond current fixed 20Hz paths.
+  - Add optional distance/visibility throttling for non-held objects.
+4. Persistence gate:
+  - Implement asset server save/load endpoints + schema migration.
+  - Add room restart replay harness using saved snapshots.
+5. Pre-production gate (20-player target):
+  - Capture bandwidth/CPU/memory metrics per client and host.
+  - Define fallback policy (auto-disable LiveKit replication path) if loss/jitter threshold exceeded.
 
 ---
 

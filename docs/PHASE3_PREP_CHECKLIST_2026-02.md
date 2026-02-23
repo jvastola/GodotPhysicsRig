@@ -54,6 +54,7 @@ Prepare a stable contract for moving realtime replication traffic from Nakama re
 2. Wrapper: verify `data_packet_received` includes non-empty topic on Android path.
 3. Rust desktop: verify native data methods send/receive and topic is preserved.
 4. Mixed test: keep Nakama control-plane active while mirroring one replication topic over LiveKit.
+5. Rate policy: verify player + held object update send paths are capped at 20Hz.
 
 ## Android/Desktop Parity Matrix (Pre-Phase-3 Gate)
 - `Connect/disconnect room`: Android ✅ / Desktop ✅
@@ -68,3 +69,22 @@ Prepare a stable contract for moving realtime replication traffic from Nakama re
 1. Run desktop Rust build in an environment with network access to LiveKit WebRTC artifact host.
 2. Run Android plugin build on a machine with a JDK installed.
 3. Optional: add receive-path reliability metadata to wrapper signal for exact parity with send-path reliability controls.
+
+## Current Main-Repo State (2026-02-23)
+- LiveKit topics now wired in `network_manager.gd`:
+  - `rep/transform`
+  - `rep/object`
+  - `rep/property`
+- Manifest/property scaffolding is in place:
+  - register/get manifest APIs
+  - property replication API with owner checks and property sequence tracking
+  - direct node apply hook for replicated property changes
+- Current rate policy in client:
+  - player transform = 20Hz
+  - held object transform = 20Hz
+
+## Remaining Execution Order
+1. Build and publish plugin binaries (Android + desktop Rust).
+2. Validate 2-instance mixed replication (`rep/object`, `rep/transform`, `rep/property`) with ownership contention.
+3. Run 6-peer soak with metrics capture and verify no desync/ownership regressions.
+4. Promote LiveKit data replication feature flag from opt-in test mode toward default-on after soak pass.
