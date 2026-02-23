@@ -191,12 +191,12 @@ func _on_disconnect_pressed() -> void:
 		room_code_input.editable = true
 
 
-func _on_player_connected(peer_id: int) -> void:
+func _on_player_connected(peer_id: String) -> void:
 	print("NetworkUI: Player connected: ", peer_id)
 	_update_status()
 
 
-func _on_player_disconnected(peer_id: int) -> void:
+func _on_player_disconnected(peer_id: String) -> void:
 	print("NetworkUI: Player disconnected: ", peer_id)
 	_update_status()
 
