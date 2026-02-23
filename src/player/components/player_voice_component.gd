@@ -43,12 +43,18 @@ func setup(p_livekit_manager: Node) -> void:
 	if livekit_manager:
 		_setup_microphone()
 		_connect_livekit_signals()
+		var has_pcm_spatial_audio := false
+		if livekit_manager.has_method("is_pcm_spatial_audio_enabled"):
+			has_pcm_spatial_audio = bool(livekit_manager.call("is_pcm_spatial_audio_enabled"))
 		_android_spatial_enabled = (
 			OS.get_name() == "Android" and
-			livekit_manager.has_method("set_participant_volume")
+			livekit_manager.has_method("set_participant_volume") and
+			not has_pcm_spatial_audio
 		)
 		if _android_spatial_enabled:
 			print("PlayerVoiceComponent: Android spatial fallback enabled (distance attenuation)")
+		elif OS.get_name() == "Android" and has_pcm_spatial_audio:
+			print("PlayerVoiceComponent: Android PCM spatial audio enabled")
 		print("PlayerVoiceComponent: Setup with LiveKit manager")
 	else:
 		push_warning("PlayerVoiceComponent: No LiveKit manager provided")
@@ -293,7 +299,10 @@ func _update_android_spatial_audio(delta: float) -> void:
 
 	for peer_id in remote_players.keys():
 		var player_data: Dictionary = remote_players[peer_id]
-		var player_node: Node = player_data.get("player_node")
+		var player_node_ref: Variant = player_data.get("player_node", null)
+		var player_node: Node = null
+		if player_node_ref is Node and is_instance_valid(player_node_ref):
+			player_node = player_node_ref
 
 		if not player_node or not is_instance_valid(player_node):
 			player_node = _find_network_player(str(peer_id))

@@ -1,6 +1,5 @@
 package com.jvastola.physicshand.livekit
 
-import android.app.Activity
 import android.os.Handler
 import android.os.Looper
 import io.livekit.android.*
@@ -9,11 +8,13 @@ import io.livekit.android.room.*
 import io.livekit.android.room.track.*
 import io.livekit.android.room.participant.*
 import kotlinx.coroutines.*
+import livekit.org.webrtc.AudioTrackSink
 import org.godotengine.godot.Godot
 import org.godotengine.godot.plugin.GodotPlugin
 import org.godotengine.godot.plugin.SignalInfo
 import org.godotengine.godot.plugin.UsedByGodot
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
 
@@ -24,6 +25,17 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
     private var room: Room? = null
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var isMuted: Boolean = false  // Track user's mute preference
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var pcmSpatialAudioEnabled: Boolean = true
+
+    private data class RemoteAudioSinkBinding(
+        val participantIdentity: String,
+        val trackSid: String,
+        val track: RemoteAudioTrack,
+        val sink: AudioTrackSink
+    )
+
+    private val remoteAudioSinks = mutableMapOf<String, RemoteAudioSinkBinding>()
 
     override fun getPluginName(): String = PLUGIN_NAME
 
@@ -49,6 +61,7 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
         android.util.Log.d("GodotLiveKit", "connectToRoom called: $url")
         scope.launch {
             try {
+                removeAllRemoteAudioSinks()
                 val currentActivity = activity
                 if (currentActivity == null) {
                     android.util.Log.e("GodotLiveKit", "Activity is null")
@@ -92,6 +105,7 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
     @UsedByGodot
     fun disconnectFromRoom() {
         scope.launch {
+            removeAllRemoteAudioSinks()
             room?.disconnect()
             room = null
             emitSignal("room_disconnected")
@@ -112,6 +126,9 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
         room?.remoteParticipants?.keys?.forEach { identities.add(it.value) }
         return identities.joinToString(",")
     }
+
+    @UsedByGodot
+    fun isPcmSpatialAudioEnabled(): Boolean = pcmSpatialAudioEnabled
 
     @UsedByGodot
     fun sendData(data: ByteArray, topic: String) {
@@ -185,6 +202,10 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
 
     @UsedByGodot
     fun setParticipantVolume(identity: String, volume: Double) {
+        if (pcmSpatialAudioEnabled) {
+            // In PCM spatial mode, remote audio is rendered by Godot's AudioStreamPlayer3D.
+            return
+        }
         // LiveKit volume range is 0.0 to 10.0 (1.0 = normal)
         android.util.Log.d("GodotLiveKit", "setParticipantVolume: $identity -> $volume")
         scope.launch {
@@ -217,10 +238,27 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
                 r.events.collect { event ->
                     when (event) {
                         is RoomEvent.ParticipantConnected -> emitSignal("participant_joined", event.participant.identity?.value ?: "")
-                        is RoomEvent.ParticipantDisconnected -> emitSignal("participant_left", event.participant.identity?.value ?: "")
+                        is RoomEvent.ParticipantDisconnected -> {
+                            val participantIdentity = event.participant.identity?.value ?: ""
+                            removeRemoteAudioSinksForParticipant(participantIdentity)
+                            emitSignal("participant_left", participantIdentity)
+                        }
                         is RoomEvent.ParticipantMetadataChanged -> emitSignal("participant_metadata_changed", event.participant.identity?.value ?: "", event.participant.metadata ?: "")
-                        is RoomEvent.TrackSubscribed -> emitSignal("track_subscribed", event.participant.identity?.value ?: "", event.track.sid ?: "")
-                        is RoomEvent.TrackUnsubscribed -> emitSignal("track_unsubscribed", event.participant.identity?.value ?: "", event.track.sid ?: "")
+                        is RoomEvent.TrackSubscribed -> {
+                            val participantIdentity = event.participant.identity?.value ?: ""
+                            val trackSid = event.track.sid ?: ""
+                            emitSignal("track_subscribed", participantIdentity, trackSid)
+                            val remoteAudioTrack = event.track as? RemoteAudioTrack
+                            if (remoteAudioTrack != null) {
+                                attachRemoteAudioSink(participantIdentity, remoteAudioTrack, trackSid)
+                            }
+                        }
+                        is RoomEvent.TrackUnsubscribed -> {
+                            val participantIdentity = event.participant.identity?.value ?: ""
+                            val trackSid = event.track.sid ?: ""
+                            removeRemoteAudioSink(trackSid)
+                            emitSignal("track_unsubscribed", participantIdentity, trackSid)
+                        }
                         is RoomEvent.DataReceived -> {
                             emitSignal("data_received", event.participant?.identity?.value ?: "", event.data, event.topic ?: "")
                         }
@@ -255,6 +293,7 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
         // IMPORTANT: Don't launch coroutines during destruction - ART may already be shutting down
         // Safely disconnect by canceling scope first, then cleaning up room reference
         try {
+            removeAllRemoteAudioSinks()
             // Cancel all pending coroutines first to prevent any callbacks
             scope.cancel()
             
@@ -287,5 +326,107 @@ class GodotLiveKitPlugin(godot: Godot) : GodotPlugin(godot) {
         }
         
         super.onMainDestroy()
+    }
+
+    private fun attachRemoteAudioSink(participantIdentity: String, remoteAudioTrack: RemoteAudioTrack, trackSid: String) {
+        if (!pcmSpatialAudioEnabled) {
+            return
+        }
+
+        val effectiveSid = if (trackSid.isNotEmpty()) trackSid else "${participantIdentity}_${remoteAudioTrack.hashCode()}"
+        removeRemoteAudioSink(effectiveSid)
+
+        val sink = AudioTrackSink { audioData, bitsPerSample, _sampleRate, channelCount, numberOfFrames, _timestamp ->
+            if (!pcmSpatialAudioEnabled) {
+                return@AudioTrackSink
+            }
+            if (bitsPerSample != 16 || channelCount <= 0 || numberOfFrames <= 0) {
+                return@AudioTrackSink
+            }
+            val frame = pcm16ToStereoFloat(audioData, channelCount, numberOfFrames)
+            if (frame.isEmpty()) {
+                return@AudioTrackSink
+            }
+            mainHandler.post {
+                emitSignal("audio_frame", participantIdentity, frame)
+            }
+        }
+
+        try {
+            remoteAudioTrack.addSink(sink)
+            // Prevent non-spatial Android mixer output (we render spatialized audio in Godot).
+            remoteAudioTrack.setVolume(0.0)
+            remoteAudioSinks[effectiveSid] = RemoteAudioSinkBinding(participantIdentity, effectiveSid, remoteAudioTrack, sink)
+        } catch (e: Exception) {
+            android.util.Log.e("GodotLiveKit", "Failed to attach audio sink for $effectiveSid: ${e.message}", e)
+            pcmSpatialAudioEnabled = false
+        } catch (t: Throwable) {
+            android.util.Log.e("GodotLiveKit", "Failed to attach audio sink (throwable) for $effectiveSid: ${t.message}", t)
+            pcmSpatialAudioEnabled = false
+        }
+    }
+
+    private fun removeRemoteAudioSink(trackSid: String) {
+        if (trackSid.isEmpty()) {
+            return
+        }
+        val binding = remoteAudioSinks.remove(trackSid) ?: return
+        try {
+            binding.track.removeSink(binding.sink)
+        } catch (_: Exception) {
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun removeRemoteAudioSinksForParticipant(participantIdentity: String) {
+        if (participantIdentity.isEmpty()) {
+            return
+        }
+        val trackSids = remoteAudioSinks.values
+            .filter { it.participantIdentity == participantIdentity }
+            .map { it.trackSid }
+            .toList()
+        trackSids.forEach { removeRemoteAudioSink(it) }
+    }
+
+    private fun removeAllRemoteAudioSinks() {
+        val trackSids = remoteAudioSinks.keys.toList()
+        trackSids.forEach { removeRemoteAudioSink(it) }
+        remoteAudioSinks.clear()
+    }
+
+    private fun pcm16ToStereoFloat(audioData: ByteBuffer, channelCount: Int, numberOfFrames: Int): FloatArray {
+        if (channelCount <= 0 || numberOfFrames <= 0) {
+            return FloatArray(0)
+        }
+
+        val bytesPerSample = 2
+        val requiredBytes = numberOfFrames * channelCount * bytesPerSample
+        val source = audioData.duplicate().order(ByteOrder.LITTLE_ENDIAN)
+        if (source.remaining() < requiredBytes) {
+            return FloatArray(0)
+        }
+
+        val output = FloatArray(numberOfFrames * 2)
+        var outputIndex = 0
+
+        for (frameIndex in 0 until numberOfFrames) {
+            val left = source.short.toInt() / 32768.0f
+            val right = if (channelCount > 1) {
+                source.short.toInt() / 32768.0f
+            } else {
+                left
+            }
+
+            // Skip channels beyond stereo if present.
+            for (extraChannel in 2 until channelCount) {
+                source.short
+            }
+
+            output[outputIndex++] = left.coerceIn(-1.0f, 1.0f)
+            output[outputIndex++] = right.coerceIn(-1.0f, 1.0f)
+        }
+
+        return output
     }
 }

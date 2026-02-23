@@ -129,6 +129,7 @@ func _connect_android_signals() -> void:
 	_android_plugin.connect("track_unsubscribed", _on_track_unsubscribed)
 	_android_plugin.connect("audio_track_published", _on_audio_track_published)
 	_android_plugin.connect("audio_track_unpublished", _on_audio_track_unpublished)
+	_android_plugin.connect("audio_frame", _on_audio_frame_android)
 
 
 func _connect_rust_signals() -> void:
@@ -448,6 +449,15 @@ func get_current_room() -> String:
 	return _current_room
 
 
+## True when backend provides decoded remote PCM frames for Godot-side 3D spatialization.
+func is_pcm_spatial_audio_enabled() -> bool:
+	if current_platform == Platform.DESKTOP:
+		return true
+	if current_platform == Platform.ANDROID and _android_plugin and _android_plugin.has_method("isPcmSpatialAudioEnabled"):
+		return bool(_android_plugin.call("isPcmSpatialAudioEnabled"))
+	return false
+
+
 ## Set volume for a specific remote participant (Android only)
 ## @param identity: Participant identity
 ## @param volume: Volume level (0.0 = muted, 1.0 = normal, up to 10.0 for boost)
@@ -564,6 +574,32 @@ func _on_audio_track_unpublished() -> void:
 
 func _on_audio_frame(peer_id: String, frame: PackedVector2Array) -> void:
 	audio_frame_received.emit(peer_id, frame)
+
+
+func _on_audio_frame_android(peer_id: String, frame_data: Variant) -> void:
+	var samples := PackedFloat32Array()
+	if frame_data is PackedFloat32Array:
+		samples = frame_data
+	elif frame_data is Array:
+		var arr: Array = frame_data
+		samples.resize(arr.size())
+		for i in range(arr.size()):
+			samples[i] = float(arr[i])
+	else:
+		return
+
+	if samples.size() < 2:
+		return
+
+	var pair_count := samples.size() / 2
+	var stereo := PackedVector2Array()
+	stereo.resize(pair_count)
+	var sample_index := 0
+	for i in range(pair_count):
+		stereo[i] = Vector2(samples[sample_index], samples[sample_index + 1])
+		sample_index += 2
+
+	audio_frame_received.emit(peer_id, stereo)
 
 
 func _on_chat_message(sender: String, message: String, timestamp: int) -> void:
