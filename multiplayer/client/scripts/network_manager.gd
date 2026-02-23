@@ -105,10 +105,15 @@ var connection_timeout: float = 10.0
 var _last_server_response_time: float = 0.0
 var _snapshot_buffers: Dictionary = {} # snapshot_id -> {total_chunks:int, chunks:Dictionary, from_peer_id:String}
 const SNAPSHOT_CHUNK_SIZE: int = 20
+const PLAYER_TRANSFORM_RATE_HZ: float = 20.0
+const HELD_OBJECT_TRANSFORM_RATE_HZ: float = 20.0
+const PLAYER_TRANSFORM_INTERVAL_MS: int = int(1000.0 / PLAYER_TRANSFORM_RATE_HZ)
+const HELD_OBJECT_TRANSFORM_INTERVAL_MS: int = int(1000.0 / HELD_OBJECT_TRANSFORM_RATE_HZ)
 const LIVEKIT_TOPIC_REP_OBJECT := "rep/object"
 const LIVEKIT_TOPIC_REP_TRANSFORM := "rep/transform"
 const LIVEKIT_TOPIC_REP_PROPERTY := "rep/property"
 var _livekit_wrapper: Node = null
+var _last_object_rep_send_msec: Dictionary = {} # object_id -> int msec timestamp
 var _replication_manifests: Dictionary = {
 	"default": {
 		"high_rate_unreliable": ["transform"],
@@ -259,7 +264,7 @@ func update_local_player_transform(head_pos: Vector3, head_rot: Vector3,
 		
 		# SECURE COMPONENT: Rate limiting (e.g., 20Hz by default, adjustable)
 		var now = Time.get_ticks_msec()
-		if now - _metrics.get("last_transform_send_time", 0) < 50: # 20Hz max
+		if now - _metrics.get("last_transform_send_time", 0) < PLAYER_TRANSFORM_INTERVAL_MS:
 			return
 		_metrics["last_transform_send_time"] = now
 		
@@ -304,6 +309,7 @@ func _on_nakama_match_joined(match_id: String) -> void:
 	players.clear()
 	grabbed_objects.clear()
 	room_object_registry.clear()
+	_last_object_rep_send_msec.clear()
 	_presence_join_order.clear()
 	_join_order_counter = 0
 	_host_peer_id = ""
@@ -338,6 +344,7 @@ func _on_nakama_match_left() -> void:
 	players.clear()
 	grabbed_objects.clear()
 	room_object_registry.clear()
+	_last_object_rep_send_msec.clear()
 	_presence_join_order.clear()
 	_host_peer_id = ""
 	_snapshot_buffers.clear()
@@ -605,6 +612,8 @@ func _handle_ownership_released(sender_id: String, data: Dictionary) -> void:
 	var object_id: String = data.get("object_id", "")
 	if object_id.is_empty():
 		return
+	if _last_object_rep_send_msec.has(object_id):
+		_last_object_rep_send_msec.erase(object_id)
 
 	var persist_mode: String = data.get("persist_mode", "placed_room")
 	var final_owner := _get_host_peer_id()
@@ -639,6 +648,8 @@ func grab_object(object_id: String, hand_name: String = "", rel_pos: Vector3 = V
 func release_object(object_id: String, final_pos: Vector3, final_rot: Quaternion, lin_vel: Vector3 = Vector3.ZERO, ang_vel: Vector3 = Vector3.ZERO, persist_mode: String = "placed_room") -> void:
 	var my_id = get_nakama_user_id()
 	if grabbed_objects.has(object_id): grabbed_objects.erase(object_id)
+	if _last_object_rep_send_msec.has(object_id):
+		_last_object_rep_send_msec.erase(object_id)
 	
 	var release_data = {
 		"object_id": object_id,
@@ -666,6 +677,14 @@ func release_object(object_id: String, final_pos: Vector3, final_rot: Quaternion
 
 
 func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion, rel_pos: Variant = null, rel_rot: Variant = null) -> void:
+	if object_id.is_empty():
+		return
+	var now := Time.get_ticks_msec()
+	var last_sent := int(_last_object_rep_send_msec.get(object_id, 0))
+	if now - last_sent < HELD_OBJECT_TRANSFORM_INTERVAL_MS:
+		return
+	_last_object_rep_send_msec[object_id] = now
+
 	var update_data = {
 		"object_id": object_id,
 		"pos": pos,
