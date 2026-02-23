@@ -115,6 +115,9 @@ func _process(_delta: float) -> void:
 				print("NakamaManager: WebSocket connected!")
 				connection_restored.emit()
 			
+			# Flush any pending outbound messages before reading new packets
+			_flush_outbound_queue()
+			
 			# Process incoming packets
 			while socket.get_available_packet_count() > 0:
 				var packet = socket.get_packet()
@@ -128,6 +131,12 @@ func _process(_delta: float) -> void:
 				is_socket_connected = false
 				print("NakamaManager: WebSocket disconnected! Code: ", socket.get_close_code())
 				connection_lost.emit()
+
+
+func _flush_outbound_queue() -> void:
+	# Outbound queueing is optional; keep this as a safe no-op unless
+	# queue buffering is explicitly reintroduced.
+	pass
 
 
 func _get_or_create_device_id() -> String:
@@ -165,7 +174,7 @@ func authenticate_device() -> void:
 		await get_tree().process_frame
 	
 	print("NakamaManager: Authenticating with device ID...")
-	print("NakamaManager: Target URL: %s" % _get_nakama_url())
+	print("NakamaManager: Target URL: http://%s:%d" % [nakama_host, nakama_port])
 	
 	_do_authenticate_request()
 
@@ -451,6 +460,7 @@ func _handle_match_data(match_data_msg: Dictionary) -> void:
 	var data_base64 = match_data_msg.get("data", "")
 	var sender_id = match_data_msg.get("presence", {}).get("user_id", "")
 	
+	# Decode base64 then parse JSON
 	# Decode base64 to raw bytes
 	var data_bytes = Marshalls.base64_to_raw(data_base64)
 	
@@ -459,7 +469,7 @@ func _handle_match_data(match_data_msg: Dictionary) -> void:
 	# Performance optimization: Skip JSON parsing for high-frequency binary opcodes
 	# These will be decoded using bytes_to_var() in NetworkManager
 	var is_binary_op = (
-		op_code == MatchOpCode.PLAYER_TRANSFORM or 
+		op_code == MatchOpCode.PLAYER_TRANSFORM or
 		op_code == MatchOpCode.OBJECT_UPDATE or
 		op_code == MatchOpCode.VOICE_DATA
 	)
@@ -526,7 +536,7 @@ func _on_http_request_completed(result: int, response_code: int, _headers: Packe
 	var result_name = result_names.get(result, "UNKNOWN")
 	
 	if result != HTTPRequest.RESULT_SUCCESS:
-		print("NakamaManager: HTTP request failed: %d (%s) to %s" % [result, result_name, _get_nakama_url()])
+		print("NakamaManager: HTTP request failed: %d (%s) to %s:%d" % [result, result_name, nakama_host, nakama_port])
 		
 		# special-case TLS handshake failure when user accidentally tried SSL on a non‑TLS port
 		if result == HTTPRequest.RESULT_TLS_HANDSHAKE_ERROR:
@@ -540,7 +550,7 @@ func _on_http_request_completed(result: int, response_code: int, _headers: Packe
 				_do_authenticate_request()
 				return
 		
-		# Retry logic for other connection errors
+		# Retry logic for connection errors
 		if _auth_retry_count < _auth_max_retries:
 			_auth_retry_count += 1
 			print("NakamaManager: Retrying authentication (%d/%d) in %.1fs..." % [_auth_retry_count, _auth_max_retries, _auth_retry_delay])
@@ -744,3 +754,117 @@ func _on_display_name_updated(result: int, response_code: int, _headers: PackedS
 		print("NakamaManager: Display name updated to: ", display_name)
 	else:
 		push_warning("NakamaManager: Failed to update display name (result: %d, code: %d)" % [result, response_code])
+
+
+# ============================================================================
+# LiveKit Token RPC
+# ============================================================================
+
+## Request a LiveKit access token from Nakama runtime RPC.
+## Returns: { "ok": bool, "token": String, "ws_url": String, "error": String }
+func request_livekit_token(room_name: String, participant_id: String = "", metadata: Dictionary = {}) -> Dictionary:
+	if not is_authenticated or not session:
+		return {
+			"ok": false,
+			"token": "",
+			"ws_url": "",
+			"error": "Not authenticated"
+		}
+	
+	var identity := participant_id if not participant_id.is_empty() else local_user_id
+	if identity.is_empty():
+		return {
+			"ok": false,
+			"token": "",
+			"ws_url": "",
+			"error": "No participant identity available"
+		}
+	
+	var rpc_http := HTTPRequest.new()
+	rpc_http.timeout = 10.0
+	add_child(rpc_http)
+	
+	var url := _get_nakama_url() + "/v2/rpc/livekit_token"
+	var payload_json := JSON.stringify({
+		"room": room_name,
+		"participant_id": identity,
+		"display_name": display_name,
+		"metadata": metadata
+	})
+	# Nakama Lua RPC endpoints expect the POST body as a JSON string, not an object.
+	var body_json := JSON.stringify(payload_json)
+	var headers := [
+		"Content-Type: application/json",
+		"Authorization: Bearer " + session.token
+	]
+	
+	var err := rpc_http.request(url, headers, HTTPClient.METHOD_POST, body_json)
+	if err != OK:
+		rpc_http.queue_free()
+		return {
+			"ok": false,
+			"token": "",
+			"ws_url": "",
+			"error": "RPC request failed to start: " + str(err)
+		}
+	
+	var result_tuple = await rpc_http.request_completed
+	rpc_http.queue_free()
+	
+	var result: int = result_tuple[0]
+	var response_code: int = result_tuple[1]
+	var response_body: PackedByteArray = result_tuple[3]
+	
+	if result != HTTPRequest.RESULT_SUCCESS:
+		return {
+			"ok": false,
+			"token": "",
+			"ws_url": "",
+			"error": "RPC transport failed: " + str(result)
+		}
+	
+	if response_code != 200:
+		return {
+			"ok": false,
+			"token": "",
+			"ws_url": "",
+			"error": "RPC HTTP error: " + str(response_code)
+		}
+	
+	var parsed = JSON.parse_string(response_body.get_string_from_utf8())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {
+			"ok": false,
+			"token": "",
+			"ws_url": "",
+			"error": "RPC invalid response"
+		}
+	
+	var payload = parsed.get("payload", {})
+	if typeof(payload) == TYPE_STRING:
+		payload = JSON.parse_string(payload)
+	
+	if typeof(payload) != TYPE_DICTIONARY:
+		return {
+			"ok": false,
+			"token": "",
+			"ws_url": "",
+			"error": "RPC payload parse failed"
+		}
+	
+	var token: String = payload.get("token", "")
+	var ws_url: String = payload.get("ws_url", payload.get("url", ""))
+	if token.is_empty():
+		return {
+			"ok": false,
+			"token": "",
+			"ws_url": ws_url,
+			"error": payload.get("error", "RPC returned empty token")
+		}
+	
+	return {
+		"ok": true,
+		"token": token,
+		"ws_url": ws_url,
+		"error": ""
+	}

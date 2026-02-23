@@ -300,7 +300,7 @@ func _on_match_created(match_id: String, match_label: String) -> void:
 	status_label.text = "✅ Created room"
 	
 	# Auto-connect to LiveKit
-	_auto_connect_livekit(current_room_name)
+	await _auto_connect_livekit(current_room_name)
 	
 	# Update connection info
 	_update_connection_info()
@@ -333,7 +333,7 @@ func _on_match_joined(match_id: String) -> void:
 	status_label.text = "✅ Joined room"
 	
 	# Auto-connect to LiveKit
-	_auto_connect_livekit(current_room_name)
+	await _auto_connect_livekit(current_room_name)
 	
 	# Update connection info
 	_update_connection_info()
@@ -395,13 +395,19 @@ func _auto_connect_livekit(room_name: String) -> void:
 		clean_room_name = clean_room_name.substr(0, clean_room_name.length() - 1)
 		print("UnifiedRoomUI: Sanitized room name from '", room_name, "' to '", clean_room_name, "'")
 	
-	# Generate LiveKit token
-	print("UnifiedRoomUI: Generating LiveKit token...")
-	var token = _generate_livekit_token(nakama_id, clean_room_name)
-	print("UnifiedRoomUI: Token generated (length: ", token.length(), ")")
+	# Generate LiveKit token through Nakama RPC
+	print("UnifiedRoomUI: Requesting LiveKit token from Nakama RPC...")
+	var token_result: Dictionary = await nakama_manager.request_livekit_token(clean_room_name, nakama_id)
+	if not token_result.get("ok", false):
+		var err_msg: String = token_result.get("error", "unknown error")
+		push_warning("UnifiedRoomUI: Failed to get LiveKit token: " + err_msg)
+		status_label.text = "❌ Voice token failed: " + err_msg
+		return
 	
-	# Connect to LiveKit
-	var server_url = "wss://godotkit-mjbmdjse.livekit.cloud"
+	var token: String = token_result.get("token", "")
+	var server_url: String = token_result.get("ws_url", "")
+	if server_url.is_empty():
+		server_url = "ws://158.101.21.99:7880"
 	
 	print("UnifiedRoomUI: Auto-connecting to LiveKit room: ", room_name)
 	print("UnifiedRoomUI: Server URL: ", server_url)
@@ -469,76 +475,6 @@ func _disconnect_livekit() -> void:
 	if livekit_manager and livekit_manager.has_method("disconnect_from_room"):
 		print("UnifiedRoomUI: Disconnecting from LiveKit")
 		livekit_manager.disconnect_from_room()
-
-
-func _generate_livekit_token(participant_id: String, room_name: String) -> String:
-	"""Generate a LiveKit JWT access token using HS256"""
-	# LiveKit Cloud credentials
-	const API_KEY = "APIbSEA2MXzP8Mf"
-	const API_SECRET = "Kqw1FLCX3rq2IWbuWjilBMlgbODqlzxTkgyzKrzuF6I"
-	const TOKEN_VALIDITY_HOURS = 24
-	
-	# Current time
-	var now = Time.get_unix_time_from_system()
-	var expire_time = now + (TOKEN_VALIDITY_HOURS * 3600)
-	
-	# JWT Header (HS256 algorithm)
-	var header = {
-		"alg": "HS256",
-		"typ": "JWT"
-	}
-	
-	# JWT Claims (Payload)
-	var claims = {
-		"exp": expire_time,
-		"iss": API_KEY,
-		"nbf": now - 60,  # Allow for 1 minute clock skew
-		"sub": participant_id,  # CRITICAL: This must match Nakama user_id
-		"video": {
-			"room": room_name,
-			"roomJoin": true,
-			"canPublish": true,
-			"canSubscribe": true,
-			"canUpdateOwnMetadata": true
-		}
-	}
-	
-	# Encode header and payload as base64url
-	var header_json = JSON.stringify(header)
-	var claims_json = JSON.stringify(claims)
-	
-	var header_b64 = _base64url_encode(header_json.to_utf8_buffer())
-	var payload_b64 = _base64url_encode(claims_json.to_utf8_buffer())
-	
-	# Create signing input
-	var signing_input = header_b64 + "." + payload_b64
-	
-	# Generate HMAC-SHA256 signature
-	var signature = _hmac_sha256(signing_input.to_utf8_buffer(), API_SECRET.to_utf8_buffer())
-	var signature_b64 = _base64url_encode(signature)
-	
-	# Construct final JWT
-	var jwt = signing_input + "." + signature_b64
-	
-	return jwt
-
-
-func _base64url_encode(data: PackedByteArray) -> String:
-	"""Encode data as base64url (JWT standard)"""
-	var b64 = Marshalls.raw_to_base64(data)
-	# Convert base64 to base64url: replace +/= with -_
-	b64 = b64.replace("+", "-")
-	b64 = b64.replace("/", "_")
-	b64 = b64.replace("=", "")  # Remove padding
-	return b64
-
-
-func _hmac_sha256(message: PackedByteArray, key: PackedByteArray) -> PackedByteArray:
-	"""Compute HMAC-SHA256"""
-	var ctx = HMACContext.new()
-	ctx.start(HashingContext.HASH_SHA256, key)
-	ctx.update(message)
-	return ctx.finish()
 
 
 func _update_livekit_ui_room_name(room_name: String) -> void:

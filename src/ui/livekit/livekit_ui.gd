@@ -141,25 +141,36 @@ func _on_disconnect_requested():
 
 
 func _on_auto_connect_requested():
-	var network_manager = get_node_or_null("/root/NetworkManager")
-	if not network_manager:
-		_set_status("❌ NetworkManager not found")
+	var nakama_manager = get_node_or_null("/root/NakamaManager")
+	if not nakama_manager:
+		_set_status("❌ NakamaManager not found")
 		return
 	
-	var nakama_id = network_manager.get_nakama_user_id()
-	if nakama_id.is_empty():
+	var nakama_id = nakama_manager.local_user_id
+	if nakama_id.is_empty() or not nakama_manager.is_authenticated:
 		_set_status("⚠️ Connect to Nakama first")
 		return
 	
-	# Generate token locally using LiveKitUtils (Client-side generation)
-	# TODO: In production, this should be moved to a Nakama server RPC
+	if not nakama_manager.has_method("request_livekit_token"):
+		_set_status("❌ Nakama RPC client missing")
+		return
+	
 	var room_name = "godot-oracle-room"
-	var token = LiveKitUtils.generate_token(nakama_id, room_name)
+	var token_result: Dictionary = await nakama_manager.request_livekit_token(room_name, nakama_id)
+	if not token_result.get("ok", false):
+		_set_status("❌ Token RPC failed: " + token_result.get("error", "unknown"))
+		return
+	
+	var token: String = token_result.get("token", "")
+	var server_url: String = token_result.get("ws_url", "")
+	if server_url.is_empty():
+		server_url = "ws://158.101.21.99:7880"
 	
 	if connection_panel:
+		connection_panel.set_server_url(server_url)
 		connection_panel.set_token_and_connect(token)
 		
-	_set_status("✅ Token generated for: " + nakama_id)
+	_set_status("✅ Voice token ready for: " + nakama_id)
 
 
 func _on_username_changed(new_name: String):

@@ -96,20 +96,30 @@ func _on_auto_connect_pressed():
 
 
 func _on_generate_token_pressed():
-	# Get Nakama ID from NetworkManager
-	var network_manager = get_node_or_null("/root/NetworkManager")
-	if not network_manager:
-		set_status("❌ NetworkManager not found")
+	var nakama_manager = get_node_or_null("/root/NakamaManager")
+	if not nakama_manager:
+		set_status("❌ NakamaManager not found")
 		return
 	
-	var nakama_id = network_manager.get_nakama_user_id()
-	if nakama_id.is_empty():
+	var nakama_id = nakama_manager.local_user_id
+	if nakama_id.is_empty() or not nakama_manager.is_authenticated:
 		set_status("⚠️ Connect to Nakama first")
 		return
 	
-	# Generate token using utility
-	var token = LiveKitUtils.generate_token(nakama_id, "test-room")
+	if not nakama_manager.has_method("request_livekit_token"):
+		set_status("❌ Nakama RPC client missing")
+		return
+	
+	var token_result: Dictionary = await nakama_manager.request_livekit_token("test-room", nakama_id)
+	if not token_result.get("ok", false):
+		set_status("❌ Token RPC failed: " + token_result.get("error", "unknown"))
+		return
+	
+	var token: String = token_result.get("token", "")
+	var server_url: String = token_result.get("ws_url", "")
 	token_entry.text = token
+	if not server_url.is_empty():
+		server_entry.text = server_url
 	set_status("✅ Token generated for: " + nakama_id)
 
 
@@ -142,11 +152,17 @@ func set_connected(connected: bool, room_name: String = ""):
 
 func set_token_and_connect(token: String):
 	token_entry.text = token
-	# Ensure URL is correct
+	# Ensure URL is set
 	if server_entry.text.is_empty():
-		server_entry.text = "ws://localhost:7880"
+		server_entry.text = "ws://158.101.21.99:7880"
 	
 	_on_connect_pressed()
+
+
+func set_server_url(server_url: String) -> void:
+	if server_url.is_empty():
+		return
+	server_entry.text = server_url
 
 
 func get_username() -> String:

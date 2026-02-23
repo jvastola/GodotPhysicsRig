@@ -1553,9 +1553,20 @@ func _connect_to_livekit_after_nakama(room_name: String) -> void:
 		_autojoin_log("ERROR: Cannot connect to LiveKit - no user ID")
 		return
 	
-	# Generate token and connect to LiveKit
-	var token = _generate_livekit_token(user_id, room_name)
-	var server_url = "wss://godotkit-mjbmdjse.livekit.cloud"
+	# Generate token via Nakama RPC and connect to LiveKit
+	if not nakama_manager or not nakama_manager.has_method("request_livekit_token"):
+		_autojoin_log("ERROR: NakamaManager missing request_livekit_token RPC client")
+		return
+	
+	var token_result: Dictionary = await nakama_manager.request_livekit_token(room_name, user_id)
+	if not token_result.get("ok", false):
+		_autojoin_log("ERROR: LiveKit token RPC failed: %s" % token_result.get("error", "unknown"))
+		return
+	
+	var token: String = token_result.get("token", "")
+	var server_url: String = token_result.get("ws_url", "")
+	if server_url.is_empty():
+		server_url = "ws://158.101.21.99:7880"
 	
 	_autojoin_log("Connecting to LiveKit...")
 	_autojoin_log("  Server: %s" % server_url)
@@ -1587,50 +1598,6 @@ func _find_node_by_script(node: Node, script_name: String) -> Node:
 		if result:
 			return result
 	return null
-
-
-func _generate_livekit_token(participant_id: String, room_name: String) -> String:
-	"""Generate a LiveKit JWT access token using HS256"""
-	const API_KEY = "APIbSEA2MXzP8Mf"
-	const API_SECRET = "Kqw1FLCX3rq2IWbuWjilBMlgbODqlzxTkgyzKrzuF6I"
-	const TOKEN_VALIDITY_HOURS = 24
-	
-	var now = Time.get_unix_time_from_system()
-	var expire_time = now + (TOKEN_VALIDITY_HOURS * 3600)
-	
-	var header = {"alg": "HS256", "typ": "JWT"}
-	var claims = {
-		"exp": expire_time,
-		"iss": API_KEY,
-		"nbf": now - 60,
-		"sub": participant_id,
-		"video": {
-			"room": room_name,
-			"roomJoin": true,
-			"canPublish": true,
-			"canSubscribe": true
-		}
-	}
-	
-	var header_b64 = _base64url_encode(JSON.stringify(header).to_utf8_buffer())
-	var payload_b64 = _base64url_encode(JSON.stringify(claims).to_utf8_buffer())
-	var signing_input = header_b64 + "." + payload_b64
-	var signature = _hmac_sha256(signing_input.to_utf8_buffer(), API_SECRET.to_utf8_buffer())
-	
-	return signing_input + "." + _base64url_encode(signature)
-
-
-func _base64url_encode(data: PackedByteArray) -> String:
-	var b64 = Marshalls.raw_to_base64(data)
-	b64 = b64.replace("+", "-").replace("/", "_").replace("=", "")
-	return b64
-
-
-func _hmac_sha256(message: PackedByteArray, key: PackedByteArray) -> PackedByteArray:
-	var ctx = HMACContext.new()
-	ctx.start(HashingContext.HASH_SHA256, key)
-	ctx.update(message)
-	return ctx.finish()
 
 
 func respawn(hard: bool = false) -> void:
