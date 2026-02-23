@@ -854,7 +854,6 @@ func _do_spawn_primitive_object(shape_type: String, position: Vector3, object_id
 	if body.has_method("set"):
 		body.set("save_id", object_id)
 
-	body.global_position = position
 	body.gravity_scale = 0.0
 	body.collision_layer = (1 << 0) | (1 << 7) # world + selectable_shapes
 	body.collision_mask = 1 << 0
@@ -872,6 +871,7 @@ func _do_spawn_primitive_object(shape_type: String, position: Vector3, object_id
 	body.add_child(collision_shape)
 	body.add_child(mesh_instance)
 	world.add_child(body)
+	body.global_position = position
 	print("NetworkManager: Spawned primitive ", shape_type, " ", object_id, " at ", position)
 
 
