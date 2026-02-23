@@ -306,18 +306,24 @@ func _update_android_spatial_audio(delta: float) -> void:
 		var distance := listener_pos.distance_to(remote_pos)
 		var volume := _distance_to_android_volume(distance)
 		var key := str(peer_id)
-		var prev := _android_last_volumes.get(key, -1.0)
+		var prev: float = float(_android_last_volumes.get(key, -1.0))
 
-		if absf(volume - float(prev)) >= ANDROID_SPATIAL_VOLUME_EPSILON:
+		if absf(volume - prev) >= ANDROID_SPATIAL_VOLUME_EPSILON:
 			livekit_manager.set_participant_volume(key, volume)
 			_android_last_volumes[key] = volume
 
 
 func _get_listener_position() -> Vector3:
-	var xr_player := get_parent()
+	var xr_player: Node = get_parent()
 	if xr_player and xr_player.has_method("get_camera_position"):
-		return xr_player.get_camera_position()
-	return global_position
+		var camera_pos: Variant = xr_player.call("get_camera_position")
+		if camera_pos is Vector3:
+			return camera_pos
+
+	var parent_3d := get_parent() as Node3D
+	if parent_3d:
+		return parent_3d.global_position
+	return Vector3.ZERO
 
 
 func _get_remote_audio_position(network_player: Node) -> Vector3:
