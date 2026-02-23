@@ -406,8 +406,8 @@ func _auto_connect_livekit(room_name: String) -> void:
 	
 	var token: String = token_result.get("token", "")
 	var server_url: String = token_result.get("ws_url", "")
-	if server_url.is_empty():
-		server_url = "ws://158.101.21.99:7880"
+	if server_url.is_empty() and nakama_manager and nakama_manager.has_method("get_livekit_ws_url"):
+		server_url = nakama_manager.get_livekit_ws_url()
 	
 	print("UnifiedRoomUI: Auto-connecting to LiveKit room: ", room_name)
 	print("UnifiedRoomUI: Server URL: ", server_url)

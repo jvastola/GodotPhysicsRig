@@ -163,8 +163,8 @@ func _on_auto_connect_requested():
 	
 	var token: String = token_result.get("token", "")
 	var server_url: String = token_result.get("ws_url", "")
-	if server_url.is_empty():
-		server_url = "ws://158.101.21.99:7880"
+	if server_url.is_empty() and nakama_manager.has_method("get_livekit_ws_url"):
+		server_url = nakama_manager.get_livekit_ws_url()
 	
 	if connection_panel:
 		connection_panel.set_server_url(server_url)

@@ -53,13 +53,12 @@ local function rpc_livekit_token(context, payload)
     return nk.json_encode({ error = "participant_id missing" })
   end
 
-  -- NOTE: keep these in sync with server runtime secret provisioning.
-  local api_key = "devkey"
-  local api_secret = "__SET_ON_SERVER__"
-  local ws_url = request.ws_url or "ws://158.101.21.99:7880"
+  local api_key = os.getenv("LIVEKIT_API_KEY") or "devkey"
+  local api_secret = os.getenv("LIVEKIT_API_SECRET") or ""
+  local ws_url = request.ws_url or os.getenv("LIVEKIT_WS_URL") or "ws://127.0.0.1:7880"
   local now = os.time()
   local exp = now + 86400
-  if api_secret == "__SET_ON_SERVER__" then
+  if api_secret == "" then
     return nk.json_encode({ error = "livekit api secret not configured" })
   end
 

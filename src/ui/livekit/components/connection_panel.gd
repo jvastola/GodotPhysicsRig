@@ -63,8 +63,7 @@ func _register_keyboard_fields() -> void:
 
 
 func _set_defaults():
-	# Default to local LiveKit server
-	server_entry.text = "ws://158.101.21.99:7880"
+	server_entry.text = _default_livekit_ws_url()
 	token_entry.text = ""
 	
 	# Try to auto-populate username from Nakama display name
@@ -154,7 +153,7 @@ func set_token_and_connect(token: String):
 	token_entry.text = token
 	# Ensure URL is set
 	if server_entry.text.is_empty():
-		server_entry.text = "ws://158.101.21.99:7880"
+		server_entry.text = _default_livekit_ws_url()
 	
 	_on_connect_pressed()
 
@@ -163,6 +162,16 @@ func set_server_url(server_url: String) -> void:
 	if server_url.is_empty():
 		return
 	server_entry.text = server_url
+
+
+func _default_livekit_ws_url() -> String:
+	var nakama_manager = get_node_or_null("/root/NakamaManager")
+	if nakama_manager and nakama_manager.has_method("get_livekit_ws_url"):
+		return nakama_manager.get_livekit_ws_url()
+	var env_url := OS.get_environment("LIVEKIT_WS_URL")
+	if not env_url.is_empty():
+		return env_url
+	return "ws://127.0.0.1:7880"
 
 
 func get_username() -> String:

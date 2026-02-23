@@ -65,6 +65,12 @@ enum MatchOpCode {
 
 
 func _ready() -> void:
+	# Load from project settings first (useful for local vs remote profiles)
+	nakama_host = ProjectSettings.get_setting("network/nakama_host", nakama_host)
+	nakama_port = int(ProjectSettings.get_setting("network/nakama_port", nakama_port))
+	nakama_server_key = ProjectSettings.get_setting("network/nakama_server_key", nakama_server_key)
+	nakama_use_ssl = ProjectSettings.get_setting("network/nakama_use_ssl", nakama_use_ssl)
+
 	# Load settings from ConfigManager
 	if has_node("/root/ConfigManager"):
 		var cm = get_node("/root/ConfigManager")
@@ -73,6 +79,25 @@ func _ready() -> void:
 		nakama_server_key = cm.get_value("nakama_server_key", nakama_server_key)
 		nakama_use_ssl = cm.get_value("nakama_use_ssl", nakama_use_ssl)
 		print("NakamaManager: Settings loaded from ConfigManager")
+
+	# Environment overrides have highest priority
+	var env_host := OS.get_environment("NAKAMA_HOST")
+	if not env_host.is_empty():
+		nakama_host = env_host
+	var env_port := OS.get_environment("NAKAMA_PORT")
+	if not env_port.is_empty():
+		var parsed_port = int(env_port)
+		if parsed_port > 0:
+			nakama_port = parsed_port
+	var env_server_key := OS.get_environment("NAKAMA_SERVER_KEY")
+	if not env_server_key.is_empty():
+		nakama_server_key = env_server_key
+	var env_ssl := OS.get_environment("NAKAMA_USE_SSL").to_lower()
+	if env_ssl == "1" or env_ssl == "true":
+		nakama_use_ssl = true
+	elif env_ssl == "0" or env_ssl == "false":
+		nakama_use_ssl = false
+
 	# Ensure port/protocol consistency – the default TLS port is 7443
 	if nakama_use_ssl and nakama_port == 7350:
 		push_warning("NakamaManager: SSL enabled but port is 7350 – switching to 7443 automatically")
@@ -497,6 +522,16 @@ func _get_nakama_url() -> String:
 	return "%s://%s:%d" % [protocol, nakama_host, nakama_port]
 
 
+func get_livekit_ws_url() -> String:
+	var ws_url: String = ProjectSettings.get_setting("network/livekit_ws_url", "")
+	if ws_url.is_empty():
+		ws_url = OS.get_environment("LIVEKIT_WS_URL")
+	if ws_url.is_empty():
+		var protocol = "wss" if nakama_use_ssl else "ws"
+		ws_url = "%s://%s:7880" % [protocol, nakama_host]
+	return ws_url
+
+
 func _get_websocket_url() -> String:
 	# mirror same protocol/port consistency logic as HTTP
 	if nakama_use_ssl and nakama_port == 7350:
@@ -789,7 +824,8 @@ func request_livekit_token(room_name: String, participant_id: String = "", metad
 		"room": room_name,
 		"participant_id": identity,
 		"display_name": display_name,
-		"metadata": metadata
+		"metadata": metadata,
+		"ws_url": get_livekit_ws_url()
 	})
 	# Nakama Lua RPC endpoints expect the POST body as a JSON string, not an object.
 	var body_json := JSON.stringify(payload_json)
@@ -854,6 +890,8 @@ func request_livekit_token(room_name: String, participant_id: String = "", metad
 	
 	var token: String = payload.get("token", "")
 	var ws_url: String = payload.get("ws_url", payload.get("url", ""))
+	if ws_url.is_empty():
+		ws_url = get_livekit_ws_url()
 	if token.is_empty():
 		return {
 			"ok": false,
