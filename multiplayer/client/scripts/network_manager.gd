@@ -819,6 +819,11 @@ func spawn_network_object_with_mode(scene_path: String, position: Vector3, persi
 
 
 func _do_spawn_object(scene_path: String, position: Vector3, object_id: String, persist_mode: String = "") -> void:
+	if scene_path.begins_with("primitive:"):
+		var primitive_type := scene_path.trim_prefix("primitive:")
+		_do_spawn_primitive_object(primitive_type, position, object_id)
+		return
+
 	var scene = load(scene_path)
 	if not scene: return
 	
@@ -836,6 +841,102 @@ func _do_spawn_object(scene_path: String, position: Vector3, object_id: String, 
 		if not persist_mode.is_empty() and instance.has_method("set_release_persist_mode"):
 			instance.call("set_release_persist_mode", persist_mode)
 		print("NetworkManager: Spawned object ", object_id, " at ", position)
+
+
+func _do_spawn_primitive_object(shape_type: String, position: Vector3, object_id: String) -> void:
+	var world := get_tree().current_scene
+	if world == null:
+		return
+
+	var body := RigidBody3D.new()
+	body.name = object_id
+	body.set_script(load("res://src/objects/grabbable.gd"))
+	if body.has_method("set"):
+		body.set("save_id", object_id)
+
+	body.global_position = position
+	body.gravity_scale = 0.0
+	body.collision_layer = (1 << 0) | (1 << 7) # world + selectable_shapes
+	body.collision_mask = 1 << 0
+	body.add_to_group("selectable_shapes")
+
+	var mesh_instance := MeshInstance3D.new()
+	var collision_shape := CollisionShape3D.new()
+	var mesh: Mesh = _build_primitive_mesh(shape_type)
+	var shape: Shape3D = _build_primitive_collision_shape(shape_type)
+
+	mesh_instance.mesh = mesh
+	mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	collision_shape.shape = shape
+
+	body.add_child(collision_shape)
+	body.add_child(mesh_instance)
+	world.add_child(body)
+	print("NetworkManager: Spawned primitive ", shape_type, " ", object_id, " at ", position)
+
+
+func _build_primitive_mesh(shape_type: String) -> Mesh:
+	match shape_type:
+		"cube":
+			var box := BoxMesh.new()
+			box.size = Vector3(0.5, 0.5, 0.5)
+			return box
+		"sphere":
+			var sphere := SphereMesh.new()
+			sphere.radius = 0.25
+			sphere.height = 0.5
+			return sphere
+		"cylinder":
+			var cylinder := CylinderMesh.new()
+			cylinder.top_radius = 0.25
+			cylinder.bottom_radius = 0.25
+			cylinder.height = 0.5
+			return cylinder
+		"cone":
+			var cone := CylinderMesh.new()
+			cone.top_radius = 0.0
+			cone.bottom_radius = 0.25
+			cone.height = 0.5
+			return cone
+		"capsule":
+			var capsule := CapsuleMesh.new()
+			capsule.radius = 0.2
+			capsule.height = 0.6
+			return capsule
+		"prism":
+			var prism := PrismMesh.new()
+			prism.size = Vector3(0.5, 0.5, 0.5)
+			return prism
+		_:
+			var fallback := BoxMesh.new()
+			fallback.size = Vector3(0.5, 0.5, 0.5)
+			return fallback
+
+
+func _build_primitive_collision_shape(shape_type: String) -> Shape3D:
+	match shape_type:
+		"cube", "prism":
+			var box := BoxShape3D.new()
+			box.size = Vector3(0.5, 0.5, 0.5)
+			return box
+		"sphere":
+			var sphere := SphereShape3D.new()
+			sphere.radius = 0.25
+			return sphere
+		"cylinder", "cone":
+			var cylinder := CylinderShape3D.new()
+			cylinder.radius = 0.25
+			cylinder.height = 0.5
+			return cylinder
+		"capsule":
+			var capsule := CapsuleShape3D.new()
+			capsule.radius = 0.2
+			capsule.height = 0.6
+			return capsule
+		_:
+			var fallback := BoxShape3D.new()
+			fallback.size = Vector3(0.5, 0.5, 0.5)
+			return fallback
 
 
 # ============================================================================

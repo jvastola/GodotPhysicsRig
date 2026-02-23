@@ -451,6 +451,9 @@ func _spawn_shape_deferred(shape_type: String, camera: Camera3D) -> void:
 			print("WatchMenuUI: Spawning at left hand (default)")
 	
 	print("WatchMenuUI: Spawn position: ", spawn_pos)
+
+	if _spawn_network_shape(shape_type, spawn_pos):
+		return
 	
 	var rigid_body = RigidBody3D.new()
 	rigid_body.global_position = spawn_pos
@@ -553,6 +556,20 @@ func _spawn_shape_deferred(shape_type: String, camera: Camera3D) -> void:
 	get_tree().current_scene.add_child(rigid_body)
 	
 	print("WatchMenuUI: Spawned ", shape_type, " at ", spawn_pos, " with name ", rigid_body.name, " on layer ", rigid_body.collision_layer)
+
+
+func _spawn_network_shape(shape_type: String, spawn_pos: Vector3) -> bool:
+	var network_manager := get_node_or_null("/root/NetworkManager")
+	if network_manager == null:
+		return false
+	if not network_manager.has_method("spawn_network_object_with_mode"):
+		return false
+	var scene_path := "primitive:%s" % shape_type
+	var object_id: String = network_manager.spawn_network_object_with_mode(scene_path, spawn_pos, "placed_room", "default")
+	if object_id.is_empty():
+		return false
+	print("WatchMenuUI: Spawned network shape ", shape_type, " object_id=", object_id, " at ", spawn_pos)
+	return true
 
 func _set_render_mode(mode: int) -> void:
 	if _root_viewport:

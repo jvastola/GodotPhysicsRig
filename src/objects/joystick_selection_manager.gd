@@ -38,6 +38,7 @@ var _initial_hand_direction: Vector3 = Vector3.ZERO
 var _initial_selection_center: Vector3 = Vector3.ZERO
 var _initial_selection_scale: float = 1.0
 var _object_initial_transforms: Array[Transform3D] = []
+var _network_manager: Node = null
 
 # Handle settings (from transform tool)
 var handle_length: float = 0.15
@@ -50,6 +51,7 @@ var handle_color_z: Color = Color(0.3, 0.5, 1.0, 0.85)
 func _ready() -> void:
 	_create_bounding_box()
 	_setup_selection_handles()
+	_network_manager = get_node_or_null("/root/NetworkManager")
 
 func _create_bounding_box() -> void:
 	# Create edge-only wireframe bounding box using ImmediateMesh
@@ -421,6 +423,7 @@ func update_box_grab(current_pos: Vector3) -> void:
 	# Two-hand mode: scale and rotate based on both hands
 	if _is_two_hand_grab and _second_grab_hand and is_instance_valid(_second_grab_hand):
 		_update_two_hand_grab()
+		_broadcast_selected_transform_updates()
 		return
 	
 	# Single-hand mode: follow hand rotation
@@ -452,6 +455,7 @@ func update_box_grab(current_pos: Vector3) -> void:
 	
 	# Update bounding box
 	_update_bounding_box()
+	_broadcast_selected_transform_updates()
 
 func _update_two_hand_grab() -> void:
 	"""Update two-hand manipulation - scale and rotate selection"""
@@ -507,6 +511,7 @@ func _update_two_hand_grab() -> void:
 	
 	# Update bounding box
 	_update_bounding_box()
+	_broadcast_selected_transform_updates()
 
 func release_box_grab() -> void:
 	"""Release the selection box grab"""
@@ -945,6 +950,32 @@ func update_handle_drag(current_pos: Vector3) -> void:
 			_update_scale_drag(current_pos)
 		"rotate":
 			_update_rotate_drag(current_pos)
+	_broadcast_selected_transform_updates()
+
+
+func _broadcast_selected_transform_updates() -> void:
+	if _network_manager == null:
+		return
+	if not _network_manager.has_method("update_grabbed_object"):
+		return
+	for obj in selected_objects:
+		if not is_instance_valid(obj) or not (obj is RigidBody3D):
+			continue
+		var object_id := _resolve_network_object_id(obj)
+		if object_id.is_empty():
+			continue
+		var rot: Quaternion = obj.global_transform.basis.get_rotation_quaternion()
+		_network_manager.update_grabbed_object(object_id, obj.global_position, rot)
+
+
+func _resolve_network_object_id(obj: RigidBody3D) -> String:
+	if obj.has_method("get"):
+		var save_id: String = str(obj.get("save_id"))
+		if not save_id.is_empty():
+			return save_id
+	if obj.name.begins_with("obj_"):
+		return obj.name
+	return ""
 
 func _update_translate_drag(current_pos: Vector3) -> void:
 	"""Move selected objects along the drag axis"""
