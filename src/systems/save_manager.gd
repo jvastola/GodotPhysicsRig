@@ -4,6 +4,7 @@ extends Node
 
 const SAVE_FILE_PATH := "user://save_data.json"
 const SAVE_TEMP_PATH := "user://save_data.tmp"
+const DEFAULT_SIGNING_SECRET := "rig_development_secret"
 
 # Cached save data
 var _save_data: Dictionary = {}
@@ -83,15 +84,15 @@ func load_game_state() -> void:
 				var data_string = JSON.stringify(actual_data)
 				
 				# SECURE COMPONENT: Verify signature
-				if _generate_signature(data_string) == provided_signature:
+				if _is_signature_valid(data_string, str(provided_signature)):
 					_save_data = actual_data
 					print("SaveManager: Loaded and verified save data")
 				else:
 					push_error("SaveManager: SAVE DATA TAMPERING DETECTED! Signature mismatch.")
 					# In a real game, you might want to revert to a cloud backup
-					# For now, we'll clear sensitive fields or start fresh
+					# Avoid destructive overwrite on failure; keep save untouched until a valid write path is available.
 					_save_data = {}
-					_save_dirty = true
+					_save_dirty = false
 			else:
 				# Legacy format or corrupted
 				push_warning("SaveManager: Save file format is legacy or corrupted. Attempting migration.")
@@ -105,14 +106,34 @@ func load_game_state() -> void:
 		_save_data = {}
 
 
-func _generate_signature(data_string: String) -> String:
-	# Use a secret key from ConfigManager
-	var secret = "rig_development_secret" # Default
-	if has_node("/root/ConfigManager"):
-		secret = get_node("/root/ConfigManager").get_value("save_signing_secret", secret)
-	
+func _generate_signature(data_string: String, secret_override: String = "") -> String:
+	var secret := _get_signing_secret()
+	if secret_override != "":
+		secret = secret_override
+
 	# Simple SHA-256 HMAC-style signature
 	return (data_string + secret).sha256_text()
+
+
+func _is_signature_valid(data_string: String, provided_signature: String) -> bool:
+	if _generate_signature(data_string) == provided_signature:
+		return true
+
+	# Backward compatibility: older saves may have been signed before ConfigManager loaded.
+	var current_secret := _get_signing_secret()
+	if current_secret != DEFAULT_SIGNING_SECRET and _generate_signature(data_string, DEFAULT_SIGNING_SECRET) == provided_signature:
+		push_warning("SaveManager: Save signature validated with legacy default secret. Resave to migrate signature.")
+		_save_dirty = true
+		return true
+
+	return false
+
+
+func _get_signing_secret() -> String:
+	var secret := DEFAULT_SIGNING_SECRET
+	if has_node("/root/ConfigManager"):
+		secret = str(get_node("/root/ConfigManager").get_value("save_signing_secret", secret))
+	return secret
 
 
 # Write JSON atomically: write to temp, flush, then rename over the real file.

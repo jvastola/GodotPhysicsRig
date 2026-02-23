@@ -12,14 +12,20 @@ var _config: Dictionary = {
 	"nakama_use_ssl": false,
 	"auth_service_url": ""
 }
+var _config_loaded := false
 
 func _ready() -> void:
 	_load_config()
 
 func get_value(key: String, default: Variant = null) -> Variant:
+	if not _config_loaded:
+		_load_config()
 	return _config.get(key, default)
 
 func _load_config() -> void:
+	if _config_loaded:
+		return
+
 	# 1. Start with defaults (already in _config)
 	
 	# 2. Try to load from res://config.json (packaged config)
@@ -39,6 +45,8 @@ func _load_config() -> void:
 				_config[key] = env_val.to_int()
 			else:
 				_config[key] = env_val
+
+	_config_loaded = true
 	
 	print("ConfigManager: Configuration loaded.")
 
