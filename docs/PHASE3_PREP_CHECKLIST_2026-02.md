@@ -47,3 +47,18 @@ Prepare a stable contract for moving realtime replication traffic from Nakama re
 2. Wrapper: verify `data_packet_received` includes non-empty topic on Android path.
 3. Rust desktop: verify fallback methods still send/receive with current plugin.
 4. Mixed test: keep Nakama control-plane active while mirroring one replication topic over LiveKit.
+
+## Android/Desktop Parity Matrix (Pre-Phase-3 Gate)
+- `Connect/disconnect room`: Android ✅ / Desktop ✅
+- `Reliable broadcast send`: Android ✅ (`sendDataReliable`) / Desktop ✅ (`send_reliable_data` scaffold)
+- `Unreliable broadcast send`: Android ✅ (`sendDataUnreliable`) / Desktop ⚠️ currently aliases reliable/chat fallback
+- `Reliable targeted send`: Android ✅ (`sendDataToReliable`) / Desktop ⚠️ currently broadcast fallback
+- `Unreliable targeted send`: Android ✅ (`sendDataToUnreliable`) / Desktop ⚠️ currently broadcast fallback
+- `Inbound topic preserved`: Android ✅ (RoomEvent.DataReceived topic) / Desktop ⚠️ pending native data event export
+- `Wrapper packet signal`: Android ✅ / Desktop ⚠️ currently compatibility path only
+
+## Parity Requirements Before Phase 3 Full Cutover
+1. Rust plugin emits native `data_received(identity, payload, topic)` signal.
+2. Rust plugin differentiates reliable vs unreliable publish.
+3. Rust plugin supports targeted data publish.
+4. Wrapper marks `reliable` accurately on receive path for both platforms.

@@ -15,6 +15,7 @@ signal network_object_despawn_requested(object_id: String)
 
 # Nakama is now the exclusive networking backend
 var use_nakama: bool = true
+var use_livekit_data_replication: bool = false
 
 # Room data
 var players: Dictionary = {} # user_id String -> player_info Dictionary
@@ -103,14 +104,18 @@ var connection_timeout: float = 10.0
 var _last_server_response_time: float = 0.0
 var _snapshot_buffers: Dictionary = {} # snapshot_id -> {total_chunks:int, chunks:Dictionary, from_peer_id:String}
 const SNAPSHOT_CHUNK_SIZE: int = 20
+const LIVEKIT_TOPIC_REP_OBJECT := "rep/object"
+var _livekit_wrapper: Node = null
 
 
 func _ready() -> void:
+	use_livekit_data_replication = ProjectSettings.get_setting("network/use_livekit_data_replication", false)
 	# Initialize network stats monitoring
 	_last_server_response_time = Time.get_ticks_msec() / 1000.0
 	
 	# Setup Nakama signals (deferred to ensure NakamaManager autoload is ready)
 	call_deferred("_setup_nakama_integration")
+	call_deferred("_setup_livekit_integration")
 	
 	# Timer-based connection monitoring
 	_monitor_timer = Timer.new()
@@ -134,7 +139,19 @@ func _setup_nakama_integration() -> void:
 			NakamaManager.match_presence.connect(_on_nakama_match_presence)
 		if not NakamaManager.match_state_received.is_connected(_on_nakama_match_state_received):
 			NakamaManager.match_state_received.connect(_on_nakama_match_state_received)
-		print("NetworkManager: Nakama integration initialized")
+			print("NetworkManager: Nakama integration initialized")
+
+
+func _setup_livekit_integration() -> void:
+	_livekit_wrapper = get_node_or_null("/root/LiveKitWrapper")
+	if not _livekit_wrapper:
+		return
+	if _livekit_wrapper.has_signal("data_packet_received"):
+		if not _livekit_wrapper.data_packet_received.is_connected(_on_livekit_data_packet_received):
+			_livekit_wrapper.data_packet_received.connect(_on_livekit_data_packet_received)
+	elif _livekit_wrapper.has_signal("data_received"):
+		if not _livekit_wrapper.data_received.is_connected(_on_livekit_data_received_legacy):
+			_livekit_wrapper.data_received.connect(_on_livekit_data_received_legacy)
 
 
 ## Disconnect from network
@@ -628,8 +645,20 @@ func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion, rel
 	}
 	if rel_pos is Vector3: update_data["rel_pos"] = rel_pos
 	if rel_rot is Quaternion: update_data["rel_rot"] = rel_rot
-	
-	# SECURE COMPONENT: Binary serialization
+
+	if _can_use_livekit_realtime():
+		var packet = {
+			"object_id": object_id,
+			"pos": _vec3_to_dict(pos),
+			"rot": _quat_to_dict(rot),
+			"sender_id": get_nakama_user_id()
+		}
+		if rel_pos is Vector3: packet["rel_pos"] = _vec3_to_dict(rel_pos)
+		if rel_rot is Quaternion: packet["rel_rot"] = _quat_to_dict(rel_rot)
+		_livekit_wrapper.send_json_packet(packet, LIVEKIT_TOPIC_REP_OBJECT, false)
+		return
+
+	# Fallback path: Nakama match relay
 	var binary_data = var_to_bytes(update_data)
 	NakamaManager.send_match_state(NakamaManager.MatchOpCode.OBJECT_UPDATE, binary_data)
 
@@ -872,6 +901,60 @@ func _parse_quaternion(data) -> Quaternion:
 	if data is Quaternion: return data
 	if data is Dictionary: return Quaternion(data.get("x", 0), data.get("y", 0), data.get("z", 0), data.get("w", 1))
 	return Quaternion.IDENTITY
+
+
+func _can_use_livekit_realtime() -> bool:
+	if not use_livekit_data_replication:
+		return false
+	if not _livekit_wrapper:
+		return false
+	if _livekit_wrapper.has_method("is_room_connected"):
+		return _livekit_wrapper.is_room_connected()
+	return false
+
+
+func _on_livekit_data_packet_received(sender_identity: String, payload: PackedByteArray, topic: String, _reliable: bool) -> void:
+	if topic != LIVEKIT_TOPIC_REP_OBJECT:
+		return
+	var my_id := get_nakama_user_id()
+	if sender_identity == my_id:
+		return
+	var data_str := payload.get_string_from_utf8()
+	var parsed = JSON.parse_string(data_str)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	_apply_livekit_object_update(sender_identity, parsed)
+
+
+func _on_livekit_data_received_legacy(sender_identity: String, data: String) -> void:
+	# Legacy fallback when packet signal is unavailable.
+	if not use_livekit_data_replication:
+		return
+	var my_id := get_nakama_user_id()
+	if sender_identity == my_id:
+		return
+	var parsed = JSON.parse_string(data)
+	if typeof(parsed) != TYPE_DICTIONARY or not parsed.has("object_id"):
+		return
+	_apply_livekit_object_update(sender_identity, parsed)
+
+
+func _apply_livekit_object_update(sender_identity: String, update_data: Dictionary) -> void:
+	if not update_data.has("object_id") or not update_data.has("pos") or not update_data.has("rot"):
+		return
+	var object_id: String = update_data.object_id
+	var state = _ensure_object_registry(object_id)
+	var active_owner: String = state.get("held_by", state.get("owner_id", ""))
+	if not active_owner.is_empty() and active_owner != sender_identity:
+		return
+	var sync_data = {"position": _parse_vector3(update_data.pos), "rotation": _parse_quaternion(update_data.rot)}
+	if update_data.has("rel_pos"): sync_data["rel_pos"] = _parse_vector3(update_data.rel_pos)
+	if update_data.has("rel_rot"): sync_data["rel_rot"] = _parse_quaternion(update_data.rel_rot)
+	_update_object_registry_state(object_id, {
+		"position": update_data.pos,
+		"rotation": update_data.rot
+	})
+	grabbable_sync_update.emit(object_id, sync_data)
 
 
 func request_room_snapshot() -> void:
