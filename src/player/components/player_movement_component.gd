@@ -169,6 +169,7 @@ var _jump_cooldown_timer := 0.0
 # Autojoin state
 var _autojoin_triggered := false
 var _initial_spawn_position := Vector3.ZERO
+var _autojoin_livekit_connect_started := false
 
 # Render Mode Reset state
 var _render_mode_reset_timer: float = 0.0
@@ -1442,6 +1443,7 @@ func _trigger_autojoin() -> void:
 	"""Trigger autojoin to Nakama match and LiveKit room"""
 	var nakama_manager = get_node_or_null("/root/NakamaManager")
 	var livekit_manager = _find_livekit_manager()
+	_autojoin_livekit_connect_started = false
 	
 	# Validate managers
 	if not nakama_manager:
@@ -1527,22 +1529,51 @@ func _on_autojoin_match_list(matches: Array) -> void:
 func _on_autojoin_nakama_created(match_id: String, label: String) -> void:
 	"""Handle Nakama match created"""
 	_autojoin_log("Nakama match CREATED: %s (label: %s)" % [match_id, label])
-	_connect_to_livekit_after_nakama(label if not label.is_empty() else autojoin_room_name)
+	_connect_to_livekit_after_nakama(match_id)
 
 
 func _on_autojoin_nakama_joined(match_id: String) -> void:
 	"""Handle Nakama match joined"""
 	_autojoin_log("Nakama match JOINED: %s" % match_id)
-	_connect_to_livekit_after_nakama(autojoin_room_name)
+	_connect_to_livekit_after_nakama(match_id)
 
 
 func _connect_to_livekit_after_nakama(room_name: String) -> void:
 	"""Connect to LiveKit after Nakama match is ready"""
+	if _autojoin_livekit_connect_started:
+		_autojoin_log("LiveKit connect already started - skipping duplicate request")
+		return
+
+	# UnifiedRoomUI also auto-connects on match events; avoid duplicate connect races.
+	if _has_unified_room_ui():
+		_autojoin_log("UnifiedRoomUI detected - skipping Autojoin LiveKit connect")
+		return
+
 	var livekit_manager = _find_livekit_manager()
 	var nakama_manager = get_node_or_null("/root/NakamaManager")
 	
 	if not livekit_manager:
 		_autojoin_log("ERROR: Cannot connect to LiveKit - manager not found")
+		return
+
+	if livekit_manager.has_method("is_room_connected") and livekit_manager.is_room_connected():
+		_autojoin_log("Already connected to LiveKit - skipping")
+		return
+
+	var effective_room_name := room_name.strip_edges()
+	var current_match_id := ""
+	if nakama_manager:
+		current_match_id = str(nakama_manager.current_match_id)
+	# Use the real match id when autojoin_room_name is a generic label like "default".
+	if effective_room_name.is_empty() or effective_room_name == autojoin_room_name:
+		if not current_match_id.is_empty():
+			effective_room_name = current_match_id
+	# Nakama match IDs commonly include trailing '.'; LiveKit room names should not.
+	if effective_room_name.ends_with("."):
+		effective_room_name = effective_room_name.substr(0, effective_room_name.length() - 1)
+	
+	if effective_room_name.is_empty():
+		_autojoin_log("ERROR: Cannot connect to LiveKit - no valid room name")
 		return
 	
 	var user_id: String = ""
@@ -1558,8 +1589,10 @@ func _connect_to_livekit_after_nakama(room_name: String) -> void:
 		_autojoin_log("ERROR: NakamaManager missing request_livekit_token RPC client")
 		return
 	
-	var token_result: Dictionary = await nakama_manager.request_livekit_token(room_name, user_id)
+	_autojoin_livekit_connect_started = true
+	var token_result: Dictionary = await nakama_manager.request_livekit_token(effective_room_name, user_id)
 	if not token_result.get("ok", false):
+		_autojoin_livekit_connect_started = false
 		_autojoin_log("ERROR: LiveKit token RPC failed: %s" % token_result.get("error", "unknown"))
 		return
 	
@@ -1567,10 +1600,14 @@ func _connect_to_livekit_after_nakama(room_name: String) -> void:
 	var server_url: String = token_result.get("ws_url", "")
 	if server_url.is_empty() and nakama_manager and nakama_manager.has_method("get_livekit_ws_url"):
 		server_url = nakama_manager.get_livekit_ws_url()
+	if server_url.is_empty():
+		_autojoin_livekit_connect_started = false
+		_autojoin_log("ERROR: LiveKit server URL is empty")
+		return
 	
 	_autojoin_log("Connecting to LiveKit...")
 	_autojoin_log("  Server: %s" % server_url)
-	_autojoin_log("  Room: %s" % room_name)
+	_autojoin_log("  Room: %s" % effective_room_name)
 	_autojoin_log("  User: %s" % user_id)
 	
 	livekit_manager.connect_to_room(server_url, token)
@@ -1586,6 +1623,11 @@ func _find_livekit_manager() -> Node:
 		return livekit
 	# Fallback: search scene tree
 	return _find_node_by_script(root, "livekit_wrapper.gd")
+
+
+func _has_unified_room_ui() -> bool:
+	var root = get_tree().root
+	return _find_node_by_script(root, "UnifiedRoomUI.gd") != null
 
 
 func _find_node_by_script(node: Node, script_name: String) -> Node:
