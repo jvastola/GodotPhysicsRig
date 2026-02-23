@@ -180,7 +180,7 @@ func pickup_item(slot: int) -> void:
 	
 	# For Grabbable objects, use their grab interface if available
 	if target.has_method("desktop_grab"):
-		target.desktop_grab(self)
+		target.desktop_grab(self, slot)
 	elif target is RigidBody3D:
 		# Disable physics while held
 		(target as RigidBody3D).freeze = true

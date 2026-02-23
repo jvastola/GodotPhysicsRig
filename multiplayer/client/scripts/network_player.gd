@@ -208,6 +208,8 @@ func _update_label_position() -> void:
 ## Set the display name directly on the 3D label
 func set_player_name(new_name: String) -> void:
 	if label_3d:
+		if label_3d.text == new_name:
+			return
 		label_3d.text = new_name
 		print("NetworkPlayer: Set name to ", new_name)
 

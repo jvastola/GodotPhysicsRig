@@ -33,9 +33,9 @@ func notify_grab(p_save_id: String, hand_name: String = "", rel_pos: Vector3 = V
 	if network_manager and is_network_owner:
 		network_manager.grab_object(p_save_id, hand_name, rel_pos, rel_rot)
 
-func notify_release(p_save_id: String, position: Vector3, rotation: Quaternion, lin_vel: Vector3 = Vector3.ZERO, ang_vel: Vector3 = Vector3.ZERO) -> void:
+func notify_release(p_save_id: String, position: Vector3, rotation: Quaternion, lin_vel: Vector3 = Vector3.ZERO, ang_vel: Vector3 = Vector3.ZERO, release_mode: String = "RELEASED_DYNAMIC") -> void:
 	if network_manager and is_network_owner:
-		network_manager.release_object(p_save_id, position, rotation, lin_vel, ang_vel)
+		network_manager.release_object(p_save_id, position, rotation, lin_vel, ang_vel, "placed_room", release_mode)
 
 func notify_update(p_save_id: String, position: Vector3, rotation: Quaternion) -> void:
 	if network_manager and is_network_owner:

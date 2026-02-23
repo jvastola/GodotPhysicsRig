@@ -7,6 +7,9 @@ enum GrabMode {
 	FREE_GRAB,      # Object maintains its orientation relative to hand
 	ANCHOR_GRAB     # Object snaps to a specific anchor point/rotation
 }
+const NETWORK_STATE_HELD := "HELD"
+const NETWORK_STATE_RELEASED_STATIC := "RELEASED_STATIC"
+const NETWORK_STATE_RELEASED_DYNAMIC := "RELEASED_DYNAMIC"
 
 @export var grab_mode: GrabMode = GrabMode.ANCHOR_GRAB
 @export var grab_anchor_offset: Vector3 = Vector3.ZERO
@@ -45,6 +48,10 @@ var network_component: GrabbableNetworkComponent
 var remote_grab_hand: Node3D = null
 var remote_grab_offset_pos: Vector3 = Vector3.ZERO
 var remote_grab_offset_rot: Quaternion = Quaternion.IDENTITY
+var _pending_remote_peer_id: String = ""
+var _pending_remote_hand_name: String = ""
+var _network_state: String = NETWORK_STATE_RELEASED_STATIC
+var _network_state_version: int = 0
 
 signal grabbed(hand: RigidBody3D)
 signal released()
@@ -285,12 +292,6 @@ func release() -> void:
 	
 	print("Grabbable: Object released - ", name)
 	
-	# Notify network
-	if network_component:
-		network_component.notify_release(save_id, global_position, global_transform.basis.get_rotation_quaternion())
-		network_component.set_network_owner(false)
-		network_component.set_grabbed(false)
-	
 	# Calculate global transform from first grabbed collision shape if available
 	var release_global_transform = global_transform
 	if grabbed_collision_shapes.size() > 0 and is_instance_valid(grabbed_collision_shapes[0]):
@@ -350,8 +351,13 @@ func release() -> void:
 	
 	# Restore object visibility and physics
 	_set_original_visuals_visible(true)
-	freeze = false
-	gravity_scale = 1.0
+	var release_mode: String = NETWORK_STATE_RELEASED_DYNAMIC
+	if hand_velocity.length() <= 0.05 and hand_angular_velocity.length() <= 0.05:
+		release_mode = NETWORK_STATE_RELEASED_STATIC
+	_apply_network_state_mode(release_mode, {
+		"linear_velocity": hand_velocity,
+		"angular_velocity": hand_angular_velocity
+	})
 	# Restore original collision settings
 	collision_layer = original_collision_layer
 	collision_mask = original_collision_mask
@@ -359,9 +365,18 @@ func release() -> void:
 	# Set global transform to where the grabbed shape was
 	global_transform = release_global_transform
 	
-	# Inherit hand velocity for throwing
-	linear_velocity = hand_velocity
-	angular_velocity = hand_angular_velocity
+	# Notify network with final authoritative release transform + throw velocity
+	if network_component:
+		network_component.notify_release(
+			save_id,
+			release_global_transform.origin,
+			release_global_transform.basis.get_rotation_quaternion(),
+			hand_velocity,
+			hand_angular_velocity,
+			release_mode
+		)
+		network_component.set_network_owner(false)
+		network_component.set_grabbed(false)
 	
 	is_grabbed = false
 	grabbing_hand = null
@@ -377,6 +392,12 @@ func release() -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	if not _pending_remote_peer_id.is_empty() and not is_instance_valid(remote_grab_hand):
+		_attach_to_remote_player(_pending_remote_peer_id, _pending_remote_hand_name, remote_grab_offset_pos, remote_grab_offset_rot)
+		if is_instance_valid(remote_grab_hand):
+			_pending_remote_peer_id = ""
+			_pending_remote_hand_name = ""
+
 	# Keep object smoothed to remote player's hand if grabbed remotely
 	if is_instance_valid(remote_grab_hand):
 		# Interpolate global transform to match remote hand with grabbing offset
@@ -572,43 +593,36 @@ func _on_network_grab(peer_id: String, hand_name: String, rel_pos: Vector3, rel_
 	"""Handle another player grabbing this object"""
 	# Make object semi-transparent to show it's grabbed by someone else
 	_set_remote_grabbed_visual(true)
-	freeze = true
-	collision_layer = 0
-	collision_mask = 0
+	_apply_network_state_mode(NETWORK_STATE_HELD)
 	
 	# Try to find the remote player's hand to attach to visually
 	_attach_to_remote_player(peer_id, hand_name, rel_pos, rel_rot)
+	if not is_instance_valid(remote_grab_hand):
+		_pending_remote_peer_id = peer_id
+		_pending_remote_hand_name = hand_name
 
 
 func _on_network_release(_peer_id: String) -> void:
 	"""Handle another player releasing this object"""
 	_set_remote_grabbed_visual(false)
-	freeze = false
-	collision_layer = original_collision_layer
-	collision_mask = original_collision_mask
 	remote_grab_hand = null
+	_pending_remote_peer_id = ""
+	_pending_remote_hand_name = ""
 
 
 func _attach_to_remote_player(peer_id: String, hand_name: String, rel_pos: Vector3, rel_rot: Quaternion) -> void:
 	# Clear existing
 	remote_grab_hand = null
 	
-	# Find the NetworkPlayer instance matching this peer_id
-	var players_node = get_tree().get_first_node_in_group("network_players")
-	if not players_node:
-		var root = get_node_or_null("/root/Main/Players")
-		if root: players_node = root
-	
 	var target_player = null
-	if players_node:
-		for child in players_node.get_children():
-			if child.has_method("get_peer_id"):
-				# some versions might use int vs string
-				if str(child.get("peer_id")) == str(peer_id):
-					target_player = child
-					break
-			elif "peer_id" in child and str(child.peer_id) == str(peer_id):
-				target_player = child
+	# Find the NetworkPlayer instance matching this peer_id
+	var candidates := get_tree().get_nodes_in_group("network_players")
+	for candidate in candidates:
+		if not (candidate is Node):
+			continue
+		if candidate.has_method("get_peer_id"):
+			if str(candidate.call("get_peer_id")) == str(peer_id):
+				target_player = candidate
 				break
 
 	if target_player:
@@ -634,6 +648,17 @@ func _attach_to_remote_player(peer_id: String, hand_name: String, rel_pos: Vecto
 
 func _on_network_sync(data: Dictionary) -> void:
 	"""Receive position update for this object from network"""
+	if data.has("state_version"):
+		_network_state_version = int(data["state_version"])
+	if data.has("state"):
+		_apply_network_state_mode(String(data["state"]), data)
+	elif data.has("release_mode"):
+		_apply_network_state_mode(String(data["release_mode"]), data)
+	elif data.has("is_held"):
+		if bool(data["is_held"]):
+			_apply_network_state_mode(NETWORK_STATE_HELD, data)
+		else:
+			_apply_network_state_mode(NETWORK_STATE_RELEASED_DYNAMIC, data)
 	
 	# Update relative offsets if provided (e.g. desktop distance/rotation changes)
 	if data.has("rel_pos"):
@@ -655,6 +680,45 @@ func _on_network_sync(data: Dictionary) -> void:
 		var current_quat = global_transform.basis.get_rotation_quaternion()
 		var interpolated = current_quat.slerp(target_rot, 0.3)
 		global_transform.basis = Basis(interpolated)
+
+
+func _apply_network_state_mode(mode: String, data: Dictionary = {}) -> void:
+	_network_state = mode
+	if data.has("state_version"):
+		_network_state_version = int(data["state_version"])
+
+	match mode:
+		NETWORK_STATE_HELD:
+			freeze = true
+			gravity_scale = 0.0
+			collision_layer = 0
+			collision_mask = 0
+			linear_velocity = Vector3.ZERO
+			angular_velocity = Vector3.ZERO
+		NETWORK_STATE_RELEASED_STATIC:
+			_set_remote_grabbed_visual(false)
+			remote_grab_hand = null
+			_pending_remote_peer_id = ""
+			_pending_remote_hand_name = ""
+			freeze = true
+			gravity_scale = 0.0
+			collision_layer = original_collision_layer
+			collision_mask = original_collision_mask
+			linear_velocity = Vector3.ZERO
+			angular_velocity = Vector3.ZERO
+		NETWORK_STATE_RELEASED_DYNAMIC:
+			_set_remote_grabbed_visual(false)
+			remote_grab_hand = null
+			_pending_remote_peer_id = ""
+			_pending_remote_hand_name = ""
+			freeze = false
+			gravity_scale = 1.0
+			collision_layer = original_collision_layer
+			collision_mask = original_collision_mask
+			if data.has("linear_velocity"):
+				linear_velocity = data["linear_velocity"]
+			if data.has("angular_velocity"):
+				angular_velocity = data["angular_velocity"]
 
 
 func _set_remote_grabbed_visual(is_grabbed_visual: bool) -> void:
@@ -716,7 +780,7 @@ func pointer_grab_get_scale() -> float:
 # DESKTOP GRAB INTERFACE (for DesktopInteractionComponent keyboard pickup)
 # ============================================================================
 
-func desktop_grab(grabber: Node) -> void:
+func desktop_grab(grabber: Node, slot: int = -1) -> void:
 	"""Called by DesktopInteractionComponent when picked up with E/F keys.
 	Emits grabbed signal so tools (shape_tool, etc.) can enable their functionality."""
 	if is_grabbed or is_desktop_grabbed:
@@ -742,15 +806,19 @@ func desktop_grab(grabber: Node) -> void:
 		# We need to pass the target slot offset rather than current world offset,
 		# because current world offset might be "on the ground" before reparenting.
 		var slot_offset = Vector3.ZERO
-		if desktop_grabber and desktop_grabber.has_method("_get_held_item"):
-			# Try to determine which slot we went into
+		if slot == 0 and desktop_grabber:
+			slot_offset = desktop_grabber.get("left_slot_offset")
+			slot_offset.z = -desktop_grabber.get("_left_hold_distance")
+		elif slot == 1 and desktop_grabber:
+			slot_offset = desktop_grabber.get("right_slot_offset")
+			slot_offset.z = -desktop_grabber.get("_right_hold_distance")
+		elif desktop_grabber and desktop_grabber.has_method("_get_held_item"):
+			# Fallback for callers that don't pass explicit slot
 			if desktop_grabber.get("_left_held_item") == self:
 				slot_offset = desktop_grabber.get("left_slot_offset")
-				# Correct for distance
 				slot_offset.z = -desktop_grabber.get("_left_hold_distance")
 			else:
 				slot_offset = desktop_grabber.get("right_slot_offset")
-				# Correct for distance
 				slot_offset.z = -desktop_grabber.get("_right_hold_distance")
 		else:
 			# Fallback default

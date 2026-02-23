@@ -46,6 +46,9 @@ var room_object_registry: Dictionary = {} # object_id -> state map
 signal grabbable_grabbed(object_id: String, peer_id: String, hand_name: String, rel_pos: Vector3, rel_rot: Quaternion)
 signal grabbable_released(object_id: String, peer_id: String)
 signal grabbable_sync_update(object_id: String, data: Dictionary)
+const OBJECT_STATE_HELD := "HELD"
+const OBJECT_STATE_RELEASED_STATIC := "RELEASED_STATIC"
+const OBJECT_STATE_RELEASED_DYNAMIC := "RELEASED_DYNAMIC"
 
 # Avatar signals
 signal avatar_texture_received(peer_id: String)
@@ -293,8 +296,10 @@ func _assign_join_order_if_missing(peer_id: String) -> void:
 
 
 func _get_host_peer_id() -> String:
+	var my_id := get_nakama_user_id()
 	if not _host_peer_id.is_empty():
-		return _host_peer_id
+		if _presence_join_order.has(_host_peer_id) or _host_peer_id == my_id or players.has(_host_peer_id):
+			return _host_peer_id
 	var host_id := ""
 	var host_order := 1 << 30
 	for peer_id in _presence_join_order.keys():
@@ -303,7 +308,20 @@ func _get_host_peer_id() -> String:
 			host_order = order
 			host_id = peer_id
 	if host_id.is_empty():
-		return get_nakama_user_id()
+		var candidates: Array[String] = []
+		if not my_id.is_empty():
+			candidates.append(my_id)
+		for peer_id in players.keys():
+			var pid := String(peer_id)
+			if pid.is_empty():
+				continue
+			if not candidates.has(pid):
+				candidates.append(pid)
+		candidates.sort()
+		if candidates.size() > 0:
+			host_id = candidates[0]
+	if host_id.is_empty():
+		return my_id
 	return host_id
 
 
@@ -436,8 +454,7 @@ func _on_nakama_match_presence(joins: Array, leaves: Array) -> void:
 		print("NetworkManager: Nakama player joined: ", user_id)
 		players[user_id] = _make_default_remote_player_info(user_id)
 		_assign_join_order_if_missing(user_id)
-		if _host_peer_id.is_empty():
-			_set_host_peer_id(_get_host_peer_id())
+		_set_host_peer_id(_get_host_peer_id())
 		player_connected.emit(user_id)
 		if is_server():
 			_send_room_snapshot_to_peer(user_id)
@@ -564,6 +581,8 @@ func _ensure_object_registry(object_id: String) -> Dictionary:
 			"held_by": "",
 			"placed": false,
 			"persist_mode": "transient_held",
+			"sim_state": OBJECT_STATE_RELEASED_STATIC,
+			"state_version": 0,
 			"manifest_id": "",
 			"seq": 0,
 			"property_seq": 0,
@@ -583,6 +602,30 @@ func _update_object_registry_state(object_id: String, patch: Dictionary) -> Dict
 	state["seq"] = int(state.get("seq", 0)) + 1
 	room_object_registry[object_id] = state
 	return state
+
+
+func _get_object_state_version(object_id: String) -> int:
+	return int(_ensure_object_registry(object_id).get("state_version", 0))
+
+
+func _next_object_state_version(object_id: String) -> int:
+	return _get_object_state_version(object_id) + 1
+
+
+func _is_transform_version_valid(object_id: String, incoming_version: int) -> bool:
+	if incoming_version <= 0:
+		return true
+	return incoming_version == _get_object_state_version(object_id)
+
+
+func _is_transition_version_valid(object_id: String, incoming_version: int) -> bool:
+	if incoming_version <= 0:
+		return true
+	return incoming_version >= _get_object_state_version(object_id)
+
+
+func _trace_object_state(object_id: String, state_name: String, state_version: int, source: String) -> void:
+	print("[ObjectState] ", object_id, " v", state_version, " ", state_name, " via ", source)
 
 
 func request_object_ownership(object_id: String, hand_name: String = "", rel_pos: Vector3 = Vector3.ZERO, rel_rot: Quaternion = Quaternion.IDENTITY) -> void:
@@ -626,18 +669,43 @@ func _handle_ownership_request(sender_id: String, data: Dictionary) -> void:
 	var previous_owner := String(state.get("owner_id", ""))
 
 	if approved:
+		var state_version := _next_object_state_version(object_id)
 		state = _update_object_registry_state(object_id, {
 			"owner_id": requester_id,
 			"held_by": requester_id,
 			"placed": false,
-			"persist_mode": "transient_held"
+			"persist_mode": "transient_held",
+			"sim_state": OBJECT_STATE_HELD,
+			"state_version": state_version
 		})
+		_trace_object_state(object_id, OBJECT_STATE_HELD, state_version, "ownership_request")
+		grabbed_objects[object_id] = {
+			"owner_peer_id": requester_id,
+			"is_grabbed": true,
+			"hand_name": data.get("hand_name", "")
+		}
 		ownership_changed.emit(object_id, requester_id, previous_owner)
+		# Important: server/host won't process its own OWNERSHIP_GRANTED packet due spoof guard.
+		# Emit local grab transition now so host-side object components switch to remote-owned mode.
+		grabbable_grabbed.emit(
+			object_id,
+			requester_id,
+			data.get("hand_name", ""),
+			_parse_vector3(data.get("rel_pos", {})),
+			_parse_quaternion(data.get("rel_rot", {}))
+		)
+		grabbable_sync_update.emit(object_id, {
+			"is_held": true,
+			"state": OBJECT_STATE_HELD,
+			"state_version": state_version
+		})
 		var grant_data = {
 			"object_id": object_id,
 			"requester_id": requester_id,
 			"new_owner_id": requester_id,
 			"previous_owner_id": previous_owner,
+			"state": OBJECT_STATE_HELD,
+			"state_version": state_version,
 			"hand_name": data.get("hand_name", ""),
 			"rel_pos": data.get("rel_pos", _vec3_to_dict(Vector3.ZERO)),
 			"rel_rot": data.get("rel_rot", _quat_to_dict(Quaternion.IDENTITY)),
@@ -661,19 +729,27 @@ func _handle_ownership_granted(_sender_id: String, data: Dictionary) -> void:
 	if object_id.is_empty():
 		return
 
+	var incoming_version := int(data.get("state_version", 0))
+	if not _is_transition_version_valid(object_id, incoming_version):
+		return
+
 	var new_owner_id: String = data.get("new_owner_id", data.get("requester_id", ""))
 	var previous_owner := String(data.get("previous_owner_id", ""))
+	var state_name: String = data.get("state", OBJECT_STATE_HELD)
 	_update_object_registry_state(object_id, {
 		"owner_id": new_owner_id,
 		"held_by": new_owner_id,
 		"placed": false,
-		"persist_mode": "transient_held"
+		"persist_mode": "transient_held",
+		"sim_state": state_name,
+		"state_version": incoming_version
 	})
 	grabbed_objects[object_id] = {
 		"owner_peer_id": new_owner_id,
 		"is_grabbed": true,
 		"hand_name": data.get("hand_name", "")
 	}
+	_trace_object_state(object_id, state_name, incoming_version, "ownership_granted")
 	ownership_changed.emit(object_id, new_owner_id, previous_owner)
 	grabbable_grabbed.emit(
 		object_id,
@@ -682,6 +758,11 @@ func _handle_ownership_granted(_sender_id: String, data: Dictionary) -> void:
 		_parse_vector3(data.get("rel_pos", {})),
 		_parse_quaternion(data.get("rel_rot", {}))
 	)
+	grabbable_sync_update.emit(object_id, {
+		"is_held": true,
+		"state": state_name,
+		"state_version": incoming_version
+	})
 
 
 func _handle_ownership_denied(_sender_id: String, data: Dictionary) -> void:
@@ -696,11 +777,14 @@ func _handle_ownership_released(sender_id: String, data: Dictionary) -> void:
 	var object_id: String = data.get("object_id", "")
 	if object_id.is_empty():
 		return
+	var incoming_version := int(data.get("state_version", 0))
+	if not _is_transition_version_valid(object_id, incoming_version):
+		return
 	if _last_object_rep_send_msec.has(object_id):
 		_last_object_rep_send_msec.erase(object_id)
 
 	var persist_mode: String = data.get("persist_mode", "placed_room")
-	var final_owner := _get_host_peer_id()
+	var release_mode: String = data.get("release_mode", OBJECT_STATE_RELEASED_STATIC)
 	if persist_mode == "transient_held":
 		if grabbed_objects.has(object_id):
 			grabbed_objects.erase(object_id)
@@ -711,12 +795,15 @@ func _handle_ownership_released(sender_id: String, data: Dictionary) -> void:
 	if grabbed_objects.has(object_id):
 		grabbed_objects.erase(object_id)
 	_update_object_registry_state(object_id, {
-		"owner_id": final_owner,
+		"owner_id": "",
 		"held_by": "",
 		"placed": true,
-		"persist_mode": persist_mode
+		"persist_mode": persist_mode,
+		"sim_state": release_mode,
+		"state_version": incoming_version
 	})
-	ownership_changed.emit(object_id, final_owner, sender_id)
+	_trace_object_state(object_id, release_mode, incoming_version, "ownership_released")
+	ownership_changed.emit(object_id, "", sender_id)
 
 
 func grab_object(object_id: String, hand_name: String = "", rel_pos: Vector3 = Vector3.ZERO, rel_rot: Quaternion = Quaternion.IDENTITY) -> void:
@@ -729,31 +816,42 @@ func grab_object(object_id: String, hand_name: String = "", rel_pos: Vector3 = V
 	}
 
 
-func release_object(object_id: String, final_pos: Vector3, final_rot: Quaternion, lin_vel: Vector3 = Vector3.ZERO, ang_vel: Vector3 = Vector3.ZERO, persist_mode: String = "placed_room") -> void:
+func release_object(object_id: String, final_pos: Vector3, final_rot: Quaternion, lin_vel: Vector3 = Vector3.ZERO, ang_vel: Vector3 = Vector3.ZERO, persist_mode: String = "placed_room", release_mode: String = OBJECT_STATE_RELEASED_DYNAMIC) -> void:
 	var my_id = get_nakama_user_id()
 	if grabbed_objects.has(object_id): grabbed_objects.erase(object_id)
 	if _last_object_rep_send_msec.has(object_id):
 		_last_object_rep_send_msec.erase(object_id)
+	var state_version := _next_object_state_version(object_id)
 	
 	var release_data = {
 		"object_id": object_id,
+		"owner_id": "",
 		"pos": _vec3_to_dict(final_pos),
 		"rot": _quat_to_dict(final_rot),
 		"lin_vel": _vec3_to_dict(lin_vel),
-		"ang_vel": _vec3_to_dict(ang_vel)
+		"ang_vel": _vec3_to_dict(ang_vel),
+		"persist_mode": persist_mode,
+		"release_mode": release_mode,
+		"state_version": state_version
 	}
 	NakamaManager.send_match_state(NakamaManager.MatchOpCode.RELEASE_OBJECT, release_data)
 	NakamaManager.send_match_state(NakamaManager.MatchOpCode.OWNERSHIP_RELEASED, {
 		"object_id": object_id,
 		"released_by": my_id,
+		"owner_id": "",
 		"persist_mode": persist_mode,
+		"release_mode": release_mode,
+		"state_version": state_version,
 		"pos": _vec3_to_dict(final_pos),
 		"rot": _quat_to_dict(final_rot)
 	})
 	_update_object_registry_state(object_id, {
+		"owner_id": "",
 		"held_by": "",
 		"placed": true,
 		"persist_mode": persist_mode,
+		"sim_state": release_mode,
+		"state_version": state_version,
 		"position": _vec3_to_dict(final_pos),
 		"rotation": _quat_to_dict(final_rot)
 	})
@@ -762,6 +860,15 @@ func release_object(object_id: String, final_pos: Vector3, final_rot: Quaternion
 
 func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion, rel_pos: Variant = null, rel_rot: Variant = null) -> void:
 	if object_id.is_empty():
+		return
+	var my_id := get_nakama_user_id()
+	var state := _ensure_object_registry(object_id)
+	if String(state.get("sim_state", "")) != OBJECT_STATE_HELD:
+		return
+	if String(state.get("owner_id", "")) != my_id:
+		return
+	var state_version := int(state.get("state_version", 0))
+	if state_version <= 0:
 		return
 	var now := Time.get_ticks_msec()
 	var last_sent := int(_last_object_rep_send_msec.get(object_id, 0))
@@ -773,6 +880,9 @@ func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion, rel
 		"object_id": object_id,
 		"pos": pos,
 		"rot": rot,
+		"state": OBJECT_STATE_HELD,
+		"state_version": state_version,
+		"is_held": true
 	}
 	if rel_pos is Vector3: update_data["rel_pos"] = rel_pos
 	if rel_rot is Quaternion: update_data["rel_rot"] = rel_rot
@@ -783,7 +893,10 @@ func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion, rel
 			"object_id": object_id,
 			"pos": _vec3_to_dict(pos),
 			"rot": _quat_to_dict(rot),
-			"sender_id": get_nakama_user_id()
+			"sender_id": my_id,
+			"state": OBJECT_STATE_HELD,
+			"state_version": state_version,
+			"is_held": true
 		}
 		if rel_pos is Vector3: packet["rel_pos"] = _vec3_to_dict(rel_pos)
 		if rel_rot is Quaternion: packet["rel_rot"] = _quat_to_dict(rel_rot)
@@ -885,6 +998,8 @@ func spawn_network_object_with_mode(scene_path: String, position: Vector3, persi
 		"object_id": object_id,
 		"owner_id": get_nakama_user_id(),
 		"persist_mode": persist_mode,
+		"sim_state": OBJECT_STATE_RELEASED_STATIC,
+		"state_version": 0,
 		"manifest_id": manifest_id
 	}
 	NakamaManager.send_match_state(NakamaManager.MatchOpCode.SPAWN_OBJECT, spawn_data)
@@ -896,6 +1011,8 @@ func spawn_network_object_with_mode(scene_path: String, position: Vector3, persi
 		"held_by": "",
 		"placed": true,
 		"persist_mode": persist_mode,
+		"sim_state": OBJECT_STATE_RELEASED_STATIC,
+		"state_version": 0,
 		"manifest_id": manifest_id,
 		"spawned_by": get_nakama_user_id()
 	})
@@ -1096,6 +1213,8 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 				"held_by": "",
 				"placed": true,
 				"persist_mode": spawn_data.get("persist_mode", "placed_room"),
+				"sim_state": spawn_data.get("sim_state", OBJECT_STATE_RELEASED_STATIC),
+				"state_version": int(spawn_data.get("state_version", 0)),
 				"manifest_id": spawn_data.get("manifest_id", "default"),
 				"spawned_by": peer_id
 			})
@@ -1105,33 +1224,58 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 		if data is PackedByteArray: grab_data = bytes_to_var(data)
 		
 		if grab_data is Dictionary and grab_data.has("object_id"):
+			var incoming_version := int(grab_data.get("state_version", 0))
+			if not _is_transition_version_valid(grab_data.object_id, incoming_version):
+				return
+			var state_name: String = grab_data.get("state", OBJECT_STATE_HELD)
 			_update_object_registry_state(grab_data.object_id, {
 				"owner_id": peer_id,
 				"held_by": peer_id,
 				"placed": false,
-				"persist_mode": "transient_held"
+				"persist_mode": "transient_held",
+				"sim_state": state_name,
+				"state_version": incoming_version
 			})
 			grabbable_grabbed.emit(grab_data.object_id, peer_id, grab_data.get("hand_name", ""), _parse_vector3(grab_data.get("rel_pos", {})), _parse_quaternion(grab_data.get("rel_rot", {})))
+			grabbable_sync_update.emit(grab_data.object_id, {
+				"is_held": true,
+				"state": state_name,
+				"state_version": incoming_version
+			})
 			
 	elif op_code == NakamaManager.MatchOpCode.RELEASE_OBJECT:
 		var release_data = data
 		if data is PackedByteArray: release_data = bytes_to_var(data)
 		
 		if release_data is Dictionary and release_data.has("object_id"):
+			var incoming_version := int(release_data.get("state_version", 0))
+			if not _is_transition_version_valid(release_data.object_id, incoming_version):
+				return
+			var release_mode: String = release_data.get("release_mode", OBJECT_STATE_RELEASED_STATIC)
 			if grabbed_objects.has(release_data.object_id):
 				grabbed_objects.erase(release_data.object_id)
 			_update_object_registry_state(release_data.object_id, {
+				"owner_id": String(release_data.get("owner_id", "")),
 				"held_by": "",
 				"placed": true,
-				"persist_mode": "placed_room",
+				"persist_mode": release_data.get("persist_mode", "placed_room"),
+				"sim_state": release_mode,
+				"state_version": incoming_version,
 				"position": release_data.get("pos", _vec3_to_dict(Vector3.ZERO)),
 				"rotation": release_data.get("rot", _quat_to_dict(Quaternion.IDENTITY))
 			})
+			_trace_object_state(release_data.object_id, release_mode, incoming_version, "release_packet")
 			grabbable_released.emit(release_data.object_id, peer_id)
 			if release_data.has("pos"): 
 				grabbable_sync_update.emit(release_data.object_id, {
-					"position": _parse_vector3(release_data.pos), 
-					"rotation": _parse_quaternion(release_data.get("rot", {}))
+					"position": _parse_vector3(release_data.pos),
+					"rotation": _parse_quaternion(release_data.get("rot", {})),
+					"linear_velocity": _parse_vector3(release_data.get("lin_vel", {})),
+					"angular_velocity": _parse_vector3(release_data.get("ang_vel", {})),
+					"is_held": false,
+					"state": release_mode,
+					"state_version": incoming_version,
+					"release_mode": release_mode
 				})
 	elif op_code == NakamaManager.MatchOpCode.OBJECT_UPDATE:
 		var update_data = data
@@ -1140,10 +1284,21 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 			
 		if update_data is Dictionary and update_data.has("object_id") and update_data.has("pos") and update_data.has("rot"):
 			var state = _ensure_object_registry(update_data.object_id)
+			var incoming_version := int(update_data.get("state_version", 0))
+			if not _is_transform_version_valid(update_data.object_id, incoming_version):
+				return
+			if String(state.get("sim_state", OBJECT_STATE_RELEASED_STATIC)) != OBJECT_STATE_HELD:
+				return
 			var active_owner: String = state.get("held_by", state.get("owner_id", ""))
 			if not active_owner.is_empty() and active_owner != peer_id:
 				return
-			var sync_data = {"position": _parse_vector3(update_data.pos), "rotation": _parse_quaternion(update_data.rot)}
+			var sync_data = {
+				"position": _parse_vector3(update_data.pos),
+				"rotation": _parse_quaternion(update_data.rot),
+				"is_held": bool(update_data.get("is_held", true)),
+				"state": update_data.get("state", OBJECT_STATE_HELD),
+				"state_version": incoming_version
+			}
 			if update_data.has("rel_pos"): sync_data["rel_pos"] = _parse_vector3(update_data.rel_pos)
 			if update_data.has("rel_rot"): sync_data["rel_rot"] = _parse_quaternion(update_data.rel_rot)
 			_update_object_registry_state(update_data.object_id, {
@@ -1258,10 +1413,21 @@ func _apply_livekit_object_update(sender_identity: String, update_data: Dictiona
 		return
 	var object_id: String = update_data.object_id
 	var state = _ensure_object_registry(object_id)
+	var incoming_version := int(update_data.get("state_version", 0))
+	if not _is_transform_version_valid(object_id, incoming_version):
+		return
+	if String(state.get("sim_state", OBJECT_STATE_RELEASED_STATIC)) != OBJECT_STATE_HELD:
+		return
 	var active_owner: String = state.get("held_by", state.get("owner_id", ""))
 	if not active_owner.is_empty() and active_owner != sender_identity:
 		return
-	var sync_data = {"position": _parse_vector3(update_data.pos), "rotation": _parse_quaternion(update_data.rot)}
+	var sync_data = {
+		"position": _parse_vector3(update_data.pos),
+		"rotation": _parse_quaternion(update_data.rot),
+		"is_held": bool(update_data.get("is_held", true)),
+		"state": update_data.get("state", OBJECT_STATE_HELD),
+		"state_version": incoming_version
+	}
 	if update_data.has("rel_pos"): sync_data["rel_pos"] = _parse_vector3(update_data.rel_pos)
 	if update_data.has("rel_rot"): sync_data["rel_rot"] = _parse_quaternion(update_data.rel_rot)
 	_update_object_registry_state(object_id, {
@@ -1435,7 +1601,10 @@ func _apply_snapshot_object_state(object_state: Dictionary) -> void:
 	if object_id.is_empty():
 		return
 
-	room_object_registry[object_id] = object_state.duplicate(true)
+	var normalized := _ensure_object_registry(object_id).duplicate(true)
+	for key in object_state.keys():
+		normalized[key] = object_state[key]
+	room_object_registry[object_id] = normalized
 	var path: String = object_state.get("scene_path", "")
 	var pos: Vector3 = _parse_vector3(object_state.get("position", object_state.get("pos", {})))
 	if path.is_empty():
@@ -1460,6 +1629,8 @@ func _handle_peer_disconnect_objects(peer_id: String) -> void:
 		if held_by == peer_id or owner_id == peer_id:
 			state["held_by"] = ""
 			state["owner_id"] = host_id
+			state["sim_state"] = OBJECT_STATE_RELEASED_STATIC
+			state["state_version"] = int(state.get("state_version", 0)) + 1
 			room_object_registry[object_id] = state
 
 	for object_id in to_remove:
