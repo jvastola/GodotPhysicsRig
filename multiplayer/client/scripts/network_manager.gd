@@ -8,6 +8,10 @@ signal connection_failed()
 signal connection_succeeded()
 signal server_disconnected()
 signal send_local_avatar()
+signal ownership_request_received(object_id: String, requester_id: String)
+signal ownership_changed(object_id: String, new_owner_id: String, previous_owner_id: String)
+signal snapshot_reconstructed(snapshot_id: String, object_count: int)
+signal network_object_despawn_requested(object_id: String)
 
 # Nakama is now the exclusive networking backend
 var use_nakama: bool = true
@@ -15,6 +19,8 @@ var use_nakama: bool = true
 # Room data
 var players: Dictionary = {} # user_id String -> player_info Dictionary
 var local_player: Node3D = null
+var _presence_join_order: Dictionary = {} # user_id -> join order
+var _join_order_counter: int = 0
 
 # Player info structure
 var local_player_info: Dictionary = {
@@ -31,6 +37,7 @@ var local_player_info: Dictionary = {
 
 # Grabbable sync
 var grabbed_objects: Dictionary = {} # object_id -> {owner_peer_id, position, rotation, is_grabbed}
+var room_object_registry: Dictionary = {} # object_id -> state map
 signal grabbable_grabbed(object_id: String, peer_id: String, hand_name: String, rel_pos: Vector3, rel_rot: Quaternion)
 signal grabbable_released(object_id: String, peer_id: String)
 signal grabbable_sync_update(object_id: String, data: Dictionary)
@@ -93,6 +100,8 @@ var is_push_to_talk_pressed: bool = false
 # Reconnection
 var connection_timeout: float = 10.0
 var _last_server_response_time: float = 0.0
+var _snapshot_buffers: Dictionary = {} # snapshot_id -> {total_chunks:int, chunks:Dictionary, from_peer_id:String}
+const SNAPSHOT_CHUNK_SIZE: int = 20
 
 
 func _ready() -> void:
@@ -138,16 +147,9 @@ func disconnect_from_network() -> void:
 ## Check if we are the "authority" (Nakama matches are usually hostless relay, 
 ## but we can treat the player with the lowest ID as authority for some tasks)
 func is_server() -> bool:
-	if not use_nakama or (players.is_empty() and get_nakama_user_id().is_empty()):
+	if not use_nakama:
 		return true
-	
-	var my_id = get_nakama_user_id()
-	var all_ids = players.keys()
-	if not my_id.is_empty() and not all_ids.has(my_id):
-		all_ids.append(my_id)
-	all_ids.sort()
-	
-	return all_ids[0] == my_id
+	return _get_host_peer_id() == get_nakama_user_id()
 
 
 ## Get our multiplayer ID (Always string user ID for Nakama)
@@ -162,12 +164,37 @@ func get_nakama_user_id() -> String:
 	return ""
 
 
+func get_stable_network_id() -> String:
+	return get_nakama_user_id()
+
+
 ## Register the local player node
 func _register_local_player() -> void:
 	var my_id = get_nakama_user_id()
 	if not my_id.is_empty():
 		players[my_id] = local_player_info.duplicate(true)
+		_assign_join_order_if_missing(my_id)
 		print("Local player registered with ID: ", my_id)
+
+
+func _assign_join_order_if_missing(peer_id: String) -> void:
+	if peer_id.is_empty() or _presence_join_order.has(peer_id):
+		return
+	_presence_join_order[peer_id] = _join_order_counter
+	_join_order_counter += 1
+
+
+func _get_host_peer_id() -> String:
+	var host_id := ""
+	var host_order := 1 << 30
+	for peer_id in _presence_join_order.keys():
+		var order = int(_presence_join_order.get(peer_id, host_order))
+		if order < host_order:
+			host_order = order
+			host_id = peer_id
+	if host_id.is_empty():
+		return get_nakama_user_id()
+	return host_id
 
 
 ## Update local player transform data (called by XRPlayer every frame)
@@ -219,6 +246,10 @@ func _on_nakama_match_joined(match_id: String) -> void:
 	# Reset state
 	players.clear()
 	grabbed_objects.clear()
+	room_object_registry.clear()
+	_presence_join_order.clear()
+	_join_order_counter = 0
+	_snapshot_buffers.clear()
 	
 	# Register ourselves
 	_register_local_player()
@@ -229,12 +260,17 @@ func _on_nakama_match_joined(match_id: String) -> void:
 	# Trigger avatar send after a short delay
 	await get_tree().create_timer(0.5).timeout
 	send_local_avatar.emit()
+	if not is_server():
+		request_room_snapshot()
 	_update_monitoring_state()
 
 func _on_nakama_match_left() -> void:
 	print("NetworkManager: Left Nakama match")
 	players.clear()
 	grabbed_objects.clear()
+	room_object_registry.clear()
+	_presence_join_order.clear()
+	_snapshot_buffers.clear()
 	server_disconnected.emit()
 	_update_monitoring_state()
 
@@ -248,7 +284,10 @@ func _on_nakama_match_presence(joins: Array, leaves: Array) -> void:
 		
 		print("NetworkManager: Nakama player joined: ", user_id)
 		players[user_id] = local_player_info.duplicate(true)
+		_assign_join_order_if_missing(user_id)
 		player_connected.emit(user_id)
+		if is_server():
+			_send_room_snapshot_to_peer(user_id)
 		
 	for leave in leaves:
 		var user_id = leave.get("user_id", "")
@@ -256,6 +295,9 @@ func _on_nakama_match_presence(joins: Array, leaves: Array) -> void:
 			print("NetworkManager: Nakama player left: ", user_id)
 			if players.has(user_id):
 				players.erase(user_id)
+			if _presence_join_order.has(user_id):
+				_presence_join_order.erase(user_id)
+			_handle_peer_disconnect_objects(user_id)
 			player_disconnected.emit(user_id)
 
 
@@ -348,22 +390,185 @@ func get_player_avatar_texture(peer_id: String) -> ImageTexture:
 # Grabbable Object Sync
 # ============================================================================
 
+func _ensure_object_registry(object_id: String) -> Dictionary:
+	if not room_object_registry.has(object_id):
+		room_object_registry[object_id] = {
+			"object_id": object_id,
+			"owner_id": _get_host_peer_id(),
+			"held_by": "",
+			"placed": false,
+			"persist_mode": "transient_held",
+			"manifest_id": "",
+			"seq": 0,
+			"scene_path": "",
+			"position": _vec3_to_dict(Vector3.ZERO),
+			"rotation": _quat_to_dict(Quaternion.IDENTITY),
+			"spawned_by": ""
+		}
+	return room_object_registry[object_id]
+
+
+func _update_object_registry_state(object_id: String, patch: Dictionary) -> Dictionary:
+	var state = _ensure_object_registry(object_id).duplicate(true)
+	for key in patch.keys():
+		state[key] = patch[key]
+	state["seq"] = int(state.get("seq", 0)) + 1
+	room_object_registry[object_id] = state
+	return state
+
+
+func request_object_ownership(object_id: String, hand_name: String = "", rel_pos: Vector3 = Vector3.ZERO, rel_rot: Quaternion = Quaternion.IDENTITY) -> void:
+	var my_id := get_nakama_user_id()
+	if my_id.is_empty() or object_id.is_empty():
+		return
+
+	if is_server():
+		_handle_ownership_request(my_id, {
+			"object_id": object_id,
+			"requester_id": my_id,
+			"hand_name": hand_name,
+			"rel_pos": _vec3_to_dict(rel_pos),
+			"rel_rot": _quat_to_dict(rel_rot)
+		})
+		return
+
+	var request_data = {
+		"object_id": object_id,
+		"requester_id": my_id,
+		"hand_name": hand_name,
+		"rel_pos": _vec3_to_dict(rel_pos),
+		"rel_rot": _quat_to_dict(rel_rot)
+	}
+	NakamaManager.send_match_state(NakamaManager.MatchOpCode.OWNERSHIP_REQUEST, request_data)
+
+
+func _handle_ownership_request(sender_id: String, data: Dictionary) -> void:
+	if not is_server():
+		return
+
+	var object_id: String = data.get("object_id", "")
+	var requester_id: String = data.get("requester_id", sender_id)
+	if object_id.is_empty() or requester_id.is_empty():
+		return
+
+	ownership_request_received.emit(object_id, requester_id)
+	var state = _ensure_object_registry(object_id)
+	var held_by: String = state.get("held_by", "")
+	var approved := held_by.is_empty() or held_by == requester_id
+	var previous_owner := String(state.get("owner_id", ""))
+
+	if approved:
+		state = _update_object_registry_state(object_id, {
+			"owner_id": requester_id,
+			"held_by": requester_id,
+			"placed": false,
+			"persist_mode": "transient_held"
+		})
+		ownership_changed.emit(object_id, requester_id, previous_owner)
+		var grant_data = {
+			"object_id": object_id,
+			"requester_id": requester_id,
+			"new_owner_id": requester_id,
+			"previous_owner_id": previous_owner,
+			"hand_name": data.get("hand_name", ""),
+			"rel_pos": data.get("rel_pos", _vec3_to_dict(Vector3.ZERO)),
+			"rel_rot": data.get("rel_rot", _quat_to_dict(Quaternion.IDENTITY)),
+			"seq": state.get("seq", 0)
+		}
+		grabbed_objects[object_id] = {
+			"owner_peer_id": requester_id,
+			"is_grabbed": true,
+			"hand_name": grant_data.get("hand_name", "")
+		}
+		grabbable_grabbed.emit(
+			object_id,
+			requester_id,
+			grant_data.get("hand_name", ""),
+			_parse_vector3(grant_data.get("rel_pos", {})),
+			_parse_quaternion(grant_data.get("rel_rot", {}))
+		)
+		NakamaManager.send_match_state(NakamaManager.MatchOpCode.OWNERSHIP_GRANTED, grant_data)
+		return
+
+	var deny_data = {
+		"object_id": object_id,
+		"requester_id": requester_id,
+		"reason": "already_held",
+		"current_owner_id": state.get("owner_id", ""),
+		"held_by": held_by
+	}
+	NakamaManager.send_match_state(NakamaManager.MatchOpCode.OWNERSHIP_DENIED, deny_data)
+
+
+func _handle_ownership_granted(data: Dictionary) -> void:
+	var object_id: String = data.get("object_id", "")
+	if object_id.is_empty():
+		return
+
+	var new_owner_id: String = data.get("new_owner_id", data.get("requester_id", ""))
+	var previous_owner := String(data.get("previous_owner_id", ""))
+	_update_object_registry_state(object_id, {
+		"owner_id": new_owner_id,
+		"held_by": new_owner_id,
+		"placed": false,
+		"persist_mode": "transient_held"
+	})
+	grabbed_objects[object_id] = {
+		"owner_peer_id": new_owner_id,
+		"is_grabbed": true,
+		"hand_name": data.get("hand_name", "")
+	}
+	ownership_changed.emit(object_id, new_owner_id, previous_owner)
+	grabbable_grabbed.emit(
+		object_id,
+		new_owner_id,
+		data.get("hand_name", ""),
+		_parse_vector3(data.get("rel_pos", {})),
+		_parse_quaternion(data.get("rel_rot", {}))
+	)
+
+
+func _handle_ownership_denied(data: Dictionary) -> void:
+	var requester_id: String = data.get("requester_id", "")
+	if requester_id != get_nakama_user_id():
+		return
+	var object_id: String = data.get("object_id", "")
+	push_warning("NetworkManager: Ownership denied for %s (%s)" % [object_id, data.get("reason", "unknown")])
+
+
+func _handle_ownership_released(sender_id: String, data: Dictionary) -> void:
+	var object_id: String = data.get("object_id", "")
+	if object_id.is_empty():
+		return
+
+	var persist_mode: String = data.get("persist_mode", "placed_room")
+	var final_owner := _get_host_peer_id()
+	if persist_mode == "transient_held":
+		if grabbed_objects.has(object_id):
+			grabbed_objects.erase(object_id)
+		room_object_registry.erase(object_id)
+		network_object_despawn_requested.emit(object_id)
+		return
+
+	if grabbed_objects.has(object_id):
+		grabbed_objects.erase(object_id)
+	_update_object_registry_state(object_id, {
+		"owner_id": final_owner,
+		"held_by": "",
+		"placed": true,
+		"persist_mode": persist_mode
+	})
+	ownership_changed.emit(object_id, final_owner, sender_id)
+
+
 func grab_object(object_id: String, hand_name: String = "", rel_pos: Vector3 = Vector3.ZERO, rel_rot: Quaternion = Quaternion.IDENTITY) -> void:
 	var my_id = get_nakama_user_id()
+	request_object_ownership(object_id, hand_name, rel_pos, rel_rot)
 	grabbed_objects[object_id] = {
 		"owner_peer_id": my_id,
 		"is_grabbed": true,
 		"hand_name": hand_name
 	}
-	
-	var grab_data = {
-		"object_id": object_id,
-		"hand_name": hand_name,
-		"rel_pos": _vec3_to_dict(rel_pos),
-		"rel_rot": _quat_to_dict(rel_rot)
-	}
-	NakamaManager.send_match_state(NakamaManager.MatchOpCode.GRAB_OBJECT, grab_data)
-	grabbable_grabbed.emit(object_id, my_id, hand_name, rel_pos, rel_rot)
 
 
 func release_object(object_id: String, final_pos: Vector3, final_rot: Quaternion, lin_vel: Vector3 = Vector3.ZERO, ang_vel: Vector3 = Vector3.ZERO) -> void:
@@ -378,6 +583,20 @@ func release_object(object_id: String, final_pos: Vector3, final_rot: Quaternion
 		"ang_vel": _vec3_to_dict(ang_vel)
 	}
 	NakamaManager.send_match_state(NakamaManager.MatchOpCode.RELEASE_OBJECT, release_data)
+	NakamaManager.send_match_state(NakamaManager.MatchOpCode.OWNERSHIP_RELEASED, {
+		"object_id": object_id,
+		"released_by": my_id,
+		"persist_mode": "placed_room",
+		"pos": _vec3_to_dict(final_pos),
+		"rot": _quat_to_dict(final_rot)
+	})
+	_update_object_registry_state(object_id, {
+		"held_by": "",
+		"placed": true,
+		"persist_mode": "placed_room",
+		"position": _vec3_to_dict(final_pos),
+		"rotation": _quat_to_dict(final_rot)
+	})
 	grabbable_released.emit(object_id, my_id)
 
 
@@ -396,12 +615,13 @@ func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion, rel
 
 
 func is_object_grabbed_by_other(object_id: String) -> bool:
-	if not grabbed_objects.has(object_id): return false
-	var owner_id = grabbed_objects[object_id].get("owner_peer_id", "")
-	return owner_id != get_nakama_user_id() and not owner_id.is_empty()
+	var state := _ensure_object_registry(object_id)
+	var holder: String = state.get("held_by", "")
+	return not holder.is_empty() and holder != get_nakama_user_id()
 
 func get_object_owner(object_id: String) -> String:
-	return grabbed_objects[object_id].get("owner_peer_id", "") if grabbed_objects.has(object_id) else ""
+	var state := _ensure_object_registry(object_id)
+	return state.get("owner_id", "")
 
 
 # ============================================================================
@@ -413,10 +633,23 @@ func spawn_network_object(scene_path: String, position: Vector3) -> void:
 	var spawn_data = {
 		"scene_path": scene_path,
 		"pos": _vec3_to_dict(position),
-		"object_id": object_id
+		"object_id": object_id,
+		"owner_id": get_nakama_user_id(),
+		"persist_mode": "placed_room",
+		"manifest_id": "default"
 	}
 	NakamaManager.send_match_state(NakamaManager.MatchOpCode.SPAWN_OBJECT, spawn_data)
 	_do_spawn_object(scene_path, position, object_id)
+	_update_object_registry_state(object_id, {
+		"scene_path": scene_path,
+		"position": _vec3_to_dict(position),
+		"owner_id": get_nakama_user_id(),
+		"held_by": "",
+		"placed": true,
+		"persist_mode": "placed_room",
+		"manifest_id": "default",
+		"spawned_by": get_nakama_user_id()
+	})
 
 
 func _do_spawn_object(scene_path: String, position: Vector3, object_id: String) -> void:
@@ -495,12 +728,28 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 		
 		if spawn_data is Dictionary and spawn_data.has("scene_path") and spawn_data.has("pos") and spawn_data.has("object_id"):
 			_do_spawn_object(spawn_data.scene_path, _parse_vector3(spawn_data.pos), spawn_data.object_id)
+			_update_object_registry_state(spawn_data.object_id, {
+				"scene_path": spawn_data.scene_path,
+				"position": spawn_data.get("pos", _vec3_to_dict(Vector3.ZERO)),
+				"owner_id": spawn_data.get("owner_id", peer_id),
+				"held_by": "",
+				"placed": true,
+				"persist_mode": spawn_data.get("persist_mode", "placed_room"),
+				"manifest_id": spawn_data.get("manifest_id", "default"),
+				"spawned_by": peer_id
+			})
 			
 	elif op_code == NakamaManager.MatchOpCode.GRAB_OBJECT:
 		var grab_data = data
 		if data is PackedByteArray: grab_data = bytes_to_var(data)
 		
 		if grab_data is Dictionary and grab_data.has("object_id"):
+			_update_object_registry_state(grab_data.object_id, {
+				"owner_id": peer_id,
+				"held_by": peer_id,
+				"placed": false,
+				"persist_mode": "transient_held"
+			})
 			grabbable_grabbed.emit(grab_data.object_id, peer_id, grab_data.get("hand_name", ""), _parse_vector3(grab_data.get("rel_pos", {})), _parse_quaternion(grab_data.get("rel_rot", {})))
 			
 	elif op_code == NakamaManager.MatchOpCode.RELEASE_OBJECT:
@@ -508,6 +757,15 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 		if data is PackedByteArray: release_data = bytes_to_var(data)
 		
 		if release_data is Dictionary and release_data.has("object_id"):
+			if grabbed_objects.has(release_data.object_id):
+				grabbed_objects.erase(release_data.object_id)
+			_update_object_registry_state(release_data.object_id, {
+				"held_by": "",
+				"placed": true,
+				"persist_mode": "placed_room",
+				"position": release_data.get("pos", _vec3_to_dict(Vector3.ZERO)),
+				"rotation": release_data.get("rot", _quat_to_dict(Quaternion.IDENTITY))
+			})
 			grabbable_released.emit(release_data.object_id, peer_id)
 			if release_data.has("pos"): 
 				grabbable_sync_update.emit(release_data.object_id, {
@@ -520,10 +778,40 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 			update_data = bytes_to_var(data)
 			
 		if update_data is Dictionary and update_data.has("object_id") and update_data.has("pos") and update_data.has("rot"):
+			var state = _ensure_object_registry(update_data.object_id)
+			var active_owner: String = state.get("held_by", state.get("owner_id", ""))
+			if not active_owner.is_empty() and active_owner != peer_id:
+				return
 			var sync_data = {"position": _parse_vector3(update_data.pos), "rotation": _parse_quaternion(update_data.rot)}
 			if update_data.has("rel_pos"): sync_data["rel_pos"] = _parse_vector3(update_data.rel_pos)
 			if update_data.has("rel_rot"): sync_data["rel_rot"] = _parse_quaternion(update_data.rel_rot)
+			_update_object_registry_state(update_data.object_id, {
+				"position": update_data.pos,
+				"rotation": update_data.rot
+			})
 			grabbable_sync_update.emit(update_data.object_id, sync_data)
+	elif op_code == NakamaManager.MatchOpCode.OWNERSHIP_REQUEST:
+		if data is Dictionary:
+			_handle_ownership_request(peer_id, data)
+	elif op_code == NakamaManager.MatchOpCode.OWNERSHIP_GRANTED:
+		if data is Dictionary:
+			_handle_ownership_granted(data)
+	elif op_code == NakamaManager.MatchOpCode.OWNERSHIP_DENIED:
+		if data is Dictionary:
+			_handle_ownership_denied(data)
+	elif op_code == NakamaManager.MatchOpCode.OWNERSHIP_RELEASED:
+		if data is Dictionary:
+			_handle_ownership_released(peer_id, data)
+	elif op_code == NakamaManager.MatchOpCode.SNAPSHOT_REQUEST:
+		if data is Dictionary and is_server():
+			var requester_id: String = data.get("requester_id", peer_id)
+			_send_room_snapshot_to_peer(requester_id)
+	elif op_code == NakamaManager.MatchOpCode.SNAPSHOT_CHUNK:
+		if data is Dictionary:
+			_handle_snapshot_chunk(peer_id, data)
+	elif op_code == NakamaManager.MatchOpCode.SNAPSHOT_DONE:
+		if data is Dictionary:
+			_handle_snapshot_done(peer_id, data)
 
 
 func _parse_vector3(data) -> Vector3:
@@ -540,6 +828,136 @@ func _parse_quaternion(data) -> Quaternion:
 	if data is Quaternion: return data
 	if data is Dictionary: return Quaternion(data.get("x", 0), data.get("y", 0), data.get("z", 0), data.get("w", 1))
 	return Quaternion.IDENTITY
+
+
+func request_room_snapshot() -> void:
+	var my_id := get_nakama_user_id()
+	if my_id.is_empty():
+		return
+	NakamaManager.send_match_state(NakamaManager.MatchOpCode.SNAPSHOT_REQUEST, {
+		"requester_id": my_id,
+		"room_id": NakamaManager.current_match_id if NakamaManager else ""
+	})
+
+
+func _send_room_snapshot_to_peer(requester_id: String) -> void:
+	if requester_id.is_empty():
+		return
+	var snapshot_id = "snap_%d_%d" % [Time.get_ticks_usec(), randi() % 100000]
+	var objects: Array = []
+	for object_id in room_object_registry.keys():
+		objects.append(room_object_registry[object_id])
+
+	var total_chunks = maxi(1, int(ceil(float(objects.size()) / float(SNAPSHOT_CHUNK_SIZE))))
+	for chunk_index in range(total_chunks):
+		var start_i = chunk_index * SNAPSHOT_CHUNK_SIZE
+		var end_i = mini(objects.size(), start_i + SNAPSHOT_CHUNK_SIZE)
+		var chunk_objects: Array = []
+		for i in range(start_i, end_i):
+			chunk_objects.append(objects[i])
+		NakamaManager.send_match_state(NakamaManager.MatchOpCode.SNAPSHOT_CHUNK, {
+			"snapshot_id": snapshot_id,
+			"target_peer_id": requester_id,
+			"chunk_index": chunk_index,
+			"total_chunks": total_chunks,
+			"objects": chunk_objects
+		})
+
+	NakamaManager.send_match_state(NakamaManager.MatchOpCode.SNAPSHOT_DONE, {
+		"snapshot_id": snapshot_id,
+		"target_peer_id": requester_id,
+		"total_chunks": total_chunks
+	})
+
+
+func _handle_snapshot_chunk(peer_id: String, data: Dictionary) -> void:
+	var target_peer_id: String = data.get("target_peer_id", "")
+	var my_id := get_nakama_user_id()
+	if target_peer_id != my_id:
+		return
+
+	var snapshot_id: String = data.get("snapshot_id", "")
+	if snapshot_id.is_empty():
+		return
+	var total_chunks: int = int(data.get("total_chunks", 1))
+	var chunk_index: int = int(data.get("chunk_index", 0))
+	var chunk_objects: Array = data.get("objects", [])
+
+	if not _snapshot_buffers.has(snapshot_id):
+		_snapshot_buffers[snapshot_id] = {
+			"from_peer_id": peer_id,
+			"total_chunks": total_chunks,
+			"chunks": {}
+		}
+
+	var bucket = _snapshot_buffers[snapshot_id]
+	bucket["total_chunks"] = total_chunks
+	bucket["chunks"][chunk_index] = chunk_objects
+	_snapshot_buffers[snapshot_id] = bucket
+
+
+func _handle_snapshot_done(_peer_id: String, data: Dictionary) -> void:
+	var target_peer_id: String = data.get("target_peer_id", "")
+	var my_id := get_nakama_user_id()
+	if target_peer_id != my_id:
+		return
+
+	var snapshot_id: String = data.get("snapshot_id", "")
+	if snapshot_id.is_empty() or not _snapshot_buffers.has(snapshot_id):
+		return
+	var bucket = _snapshot_buffers[snapshot_id]
+	var total_chunks: int = int(bucket.get("total_chunks", 0))
+	var chunks: Dictionary = bucket.get("chunks", {})
+	var restored_count := 0
+
+	for chunk_index in range(total_chunks):
+		if not chunks.has(chunk_index):
+			continue
+		var chunk_objects: Array = chunks[chunk_index]
+		for object_state in chunk_objects:
+			if object_state is Dictionary:
+				_apply_snapshot_object_state(object_state)
+				restored_count += 1
+
+	_snapshot_buffers.erase(snapshot_id)
+	snapshot_reconstructed.emit(snapshot_id, restored_count)
+
+
+func _apply_snapshot_object_state(object_state: Dictionary) -> void:
+	var object_id: String = object_state.get("object_id", "")
+	if object_id.is_empty():
+		return
+
+	room_object_registry[object_id] = object_state.duplicate(true)
+	var path: String = object_state.get("scene_path", "")
+	var pos: Vector3 = _parse_vector3(object_state.get("position", object_state.get("pos", {})))
+	if path.is_empty():
+		return
+	var existing := get_tree().current_scene.get_node_or_null(object_id) if get_tree().current_scene else null
+	if existing:
+		return
+	_do_spawn_object(path, pos, object_id)
+
+
+func _handle_peer_disconnect_objects(peer_id: String) -> void:
+	var host_id := _get_host_peer_id()
+	var to_remove: Array = []
+	for object_id in room_object_registry.keys():
+		var state: Dictionary = room_object_registry[object_id]
+		var held_by: String = state.get("held_by", "")
+		var owner_id: String = state.get("owner_id", "")
+		var persist_mode: String = state.get("persist_mode", "placed_room")
+		if held_by == peer_id and persist_mode == "transient_held":
+			to_remove.append(object_id)
+			continue
+		if held_by == peer_id or owner_id == peer_id:
+			state["held_by"] = ""
+			state["owner_id"] = host_id
+			room_object_registry[object_id] = state
+
+	for object_id in to_remove:
+		room_object_registry.erase(object_id)
+		network_object_despawn_requested.emit(object_id)
 
 
 # ============================================================================
