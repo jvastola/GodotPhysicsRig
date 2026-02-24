@@ -266,6 +266,8 @@ func try_grab(hand: RigidBody3D) -> bool:
 	# Notify hand to integrate collision shapes (if hand supports it)
 	if hand.has_method("integrate_grabbed_collision"):
 		hand.integrate_grabbed_collision(grabbed_collision_shapes)
+	if hand.has_method("register_grabbed_nodes"):
+		hand.register_grabbed_nodes(grabbed_collision_shapes, grabbed_mesh_instances)
 	
 	
 	# Hide original object visuals but keep the parent and other nodes (like SubViewport) active
@@ -322,17 +324,23 @@ func release() -> void:
 		
 		for child in children_to_remove:
 			print("Grabbable: Releasing shape: ", child.name)
+			if hand_ref.has_method("unregister_grabbed_nodes"):
+				hand_ref.unregister_grabbed_nodes([child])
 			hand_ref.remove_child(child)
 			child.queue_free()
 		
 		# Also clean up any shapes still in the arrays (belt and suspenders)
 		for collision_shape in grabbed_collision_shapes:
 			if is_instance_valid(collision_shape) and collision_shape.get_parent() == hand_ref:
+				if hand_ref.has_method("unregister_grabbed_nodes"):
+					hand_ref.unregister_grabbed_nodes([collision_shape])
 				hand_ref.remove_child(collision_shape)
 				collision_shape.queue_free()
 		
 		for mesh_instance in grabbed_mesh_instances:
 			if is_instance_valid(mesh_instance) and mesh_instance.get_parent() == hand_ref:
+				if hand_ref.has_method("unregister_grabbed_nodes"):
+					hand_ref.unregister_grabbed_nodes([mesh_instance])
 				hand_ref.remove_child(mesh_instance)
 				mesh_instance.queue_free()
 		

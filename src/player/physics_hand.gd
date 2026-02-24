@@ -68,6 +68,7 @@ var _base_collision_shape_scale: Vector3 = Vector3.ONE
 var _base_mesh_scale: Vector3 = Vector3.ONE
 var _base_grab_sensor_radius: float = 0.2
 var _current_scale_multiplier: float = 1.0
+var _grabbed_node_scale_bases: Dictionary = {}
 
 
 func _ready() -> void:
@@ -157,6 +158,8 @@ func set_hand_scale_multiplier(scale_multiplier: float) -> void:
 	if _grab_sensor_collision_shape and _grab_sensor_collision_shape.shape is SphereShape3D:
 		var sphere := _grab_sensor_collision_shape.shape as SphereShape3D
 		sphere.radius = _base_grab_sensor_radius * _current_scale_multiplier
+	
+	_apply_grabbed_node_scale_multiplier()
 
 	if debug_scale_logs:
 		print("PhysicsHand ScaleDebug ", name, " mul=", snapped(_current_scale_multiplier, 0.001), " state=", get_scale_debug_state())
@@ -468,6 +471,7 @@ func integrate_grabbed_collision(collision_shapes: Array) -> void:
 	# No additional configuration needed - just log for debugging
 	if collision_shapes.size() > 0:
 		print("PhysicsHand: Integrated ", collision_shapes.size(), " collision shapes from grabbed object")
+	_register_grabbed_nodes_for_scaling(collision_shapes)
 	
 	# If in ghost mode, ensure the new shapes also have no collision layer
 	if is_ghost_mode:
@@ -500,11 +504,68 @@ func remove_grabbed_collision(collision_shapes: Array) -> void:
 	"""
 	for shape in collision_shapes:
 		if is_instance_valid(shape) and shape.get_parent() == self:
+			_unregister_grabbed_node_for_scaling(shape)
 			remove_child(shape)
 			shape.queue_free()
 	
 	if collision_shapes.size() > 0:
 		print("PhysicsHand: Removed ", collision_shapes.size(), " collision shapes")
+
+
+func register_grabbed_nodes(collision_shapes: Array, mesh_instances: Array = []) -> void:
+	"""Register cloned grabbed nodes so they track hand scale changes."""
+	_register_grabbed_nodes_for_scaling(collision_shapes)
+	_register_grabbed_nodes_for_scaling(mesh_instances)
+	_apply_grabbed_node_scale_multiplier()
+
+
+func unregister_grabbed_nodes(nodes: Array) -> void:
+	for node in nodes:
+		_unregister_grabbed_node_for_scaling(node)
+
+
+func _register_grabbed_nodes_for_scaling(nodes: Array) -> void:
+	var base_multiplier := maxf(_current_scale_multiplier, 0.0001)
+	for node in nodes:
+		if not (node is Node3D):
+			continue
+		var node3d := node as Node3D
+		if not is_instance_valid(node3d) or node3d.get_parent() != self:
+			continue
+		_grabbed_node_scale_bases[node3d.get_instance_id()] = {
+			"node": node3d,
+			"base_transform": node3d.transform,
+			"base_multiplier": base_multiplier,
+		}
+
+
+func _unregister_grabbed_node_for_scaling(node: Node) -> void:
+	if not node:
+		return
+	var id := node.get_instance_id()
+	if _grabbed_node_scale_bases.has(id):
+		_grabbed_node_scale_bases.erase(id)
+
+
+func _apply_grabbed_node_scale_multiplier() -> void:
+	if _grabbed_node_scale_bases.is_empty():
+		return
+	var stale_ids: Array = []
+	for id in _grabbed_node_scale_bases.keys():
+		var entry: Dictionary = _grabbed_node_scale_bases[id]
+		var node := entry.get("node", null) as Node3D
+		if not node or not is_instance_valid(node) or node.get_parent() != self:
+			stale_ids.append(id)
+			continue
+		var base_transform := entry.get("base_transform", node.transform) as Transform3D
+		var base_multiplier: float = maxf(float(entry.get("base_multiplier", 1.0)), 0.0001)
+		var rel_multiplier := _current_scale_multiplier / base_multiplier
+		var scaled_transform := base_transform
+		scaled_transform.origin = base_transform.origin * rel_multiplier
+		scaled_transform.basis = base_transform.basis.scaled(Vector3.ONE * rel_multiplier)
+		node.transform = scaled_transform
+	for stale_id in stale_ids:
+		_grabbed_node_scale_bases.erase(stale_id)
 
 
 func _cleanup_orphaned_grabbed_shapes() -> void:
@@ -524,6 +585,7 @@ func _cleanup_orphaned_grabbed_shapes() -> void:
 	if orphans.size() > 0:
 		print("PhysicsHand: Cleaning up ", orphans.size(), " orphaned grabbed shapes")
 		for orphan in orphans:
+			_unregister_grabbed_node_for_scaling(orphan)
 			remove_child(orphan)
 			orphan.queue_free()
 
