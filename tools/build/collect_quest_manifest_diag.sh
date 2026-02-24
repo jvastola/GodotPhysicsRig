@@ -54,7 +54,11 @@ fi
 run "java -version"
 
 section "Project XR Settings"
-run "rg -n \"^\\[editor_plugins\\]|^enabled=|openxr|xr_features|meta_xr_features|plugins/|gradle_build/min_sdk|gradle_build/target_sdk|version/code|version/name\" project.godot export_presets.cfg -S"
+if command -v rg >/dev/null 2>&1; then
+  run "rg -n \"^\\[editor_plugins\\]|^enabled=|openxr|xr_features|meta_xr_features|plugins/|gradle_build/min_sdk|gradle_build/target_sdk|version/code|version/name\" project.godot export_presets.cfg -S"
+else
+  run "grep -nE \"^\\[editor_plugins\\]|^enabled=|openxr|xr_features|meta_xr_features|plugins/|gradle_build/min_sdk|gradle_build/target_sdk|version/code|version/name\" project.godot export_presets.cfg"
+fi
 
 section "Addon/Plugin Inventory"
 run "ls -la addons"
@@ -69,11 +73,19 @@ fi
 
 section "Godot Cache State"
 run "cat .godot/extension_list.cfg"
-run "rg -n \"godotopenxrvendors|openxr|meta\" .godot/editor/filesystem_cache10 -S"
+if command -v rg >/dev/null 2>&1; then
+  run "rg -n \"godotopenxrvendors|openxr|meta\" .godot/editor/filesystem_cache10 -S"
+else
+  run "grep -nE \"godotopenxrvendors|openxr|meta\" .godot/editor/filesystem_cache10"
+fi
 
 section "Android Build Manifests"
 run "find android/build -name AndroidManifest.xml -print | sort"
-run "rg -n \"com\\.oculus\\.intent\\.category\\.VR|com\\.oculus\\.vr\\.focusaware|com\\.oculus\\.supportedDevices|IMMERSIVE_HMD|android\\.hardware\\.vr\\.headtracking\" android/build -S"
+if command -v rg >/dev/null 2>&1; then
+  run "rg -n \"com\\.oculus\\.intent\\.category\\.VR|com\\.oculus\\.vr\\.focusaware|com\\.oculus\\.supportedDevices|IMMERSIVE_HMD|android\\.hardware\\.vr\\.headtracking\" android/build -S"
+else
+  run "grep -R -nE \"com\\.oculus\\.intent\\.category\\.VR|com\\.oculus\\.vr\\.focusaware|com\\.oculus\\.supportedDevices|IMMERSIVE_HMD|android\\.hardware\\.vr\\.headtracking\" android/build"
+fi
 
 section "APK Manifest"
 SDK_ROOT="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
@@ -84,10 +96,13 @@ fi
 if [[ -n "$AAPT_BIN" && -f "$APK_PATH" ]]; then
   printf "Using aapt: %s\n" "$AAPT_BIN" >>"$REPORT"
   "$AAPT_BIN" dump xmltree "$APK_PATH" AndroidManifest.xml >"$OUT_DIR/apk_manifest_xmltree.txt" 2>&1 || true
-  run "rg -n \"com\\.oculus\\.intent\\.category\\.VR|com\\.oculus\\.vr\\.focusaware|com\\.oculus\\.supportedDevices|IMMERSIVE_HMD|android\\.hardware\\.vr\\.headtracking\" \"$OUT_DIR/apk_manifest_xmltree.txt\" -S"
+  if command -v rg >/dev/null 2>&1; then
+    run "rg -n \"com\\.oculus\\.intent\\.category\\.VR|com\\.oculus\\.vr\\.focusaware|com\\.oculus\\.supportedDevices|IMMERSIVE_HMD|android\\.hardware\\.vr\\.headtracking\" \"$OUT_DIR/apk_manifest_xmltree.txt\" -S"
+  else
+    run "grep -nE \"com\\.oculus\\.intent\\.category\\.VR|com\\.oculus\\.vr\\.focusaware|com\\.oculus\\.supportedDevices|IMMERSIVE_HMD|android\\.hardware\\.vr\\.headtracking\" \"$OUT_DIR/apk_manifest_xmltree.txt\""
+  fi
 else
   printf "aapt/apk missing. aapt=%s apk=%s\n" "${AAPT_BIN:-missing}" "$APK_PATH" >>"$REPORT"
 fi
 
 printf "\nWrote diagnostics to: %s\n" "$OUT_DIR" | tee -a "$REPORT"
-

@@ -1,0 +1,50 @@
+[gd_scene format=3 uid="uid://cfu4ue80xt2kr"]
+
+[ext_resource type="Script" uid="uid://d20mjy3mr3gyp" path="res://src/ui/ui_viewport_3d.gd" id="1_ui_script"]
+[ext_resource type="Script" uid="uid://dtark8bf20lef" path="res://src/ui/physics_hand_tuner_ui.gd" id="2_tuner_ui_script"]
+
+[sub_resource type="ViewportTexture" id="ViewportTexture_ui"]
+viewport_path = NodePath("SubViewport")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ui"]
+resource_local_to_scene = true
+transparency = 1
+shading_mode = 0
+albedo_texture = SubResource("ViewportTexture_ui")
+
+[sub_resource type="QuadMesh" id="QuadMesh_ui"]
+size = Vector2(1.2, 1.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ui"]
+size = Vector3(1.2, 1.8, 0.01)
+
+[node name="PhysicsHandTunerViewport3D" type="Node3D" unique_id=2110382211]
+script = ExtResource("1_ui_script")
+ui_size = Vector2(720, 1080)
+quad_size = Vector2(1.2, 1.8)
+
+[node name="SubViewport" type="SubViewport" parent="." unique_id=2110382212]
+transparent_bg = true
+size = Vector2i(720, 1080)
+render_target_update_mode = 4
+
+[node name="PhysicsHandTunerUI" type="Control" parent="SubViewport" unique_id=2110382213]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2_tuner_ui_script")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=2110382214]
+material_override = SubResource("StandardMaterial3D_ui")
+cast_shadow = 0
+mesh = SubResource("QuadMesh_ui")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="MeshInstance3D" unique_id=2110382215]
+collision_layer = 32
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D/StaticBody3D" unique_id=2110382216]
+shape = SubResource("BoxShape3D_ui")

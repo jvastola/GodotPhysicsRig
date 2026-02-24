@@ -26,6 +26,7 @@ extends Node3D
 @onready var head_collision_shape: CollisionShape3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadCollisionShape
 @onready var head_mesh: MeshInstance3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadMesh
 @onready var body_mesh: MeshInstance3D = $PlayerBody/XROrigin3D/XRCamera3D/HeadArea/BodyMesh
+@onready var head_follow_rigidbody_shape: CollisionShape3D = $"PlayerBody/not moving correctly with head"
 
 # Hand Tracking
 const CAPSULE_MATERIAL = preload("res://assets/materials/capsule_material.tres")
@@ -69,6 +70,9 @@ var _desktop_trigger_event: InputEventMouseButton = null
 @export var auto_scale_physics_hands: bool = true
 @export var auto_scale_head: bool = true
 @export var auto_scale_hand_visuals: bool = true
+@export var follow_head_with_rigidbody_shape: bool = true
+@export var head_follow_shape_local_offset: Vector3 = Vector3.ZERO
+@export var head_follow_shape_lerp_speed: float = 0.0
 
 # Player scale tracking
 var _manual_player_scale: float = 1.0
@@ -352,8 +356,8 @@ func _physics_process(delta: float) -> void:
 	if movement_component:
 		movement_component.physics_process_turning(delta)
 		movement_component.physics_process_locomotion(delta)
-		
-	# Head collision is now an Area3D parented to the XRCamera3D; it follows the headset automatically
+
+	_sync_head_follow_rigidbody_shape(delta)
 
 
 func _check_initial_mode() -> void:
@@ -414,6 +418,8 @@ func _activate_vr_mode() -> void:
 
 	# Remove desktop-only extra collider when in VR
 	_remove_desktop_extra_collider()
+	if head_follow_rigidbody_shape:
+		head_follow_rigidbody_shape.disabled = not follow_head_with_rigidbody_shape
 	
 	# Disable center pointer on VR
 	var center_ptr = get_node_or_null("PlayerBody/DesktopCamera/CenterPointer")
@@ -454,6 +460,8 @@ func _activate_desktop_mode() -> void:
 
 	# Ensure extra collider is present on desktop
 	_ensure_desktop_extra_collider()
+	if head_follow_rigidbody_shape:
+		head_follow_rigidbody_shape.disabled = true
 
 	# Show center pointer on desktop
 	var center_ptr = get_node_or_null("PlayerBody/DesktopCamera/CenterPointer")
@@ -556,6 +564,24 @@ func _remove_desktop_extra_collider() -> void:
 	var existing := player_body.get_node_or_null(cs_name)
 	if existing:
 		existing.queue_free()
+
+
+func _sync_head_follow_rigidbody_shape(delta: float) -> void:
+	if not follow_head_with_rigidbody_shape:
+		return
+	if not is_vr_mode:
+		return
+	if not player_body or not xr_camera or not head_follow_rigidbody_shape:
+		return
+
+	var target_local_pos: Vector3 = player_body.to_local(xr_camera.global_position) + head_follow_shape_local_offset
+	var shape_xform := head_follow_rigidbody_shape.transform
+	if head_follow_shape_lerp_speed <= 0.0:
+		shape_xform.origin = target_local_pos
+	else:
+		var t := clampf(delta * head_follow_shape_lerp_speed, 0.0, 1.0)
+		shape_xform.origin = shape_xform.origin.lerp(target_local_pos, t)
+	head_follow_rigidbody_shape.transform = shape_xform
 
 
 func set_player_scale(new_scale: float) -> void:

@@ -5,17 +5,27 @@ extends Node
 const SAVE_FILE_PATH := "user://save_data.json"
 const SAVE_TEMP_PATH := "user://save_data.tmp"
 const DEFAULT_SIGNING_SECRET := "rig_development_secret"
+const CONFIG_FILE_PATH := "res://config.json"
+const USER_CONFIG_PATH := "user://config.json"
+const SIGNING_SECRET_KEY := "save_signing_secret"
 
 # Cached save data
 var _save_data: Dictionary = {}
 var _save_dirty := false
 var _autosave_timer := 0.0
+var _active_signing_secret: String = ""
 # Debounce autosave writes to reduce churn on mobile/Quest storage.
 const AUTOSAVE_INTERVAL := 5.0  # seconds
 const LEGAL_KEY := "legal_acceptance"
 
 
 func _ready() -> void:
+	_active_signing_secret = _resolve_signing_secret_without_autoload()
+	if has_node("/root/ConfigManager"):
+		_active_signing_secret = str(get_node("/root/ConfigManager").get_value(SIGNING_SECRET_KEY, _active_signing_secret))
+	if _active_signing_secret.strip_edges() == "":
+		_active_signing_secret = DEFAULT_SIGNING_SECRET
+
 	# Load save data on startup
 	load_game_state()
 	print("SaveManager: Initialized, save file: ", SAVE_FILE_PATH)
@@ -45,16 +55,16 @@ func _maybe_flush_save(reason: String = "") -> void:
 
 func save_game_state() -> void:
 	"""Write current save data to disk with integrity signature"""
-	var json_string := JSON.stringify(_save_data)
+	var data_json: String = JSON.stringify(_save_data)
 	
 	# SECURE COMPONENT: Sign the data to detect tampering (Issue #7)
-	var signature = _generate_signature(json_string)
-	var final_payload = {
-		"data": _save_data,
+	var signature: String = _generate_signature(data_json)
+	var final_payload: Dictionary = {
+		"data_json": data_json,
 		"signature": signature
 	}
 	
-	var final_json = JSON.stringify(final_payload, "\t")
+	var final_json: String = JSON.stringify(final_payload, "\t")
 	if _write_atomic(final_json):
 		_save_dirty = false
 		_autosave_timer = 0.0
@@ -77,30 +87,68 @@ func load_game_state() -> void:
 		var parse_result := json.parse(json_string)
 		
 		if parse_result == OK:
-			var payload = json.data
-			if payload is Dictionary and payload.has("data") and payload.has("signature"):
-				var actual_data = payload["data"]
-				var provided_signature = payload["signature"]
-				var data_string = JSON.stringify(actual_data)
-				
-				# SECURE COMPONENT: Verify signature
-				if _is_signature_valid(data_string, str(provided_signature)):
-					_save_data = actual_data
-					print("SaveManager: Loaded and verified save data")
+			var payload_variant: Variant = json.data
+			if payload_variant is Dictionary:
+				var payload: Dictionary = payload_variant
+				# V2 format: signature is computed over exact serialized data_json.
+				if payload.has("data_json") and payload.has("signature"):
+					var data_json: String = str(payload.get("data_json", ""))
+					var provided_signature: String = str(payload.get("signature", ""))
+					if _is_signature_valid(data_json, provided_signature):
+						var data_json_parser := JSON.new()
+						var data_parse_result := data_json_parser.parse(data_json)
+						var parsed_data_variant: Variant = data_json_parser.data
+						if data_parse_result == OK and parsed_data_variant is Dictionary:
+							var parsed_data: Dictionary = parsed_data_variant
+							_save_data = parsed_data
+							print("SaveManager: Loaded and verified save data")
+						else:
+							push_warning("SaveManager: Save file data_json is invalid. Clearing invalid save.")
+							_flush_invalid_save("invalid data_json payload")
+					else:
+						push_error("SaveManager: SAVE DATA TAMPERING DETECTED! Signature mismatch.")
+						_flush_invalid_save("signature mismatch")
+				# Legacy signed format.
+				elif payload.has("data") and payload.has("signature"):
+					var actual_data: Variant = payload["data"]
+					var provided_signature: String = str(payload["signature"])
+					var canonical_data_string: String = _build_signature_payload_string(actual_data)
+					var raw_data_string: String = JSON.stringify(actual_data)
+					
+					# SECURE COMPONENT: Verify signature
+					if _is_signature_valid(canonical_data_string, provided_signature):
+						if actual_data is Dictionary:
+							var legacy_data: Dictionary = actual_data
+							_save_data = legacy_data
+							_save_dirty = true
+							print("SaveManager: Loaded legacy save and scheduling rewrite to canonical format")
+						else:
+							push_warning("SaveManager: Legacy save data payload is invalid. Clearing invalid save.")
+							_flush_invalid_save("invalid legacy data payload")
+					elif raw_data_string != canonical_data_string and _is_signature_valid(raw_data_string, provided_signature):
+						# Backward compatibility for older non-canonical JSON signing.
+						push_warning("SaveManager: Save validated with legacy signature format. Resaving with canonical format.")
+						if actual_data is Dictionary:
+							var legacy_data_compat: Dictionary = actual_data
+							_save_data = legacy_data_compat
+							_save_dirty = true
+						else:
+							push_warning("SaveManager: Legacy save data payload is invalid. Clearing invalid save.")
+							_flush_invalid_save("invalid legacy data payload")
+					else:
+						push_error("SaveManager: SAVE DATA TAMPERING DETECTED! Signature mismatch.")
+						_flush_invalid_save("signature mismatch")
 				else:
-					push_error("SaveManager: SAVE DATA TAMPERING DETECTED! Signature mismatch.")
-					# In a real game, you might want to revert to a cloud backup
-					# Avoid destructive overwrite on failure; keep save untouched until a valid write path is available.
-					_save_data = {}
-					_save_dirty = false
+					# Legacy format support: raw dictionary from old versions.
+					push_warning("SaveManager: Save file format is legacy. Attempting migration.")
+					_save_data = payload
+					_save_dirty = true
 			else:
-				# Legacy format or corrupted
-				push_warning("SaveManager: Save file format is legacy or corrupted. Attempting migration.")
-				_save_data = payload if payload is Dictionary else {}
-				_save_dirty = true
+				push_warning("SaveManager: Save file format is corrupted. Clearing invalid save.")
+				_flush_invalid_save("invalid payload format")
 		else:
 			push_error("SaveManager: Failed to parse save file: ", json.get_error_line(), ": ", json.get_error_message())
-			_save_data = {}
+			_flush_invalid_save("json parse failure")
 	else:
 		push_error("SaveManager: Failed to read save file: ", FileAccess.get_open_error())
 		_save_data = {}
@@ -130,10 +178,14 @@ func _is_signature_valid(data_string: String, provided_signature: String) -> boo
 
 
 func _get_signing_secret() -> String:
-	var secret := DEFAULT_SIGNING_SECRET
+	if _active_signing_secret.strip_edges() != "":
+		return _active_signing_secret
+	_active_signing_secret = _resolve_signing_secret_without_autoload()
 	if has_node("/root/ConfigManager"):
-		secret = str(get_node("/root/ConfigManager").get_value("save_signing_secret", secret))
-	return secret
+		_active_signing_secret = str(get_node("/root/ConfigManager").get_value(SIGNING_SECRET_KEY, _active_signing_secret))
+	if _active_signing_secret.strip_edges() == "":
+		_active_signing_secret = DEFAULT_SIGNING_SECRET
+	return _active_signing_secret
 
 
 # Write JSON atomically: write to temp, flush, then rename over the real file.
@@ -153,13 +205,95 @@ func _write_atomic(json_string: String) -> bool:
 	tmp_file.close()
 
 	# Replace existing save atomically
-	if dir.file_exists(SAVE_FILE_PATH):
-		dir.remove(SAVE_FILE_PATH)
-	var err := dir.rename(SAVE_TEMP_PATH, SAVE_FILE_PATH)
+	var save_file := _to_user_relative_path(SAVE_FILE_PATH)
+	var temp_file := _to_user_relative_path(SAVE_TEMP_PATH)
+	if dir.file_exists(save_file):
+		dir.remove(save_file)
+	var err := dir.rename(temp_file, save_file)
 	if err != OK:
 		push_error("SaveManager: Failed to finalize save (rename): ", err)
 		return false
 	return true
+
+
+func _flush_invalid_save(reason: String) -> void:
+	"""Purge invalid save artifacts and write a fresh signed baseline save."""
+	_save_data = {}
+	_save_dirty = false
+	_autosave_timer = 0.0
+
+	var dir := DirAccess.open("user://")
+	if dir != null:
+		var save_file := _to_user_relative_path(SAVE_FILE_PATH)
+		var temp_file := _to_user_relative_path(SAVE_TEMP_PATH)
+		if dir.file_exists(save_file):
+			dir.remove(save_file)
+		if dir.file_exists(temp_file):
+			dir.remove(temp_file)
+	else:
+		push_warning("SaveManager: Could not open user:// while flushing invalid save.")
+
+	save_game_state()
+	push_warning("SaveManager: Invalid save was flushed and reset (%s)." % reason)
+
+
+func _to_user_relative_path(path: String) -> String:
+	if path.begins_with("user://"):
+		return path.substr(7)
+	return path
+
+
+func _build_signature_payload_string(data: Variant) -> String:
+	# Canonicalize dictionaries so key ordering differences do not break signatures.
+	return JSON.stringify(_canonicalize_for_signature(data))
+
+
+func _canonicalize_for_signature(value: Variant) -> Variant:
+	if value is Dictionary:
+		var dict_value: Dictionary = value
+		var keys: Array = dict_value.keys()
+		keys.sort()
+		var canonical_dict: Dictionary = {}
+		for key in keys:
+			canonical_dict[key] = _canonicalize_for_signature(dict_value[key])
+		return canonical_dict
+	if value is Array:
+		var arr_value: Array = value
+		var canonical_arr: Array = []
+		for item in arr_value:
+			canonical_arr.append(_canonicalize_for_signature(item))
+		return canonical_arr
+	return value
+
+
+func _resolve_signing_secret_without_autoload() -> String:
+	# SaveManager initializes before some autoloads; resolve directly from files/env as fallback.
+	var secret := DEFAULT_SIGNING_SECRET
+	secret = _read_signing_secret_from_file(CONFIG_FILE_PATH, secret)
+	secret = _read_signing_secret_from_file(USER_CONFIG_PATH, secret)
+	var env_secret := OS.get_environment(SIGNING_SECRET_KEY.to_upper())
+	if not env_secret.is_empty():
+		secret = env_secret
+	return secret
+
+
+func _read_signing_secret_from_file(path: String, current_secret: String) -> String:
+	if not FileAccess.file_exists(path):
+		return current_secret
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return current_secret
+	var json := JSON.new()
+	var parse_result := json.parse(file.get_as_text())
+	file.close()
+	if parse_result != OK:
+		return current_secret
+	var data: Variant = json.data
+	if data is Dictionary and data.has(SIGNING_SECRET_KEY):
+		var file_secret := str(data[SIGNING_SECRET_KEY]).strip_edges()
+		if file_secret != "":
+			return file_secret
+	return current_secret
 
 
 # --- LEGAL ACCEPTANCE ---

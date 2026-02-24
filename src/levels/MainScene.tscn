@@ -42,6 +42,7 @@
 [ext_resource type="Script" uid="uid://d2d0lk7frpl5n" path="res://src/objects/grabbables/MiningTool.gd" id="52_mining_tool"]
 [ext_resource type="PackedScene" uid="uid://b2mp18xsksksj" path="res://src/objects/OreDeposit.tscn" id="53_ore_deposit"]
 [ext_resource type="Material" uid="uid://bvqm8x7y5n8hs" path="res://src/demos/tools/materials/plasma.tres" id="54_plasma"]
+[ext_resource type="PackedScene" uid="uid://cfu4ue80xt2kr" path="res://src/ui/PhysicsHandTunerViewport3D.tscn" id="55_hand_tuner_viewport"]
 
 [sub_resource type="Environment" id="Environment_main"]
 fog_enabled = true
@@ -130,6 +131,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -42.777176)
 [node name="XRPlayer" parent="." unique_id=1371219310 instance=ExtResource("1_xrplayer")]
 transform = Transform3D(0.999598, 0, 0, 0, 0.999598, 0, 0, 0, 0.999598, 0, 2, -42.915047)
 
+[node name="PhysicsHandTunerViewport3D" parent="." unique_id=2110382217 instance=ExtResource("55_hand_tuner_viewport")]
+transform = Transform3D(-0.9324436, 0, -0.36131555, 0, 1, 0, 0.36131555, 0, -0.9324436, 1.25, 1.4, -39.96438)
+visible = false
+
 [node name="UnifiedRoomViewport3D" parent="." unique_id=1842196751 instance=ExtResource("13_unified_ui")]
 transform = Transform3D(-0.030811917, 0, -0.50405914, 0, 0.505, 0, 0.50405914, 0, -0.030811917, 5.048676, 0.77457607, -40.22247)
 
@@ -167,29 +172,37 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.2291398, 0, -3)
 
 [node name="PolyTool" parent="Node3D" unique_id=1848529103 instance=ExtResource("29_poly_tool")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.7291398, 0, -3)
+grab_mode = 0
 
 [node name="ShapeTool" parent="Node3D" unique_id=2001238079 instance=ExtResource("51_shape_tool")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.72914, -1.4064087, -7.740692)
+grab_mode = 0
 
 [node name="VoxelToolNew" parent="Node3D" unique_id=1529691265 instance=ExtResource("15_voxel_tool")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.3882632, -0.5534687, -5.085684)
+grab_mode = 0
 
 [node name="ConvexHullPen" parent="Node3D" unique_id=438475259 instance=ExtResource("23_convex_hull_pen")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.2291398, 0, -3)
 
 [node name="SpeedBooster" parent="Node3D" unique_id=1021745802 instance=ExtResource("10_speed_booster")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.14173031, 0, -1.5)
+grab_mode = 0
 
 [node name="DizzySphere" parent="Node3D" unique_id=1325823028 instance=ExtResource("9_dizzy_sphere")]
+grab_mode = 0
 
 [node name="CameraFlipper" parent="Node3D" unique_id=284514304 instance=ExtResource("8_camera_flipper")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.7646799, 0, -0.43906498)
+grab_mode = 0
 
 [node name="GravityInverter" parent="Node3D" unique_id=465867166 instance=ExtResource("7_gravity_inverter")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.4315696, 0, 0)
+grab_mode = 0
 
 [node name="TransformTool" parent="Node3D" unique_id=1583429753 instance=ExtResource("33_transform_tool")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.1291399, -0.5, -3)
+grab_mode = 0
 
 [node name="GrappleHook" parent="." unique_id=2106789012 instance=ExtResource("42_grapple_hook")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.4440007, -4.1024504, -13.2121725)
@@ -292,7 +305,7 @@ transform = Transform3D(-0.2, 0, -3.019916e-08, 0, 0.2, 0, 3.019916e-08, 0, -0.2
 content_viewport_scene = ExtResource("44_l4aac")
 
 [node name="island" parent="." unique_id=1304383343 instance=ExtResource("37_82eun")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0017240047, -0.009035349, -42.157425)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0026522875, -0.009035587, -42.158504)
 
 [node name="islandcollision" type="Node" parent="island" unique_id=1618902482]
 script = ExtResource("49_collision")
