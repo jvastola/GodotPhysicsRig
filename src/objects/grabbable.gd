@@ -29,6 +29,8 @@ var original_parent: Node = null
 var grab_offset: Vector3 = Vector3.ZERO
 var grab_rotation_offset: Quaternion = Quaternion.IDENTITY
 var grab_scale_offset: Vector3 = Vector3.ONE
+var _grab_reference_shape: CollisionShape3D = null
+var _grab_reference_local_transform: Transform3D = Transform3D.IDENTITY
 
 # Desktop grab state (separate from VR physics hand grab)
 var is_desktop_grabbed := false
@@ -152,6 +154,8 @@ func _force_cleanup_grab_state() -> void:
 	
 	grabbed_collision_shapes.clear()
 	grabbed_mesh_instances.clear()
+	_grab_reference_shape = null
+	_grab_reference_local_transform = Transform3D.IDENTITY
 	
 	# Reset grab state
 	is_grabbed = false
@@ -260,6 +264,8 @@ func try_grab(hand: RigidBody3D) -> bool:
 	# Clone collision shapes and meshes as direct children of the hand
 	grabbed_collision_shapes.clear()
 	grabbed_mesh_instances.clear()
+	_grab_reference_shape = null
+	_grab_reference_local_transform = Transform3D.IDENTITY
 	
 	_create_hand_collision_shapes(hand)
 	
@@ -291,6 +297,20 @@ func try_grab(hand: RigidBody3D) -> bool:
 	return true
 
 
+func _compute_grabbed_object_global_transform() -> Transform3D:
+	"""Reconstruct object transform from a grabbed clone and its original local offset."""
+	if is_instance_valid(_grab_reference_shape):
+		return _grab_reference_shape.global_transform * _grab_reference_local_transform.affine_inverse()
+	
+	if grabbed_collision_shapes.size() > 0 and is_instance_valid(grabbed_collision_shapes[0]):
+		return grabbed_collision_shapes[0].global_transform
+	
+	if is_instance_valid(grabbing_hand):
+		return grabbing_hand.global_transform * Transform3D(Basis(grab_rotation_offset).scaled(grab_scale_offset), grab_offset)
+	
+	return global_transform
+
+
 func release() -> void:
 	"""Release the object from the hand"""
 	if not is_grabbed:
@@ -298,13 +318,8 @@ func release() -> void:
 	
 	print("Grabbable: Object released - ", name)
 	
-	# Calculate global transform from first grabbed collision shape if available
-	var release_global_transform = global_transform
-	if grabbed_collision_shapes.size() > 0 and is_instance_valid(grabbed_collision_shapes[0]):
-		release_global_transform = grabbed_collision_shapes[0].global_transform
-	elif is_instance_valid(grabbing_hand):
-		# If no valid collision shape, use hand position with grab offset
-		release_global_transform = grabbing_hand.global_transform * Transform3D(Basis(grab_rotation_offset).scaled(grab_scale_offset), grab_offset)
+	# Rebuild object transform from a reference clone + its original local transform.
+	var release_global_transform = _compute_grabbed_object_global_transform()
 	
 	# Store hand velocity
 	var hand_velocity = Vector3.ZERO
@@ -360,6 +375,8 @@ func release() -> void:
 	
 	grabbed_collision_shapes.clear()
 	grabbed_mesh_instances.clear()
+	_grab_reference_shape = null
+	_grab_reference_local_transform = Transform3D.IDENTITY
 	
 	# Restore object visibility and physics
 	_set_original_visuals_visible(true)
@@ -450,6 +467,8 @@ func _physics_process(_delta: float) -> void:
 			if is_instance_valid(grabbing_hand) and grabbing_hand.has_method("set"):
 				grabbing_hand.set("held_object", null)
 			grabbing_hand = null
+			_grab_reference_shape = null
+			_grab_reference_local_transform = Transform3D.IDENTITY
 			_save_grab_state(null)
 			return
 		
@@ -462,15 +481,16 @@ func _physics_process(_delta: float) -> void:
 			collision_mask = original_collision_mask
 			grabbed_collision_shapes.clear()
 			grabbed_mesh_instances.clear()
+			_grab_reference_shape = null
+			_grab_reference_local_transform = Transform3D.IDENTITY
 			if is_instance_valid(grabbing_hand) and grabbing_hand.has_method("set"):
 				grabbing_hand.set("held_object", null)
 			grabbing_hand = null
 			_save_grab_state(null)
 			return
 		
-		# Update invisible body position to follow first grabbed shape
-		if is_instance_valid(grabbed_collision_shapes[0]):
-			global_transform = grabbed_collision_shapes[0].global_transform
+		# Keep the hidden original body aligned to the held clone transform.
+		global_transform = _compute_grabbed_object_global_transform()
 
 
 func _create_hand_collision_shapes(hand: RigidBody3D) -> void:
@@ -495,6 +515,9 @@ func _create_hand_collision_shapes(hand: RigidBody3D) -> void:
 				new_collision.name = name + "_grabbed_collision_" + str(grabbed_collision_shapes.size())
 				hand.add_child(new_collision)
 				grabbed_collision_shapes.append(new_collision)
+				if not is_instance_valid(_grab_reference_shape):
+					_grab_reference_shape = new_collision
+					_grab_reference_local_transform = relative_transform
 			elif child is MeshInstance3D and (child as MeshInstance3D).mesh:
 				var source_mesh := child as MeshInstance3D
 				if source_mesh.get_parent() is Area3D:

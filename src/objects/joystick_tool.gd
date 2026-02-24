@@ -5,7 +5,7 @@ extends Grabbable
 
 @onready var ui_viewport: SubViewport = $SubViewport
 @onready var tool_ui = $SubViewport/JoystickToolUI
-@onready var tip_sphere = %TipSphere
+@onready var tip_sphere: MeshInstance3D = %TipSphere
 @onready var selection_area: Area3D = null
 
 var anchor_y: float = 0.0
@@ -18,6 +18,11 @@ var _hover_sticky_threshold: float = 0.2  # Stay highlighted within 20cm
 
 # Shared selection manager across all joystick tools
 static var _shared_selection_manager: JoystickSelectionManager = null
+const TIP_BASE_RADIUS_DEFAULT := 0.03
+const SELECTION_BASE_RADIUS := 0.05
+var _tip_base_radius: float = TIP_BASE_RADIUS_DEFAULT
+var _tip_clone_meshes: Array[MeshInstance3D] = []
+var _tip_clone_base_hand_multiplier: float = 1.0
 
 func _ready() -> void:
 	super._ready()
@@ -43,9 +48,12 @@ func _ready() -> void:
 	if tool_ui:
 		tool_ui.tip_scale_changed.connect(_on_tip_scale_changed)
 	
+	if tip_sphere and tip_sphere.mesh is SphereMesh:
+		_tip_base_radius = (tip_sphere.mesh as SphereMesh).radius
+	
 	# Calculate anchor (cone tip) based on initial editor placement
 	if tip_sphere:
-		anchor_y = tip_sphere.position.y - 0.03 # Radius is 0.03
+		anchor_y = tip_sphere.position.y - _tip_base_radius * tip_sphere.scale.y
 
 func _physics_process(_delta: float) -> void:
 	# Update selection area to match tip sphere
@@ -67,7 +75,7 @@ func _create_selection_area() -> void:
 	
 	var collision_shape = CollisionShape3D.new()
 	var sphere_shape = SphereShape3D.new()
-	sphere_shape.radius = 0.05  # Small fixed radius for precise tip interaction
+	sphere_shape.radius = SELECTION_BASE_RADIUS
 	collision_shape.shape = sphere_shape
 	
 	selection_area.add_child(collision_shape)
@@ -77,8 +85,8 @@ func _create_selection_area() -> void:
 	var debug_mesh = MeshInstance3D.new()
 	debug_mesh.name = "DebugVisual"
 	var sphere_mesh = SphereMesh.new()
-	sphere_mesh.radius = 0.03  # Match tip sphere base size
-	sphere_mesh.height = 0.06
+	sphere_mesh.radius = _tip_base_radius
+	sphere_mesh.height = _tip_base_radius * 2.0
 	debug_mesh.mesh = sphere_mesh
 	
 	var debug_mat = StandardMaterial3D.new()
@@ -90,7 +98,7 @@ func _create_selection_area() -> void:
 	
 	selection_area.add_child(debug_mesh)
 	
-	print("JoystickTool: Selection area created with collision radius 0.05m, visual radius 0.03m on mask 128+1")
+	print("JoystickTool: Selection area created with collision radius ", snapped(SELECTION_BASE_RADIUS, 0.001), "m")
 
 func _on_tip_scale_changed(_new_scale: float) -> void:
 	_update_tip_sphere()
@@ -98,6 +106,54 @@ func _on_tip_scale_changed(_new_scale: float) -> void:
 func _process(_delta: float) -> void:
 	_update_tip_sphere()
 	_check_controller_input()
+
+
+func _get_grabbing_hand_scale_multiplier() -> float:
+	if not (is_grabbed and is_instance_valid(grabbing_hand)):
+		return 1.0
+	
+	if grabbing_hand.has_method("get_scale_debug_state"):
+		var state_variant = grabbing_hand.call("get_scale_debug_state")
+		if state_variant is Dictionary:
+			var state := state_variant as Dictionary
+			if state.has("multiplier"):
+				return maxf(float(state["multiplier"]), 0.0001)
+	
+	if grabbing_hand.has_method("get"):
+		var raw_multiplier = grabbing_hand.get("_current_scale_multiplier")
+		if typeof(raw_multiplier) == TYPE_FLOAT:
+			return maxf(float(raw_multiplier), 0.0001)
+	
+	return 1.0
+
+
+func _get_tip_clone_hand_scale_factor() -> float:
+	var current_multiplier: float = maxf(_get_grabbing_hand_scale_multiplier(), 0.0001)
+	var base_multiplier: float = maxf(_tip_clone_base_hand_multiplier, 0.0001)
+	return current_multiplier / base_multiplier
+
+
+func _build_tip_clone_transform() -> Transform3D:
+	# Build the hand-local tip transform at grab baseline, then apply the
+	# same relative hand-scale rule used by PhysicsHand for grabbed nodes.
+	var hand_space_base_tf: Transform3D = Transform3D(Basis(grab_rotation_offset).scaled(grab_scale_offset), grab_offset) * tip_sphere.transform
+	var hand_scale_factor: float = _get_tip_clone_hand_scale_factor()
+	var scaled_tf: Transform3D = hand_space_base_tf
+	scaled_tf.origin = hand_space_base_tf.origin * hand_scale_factor
+	scaled_tf.basis = hand_space_base_tf.basis.scaled(Vector3.ONE * hand_scale_factor)
+	return scaled_tf
+
+
+func _get_tip_world_radius() -> float:
+	for tip_clone in _tip_clone_meshes:
+		if is_instance_valid(tip_clone):
+			return _tip_base_radius * absf(tip_clone.global_transform.basis.get_scale().x)
+	
+	if tip_sphere:
+		return _tip_base_radius * absf(tip_sphere.global_transform.basis.get_scale().x)
+	
+	return _tip_base_radius
+
 
 func _update_selection_area() -> void:
 	"""Update the selection area to match tip sphere position and scale"""
@@ -110,19 +166,16 @@ func _update_selection_area() -> void:
 	if is_grabbed and is_instance_valid(grabbing_hand):
 		var found_tip = false
 		
-		# Check grabbed mesh instances for the visible tip sphere
-		for mesh in grabbed_mesh_instances:
-			if mesh is MeshInstance3D and mesh.visible and mesh.mesh is SphereMesh:
-				tip_pos = mesh.global_position
+		# Check tracked cloned tip meshes first.
+		for tip_clone in _tip_clone_meshes:
+			if is_instance_valid(tip_clone) and tip_clone.visible:
+				tip_pos = tip_clone.global_position
 				found_tip = true
 				break
 		
 		if not found_tip:
-			# Fallback: use tool position + tip offset
-			# The tip sphere is at anchor_y + radius in local Y
-			var tip_local_y = anchor_y + (0.03 * (tool_ui.tip_scale if tool_ui else 1.0))
-			var tip_local = Vector3(0, tip_local_y, 0)
-			tip_pos = global_transform * tip_local
+			var tip_hand_tf: Transform3D = _build_tip_clone_transform()
+			tip_pos = (grabbing_hand.global_transform * tip_hand_tf).origin
 	elif tip_sphere:
 		# Not grabbed, use tip sphere position directly
 		tip_pos = tip_sphere.global_position
@@ -132,12 +185,15 @@ func _update_selection_area() -> void:
 	
 	selection_area.global_position = tip_pos
 	
-	# Scale both collision and visual to match tip sphere scale
-	var current_scale = tool_ui.tip_scale if tool_ui else 1.0
-	selection_area.scale = Vector3.ONE * current_scale
-	
-	# The debug visual is a child, so it inherits the parent scale
-	# No need to scale it separately
+	# Keep selection volume in lock-step with the visible tip radius in world space.
+	var tip_world_radius = _get_tip_world_radius()
+	var desired_world_scale = tip_world_radius / maxf(_tip_base_radius, 0.0001)
+	var parent_world_scale := 1.0
+	var parent_node := selection_area.get_parent()
+	if parent_node is Node3D:
+		parent_world_scale = maxf(absf((parent_node as Node3D).global_transform.basis.get_scale().x), 0.0001)
+	var local_scale = desired_world_scale / parent_world_scale
+	selection_area.scale = Vector3.ONE * local_scale
 
 func _check_selection_overlaps() -> void:
 	"""Check for overlapping bodies when trigger is held"""
@@ -331,33 +387,45 @@ func _update_tip_sphere() -> void:
 	tip_sphere.scale = Vector3.ONE * current_scale
 	
 	# POSITIONING: Attach bottom of sphere to calculated anchor
-	var radius = 0.03 * current_scale
+	var radius = _tip_base_radius * current_scale
 	tip_sphere.position = Vector3(0, anchor_y + radius, 0)
 	
 	# Also update the cloned visuals on the hand if grabbed
 	if is_grabbed and is_instance_valid(grabbing_hand):
-		var grab_tf = Transform3D(Basis(grab_rotation_offset), grab_offset)
-		var sphere_local_tf = tip_sphere.transform
-		var sphere_hand_tf = grab_tf * sphere_local_tf
+		var sphere_hand_tf: Transform3D = _build_tip_clone_transform()
 		
-		for mesh in grabbed_mesh_instances:
-			if mesh is MeshInstance3D and mesh.mesh is SphereMesh:
-				mesh.visible = true
-				mesh.transform = sphere_hand_tf
+		for tip_clone in _tip_clone_meshes:
+			if is_instance_valid(tip_clone):
+				tip_clone.visible = true
+				tip_clone.transform = sphere_hand_tf
 
 func _on_grabbed(hand: RigidBody3D) -> void:
 	if not hand:
 		# Could be a desktop grab
 		return
+
+	_tip_clone_meshes.clear()
+	_tip_clone_base_hand_multiplier = _get_grabbing_hand_scale_multiplier()
+	for mesh in grabbed_mesh_instances:
+		if mesh is MeshInstance3D and mesh.mesh is SphereMesh:
+			_tip_clone_meshes.append(mesh)
+	
+	# Tip clones are updated manually each frame (tip scale + hand scale), so keep them
+	# out of generic hand-scale rebasing.
+	if not _tip_clone_meshes.is_empty() and hand.has_method("unregister_grabbed_nodes"):
+		hand.unregister_grabbed_nodes(_tip_clone_meshes)
 		
 	# Find the XRController3D associated with this hand
 	var controller = _find_controller_from_hand(hand)
 	if tool_ui and controller:
 		tool_ui.set_controller(controller)
+	_update_tip_sphere()
 
 func _on_released() -> void:
 	if tool_ui:
 		tool_ui.set_controller(null)
+	_tip_clone_meshes.clear()
+	_tip_clone_base_hand_multiplier = 1.0
 
 func _find_controller_from_hand(hand: RigidBody3D) -> XRController3D:
 	# In this project's structure, the controller is often the parent or grandparent of the hand

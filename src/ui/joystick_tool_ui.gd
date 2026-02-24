@@ -178,8 +178,6 @@ func set_controller(controller: XRController3D) -> void:
 		if current_selection == "":
 			current_selection = "up"
 	else:
-		# On release, we can keep the selection state or reset.
-		# User requested "start with hand mode", implying persistence or defaulting.
-		# Let's keep the state so it doesn't look broken on drop, 
-		# or just allow the _process to handle visuals.
-		pass
+		if reset_scale_on_release:
+			tip_scale = 0.2
+			tip_scale_changed.emit(tip_scale)

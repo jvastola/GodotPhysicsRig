@@ -173,4 +173,6 @@ func set_controller(controller: XRController3D) -> void:
 		if current_selection == "":
 			current_selection = "up"
 	else:
-		pass
+		if reset_scale_on_release:
+			tip_scale = 0.2
+			tip_scale_changed.emit(tip_scale)

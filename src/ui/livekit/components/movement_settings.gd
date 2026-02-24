@@ -92,6 +92,7 @@ const DEFAULTS := {
 	"hand_movement_invert_direction": true,
 	"hand_movement_apply_release_velocity": true,
 	"hand_movement_show_visual": true,
+	"simple_world_grab_enabled": false,
 }
 
 const INPUT_ACTIONS := [
@@ -2217,10 +2218,10 @@ func _get_simple_world_grab_enabled() -> bool:
 		var simple_grab = player.get_node_or_null("SimpleWorldGrabComponent")
 		if simple_grab:
 			return simple_grab.enabled
-	return false
+	return defaults_snapshot.get("simple_world_grab_enabled", DEFAULTS["simple_world_grab_enabled"])
 
 
-func _on_simple_world_grab_toggled(pressed: bool):
+func _set_simple_world_grab_enabled(pressed: bool, record_change: bool = true) -> void:
 	var player = get_tree().get_first_node_in_group("xr_player")
 	if player:
 		var simple_grab = player.get_node_or_null("SimpleWorldGrabComponent")
@@ -2228,12 +2229,17 @@ func _on_simple_world_grab_toggled(pressed: bool):
 			var old_val = simple_grab.enabled
 			simple_grab.enabled = pressed
 			print("SimpleWorldGrab: ", "enabled" if pressed else "disabled")
-			MovementSettingsPanel.record_toggle(
-				"Simple World Grab",
-				"ON" if old_val else "OFF",
-				"ON" if pressed else "OFF",
-				func(): _on_simple_world_grab_toggled(old_val)
-			)
+			if record_change:
+				MovementSettingsPanel.record_toggle(
+					"Simple World Grab",
+					"ON" if old_val else "OFF",
+					"ON" if pressed else "OFF",
+					func(): _set_simple_world_grab_enabled(old_val)
+				)
+
+
+func _on_simple_world_grab_toggled(pressed: bool):
+	_set_simple_world_grab_enabled(pressed, true)
 	settings_changed.emit()
 
 
@@ -2783,11 +2789,12 @@ func _snapshot_defaults():
 		"v2_right_action": movement_component.v2_right_action,
 		"v2_show_visual": movement_component.v2_show_visual,
 		"v2_debug_logs": movement_component.v2_debug_logs,
-		# V3
-		"enable_two_hand_grab_v3": movement_component.enable_two_hand_grab_v3,
-		"v3_world_scale_min": movement_component.v3_world_scale_min,
-		"v3_world_scale_max": movement_component.v3_world_scale_max,
-	}
+			# V3
+			"enable_two_hand_grab_v3": movement_component.enable_two_hand_grab_v3,
+			"v3_world_scale_min": movement_component.v3_world_scale_min,
+			"v3_world_scale_max": movement_component.v3_world_scale_max,
+			"simple_world_grab_enabled": _get_simple_world_grab_enabled(),
+		}
 
 
 func _apply_defaults(source: Dictionary):
@@ -2912,6 +2919,10 @@ func _apply_defaults(source: Dictionary):
 	if hand_movement_show_visual_check:
 		hand_movement_show_visual_check.button_pressed = source.get("hand_movement_show_visual", DEFAULTS["hand_movement_show_visual"])
 		_on_hand_movement_show_visual_toggled(hand_movement_show_visual_check.button_pressed)
+	if simple_world_grab_check:
+		var simple_enabled: bool = source.get("simple_world_grab_enabled", DEFAULTS["simple_world_grab_enabled"])
+		simple_world_grab_check.button_pressed = simple_enabled
+		_set_simple_world_grab_enabled(simple_enabled, false)
 
 
 func _update_turn_mode_ui():
@@ -3063,11 +3074,12 @@ func _collect_settings_data() -> Dictionary:
 		# Hand Movement settings
 		"enable_hand_movement": hand_movement_enable_check.button_pressed if hand_movement_enable_check else DEFAULTS["enable_hand_movement"],
 		"hand_movement_grab_mode": hand_movement_grab_mode_btn.selected if hand_movement_grab_mode_btn else DEFAULTS["hand_movement_grab_mode"],
-		"hand_movement_sensitivity": hand_movement_sensitivity_slider.value if hand_movement_sensitivity_slider else DEFAULTS["hand_movement_sensitivity"],
-		"hand_movement_invert_direction": hand_movement_invert_check.button_pressed if hand_movement_invert_check else DEFAULTS["hand_movement_invert_direction"],
-		"hand_movement_apply_release_velocity": hand_movement_release_vel_check.button_pressed if hand_movement_release_vel_check else DEFAULTS["hand_movement_apply_release_velocity"],
-		"hand_movement_show_visual": hand_movement_show_visual_check.button_pressed if hand_movement_show_visual_check else DEFAULTS["hand_movement_show_visual"],
-	}
+			"hand_movement_sensitivity": hand_movement_sensitivity_slider.value if hand_movement_sensitivity_slider else DEFAULTS["hand_movement_sensitivity"],
+			"hand_movement_invert_direction": hand_movement_invert_check.button_pressed if hand_movement_invert_check else DEFAULTS["hand_movement_invert_direction"],
+			"hand_movement_apply_release_velocity": hand_movement_release_vel_check.button_pressed if hand_movement_release_vel_check else DEFAULTS["hand_movement_apply_release_velocity"],
+			"hand_movement_show_visual": hand_movement_show_visual_check.button_pressed if hand_movement_show_visual_check else DEFAULTS["hand_movement_show_visual"],
+			"simple_world_grab_enabled": simple_world_grab_check.button_pressed if simple_world_grab_check else _get_simple_world_grab_enabled(),
+		}
 
 
 func _refresh_profiles():

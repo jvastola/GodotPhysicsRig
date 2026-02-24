@@ -226,7 +226,7 @@ func _setup_components() -> void:
 	simple_world_grab = get_node_or_null("SimpleWorldGrabComponent")
 	if simple_world_grab:
 		simple_world_grab.setup(xr_origin, xr_camera, left_controller, right_controller)
-		simple_world_grab.enabled = false  # Disabled by default, enable via UI
+		simple_world_grab.enabled = _load_saved_simple_world_grab_enabled()
 	
 	# Hand Movement Component (middle finger pinch world grab)
 	hand_movement_component = get_node_or_null("HandMovementComponent")
@@ -254,6 +254,20 @@ func _find_livekit_manager() -> Node:
 		return livekit_manager
 	
 	return null
+
+
+func _load_saved_simple_world_grab_enabled() -> bool:
+	"""Read persisted movement settings for SimpleWorldGrab state."""
+	var save_manager = get_node_or_null("/root/SaveManager")
+	if not save_manager:
+		return false
+	if not save_manager.has_method("get_movement_settings"):
+		return false
+	var settings_variant = save_manager.call("get_movement_settings")
+	if not (settings_variant is Dictionary):
+		return false
+	var settings: Dictionary = settings_variant
+	return bool(settings.get("simple_world_grab_enabled", false))
 
 
 func _find_node_by_script(node: Node, script_name: String) -> Node:
