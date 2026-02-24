@@ -15,7 +15,7 @@ signal grab_ended()
 @export var world_scale_min: float = 0.1
 
 ## Maximum world scale  
-@export var world_scale_max: float = 10.0
+@export var world_scale_max: float = 1000.0
 
 ## Grip threshold for detecting grab
 @export var grip_threshold: float = 0.7
@@ -50,6 +50,9 @@ func setup(p_origin: XROrigin3D, p_camera: XRCamera3D, p_left: XRController3D, p
 	xr_camera = p_camera
 	left_controller = p_left
 	right_controller = p_right
+	var player_root := get_parent()
+	if player_root and player_root.has_method("set_scale_rig_with_world_scale"):
+		player_root.call("set_scale_rig_with_world_scale", true)
 	if debug_logs:
 		print("SimpleWorldGrabComponent: Setup complete")
 

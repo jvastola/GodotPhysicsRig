@@ -142,6 +142,9 @@ var _selection_handle_rotate_center: Vector3 = Vector3.ZERO
 var _grab_target: Node = null  # Currently grabbed object
 var _grab_distance: float = 0.0  # Current distance from pointer origin
 var _grab_initial_scale: Vector3 = Vector3.ONE  # Scale when grab started
+var _grab_initial_world_scale: float = 1.0
+var _grab_reference_uniform_scale: float = 1.0
+var _grab_user_uniform_scale: float = 1.0
 var _grab_offset: Vector3 = Vector3.ZERO  # Offset from grab point to object center
 var _prev_grip_pressed: bool = false  # For edge detection
 var _grab_should_rotate: bool = false # Whether current grab target allows rotation
@@ -1521,32 +1524,8 @@ func _process_secondary_actions(handler: Node, base_event: Dictionary, action_st
 		_secondary_hold_time = 0.0
 
 func _process_ui_scroll(handler: Node, base_event: Dictionary, controller: XRController3D, _delta: float) -> void:
-	var movement := _get_movement_component()
-	if not movement or not movement.ui_scroll_steals_stick:
-		_clear_ui_scroll_capture(controller, movement)
-		return
-	if not handler or not is_instance_valid(handler):
-		_clear_ui_scroll_capture(controller, movement)
-		return
-	if not controller:
-		_clear_ui_scroll_capture(controller, movement)
-		return
-
-	var axis: Vector2 = _get_pointer_axis_vector(controller)
-	var scroll_value: float = axis.y
-	if abs(scroll_value) <= movement.ui_scroll_deadzone:
-		_clear_ui_scroll_capture(controller, movement)
-		return
-
-	var scroll_event := base_event.duplicate(true)
-	scroll_event["type"] = "scroll"
-	scroll_event["scroll_value"] = scroll_value
-	scroll_event["scroll_vector"] = axis
-	scroll_event["scroll_wheel_factor"] = movement.ui_scroll_wheel_factor * _delta
-	_emit_event(handler, "scroll", scroll_event)
-
-	movement.set_ui_scroll_capture(true, controller)
-	_ui_scroll_active = true
+	# UI stick scrolling was removed from movement settings.
+	_clear_ui_scroll_capture(controller, _get_movement_component())
 
 func _clear_ui_scroll_capture(controller: XRController3D, movement: PlayerMovementComponent = null) -> void:
 	var move_ref := movement if movement else _movement_component
@@ -1688,25 +1667,31 @@ func _try_start_grab() -> void:
 	# Calculate grab parameters based on the ACTUAL target we are moving
 	if _grab_target is Node3D:
 		var target_3d: Node3D = _grab_target as Node3D
-		
+
 		# Get the actual hit point from raycast
 		var hit_point: Vector3 = target_3d.global_position # Default to center if ray fails
 		if _raycast and _raycast.is_colliding():
 			hit_point = _raycast.get_collision_point()
-		
+
 		# Calculate offset from hit point to object center (in object's local space)
 		# IMPORTANT: Use target_3d (Wrapper) position, even if we hit a child (Chrome)
 		_grab_offset = target_3d.global_position - hit_point
-		
+
 		# Calculate distance along ray to HIT POINT (not object center)
 		# This ensures we grab it "where it is" relative to the pointer
 		var to_hit: Vector3 = hit_point - start
 		_grab_distance = to_hit.dot(axis_world)
 		_grab_distance = clamp(_grab_distance, grab_min_distance, grab_max_distance)
 		_grab_initial_scale = target_3d.scale
+		_grab_reference_uniform_scale = maxf(absf(target_3d.scale.x), 0.0001)
+		_grab_user_uniform_scale = target_3d.scale.x
+		_grab_initial_world_scale = maxf(XRServer.world_scale, 0.0001)
 	else:
 		_grab_distance = ray_length
 		_grab_initial_scale = Vector3.ONE
+		_grab_reference_uniform_scale = 1.0
+		_grab_user_uniform_scale = 1.0
+		_grab_initial_world_scale = maxf(XRServer.world_scale, 0.0001)
 		_grab_offset = Vector3.ZERO
 
 
@@ -1760,6 +1745,9 @@ func _end_grab() -> void:
 	_grab_target = null
 	_grab_distance = 0.0
 	_grab_initial_scale = Vector3.ONE
+	_grab_initial_world_scale = 1.0
+	_grab_reference_uniform_scale = 1.0
+	_grab_user_uniform_scale = 1.0
 	_grab_offset = Vector3.ZERO
 	_grab_should_rotate = false
 
@@ -1799,9 +1787,9 @@ func _update_grabbed_object(delta: float, controller: XRController3D) -> void:
 		_grab_distance = clamp(_grab_distance, grab_min_distance, grab_max_distance)
 	
 	# Adjust scale (joystick X = left/right)
-	var scale_delta: float = 0.0
 	if joystick.x != 0.0:
-		scale_delta = joystick.x * grab_scale_adjust_speed * delta
+		var scale_delta: float = joystick.x * grab_scale_adjust_speed * delta
+		_grab_user_uniform_scale = clamp(_grab_user_uniform_scale + scale_delta, grab_min_scale, grab_max_scale)
 	
 	# Calculate grab point on ray, then add offset to get object center
 	var axis_local: Vector3 = pointer_axis_local.normalized()
@@ -1825,16 +1813,18 @@ func _update_grabbed_object(delta: float, controller: XRController3D) -> void:
 				# Just call for rotation side side effect - but DON'T let it reposition
 				# Actually skip this since it repositions
 				pass
-		
-		if scale_delta != 0.0:
-			if _grab_target.has_method("pointer_grab_set_scale"):
-				var current_uniform_scale: float = target_3d.scale.x
-				var new_uniform_scale: float = clamp(current_uniform_scale + scale_delta, grab_min_scale, grab_max_scale)
-				_grab_target.pointer_grab_set_scale(new_uniform_scale)
-			else:
-				# Direct scale update for objects without interface
-				var new_scale: float = clamp(target_3d.scale.x + scale_delta, grab_min_scale, grab_max_scale)
-				target_3d.scale = Vector3.ONE * new_scale
+
+		var safe_grab_world_scale := maxf(_grab_initial_world_scale, 0.0001)
+		var world_scale_ratio := XRServer.world_scale / safe_grab_world_scale
+		var safe_reference_uniform := maxf(_grab_reference_uniform_scale, 0.0001)
+		var user_scale_multiplier := _grab_user_uniform_scale / safe_reference_uniform
+		var target_scale_multiplier := world_scale_ratio * user_scale_multiplier
+		if _grab_target.has_method("pointer_grab_set_scale"):
+			var new_uniform_scale: float = _grab_user_uniform_scale * world_scale_ratio
+			_grab_target.pointer_grab_set_scale(new_uniform_scale)
+		else:
+			# Preserve the grabbed node's original per-axis proportions while tracking world scale.
+			target_3d.scale = _grab_initial_scale * target_scale_multiplier
 
 
 func _update_resize_operation() -> void:

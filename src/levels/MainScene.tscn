@@ -32,6 +32,7 @@
 [ext_resource type="Script" uid="uid://bid6ju5yhq61q" path="res://src/systems/scene_environment_setup.gd" id="41_env_setup"]
 [ext_resource type="PackedScene" uid="uid://cm8nv7v0apls3" path="res://src/objects/grabbables/GrappleHook.tscn" id="42_grapple_hook"]
 [ext_resource type="PackedScene" path="res://src/objects/ReferenceBlock.tscn" id="43_reference_block"]
+[ext_resource type="PackedScene" path="res://src/ui/MovementSettingsViewport3DV2.tscn" id="44_giw25"]
 [ext_resource type="PackedScene" uid="uid://beim5pnvstjcv" path="res://src/ui/WatchMenuViewport3D.tscn" id="44_l4aac"]
 [ext_resource type="PackedScene" uid="uid://qsf5yp02t1i7" path="res://src/ui/window_wrapper/WindowWrapper.tscn" id="45_giw25"]
 [ext_resource type="PackedScene" uid="uid://baesap7jjgmfh" path="res://src/objects/grabbables/PaintBrush.tscn" id="45_paint_brush"]
@@ -350,5 +351,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.6202674, 0.5, -35)
 
 [node name="InventoryUIViewport3D" parent="." unique_id=1812015456 instance=ExtResource("40_0bb85")]
 transform = Transform3D(-0.9984447, 0, 0.05575188, 0, 1, 0, -0.05575188, 0, -0.9984447, 3.9532697, 0.83622026, -34.532124)
+
+[node name="MovementSettingsViewport3D" parent="." unique_id=1913748936 instance=ExtResource("44_giw25")]
+transform = Transform3D(-0.4029544, 0, 0.9152201, 0, 1, 0, -0.9152201, 0, -0.4029544, -1.1318345, 0, -38.285004)
 
 [editable path="OreDeposit2"]

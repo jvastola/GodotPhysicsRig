@@ -22,7 +22,6 @@
 [ext_resource type="PackedScene" uid="uid://beim5pnvstjcv" path="res://src/ui/WatchMenuViewport3D.tscn" id="18_watch_viewport"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_xxbg3"]
-size = Vector3(0.3, 0.4, 0.2)
 
 [sub_resource type="BoxMesh" id="BoxMesh_l588l"]
 size = Vector3(0.22, 0.22, 0.22)
@@ -98,7 +97,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.03717, 0)
 collision_layer = 2
 
 [node name="BodyMesh" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/XRCamera3D/HeadArea" unique_id=596586885]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.35, 0)
+transform = Transform3D(0.3, 0, 0, 0, 0.4, 0, 0, 0, 0.2, 0, -0.35, 0)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_xxbg3")
 
@@ -357,7 +356,6 @@ shape = SubResource("BoxShape3D_tqmwh")
 
 [node name="PhysicsHandLeftMesh" type="MeshInstance3D" parent="PhysicsHandLeft" unique_id=1450919141]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
-visible = false
 cast_shadow = 0
 mesh = SubResource("BoxMesh_vf3tq")
 
@@ -391,17 +389,10 @@ script = ExtResource("12_movement")
 locomotion_mode = 0
 turn_mode = 1
 debug_world_grab_logs = false
-enable_one_hand_world_grab = false
-enable_one_hand_world_rotate = false
-enable_one_hand_rotation = false
-show_one_hand_grab_visual = false
 auto_respawn_enabled = true
 player_gravity_enabled = true
 player_drag_force = 0.0
 autojoin_enabled = true
-v2_show_visual = false
-enable_two_hand_grab_v3 = false
-v3_show_visual = false
 
 [node name="VoxelChunkManager" type="Node" parent="." unique_id=1325437584 groups=["voxel_manager"]]
 script = ExtResource("11_2d0bc")

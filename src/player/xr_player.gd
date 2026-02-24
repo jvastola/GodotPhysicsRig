@@ -70,6 +70,13 @@ var _desktop_trigger_event: InputEventMouseButton = null
 @export var auto_scale_physics_hands: bool = true
 @export var auto_scale_head: bool = true
 @export var auto_scale_hand_visuals: bool = true
+@export var scale_rig_with_world_scale: bool = true
+@export var hide_head_mesh_in_vr: bool = true
+@export var auto_scale_camera_clip: bool = true
+@export_range(0.001, 5.0, 0.001) var camera_near_min: float = 0.005
+@export_range(0.01, 500.0, 0.01) var camera_near_max: float = 100.0
+@export_range(10.0, 10000000.0, 10.0) var camera_far_max: float = 5000000.0
+@export_range(0.1, 10.0, 0.1) var camera_far_scale_boost: float = 1.0
 @export var follow_head_with_rigidbody_shape: bool = true
 @export var head_follow_shape_local_offset: Vector3 = Vector3.ZERO
 @export var head_follow_shape_lerp_speed: float = 0.0
@@ -83,16 +90,24 @@ var _base_right_hand_scale: Vector3 = Vector3.ONE
 var _base_head_area_scale: Vector3 = Vector3.ONE
 var _hand_visual_nodes: Array[Node3D] = []
 var _base_hand_visual_scales: Dictionary = {}
-var _base_hand_visual_transforms: Dictionary = {}
+var _base_xr_camera_near: float = 0.05
+var _base_xr_camera_far: float = 4000.0
+var _base_desktop_camera_near: float = 0.05
+var _base_desktop_camera_far: float = 4000.0
 
 # Poke Interaction
 var left_poke_area: Area3D
 var right_poke_area: Area3D
 var left_poke_visual: MeshInstance3D
 var right_poke_visual: MeshInstance3D
+var left_poke_shape: SphereShape3D
+var right_poke_shape: SphereShape3D
+var left_poke_mesh: SphereMesh
+var right_poke_mesh: SphereMesh
 var left_ui_last_collider: Node = null
 var right_ui_last_collider: Node = null
 var _poke_radius: float = 0.005
+var _current_rig_scale: float = 1.0
 var _poke_visual_color := Color(0.0, 0.8, 1.0, 0.8)
 var _poke_active_color := Color(0.2, 1.0, 0.2, 1.0)
 var _pinch_threshold: float = 0.8  # Strength to trigger grab
@@ -160,11 +175,7 @@ func _ready() -> void:
 	if head_collision_shape and head_collision_shape.shape and head_collision_shape.shape is SphereShape3D:
 		head_collision_shape.shape.radius = head_radius
 	
-	if head_mesh:
-		head_mesh.visible = show_head_mesh
-	
-	if body_mesh:
-		body_mesh.visible = show_body_mesh
+	_update_local_mesh_visibility()
 	
 	# Ensure physics hands are properly connected
 	call_deferred("_setup_physics_hands")
@@ -386,6 +397,7 @@ func _on_vr_mode_changed(vr_active: bool) -> void:
 	else:
 		print("XRPlayer: Desktop mode active")
 		_activate_desktop_mode()
+	_update_local_mesh_visibility()
 
 
 func _activate_vr_mode() -> void:
@@ -595,6 +607,11 @@ func set_player_scale(new_scale: float) -> void:
 	_apply_rig_scale()
 
 
+func set_scale_rig_with_world_scale(enabled: bool) -> void:
+	scale_rig_with_world_scale = enabled
+	_apply_rig_scale()
+
+
 func _cache_base_scales() -> void:
 	if player_body:
 		_base_player_body_scale = player_body.scale
@@ -604,20 +621,27 @@ func _cache_base_scales() -> void:
 		_base_right_hand_scale = physics_hand_right.scale
 	if head_area:
 		_base_head_area_scale = head_area.scale
+	if xr_camera:
+		_base_xr_camera_near = maxf(xr_camera.near, 0.0001)
+		_base_xr_camera_far = maxf(xr_camera.far, _base_xr_camera_near + 1.0)
+	if desktop_camera:
+		_base_desktop_camera_near = maxf(desktop_camera.near, 0.0001)
+		_base_desktop_camera_far = maxf(desktop_camera.far, _base_desktop_camera_near + 1.0)
 	_cache_hand_visual_data()
 
 
 func _cache_hand_visual_data() -> void:
 	_hand_visual_nodes.clear()
 	_base_hand_visual_scales.clear()
-	_base_hand_visual_transforms.clear()
 
 	var hand_visual_candidates: Array = [
 		left_hand_mesh,
 		left_hand_pointer,
 		left_watch,
+		left_hand_skeleton,
 		right_hand_mesh,
 		right_hand_pointer,
+		right_hand_skeleton,
 		center_pointer,
 	]
 
@@ -626,11 +650,12 @@ func _cache_hand_visual_data() -> void:
 			var node3d := node as Node3D
 			_hand_visual_nodes.append(node3d)
 			_base_hand_visual_scales[node3d] = node3d.scale
-			_base_hand_visual_transforms[node3d] = node3d.transform
 
 
 func _apply_rig_scale() -> void:
-	var combined_scale := _manual_player_scale * XRServer.world_scale
+	var world_factor := XRServer.world_scale if scale_rig_with_world_scale else 1.0
+	var combined_scale := _manual_player_scale * world_factor
+	_current_rig_scale = combined_scale
 
 	if player_body:
 		player_body.scale = _base_player_body_scale * combined_scale
@@ -653,10 +678,40 @@ func _apply_rig_scale() -> void:
 	if auto_scale_hand_visuals and not _hand_visual_nodes.is_empty():
 		for node in _hand_visual_nodes:
 			if node and is_instance_valid(node):
-				var base_xf: Transform3D = _base_hand_visual_transforms.get(node, node.transform)
-				var scaled_basis := base_xf.basis.scaled(Vector3.ONE * combined_scale)
-				var scaled_origin := base_xf.origin * combined_scale
-				node.transform = Transform3D(scaled_basis, scaled_origin)
+				if node == left_watch and left_watch and left_watch.has_method("set_rig_scale_multiplier"):
+					left_watch.call("set_rig_scale_multiplier", combined_scale)
+					continue
+				var base_scale: Vector3 = _base_hand_visual_scales.get(node, node.scale)
+				node.scale = base_scale * combined_scale
+	if left_watch and is_instance_valid(left_watch) and left_watch.has_method("set_rig_scale_multiplier"):
+		left_watch.call("set_rig_scale_multiplier", combined_scale)
+	_apply_poke_scale(combined_scale)
+	_apply_camera_clip_scaling(combined_scale)
+
+
+func _apply_camera_clip_scaling(scale_factor: float) -> void:
+	if not auto_scale_camera_clip:
+		return
+	var clip_scale := maxf(scale_factor, 0.01)
+	if xr_camera:
+		var xr_near := clampf(_base_xr_camera_near * clip_scale, camera_near_min, camera_near_max)
+		var xr_far_target := _base_xr_camera_far * clip_scale * camera_far_scale_boost
+		var xr_far := clampf(xr_far_target, maxf(xr_near + 10.0, xr_near * 2.0), camera_far_max)
+		xr_camera.near = xr_near
+		xr_camera.far = xr_far
+	if desktop_camera:
+		var desktop_near := clampf(_base_desktop_camera_near * clip_scale, camera_near_min, camera_near_max)
+		var desktop_far_target := _base_desktop_camera_far * clip_scale * camera_far_scale_boost
+		var desktop_far := clampf(desktop_far_target, maxf(desktop_near + 10.0, desktop_near * 2.0), camera_far_max)
+		desktop_camera.near = desktop_near
+		desktop_camera.far = desktop_far
+
+
+func _update_local_mesh_visibility() -> void:
+	if head_mesh:
+		head_mesh.visible = show_head_mesh and not (is_vr_mode and hide_head_mesh_in_vr)
+	if body_mesh:
+		body_mesh.visible = show_body_mesh
 
 
 func apply_texture_to_head(texture: ImageTexture) -> void:
@@ -992,14 +1047,51 @@ func _setup_poke_interaction() -> void:
 	# Left Hand Poke
 	left_poke_area = _create_poke_area("LeftPokeArea")
 	left_poke_visual = _create_poke_visual("LeftPokeVisual")
-	left_poke_area.add_child(left_poke_visual)
-	add_child(left_poke_area)
+	if left_poke_area and left_poke_visual:
+		left_poke_area.add_child(left_poke_visual)
+	left_poke_shape = _get_poke_sphere_shape(left_poke_area)
+	left_poke_mesh = left_poke_visual.mesh as SphereMesh
+	if left_poke_area:
+		add_child(left_poke_area)
 
 	# Right Hand Poke
 	right_poke_area = _create_poke_area("RightPokeArea")
 	right_poke_visual = _create_poke_visual("RightPokeVisual")
-	right_poke_area.add_child(right_poke_visual)
-	add_child(right_poke_area)
+	if right_poke_area and right_poke_visual:
+		right_poke_area.add_child(right_poke_visual)
+	right_poke_shape = _get_poke_sphere_shape(right_poke_area)
+	right_poke_mesh = right_poke_visual.mesh as SphereMesh
+	if right_poke_area:
+		add_child(right_poke_area)
+	_apply_poke_scale(_current_rig_scale)
+
+
+func _get_poke_sphere_shape(area: Area3D) -> SphereShape3D:
+	if not area:
+		return null
+	var collision := area.get_node_or_null("CollisionShape3D") as CollisionShape3D
+	if not collision:
+		for child in area.get_children():
+			if child is CollisionShape3D:
+				collision = child as CollisionShape3D
+				break
+	if collision and collision.shape is SphereShape3D:
+		return collision.shape as SphereShape3D
+	return null
+
+
+func _apply_poke_scale(scale_factor: float) -> void:
+	var scaled_radius := maxf(_poke_radius * maxf(scale_factor, 0.001), 0.0005)
+	if left_poke_shape:
+		left_poke_shape.radius = scaled_radius
+	if right_poke_shape:
+		right_poke_shape.radius = scaled_radius
+	if left_poke_mesh:
+		left_poke_mesh.radius = scaled_radius
+		left_poke_mesh.height = scaled_radius * 2.0
+	if right_poke_mesh:
+		right_poke_mesh.radius = scaled_radius
+		right_poke_mesh.height = scaled_radius * 2.0
 
 
 func _create_poke_area(p_name: String) -> Area3D:
@@ -1047,7 +1139,7 @@ func _process_poke_and_pinch(_delta: float) -> void:
 		var index_tip: Transform3D = left_tracker.get_hand_joint_transform(10 as XRHandTracker.HandJoint)
 		# Transform to world space
 		if xr_origin:
-			var world_tip = xr_origin.global_transform * index_tip
+			var world_tip = (xr_origin.global_transform * index_tip).orthonormalized()
 			if left_poke_area:
 				left_poke_area.global_transform = world_tip
 				_handle_poke_physics(left_poke_area, left_poke_visual, true)
@@ -1064,7 +1156,7 @@ func _process_poke_and_pinch(_delta: float) -> void:
 		# Update Poke Position
 		var index_tip: Transform3D = right_tracker.get_hand_joint_transform(10 as XRHandTracker.HandJoint)
 		if xr_origin:
-			var world_tip = xr_origin.global_transform * index_tip
+			var world_tip = (xr_origin.global_transform * index_tip).orthonormalized()
 			if right_poke_area:
 				right_poke_area.global_transform = world_tip
 				_handle_poke_physics(right_poke_area, right_poke_visual, false)

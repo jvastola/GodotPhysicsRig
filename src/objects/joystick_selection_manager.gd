@@ -39,6 +39,14 @@ var _initial_selection_center: Vector3 = Vector3.ZERO
 var _initial_selection_scale: float = 1.0
 var _object_initial_transforms: Array[Transform3D] = []
 var _network_manager: Node = null
+var _owned_selected_object_ids: Dictionary = {} # object_id -> true while this manager holds ownership
+var _ownership_request_msec: Dictionary = {} # object_id -> last ownership request tick
+var _last_scale_sync_msec: Dictionary = {} # object_id -> msec
+var _last_synced_scale: Dictionary = {} # object_id -> Vector3
+
+const SCALE_SYNC_INTERVAL_MS: int = 50
+const SCALE_SYNC_EPSILON: float = 0.0005
+const OWNERSHIP_REQUEST_RETRY_MS: int = 250
 
 # Handle settings (from transform tool)
 var handle_length: float = 0.15
@@ -51,7 +59,18 @@ var handle_color_z: Color = Color(0.3, 0.5, 1.0, 0.85)
 func _ready() -> void:
 	_create_bounding_box()
 	_setup_selection_handles()
+	_network_manager = _get_network_manager()
+
+
+func _exit_tree() -> void:
+	_release_all_owned_selection_objects()
+
+
+func _get_network_manager() -> Node:
+	if _network_manager and is_instance_valid(_network_manager):
+		return _network_manager
 	_network_manager = get_node_or_null("/root/NetworkManager")
+	return _network_manager
 
 func _create_bounding_box() -> void:
 	# Create edge-only wireframe bounding box using ImmediateMesh
@@ -90,6 +109,7 @@ func start_selection() -> void:
 func add_to_selection(body: RigidBody3D) -> void:
 	if body and body.is_in_group("selectable_shapes") and body not in selected_objects:
 		selected_objects.append(body)
+		_claim_network_ownership_for_object(body)
 		print("JoystickSelection: Added ", body.name, " to selection (", selected_objects.size(), " total)")
 		_update_bounding_box()
 		selection_changed.emit(selected_objects)
@@ -97,6 +117,7 @@ func add_to_selection(body: RigidBody3D) -> void:
 func remove_from_selection(body: RigidBody3D) -> void:
 	if body in selected_objects:
 		selected_objects.erase(body)
+		_release_network_ownership_for_object(body)
 		print("JoystickSelection: Removed ", body.name, " from selection (", selected_objects.size(), " total)")
 		_update_bounding_box()
 		selection_changed.emit(selected_objects)
@@ -110,7 +131,12 @@ func end_selection() -> void:
 		clear_selection()
 
 func clear_selection() -> void:
+	var objects_to_release: Array[RigidBody3D] = selected_objects.duplicate()
+	if not objects_to_release.is_empty():
+		_broadcast_selected_transform_updates(true)
 	selected_objects.clear()
+	for obj in objects_to_release:
+		_release_network_ownership_for_object(obj)
 	if bounding_box:
 		bounding_box.visible = false
 	if bounding_box_collision:
@@ -348,6 +374,7 @@ func is_point_in_bounding_box(point: Vector3) -> bool:
 func grab_selection(hand: RigidBody3D, grab_point: Vector3) -> void:
 	if selected_objects.is_empty():
 		return
+	_claim_network_ownership_for_selection()
 	
 	# Check if this is a second hand grabbing (two-hand mode)
 	if _is_grabbing_box and hand != _grab_hand:
@@ -516,6 +543,7 @@ func _update_two_hand_grab() -> void:
 func release_box_grab() -> void:
 	"""Release the selection box grab"""
 	if _is_grabbing_box:
+		_broadcast_selected_transform_updates(true)
 		print("JoystickSelection: Released selection box")
 		_is_grabbing_box = false
 		_is_two_hand_grab = false
@@ -529,6 +557,7 @@ func release_box_grab() -> void:
 func release_second_hand() -> void:
 	"""Release the second hand from two-hand grab, return to single-hand mode"""
 	if _is_two_hand_grab:
+		_broadcast_selected_transform_updates(true)
 		print("JoystickSelection: Released second hand, returning to single-hand mode")
 		_is_two_hand_grab = false
 		_second_grab_hand = null
@@ -893,6 +922,7 @@ func _hide_handles() -> void:
 
 func start_handle_drag(handle: Area3D, start_pos: Vector3) -> void:
 	"""Start dragging a transform handle - mode depends on which part was grabbed"""
+	_claim_network_ownership_for_selection()
 	_active_handle = handle
 	_drag_start_pos = start_pos
 	_drag_axis = handle.get_meta("selection_axis", Vector3.ZERO).normalized()
@@ -953,11 +983,13 @@ func update_handle_drag(current_pos: Vector3) -> void:
 	_broadcast_selected_transform_updates()
 
 
-func _broadcast_selected_transform_updates() -> void:
-	if _network_manager == null:
+func _broadcast_selected_transform_updates(force_scale_sync: bool = false) -> void:
+	var network_manager := _get_network_manager()
+	if network_manager == null:
 		return
-	if not _network_manager.has_method("update_grabbed_object"):
+	if not network_manager.has_method("update_grabbed_object"):
 		return
+	_claim_network_ownership_for_selection()
 	for obj in selected_objects:
 		if not is_instance_valid(obj) or not (obj is RigidBody3D):
 			continue
@@ -965,12 +997,183 @@ func _broadcast_selected_transform_updates() -> void:
 		if object_id.is_empty():
 			continue
 		var rot: Quaternion = obj.global_transform.basis.get_rotation_quaternion()
-		_network_manager.update_grabbed_object(object_id, obj.global_position, rot)
+		network_manager.update_grabbed_object(object_id, obj.global_position, rot)
+		_maybe_broadcast_object_scale(network_manager, object_id, obj.scale, force_scale_sync)
+
+
+func _claim_network_ownership_for_selection() -> void:
+	for obj in selected_objects:
+		if is_instance_valid(obj):
+			_claim_network_ownership_for_object(obj)
+
+
+func _claim_network_ownership_for_object(obj: RigidBody3D) -> void:
+	var network_manager := _get_network_manager()
+	if network_manager == null:
+		return
+	var object_id := _resolve_network_object_id(obj)
+	if object_id.is_empty():
+		return
+	if _is_locally_authoritative_for_object(network_manager, object_id):
+		_owned_selected_object_ids[object_id] = true
+		return
+	var now_msec := Time.get_ticks_msec()
+	var last_request_msec := int(_ownership_request_msec.get(object_id, 0))
+	if _owned_selected_object_ids.has(object_id) and (now_msec - last_request_msec) < OWNERSHIP_REQUEST_RETRY_MS:
+		return
+	if network_manager.has_method("grab_object"):
+		network_manager.grab_object(object_id, "joystick_selection")
+	elif network_manager.has_method("request_object_ownership"):
+		network_manager.request_object_ownership(object_id, "joystick_selection")
+	else:
+		return
+	_owned_selected_object_ids[object_id] = true
+	_ownership_request_msec[object_id] = now_msec
+
+
+func _release_network_ownership_for_object(obj: RigidBody3D) -> void:
+	var object_id := _resolve_network_object_id(obj)
+	if object_id.is_empty():
+		return
+	_owned_selected_object_ids.erase(object_id)
+	_ownership_request_msec.erase(object_id)
+	_last_scale_sync_msec.erase(object_id)
+	_last_synced_scale.erase(object_id)
+
+	var network_manager := _get_network_manager()
+	if network_manager == null:
+		return
+	if not network_manager.has_method("release_object"):
+		return
+	if not is_instance_valid(obj):
+		return
+	if not _is_locally_authoritative_for_object(network_manager, object_id):
+		return
+
+	var persist_mode := _resolve_object_persist_mode(network_manager, object_id)
+	var rot: Quaternion = obj.global_transform.basis.get_rotation_quaternion()
+	network_manager.release_object(
+		object_id,
+		obj.global_position,
+		rot,
+		Vector3.ZERO,
+		Vector3.ZERO,
+		persist_mode,
+		"RELEASED_STATIC"
+	)
+
+
+func _release_all_owned_selection_objects() -> void:
+	if _owned_selected_object_ids.is_empty():
+		return
+	var network_manager := _get_network_manager()
+	var owned_ids: Array = _owned_selected_object_ids.keys()
+	for object_id_variant in owned_ids:
+		var object_id := String(object_id_variant)
+		if object_id.is_empty():
+			continue
+		var obj := _find_selected_object_by_id(object_id)
+		if not is_instance_valid(obj):
+			continue
+		if network_manager and network_manager.has_method("release_object"):
+			if not _is_locally_authoritative_for_object(network_manager, object_id):
+				continue
+			var persist_mode := _resolve_object_persist_mode(network_manager, object_id)
+			var rot: Quaternion = obj.global_transform.basis.get_rotation_quaternion()
+			network_manager.release_object(
+				object_id,
+				obj.global_position,
+				rot,
+				Vector3.ZERO,
+				Vector3.ZERO,
+				persist_mode,
+				"RELEASED_STATIC"
+			)
+	_owned_selected_object_ids.clear()
+	_ownership_request_msec.clear()
+	_last_scale_sync_msec.clear()
+	_last_synced_scale.clear()
+
+
+func _find_selected_object_by_id(object_id: String) -> RigidBody3D:
+	for obj in selected_objects:
+		if not is_instance_valid(obj):
+			continue
+		if _resolve_network_object_id(obj) == object_id:
+			return obj
+	return null
+
+
+func _resolve_object_persist_mode(network_manager: Node, object_id: String) -> String:
+	var persist_mode := "placed_room"
+	if network_manager == null:
+		return persist_mode
+	var registry_variant: Variant = network_manager.get("room_object_registry")
+	if registry_variant is Dictionary:
+		var registry := registry_variant as Dictionary
+		var object_state_variant: Variant = registry.get(object_id, null)
+		if object_state_variant is Dictionary:
+			var object_state := object_state_variant as Dictionary
+			var state_mode := String(object_state.get("persist_mode", ""))
+			if not state_mode.is_empty():
+				persist_mode = state_mode
+	return persist_mode
+
+
+func _is_locally_authoritative_for_object(network_manager: Node, object_id: String) -> bool:
+	if network_manager == null or object_id.is_empty():
+		return false
+	if not network_manager.has_method("get_nakama_user_id"):
+		return false
+
+	var my_id := String(network_manager.get_nakama_user_id())
+	if my_id.is_empty():
+		return false
+
+	if network_manager.has_method("get_object_owner"):
+		var owner_id := String(network_manager.get_object_owner(object_id))
+		if not owner_id.is_empty() and owner_id == my_id:
+			return true
+
+	var registry_variant: Variant = network_manager.get("room_object_registry")
+	if registry_variant is Dictionary:
+		var registry := registry_variant as Dictionary
+		var state_variant: Variant = registry.get(object_id, null)
+		if state_variant is Dictionary:
+			var state := state_variant as Dictionary
+			var held_by := String(state.get("held_by", ""))
+			if held_by == my_id:
+				return true
+	return false
+
+
+func _maybe_broadcast_object_scale(network_manager: Node, object_id: String, object_scale: Vector3, force_sync: bool = false) -> void:
+	if network_manager == null:
+		return
+	if not network_manager.has_method("replicate_object_property"):
+		return
+
+	var should_send: bool = force_sync or not _last_synced_scale.has(object_id)
+	if not should_send:
+		var previous_scale: Vector3 = _last_synced_scale[object_id]
+		should_send = previous_scale.distance_to(object_scale) > SCALE_SYNC_EPSILON
+	if not should_send:
+		return
+
+	var now_msec := Time.get_ticks_msec()
+	var last_sent_msec := int(_last_scale_sync_msec.get(object_id, 0))
+	if not force_sync and now_msec - last_sent_msec < SCALE_SYNC_INTERVAL_MS:
+		return
+
+	network_manager.replicate_object_property(object_id, "scale", object_scale, false)
+	_last_scale_sync_msec[object_id] = now_msec
+	_last_synced_scale[object_id] = object_scale
 
 
 func _resolve_network_object_id(obj: RigidBody3D) -> String:
 	if obj.has_method("get"):
-		var save_id: String = str(obj.get("save_id"))
+		var raw_save_id: Variant = obj.get("save_id")
+		var save_id: String = String(raw_save_id) if raw_save_id != null else ""
 		if not save_id.is_empty():
 			return save_id
 	if obj.name.begins_with("obj_"):
@@ -1136,6 +1339,7 @@ func _update_rotation_handle_visual(handle: Area3D, rotation_angle: float) -> vo
 
 func end_handle_drag() -> void:
 	"""End handle dragging"""
+	_broadcast_selected_transform_updates(true)
 	print("JoystickSelection: Ended ", _active_handle_mode, " drag")
 	_active_handle = null
 	_active_handle_mode = ""

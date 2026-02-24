@@ -28,6 +28,7 @@ var grabbing_hand: RigidBody3D = null
 var original_parent: Node = null
 var grab_offset: Vector3 = Vector3.ZERO
 var grab_rotation_offset: Quaternion = Quaternion.IDENTITY
+var grab_scale_offset: Vector3 = Vector3.ONE
 
 # Desktop grab state (separate from VR physics hand grab)
 var is_desktop_grabbed := false
@@ -52,6 +53,7 @@ var _pending_remote_peer_id: String = ""
 var _pending_remote_hand_name: String = ""
 var _network_state: String = NETWORK_STATE_RELEASED_STATIC
 var _network_state_version: int = 0
+var _remote_visual_material_cache: Dictionary = {} # mesh_instance_id -> original material_override
 
 signal grabbed(hand: RigidBody3D)
 signal released()
@@ -156,6 +158,7 @@ func _force_cleanup_grab_state() -> void:
 	grabbing_hand = null
 	is_desktop_grabbed = false
 	desktop_grabber = null
+	grab_scale_offset = Vector3.ONE
 	
 	# Update save state to reflect release
 	_save_grab_state(null)
@@ -241,11 +244,12 @@ func try_grab(hand: RigidBody3D) -> bool:
 	# Calculate the offset in hand's local space
 	var hand_inv = hand.global_transform.affine_inverse()
 	var obj_to_hand = hand_inv * global_transform
+	grab_scale_offset = obj_to_hand.basis.get_scale()
 	
 	if grab_mode == GrabMode.FREE_GRAB:
 		# Store relative position and rotation at moment of grab in local space
 		grab_offset = obj_to_hand.origin
-		grab_rotation_offset = obj_to_hand.basis.get_rotation_quaternion()
+		grab_rotation_offset = obj_to_hand.basis.orthonormalized().get_rotation_quaternion()
 	else:  # ANCHOR_GRAB
 		# Use the exported anchor offset and rotation
 		grab_offset = grab_anchor_offset
@@ -298,7 +302,7 @@ func release() -> void:
 		release_global_transform = grabbed_collision_shapes[0].global_transform
 	elif is_instance_valid(grabbing_hand):
 		# If no valid collision shape, use hand position with grab offset
-		release_global_transform = grabbing_hand.global_transform * Transform3D(Basis(grab_rotation_offset), grab_offset)
+		release_global_transform = grabbing_hand.global_transform * Transform3D(Basis(grab_rotation_offset).scaled(grab_scale_offset), grab_offset)
 	
 	# Store hand velocity
 	var hand_velocity = Vector3.ZERO
@@ -382,6 +386,7 @@ func release() -> void:
 	grabbing_hand = null
 	is_desktop_grabbed = false
 	desktop_grabber = null
+	grab_scale_offset = Vector3.ONE
 	
 	released.emit()
 	
@@ -462,40 +467,48 @@ func _physics_process(_delta: float) -> void:
 
 func _create_hand_collision_shapes(hand: RigidBody3D) -> void:
 	"""Create collision shapes and meshes as children of the hand with proper physics integration"""
-	for child in get_children():
-		if child is CollisionShape3D and child.shape:
-			# Create new collision shape as direct child of hand
-			var new_collision = CollisionShape3D.new()
-			new_collision.shape = child.shape
-			
-			# Transform is relative to this object, need to convert to hand space
-			new_collision.transform = Transform3D(Basis(grab_rotation_offset), grab_offset) * child.transform
-			new_collision.name = name + "_grabbed_collision_" + str(grabbed_collision_shapes.size())
-			
-			# Add to hand first, then configure (required for set_collision_layer_value to work)
-			hand.add_child(new_collision)
-			grabbed_collision_shapes.append(new_collision)
-			
-			# The collision shape inherits the RigidBody3D's layer/mask by being a child
-			# No explicit layer/mask setting needed - it uses the hand's collision settings
-			
-		elif child is MeshInstance3D and child.mesh:
-			# Create new mesh instance as visual
-			var new_mesh = MeshInstance3D.new()
-			new_mesh.mesh = child.mesh
-			new_mesh.transform = Transform3D(Basis(grab_rotation_offset), grab_offset) * child.transform
-			new_mesh.name = name + "_grabbed_mesh_" + str(grabbed_mesh_instances.size())
-			
-			# COPY MATERIAL OVERRIDES
-			if child.material_override:
-				new_mesh.material_override = child.material_override
-			for i in child.get_surface_override_material_count():
-				var mat = child.get_surface_override_material(i)
-				if mat:
-					new_mesh.set_surface_override_material(i, mat)
-			
-			hand.add_child(new_mesh)
-			grabbed_mesh_instances.append(new_mesh)
+	var hand_space_object_transform := Transform3D(Basis(grab_rotation_offset).scaled(grab_scale_offset), grab_offset)
+	var object_inv := global_transform.affine_inverse()
+	var stack: Array[Node] = [self]
+	while not stack.is_empty():
+		var current: Node = stack.pop_back()
+		for child in current.get_children():
+			if child is Node:
+				stack.append(child)
+			if child is CollisionShape3D and (child as CollisionShape3D).shape:
+				var source_collision := child as CollisionShape3D
+				if source_collision.get_parent() is Area3D:
+					continue
+				var new_collision := CollisionShape3D.new()
+				new_collision.shape = source_collision.shape
+				var relative_transform: Transform3D = object_inv * source_collision.global_transform
+				new_collision.transform = hand_space_object_transform * relative_transform
+				new_collision.disabled = source_collision.disabled
+				new_collision.name = name + "_grabbed_collision_" + str(grabbed_collision_shapes.size())
+				hand.add_child(new_collision)
+				grabbed_collision_shapes.append(new_collision)
+			elif child is MeshInstance3D and (child as MeshInstance3D).mesh:
+				var source_mesh := child as MeshInstance3D
+				if source_mesh.get_parent() is Area3D:
+					continue
+				var new_mesh := MeshInstance3D.new()
+				new_mesh.mesh = source_mesh.mesh
+				var relative_mesh_transform: Transform3D = object_inv * source_mesh.global_transform
+				new_mesh.transform = hand_space_object_transform * relative_mesh_transform
+				new_mesh.visible = source_mesh.visible
+				new_mesh.cast_shadow = source_mesh.cast_shadow
+				new_mesh.name = name + "_grabbed_mesh_" + str(grabbed_mesh_instances.size())
+				
+				# COPY MATERIAL OVERRIDES
+				if source_mesh.material_override:
+					new_mesh.material_override = source_mesh.material_override
+				for i in source_mesh.get_surface_override_material_count():
+					var mat := source_mesh.get_surface_override_material(i)
+					if mat:
+						new_mesh.set_surface_override_material(i, mat)
+				
+				hand.add_child(new_mesh)
+				grabbed_mesh_instances.append(new_mesh)
 
 
 func _set_original_visuals_visible(p_visible: bool) -> void:
@@ -725,16 +738,24 @@ func _set_remote_grabbed_visual(is_grabbed_visual: bool) -> void:
 	"""Visual feedback when object is grabbed by remote player"""
 	for child in get_children():
 		if child is MeshInstance3D:
+			var mesh := child as MeshInstance3D
+			var mesh_id := mesh.get_instance_id()
 			if is_grabbed_visual:
-				# Make semi-transparent
-				if not child.material_override:
-					var mat = StandardMaterial3D.new()
-					mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-					mat.albedo_color = Color(1, 1, 1, 0.5)
-					child.material_override = mat
+				if not _remote_visual_material_cache.has(mesh_id):
+					_remote_visual_material_cache[mesh_id] = mesh.material_override
+				# Make semi-transparent while preserving texture/materials where possible.
+				var mat := StandardMaterial3D.new()
+				mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+				mat.albedo_color = Color(1, 1, 1, 0.5)
+				mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+				mesh.material_override = mat
 			else:
-				# Restore normal appearance
-				child.material_override = null
+				if _remote_visual_material_cache.has(mesh_id):
+					mesh.material_override = _remote_visual_material_cache[mesh_id]
+				else:
+					mesh.material_override = null
+	if not is_grabbed_visual:
+		_remote_visual_material_cache.clear()
 
 
 # ============================================================================

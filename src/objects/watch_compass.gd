@@ -40,12 +40,16 @@ var _ray_mesh: ImmediateMesh
 var _hit_player := false
 var _manual_ui_visible := false
 var _base_scale := Vector3.ONE
+var _rig_scale_multiplier: float = 1.0
+
+func _get_effective_ray_length() -> float:
+	return maxf(ray_length * _rig_scale_multiplier, 0.001)
 
 func _ready() -> void:
 	if _raycast:
 		var axis_local := rotation_axis_local.normalized()
 		if axis_local.length_squared() > 0.0:
-			_raycast.target_position = axis_local * ray_length
+			_raycast.target_position = axis_local * _get_effective_ray_length()
 		_raycast.enabled = true
 	if _ray_visual:
 		var existing_mesh := _ray_visual.mesh
@@ -124,7 +128,7 @@ func _process(delta: float) -> void:
 
 	# Handle watch scaling when looked at
 	var target_scale_val = looked_at_scale if _hit_player else 1.0
-	var target_scale_vec = _base_scale * target_scale_val
+	var target_scale_vec = _base_scale * _rig_scale_multiplier * target_scale_val
 	scale = scale.lerp(target_scale_vec, scale_smoothing * delta)
 	
 	# Handle joystick toggle for UI
@@ -146,6 +150,10 @@ func _process(delta: float) -> void:
 		else:
 			_ui_viewport.visible = should_be_visible
 
+
+func set_rig_scale_multiplier(multiplier: float) -> void:
+	_rig_scale_multiplier = maxf(multiplier, 0.001)
+
 func _physics_process(_delta: float) -> void:
 	# Perform raycast and visual updates in the physics step to access space state safely
 	# Compute watch face normal in world space
@@ -158,14 +166,15 @@ func _update_ray_visual(axis_world: Vector3) -> void:
 	if axis_local.length_squared() < 1e-8:
 		return
 
+	var effective_ray_length := _get_effective_ray_length()
 	var start_global: Vector3 = global_transform.origin
-	var hit_point: Vector3 = start_global + axis_world * ray_length
-	var hit_distance: float = ray_length
+	var hit_point: Vector3 = start_global + axis_world * effective_ray_length
+	var hit_distance: float = effective_ray_length
 	var hit_player := false
 	var has_hit := false
 
 	if _raycast:
-		_raycast.target_position = axis_local * ray_length
+		_raycast.target_position = axis_local * effective_ray_length
 		_raycast.force_raycast_update()
 		has_hit = _raycast.is_colliding()
 		if has_hit:

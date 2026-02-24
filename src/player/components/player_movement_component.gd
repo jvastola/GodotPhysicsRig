@@ -2,8 +2,6 @@ class_name PlayerMovementComponent
 extends Node
 ## Handles VR turning and joystick locomotion
 
-const InputBindingManager = preload("res://src/systems/input_binding_manager.gd")
-
 # === Locomotion Settings ===
 # Order is important to avoid breaking saved values; new modes are appended.
 enum LocomotionMode { DISABLED, HEAD_DIRECTION, HAND_DIRECTION, HEAD_DIRECTION_3D, HAND_DIRECTION_3D }
@@ -48,7 +46,7 @@ enum HandAssignment { DEFAULT, SWAPPED }
 @export_range(0.05, 3.0, 0.05) var world_grab_move_factor: float = 1.0
 @export_range(0.05, 1.0, 0.05) var world_grab_smooth_factor: float = 0.15
 @export var invert_two_hand_scale_direction: bool = true
-@export var show_two_hand_rotation_visual: bool = true
+@export var show_two_hand_rotation_visual: bool = false
 enum TwoHandPivot { MIDPOINT, PLAYER_ORIGIN }
 @export var two_hand_rotation_pivot: TwoHandPivot = TwoHandPivot.MIDPOINT
 @export var two_hand_left_action: String = "trigger"
@@ -97,7 +95,7 @@ enum OneHandGrabMode { RELATIVE, ANCHORED }
 
 # === Two-Hand Grab V3 Settings ===
 # XRToolsMovementWorldGrab style - exact algorithm from godot-xr-tools
-@export var enable_two_hand_grab_v3: bool = true
+@export var enable_two_hand_grab_v3: bool = false
 @export_range(0.1, 20.0, 0.1) var v3_world_scale_min: float = 0.5
 @export_range(0.5, 100.0, 0.5) var v3_world_scale_max: float = 2.0
 @export var v3_left_action: String = "trigger"
@@ -127,7 +125,6 @@ var _world_grab_prev_midpoint := Vector3.ZERO
 var _world_grab_current_scale := 1.0
 var _world_grab_smoothed_move := Vector3.ZERO
 var _one_hand_grab_anchor := Vector3.ZERO
-var _world_grab_initial_yaw := 0.0
 var _one_hand_anchor_local := Vector3.ZERO
 var _one_hand_initial_dir2d := Vector2.ZERO
 var _one_hand_initial_yaw := 0.0
@@ -163,9 +160,6 @@ var _one_hand_controller: XRController3D
 var _one_hand_initial_controller_pos := Vector3.ZERO
 var _one_hand_initial_body_pos := Vector3.ZERO
 
-# Jump state
-var _jump_cooldown_timer := 0.0
-
 # Autojoin state
 var _autojoin_triggered := false
 var _initial_spawn_position := Vector3.ZERO
@@ -174,15 +168,6 @@ var _autojoin_livekit_connect_started := false
 # Render Mode Reset state
 var _render_mode_reset_timer: float = 0.0
 const RENDER_MODE_RESET_TIME: float = 2.0
-
-# Input mapping helper
-var _input_binding_manager: InputBindingManager
-
-# Two-Hand Grab V2 component
-var _two_hand_grab_v2: TwoHandGrabV2
-
-# Two-Hand Grab V3 component
-var _two_hand_grab_v3: TwoHandGrabV3
 
 # References
 # References
@@ -235,8 +220,6 @@ func setup(p_player_body: RigidBody3D, p_left_controller: XRController3D, p_righ
 	_apply_player_drag()
 	_update_physics_hands()
 	_ensure_visuals()
-	_setup_two_hand_grab_v2()
-	_setup_two_hand_grab_v3()
 	print("PlayerMovementComponent: Setup with hands")
 	print("PlayerMovementComponent: Auto Respawn State: ", auto_respawn_enabled)
 
@@ -284,12 +267,6 @@ func _physics_process(delta: float) -> void:
 
 
 func _ready() -> void:
-	_input_binding_manager = InputBindingManager.get_singleton()
-	if _input_binding_manager:
-		var default_events := []
-		if InputMap.has_action("jump"):
-			default_events = InputMap.action_get_events("jump")
-		_input_binding_manager.ensure_binding("jump", default_events, InputBindingManager.MODE_ANY)
 	# Auto-load saved movement settings (Meta VRCS requirement: preserve user data)
 	_load_saved_settings()
 
@@ -310,21 +287,9 @@ func swap_hands() -> void:
 	_clear_ui_scroll_capture()
 
 
-func set_ui_scroll_capture(active: bool, controller: XRController3D) -> void:
-	if not ui_scroll_steals_stick:
-		_clear_ui_scroll_capture()
-		return
-	if active:
-		# While scrolling, pause both locomotion and turning to prevent drift.
-		_ui_block_locomotion = true
-		_ui_block_turn = true
-	else:
-		if controller and controller == locomotion_controller:
-			_ui_block_locomotion = false
-		if controller and controller == turn_controller:
-			_ui_block_turn = false
-		if not controller:
-			_clear_ui_scroll_capture()
+func set_ui_scroll_capture(_active: bool, _controller: XRController3D) -> void:
+	# UI thumbstick capture was removed from movement controls.
+	_clear_ui_scroll_capture()
 
 
 func _clear_ui_scroll_capture() -> void:
@@ -360,12 +325,12 @@ func _load_saved_settings() -> void:
 	turn_deadzone = settings.get("turn_deadzone", turn_deadzone)
 	snap_turn_cooldown = settings.get("snap_turn_cooldown", snap_turn_cooldown)
 	invert_turn_x = settings.get("invert_turn_x", invert_turn_x)
-	ui_scroll_steals_stick = settings.get("ui_scroll_steals_stick", ui_scroll_steals_stick)
+	ui_scroll_steals_stick = false
 	ui_scroll_wheel_factor = settings.get("ui_scroll_wheel_factor", ui_scroll_wheel_factor)
-	disable_joystick_on_grip = settings.get("disable_joystick_on_grip", disable_joystick_on_grip)
+	disable_joystick_on_grip = false
 	hand_assignment = settings.get("hand_assignment", hand_assignment)
-	enable_two_hand_world_scale = settings.get("enable_two_hand_world_scale", enable_two_hand_world_scale)
-	enable_two_hand_world_rotation = settings.get("enable_two_hand_world_rotation", enable_two_hand_world_rotation)
+	enable_two_hand_world_scale = false
+	enable_two_hand_world_rotation = false
 	world_scale_min = settings.get("world_scale_min", world_scale_min)
 	world_scale_max = settings.get("world_scale_max", world_scale_max)
 	world_scale_sensitivity = settings.get("world_scale_sensitivity", world_scale_sensitivity)
@@ -373,7 +338,7 @@ func _load_saved_settings() -> void:
 	world_grab_move_factor = settings.get("world_grab_move_factor", world_grab_move_factor)
 	world_grab_smooth_factor = settings.get("world_grab_smooth_factor", world_grab_smooth_factor)
 	invert_two_hand_scale_direction = settings.get("invert_two_hand_scale_direction", invert_two_hand_scale_direction)
-	show_two_hand_rotation_visual = settings.get("show_two_hand_rotation_visual", show_two_hand_rotation_visual)
+	show_two_hand_rotation_visual = false
 	two_hand_left_action = settings.get("two_hand_left_action", two_hand_left_action)
 	two_hand_right_action = settings.get("two_hand_right_action", two_hand_right_action)
 	two_hand_rotation_pivot = settings.get("two_hand_rotation_pivot", two_hand_rotation_pivot)
@@ -390,18 +355,12 @@ func _load_saved_settings() -> void:
 	auto_respawn_enabled = settings.get("auto_respawn_enabled", auto_respawn_enabled)
 	auto_respawn_distance = settings.get("auto_respawn_distance", auto_respawn_distance)
 	hard_respawn_resets_settings = settings.get("hard_respawn_resets_settings", hard_respawn_resets_settings)
-	jump_enabled = settings.get("jump_enabled", jump_enabled)
-	jump_impulse = settings.get("jump_impulse", jump_impulse)
-	jump_cooldown = settings.get("jump_cooldown", jump_cooldown)
+	jump_enabled = false
 	player_gravity_enabled = settings.get("player_gravity_enabled", player_gravity_enabled)
 	player_drag_force = settings.get("player_drag_force", player_drag_force)
 	enable_physics_hands = settings.get("enable_physics_hands", enable_physics_hands)
-	# V3 settings
-	v3_scale_sensitivity = settings.get("v3_scale_sensitivity", v3_scale_sensitivity)
-	v3_invert_scale = settings.get("v3_invert_scale", v3_invert_scale)
-	v3_rotation_sensitivity = settings.get("v3_rotation_sensitivity", v3_rotation_sensitivity)
-	v3_translation_sensitivity = settings.get("v3_translation_sensitivity", v3_translation_sensitivity)
-	v3_smoothing = settings.get("v3_smoothing", v3_smoothing)
+	enable_two_hand_grab_v2 = false
+	enable_two_hand_grab_v3 = false
 	
 	print("PlayerMovementComponent: Settings restored successfully")
 
@@ -409,19 +368,13 @@ func _load_saved_settings() -> void:
 func process_turning(delta: float) -> void:
 	if not is_vr_mode:
 		return
-	if ui_scroll_steals_stick and _ui_block_turn:
-		_smooth_input = 0.0
-		return
 	_handle_turning(delta)
 
 
 func process_locomotion(delta: float) -> void:
 	if not is_vr_mode or locomotion_mode == LocomotionMode.DISABLED:
 		return
-	if ui_scroll_steals_stick and _ui_block_locomotion:
-		return
 	_handle_locomotion(delta)
-	_handle_jump(delta)
 	_check_auto_respawn()
 
 
@@ -444,7 +397,7 @@ func physics_process_turning(delta: float) -> void:
 			_rotate_player_body_y(deg_to_rad(turn_amount))
 			player_body.linear_velocity = lv2
 
-	# Handle two-hand world manipulation (rotation/scale) in the physics step
+		# Handle world grab locomotion/manipulation in the physics step.
 	if is_vr_mode:
 		physics_process_world_grab(delta)
 
@@ -455,13 +408,6 @@ func physics_process_locomotion(_delta: float) -> void:
 		return
 	if not player_body or not locomotion_controller:
 		return
-	if ui_scroll_steals_stick and _ui_block_locomotion:
-		return
-	
-	# Disable locomotion when grip is held (if setting enabled)
-	if disable_joystick_on_grip:
-		if _is_action_pressed(locomotion_controller, "grip"):
-			return
 	
 	# Get thumbstick input
 	var input = locomotion_controller.get_vector2("primary")
@@ -592,11 +538,6 @@ func _handle_turning(delta: float) -> void:
 		_smooth_input = 0.0
 		return
 	
-	# Disable turning when grip is held (if setting enabled)
-	if disable_joystick_on_grip:
-		if _is_action_pressed(turn_controller, "grip"):
-			return
-	
 	# Update snap turn cooldown
 	if snap_turn_timer > 0:
 		snap_turn_timer -= delta
@@ -697,63 +638,31 @@ func _signed_angle_2d(a: Vector2, b: Vector2) -> float:
 # === World Grab Helpers ===
 
 func physics_process_world_grab(delta: float) -> void:
-	"""Allow two-hand grab gestures to scale/rotate the world."""
-	
-	# === V3 Mode: XRToolsMovementWorldGrab style ===
-	if enable_two_hand_grab_v3 and _two_hand_grab_v3:
-		_sync_v3_settings()
-		var _v3_handled := _two_hand_grab_v3.process_grab(delta)
-		# If V3 is active, normally we skip V1. But if V1 scaling is enabled, we allow fall-through.
-		if _two_hand_grab_v3.is_active():
-			if not enable_two_hand_world_scale:
-				_end_world_grab()
-				_end_one_hand_grab()
-				return
-		# If V3 not grabbing, fall through to one-hand grab if enabled
-	
-	# === V2 Mode: Completely separate implementation ===
-	if enable_two_hand_grab_v2 and _two_hand_grab_v2 and not enable_two_hand_grab_v3:
-		_sync_v2_settings()
-		_two_hand_grab_v2.process_grab(delta)
-		# If V2 is active, skip V1 logic entirely
-		if _two_hand_grab_v2.is_active():
-			_end_world_grab()  # Ensure V1 state is cleaned up
-			_end_one_hand_grab()
-			return
-		# If V2 not grabbing, fall through to one-hand grab if enabled
-	
-	# === V1 Mode: Original implementation (Hybrid-capable) ===
-	var v3_active_and_scaling_wanted := enable_two_hand_grab_v3 and _two_hand_grab_v3 and _two_hand_grab_v3.is_active() and enable_two_hand_world_scale
-	var two_hand_v1_enabled := ((enable_two_hand_world_scale or enable_two_hand_world_rotation) and not enable_two_hand_grab_v2 and not enable_two_hand_grab_v3) or v3_active_and_scaling_wanted
-	var one_hand_enabled := enable_one_hand_world_grab or enable_one_hand_world_rotate
-
-	if not (two_hand_v1_enabled or one_hand_enabled):
-		_end_world_grab()
+	"""One-hand world grab only."""
+	_end_world_grab() # Keep legacy two-hand state cleared.
+	if not player_body:
 		_end_one_hand_grab()
 		return
-	if not player_body:
-		_end_world_grab()
+
+	var one_hand_enabled := enable_one_hand_world_grab or enable_one_hand_world_rotate
+	if not one_hand_enabled:
 		_end_one_hand_grab()
 		return
 
 	var left_pressed: bool = left_controller and _is_action_pressed(left_controller, two_hand_left_action)
 	var right_pressed: bool = right_controller and _is_action_pressed(right_controller, two_hand_right_action)
+	if left_pressed == right_pressed:
+		_end_one_hand_grab()
+		return
 
-	if two_hand_v1_enabled and left_pressed and right_pressed and left_controller and right_controller:
+	var controller := left_controller if left_pressed else right_controller
+	if not controller:
 		_end_one_hand_grab()
-		if not _world_grab_active:
-			_start_world_grab()
-		_update_world_grab()
-	elif one_hand_enabled and (left_pressed != right_pressed): # exactly one pressed
-		_end_world_grab()
-		var controller := left_controller if left_pressed else right_controller
-		if controller:
-			if not _one_hand_grab_active:
-				_start_one_hand_grab(controller)
-			_update_one_hand_grab(controller, delta)
-	else:
-		_end_world_grab()
-		_end_one_hand_grab()
+		return
+
+	if not _one_hand_grab_active:
+		_start_one_hand_grab(controller)
+	_update_one_hand_grab(controller, delta)
 
 
 func _is_action_pressed(controller: XRController3D, action: String) -> bool:
@@ -770,124 +679,6 @@ func _is_action_pressed(controller: XRController3D, action: String) -> bool:
 	if controller.has_method("get_bool"):
 		return controller.get_bool(action)
 	return false
-
-
-func _start_world_grab() -> void:
-	_world_grab_active = true
-	var up := _get_player_up()
-	var initial_vec := (right_controller.global_position - left_controller.global_position).slide(up)
-	_world_grab_initial_distance = max(0.01, initial_vec.length())
-	_world_grab_initial_scale = XRServer.world_scale
-	_world_grab_current_scale = XRServer.world_scale
-	_world_grab_smoothed_move = Vector3.ZERO
-	_world_grab_initial_vector = initial_vec
-	_world_grab_prev_vector = _world_grab_initial_vector
-	_world_grab_initial_midpoint = (left_controller.global_position + right_controller.global_position) * 0.5
-	_world_grab_prev_midpoint = _world_grab_initial_midpoint
-	_world_grab_initial_yaw = _get_yaw(player_body.global_transform)
-	_world_grab_left_anchor = left_controller.global_position
-	_world_grab_right_anchor = right_controller.global_position
-	_world_grab_target_left_anchor = _world_grab_left_anchor
-	_world_grab_target_right_anchor = _world_grab_right_anchor
-	_update_two_hand_visual(left_controller.global_position, right_controller.global_position, _world_grab_initial_midpoint)
-
-
-func _update_world_grab() -> void:
-	if not _world_grab_active:
-		return
-
-	var up := _get_player_up()
-	var raw_vector: Vector3 = (right_controller.global_position - left_controller.global_position).slide(up)
-	var raw_midpoint: Vector3 = (left_controller.global_position + right_controller.global_position) * 0.5
-	# Low-pass filter controller delta to reduce jitter before applying scale/rotation.
-	_world_grab_prev_vector = _world_grab_prev_vector.lerp(raw_vector, world_grab_smooth_factor)
-	var current_vector: Vector3 = _world_grab_prev_vector
-	var current_distance: float = max(0.01, current_vector.length())
-	var current_midpoint: Vector3 = _world_grab_prev_midpoint.lerp(raw_midpoint, world_grab_smooth_factor)
-
-	if enable_two_hand_world_scale and _world_grab_initial_distance > 0.01:
-		var ratio: float = current_distance / _world_grab_initial_distance
-		var effective_ratio: float = ratio if not invert_two_hand_scale_direction else (1.0 / max(ratio, 0.0001))
-		# Ignore micro-changes to avoid jitter from controller noise.
-		if abs(effective_ratio - 1.0) > 0.01:
-			var scale_factor: float = 1.0 + (effective_ratio - 1.0) * world_scale_sensitivity
-			var target_scale: float = clampf(
-				_world_grab_initial_scale * scale_factor,
-				world_scale_min,
-				world_scale_max
-			)
-			_world_grab_current_scale = lerpf(_world_grab_current_scale, target_scale, world_grab_smooth_factor)
-			var anchor_point := xr_camera.global_transform.origin if xr_camera else player_body.global_transform.origin
-			XRServer.world_scale = _world_grab_current_scale
-			_reanchor_player(anchor_point)
-
-
-
-	# Update target anchors to account for scale about the initial midpoint.
-	var safe_scale: float = max(_world_grab_current_scale, 0.0001)
-	var scale_ratio: float = _world_grab_initial_scale / safe_scale
-	_world_grab_target_left_anchor = _world_grab_initial_midpoint + (_world_grab_left_anchor - _world_grab_initial_midpoint) * scale_ratio
-	_world_grab_target_right_anchor = _world_grab_initial_midpoint + (_world_grab_right_anchor - _world_grab_initial_midpoint) * scale_ratio
-
-	# Keep the original grab anchors fixed in world space (average correction).
-	var anchor_err_left := left_controller.global_position - _world_grab_target_left_anchor if _world_grab_left_anchor != Vector3.ZERO else Vector3.ZERO
-	var anchor_err_right := right_controller.global_position - _world_grab_target_right_anchor if _world_grab_right_anchor != Vector3.ZERO else Vector3.ZERO
-	var avg_err := (anchor_err_left + anchor_err_right) * 0.5
-	var vertical_correction := Vector3(0.0, -avg_err.y * world_grab_move_factor, 0.0)
-	var horizontal_correction := -Vector3(avg_err.x, 0.0, avg_err.z) * world_grab_move_factor
-	var anchor_max_step := 0.15
-	horizontal_correction = horizontal_correction.limit_length(anchor_max_step)
-	_world_grab_smoothed_move = _world_grab_smoothed_move.lerp(horizontal_correction + vertical_correction, world_grab_smooth_factor)
-	if debug_world_grab_logs:
-		print(
-			"[WorldGrab] Lpos=", left_controller.global_position,
-			" Rpos=", right_controller.global_position,
-			" Lanchor=", _world_grab_target_left_anchor,
-			" Ranchor=", _world_grab_target_right_anchor,
-			" Lerr=", anchor_err_left,
-			" Rerr=", anchor_err_right,
-			" AvgErr=", avg_err,
-			" AvgLen=", avg_err.length(),
-			" Scale=", _world_grab_current_scale
-		)
-	if _world_grab_smoothed_move.length_squared() > 0.000001:
-		var xf := player_body.global_transform
-		var lv = player_body.linear_velocity
-		var av = player_body.angular_velocity
-		xf.origin += _world_grab_smoothed_move
-		player_body.global_transform = xf
-		player_body.linear_velocity = lv
-		player_body.angular_velocity = av
-
-	# Prevent V1 rotation if V3 is active (handled there)
-	var v3_rotates := enable_two_hand_grab_v3 and _two_hand_grab_v3 and _two_hand_grab_v3.is_active()
-	if enable_two_hand_world_rotation and not v3_rotates:
-		var init_vec := _world_grab_initial_vector
-		var curr_vec := current_vector
-		if init_vec.length_squared() > 0.0001 and curr_vec.length_squared() > 0.0001:
-			# Rotate world opposite to hand rotation (negative sign).
-			var signed_angle := -init_vec.signed_angle_to(curr_vec, up) * world_rotation_sensitivity
-			var target_yaw := _world_grab_initial_yaw + signed_angle
-			var current_yaw := _get_yaw(player_body.global_transform)
-			var delta_yaw := wrapf(target_yaw - current_yaw, -PI, PI)
-			var rotation_deadzone := deg_to_rad(0.35)
-			if abs(delta_yaw) > rotation_deadzone:
-				var dot_sign := init_vec.normalized().dot(curr_vec.normalized())
-				var hands_crossed := dot_sign < 0.0
-				var max_step := deg_to_rad(world_rotation_max_delta_deg)
-				if hands_crossed:
-					max_step = abs(delta_yaw)  # allow full 180 catch-up when swapping
-				var applied := clampf(delta_yaw, -max_step, max_step)
-				if abs(applied) > 0.0001:
-					var lv = player_body.linear_velocity
-					var av = player_body.angular_velocity
-					var pivot := _get_two_hand_pivot_point(current_midpoint)
-					_rotate_body_around_point(applied, pivot)
-					player_body.linear_velocity = lv
-					player_body.angular_velocity = av
-	_world_grab_prev_midpoint = current_midpoint
-	_world_grab_prev_vector = current_vector
-	_update_two_hand_visual(left_controller.global_position, right_controller.global_position, current_midpoint)
 
 
 func _check_render_mode_reset(delta: float) -> void:
@@ -922,9 +713,8 @@ func _start_one_hand_grab(controller: XRController3D) -> void:
 	_one_hand_initial_controller_pos = controller.global_position
 	_one_hand_initial_body_pos = player_body.global_transform.origin
 	_one_hand_prev_body_pos = player_body.global_transform.origin
-	_one_hand_anchor_local = player_body.to_local(controller.global_position) if player_body else controller.global_position
-	# Store initial grab anchor in world space (used for relative mode visuals)
 	_one_hand_grab_anchor = controller.global_position
+	_one_hand_anchor_local = player_body.to_local(controller.global_position) if player_body else controller.global_position
 	_one_hand_rotation_pivot = _one_hand_grab_anchor
 	_one_hand_initial_dir2d = Vector2(controller.global_position.x - _one_hand_rotation_pivot.x, controller.global_position.z - _one_hand_rotation_pivot.z)
 	_one_hand_initial_yaw = _get_yaw(player_body.global_transform)
@@ -934,14 +724,14 @@ func _start_one_hand_grab(controller: XRController3D) -> void:
 func _update_one_hand_grab(controller: XRController3D, delta: float) -> void:
 	if not _one_hand_grab_active or not controller or not player_body:
 		return
-	# Anchor always follows player space; relative mode uses the hand delta for movement, but visuals/pivot stay player-relative
-	var anchor_move_world := player_body.to_global(_one_hand_anchor_local)
-	_one_hand_grab_anchor = anchor_move_world
-	_one_hand_rotation_pivot = anchor_move_world
+	# Anchored mode keeps a fixed world-space point. Relative mode keeps a local-space anchor.
+	if one_hand_grab_mode == OneHandGrabMode.RELATIVE:
+		_one_hand_grab_anchor = player_body.to_global(_one_hand_anchor_local)
+	_one_hand_rotation_pivot = _one_hand_grab_anchor
 	var offset: Vector3
 	if enable_one_hand_world_grab:
 		if one_hand_grab_mode == OneHandGrabMode.ANCHORED:
-			offset = (anchor_move_world - controller.global_position) * one_hand_world_move_sensitivity
+			offset = (_one_hand_grab_anchor - controller.global_position) * one_hand_world_move_sensitivity
 		else:
 			offset = (controller.global_position - _one_hand_initial_controller_pos) * one_hand_world_move_sensitivity
 		if invert_one_hand_grab_direction:
@@ -994,28 +784,12 @@ func _end_world_grab() -> void:
 	_world_grab_right_anchor = Vector3.ZERO
 	_world_grab_target_left_anchor = Vector3.ZERO
 	_world_grab_target_right_anchor = Vector3.ZERO
-	_world_grab_target_left_anchor = Vector3.ZERO
-	_world_grab_target_right_anchor = Vector3.ZERO
 	_clear_two_hand_visual()
 
 
 func set_player_gravity_enabled(enabled: bool) -> void:
 	player_gravity_enabled = enabled
 	_apply_player_gravity()
-
-
-func _handle_jump(delta: float) -> void:
-	if not jump_enabled or not player_body:
-		return
-	if _jump_cooldown_timer > 0.0:
-		_jump_cooldown_timer = max(0.0, _jump_cooldown_timer - delta)
-		return
-	var triggered := Input.is_action_just_pressed("jump")
-	if _input_binding_manager:
-		triggered = triggered or _input_binding_manager.is_action_just_triggered("jump")
-	if triggered:
-		player_body.apply_central_impulse(Vector3.UP * jump_impulse * player_body.mass)
-		_jump_cooldown_timer = jump_cooldown
 
 
 func set_manual_player_scale(scale: float) -> void:
@@ -1191,12 +965,12 @@ func _apply_settings_snapshot(data: Dictionary) -> void:
 	turn_deadzone = data.get("turn_deadzone", turn_deadzone)
 	snap_turn_cooldown = data.get("snap_turn_cooldown", snap_turn_cooldown)
 	invert_turn_x = data.get("invert_turn_x", invert_turn_x)
-	ui_scroll_steals_stick = data.get("ui_scroll_steals_stick", ui_scroll_steals_stick)
+	ui_scroll_steals_stick = false
 	ui_scroll_deadzone = data.get("ui_scroll_deadzone", ui_scroll_deadzone)
 	ui_scroll_wheel_factor = data.get("ui_scroll_wheel_factor", ui_scroll_wheel_factor)
 	hand_assignment = data.get("hand_assignment", hand_assignment)
-	enable_two_hand_world_scale = data.get("enable_two_hand_world_scale", enable_two_hand_world_scale)
-	enable_two_hand_world_rotation = data.get("enable_two_hand_world_rotation", enable_two_hand_world_rotation)
+	enable_two_hand_world_scale = false
+	enable_two_hand_world_rotation = false
 	world_scale_min = data.get("world_scale_min", world_scale_min)
 	world_scale_max = data.get("world_scale_max", world_scale_max)
 	world_scale_sensitivity = data.get("world_scale_sensitivity", world_scale_sensitivity)
@@ -1204,7 +978,7 @@ func _apply_settings_snapshot(data: Dictionary) -> void:
 	world_grab_move_factor = data.get("world_grab_move_factor", world_grab_move_factor)
 	world_grab_smooth_factor = data.get("world_grab_smooth_factor", world_grab_smooth_factor)
 	invert_two_hand_scale_direction = data.get("invert_two_hand_scale_direction", invert_two_hand_scale_direction)
-	show_two_hand_rotation_visual = data.get("show_two_hand_rotation_visual", show_two_hand_rotation_visual)
+	show_two_hand_rotation_visual = false
 	two_hand_left_action = data.get("two_hand_left_action", two_hand_left_action)
 	two_hand_right_action = data.get("two_hand_right_action", two_hand_right_action)
 	enable_one_hand_world_grab = data.get("enable_one_hand_world_grab", enable_one_hand_world_grab)
@@ -1214,16 +988,14 @@ func _apply_settings_snapshot(data: Dictionary) -> void:
 	invert_one_hand_grab_direction = data.get("invert_one_hand_grab_direction", invert_one_hand_grab_direction)
 	show_one_hand_grab_visual = data.get("show_one_hand_grab_visual", show_one_hand_grab_visual)
 	invert_one_hand_rotation = data.get("invert_one_hand_rotation", invert_one_hand_rotation)
-	jump_enabled = data.get("jump_enabled", jump_enabled)
-	jump_impulse = data.get("jump_impulse", jump_impulse)
-	jump_cooldown = data.get("jump_cooldown", jump_cooldown)
+	jump_enabled = false
 	player_gravity_enabled = data.get("player_gravity_enabled", player_gravity_enabled)
 	player_drag_force = data.get("player_drag_force", player_drag_force)
 	auto_respawn_enabled = data.get("auto_respawn_enabled", auto_respawn_enabled)
 	auto_respawn_distance = data.get("auto_respawn_distance", auto_respawn_distance)
 	hard_respawn_resets_settings = data.get("hard_respawn_resets_settings", hard_respawn_resets_settings)
 	# V2 Settings
-	enable_two_hand_grab_v2 = data.get("enable_two_hand_grab_v2", enable_two_hand_grab_v2)
+	enable_two_hand_grab_v2 = false
 	v2_scale_enabled = data.get("v2_scale_enabled", v2_scale_enabled)
 	v2_rotation_enabled = data.get("v2_rotation_enabled", v2_rotation_enabled)
 	v2_world_scale_min = data.get("v2_world_scale_min", v2_world_scale_min)
@@ -1232,6 +1004,7 @@ func _apply_settings_snapshot(data: Dictionary) -> void:
 	v2_right_action = data.get("v2_right_action", v2_right_action)
 	v2_show_visual = data.get("v2_show_visual", v2_show_visual)
 	v2_debug_logs = data.get("v2_debug_logs", v2_debug_logs)
+	enable_two_hand_grab_v3 = false
 	_apply_player_gravity()
 	_apply_player_drag()
 
@@ -1351,23 +1124,6 @@ func _clear_two_hand_visual() -> void:
 		_two_hand_midpoint_mesh.visible = false
 	_world_grab_left_anchor = Vector3.ZERO
 	_world_grab_right_anchor = Vector3.ZERO
-
-
-func _reanchor_player(anchor_point: Vector3) -> void:
-	if not player_body:
-		return
-	var current_anchor := xr_camera.global_transform.origin if xr_camera else player_body.global_transform.origin
-	var delta := current_anchor - anchor_point
-	if delta.length_squared() < 0.00000001:
-		return
-	var xf := player_body.global_transform
-	var lv := player_body.linear_velocity
-	var av := player_body.angular_velocity
-	xf.origin -= delta
-	player_body.global_transform = xf
-	player_body.linear_velocity = lv
-	player_body.angular_velocity = av
-
 
 func _set_one_hand_visual_style() -> void:
 	# Anchored = cyan, Relative = orange
@@ -1683,66 +1439,3 @@ func _reset_physics_hands() -> void:
 		right_hand.angular_velocity = Vector3.ZERO
 		right_hand.global_position = right_controller.global_position
 		right_hand.global_rotation = right_controller.global_rotation
-
-
-# === Two-Hand Grab V2 Helpers ===
-
-func _setup_two_hand_grab_v2() -> void:
-	"""Create and configure the V2 two-hand grab component."""
-	if _two_hand_grab_v2:
-		return  # Already setup
-	
-	_two_hand_grab_v2 = TwoHandGrabV2.new()
-	_two_hand_grab_v2.name = "TwoHandGrabV2"
-	add_child(_two_hand_grab_v2)
-	_two_hand_grab_v2.setup(player_body, left_controller, right_controller, xr_camera)
-	_sync_v2_settings()
-	print("PlayerMovementComponent: Two-Hand Grab V2 component initialized")
-
-
-func _sync_v2_settings() -> void:
-	"""Sync V2 component settings with exported values."""
-	if not _two_hand_grab_v2:
-		return
-	
-	_two_hand_grab_v2.scale_enabled = v2_scale_enabled
-	_two_hand_grab_v2.rotation_enabled = v2_rotation_enabled
-	_two_hand_grab_v2.world_scale_min = v2_world_scale_min
-	_two_hand_grab_v2.world_scale_max = v2_world_scale_max
-	_two_hand_grab_v2.left_action = v2_left_action
-	_two_hand_grab_v2.right_action = v2_right_action
-	_two_hand_grab_v2.show_visual = v2_show_visual
-	_two_hand_grab_v2.debug_logs = v2_debug_logs
-
-
-# === Two-Hand Grab V3 Helpers ===
-
-func _setup_two_hand_grab_v3() -> void:
-	"""Create and configure the V3 two-hand grab component."""
-	if _two_hand_grab_v3:
-		return  # Already setup
-	
-	_two_hand_grab_v3 = TwoHandGrabV3.new()
-	_two_hand_grab_v3.name = "TwoHandGrabV3"
-	add_child(_two_hand_grab_v3)
-	_two_hand_grab_v3.setup(player_body, left_controller, right_controller, xr_camera)
-	_sync_v3_settings()
-	print("PlayerMovementComponent: Two-Hand Grab V3 component initialized")
-
-
-func _sync_v3_settings() -> void:
-	"""Sync V3 component settings with exported values."""
-	if not _two_hand_grab_v3:
-		return
-	
-	_two_hand_grab_v3.scale_sensitivity = v3_scale_sensitivity
-	_two_hand_grab_v3.rotation_sensitivity = v3_rotation_sensitivity
-	_two_hand_grab_v3.translation_sensitivity = v3_translation_sensitivity
-	_two_hand_grab_v3.smoothing = v3_smoothing
-	_two_hand_grab_v3.invert_scale = v3_invert_scale
-	_two_hand_grab_v3.world_scale_min = v3_world_scale_min
-	_two_hand_grab_v3.world_scale_max = v3_world_scale_max
-	_two_hand_grab_v3.left_action = v3_left_action
-	_two_hand_grab_v3.right_action = v3_right_action
-	_two_hand_grab_v3.show_visual = v3_show_visual
-	_two_hand_grab_v3.debug_logs = v3_debug_logs

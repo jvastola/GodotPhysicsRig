@@ -22,7 +22,6 @@ const UI_PANEL_NAMES := [
 	"ColorPickerViewport3D",
 	"PolyToolViewport3D",
 	"ActionMapViewport3D",
-	"TwoHandGrabSettingsViewport3D",
 	# Keep PerformancePanelViewport3D as it's useful for managing panels
 ]
 

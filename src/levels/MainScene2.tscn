@@ -26,7 +26,6 @@
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/ShapeTool.tscn" id="24_5gfrw"]
 [ext_resource type="PackedScene" uid="uid://cqtv3jhgmgsfw" path="res://src/levels/poly_exports/poly_2025-12-09T16-25-02.gltf" id="25_ru24h"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/TwoHandGrabCube.tscn" id="26_b6rm8"]
-[ext_resource type="PackedScene" path="res://src/ui/TwoHandGrabSettingsViewport3D.tscn" id="27_wc14x"]
 [ext_resource type="PackedScene" path="res://src/ui/PassthroughSettingsViewport3D.tscn" id="28_1qsmp"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/WorldGrabSphere.tscn" id="29_wvysy"]
 [ext_resource type="PackedScene" uid="uid://cm8nv7v0apls3" path="res://src/objects/grabbables/GrappleHook.tscn" id="30_y4gp3"]
@@ -234,9 +233,6 @@ transform = Transform3D(1, 0, 0, 0, 1.6025667, 0, 0, 0, 1, 0, -1.54777, -7.05052
 [node name="TwoHandGrabCube" parent="." unique_id=1441243323 instance=ExtResource("26_b6rm8")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 1.5, 1.3955536)
 grab_mode = 0
-
-[node name="TwoHandGrabSettingsViewport3D" parent="." unique_id=1249878899 instance=ExtResource("27_wc14x")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 2.3, 1.3955536)
 
 [node name="PassthroughSettingsViewport3D" parent="." unique_id=711707377 instance=ExtResource("28_1qsmp")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.01244545, 2.3, -1.7094151)
