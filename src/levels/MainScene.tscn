@@ -301,10 +301,6 @@ collision_mask = 32
 [node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest/GridTargetBody/GridTargetBodyArea" unique_id=1858467520]
 shape = SubResource("BoxShape3D_body_grid")
 
-[node name="WindowWrapper" parent="." unique_id=858073771 instance=ExtResource("45_giw25")]
-transform = Transform3D(-0.2, 0, -3.019916e-08, 0, 0.2, 0, 3.019916e-08, 0, -0.2, 0, 1.8854713, -37.474968)
-content_viewport_scene = ExtResource("44_l4aac")
-
 [node name="island" parent="." unique_id=1304383343 instance=ExtResource("37_82eun")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0026522875, -0.009035587, -42.158504)
 
@@ -349,10 +345,17 @@ mesh = SubResource("BoxMesh_plasma_subdivided")
 [node name="OreDeposit3" parent="." unique_id=1310738100 instance=ExtResource("53_ore_deposit")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.6202674, 0.5, -35)
 
+[node name="WindowWrapper" parent="." unique_id=858073771 instance=ExtResource("45_giw25")]
+transform = Transform3D(-0.19999999, 0, -2.9802322e-08, 0, 0.2, 0, 2.9802322e-08, 0, -0.19999999, 2.3841858e-07, 1.8854713, -37.474968)
+visible = false
+content_viewport_scene = ExtResource("44_l4aac")
+
 [node name="InventoryUIViewport3D" parent="." unique_id=1812015456 instance=ExtResource("40_0bb85")]
 transform = Transform3D(-0.9984447, 0, 0.05575188, 0, 1, 0, -0.05575188, 0, -0.9984447, 3.9532697, 0.83622026, -34.532124)
+visible = false
 
 [node name="MovementSettingsViewport3D" parent="." unique_id=1913748936 instance=ExtResource("44_giw25")]
 transform = Transform3D(-0.4029544, 0, 0.9152201, 0, 1, 0, -0.9152201, 0, -0.4029544, -1.1318345, 0, -38.285004)
+visible = false
 
 [editable path="OreDeposit2"]

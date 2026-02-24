@@ -73,7 +73,16 @@ var _desktop_trigger_event: InputEventMouseButton = null
 @export var match_cube_and_physics_to_tracked_hand_mesh: bool = true
 @export var debug_physics_hand_scale_logs: bool = false
 @export var scale_rig_with_world_scale: bool = true
-@export var hide_head_mesh_in_vr: bool = true
+# When running in VR the camera is positioned at the
+# head mesh origin.  By default the interior faces are culled so
+# you end up "inside" the cube and can't see it.  Historically we
+# hid the head mesh entirely for the local VR helmet to avoid
+#(renderer) artifacts, but you can override this behaviour if you
+# want both the head *and* body visible in VR (e.g. for spectators
+# or when spawning XRPlayer instances for remote users).
+#
+# Set to `false` if you want the head mesh to remain visible in VR.
+@export var hide_head_mesh_in_vr: bool = false
 @export var auto_scale_camera_clip: bool = true
 @export_range(0.001, 5.0, 0.001) var camera_near_min: float = 0.005
 @export_range(0.01, 500.0, 0.01) var camera_near_max: float = 100.0
@@ -856,7 +865,13 @@ func _apply_camera_clip_scaling(scale_factor: float) -> void:
 
 
 func _update_local_mesh_visibility() -> void:
+	# head/body meshes are part of the local XRPlayer scene.  The
+	# body is always shown when `show_body_mesh` is true.  the head
+	# mesh used to be forcibly hidden in VR (see `hide_head_mesh_in_vr`)
+	# because the camera lives inside it.  You can now toggle that
+	# behaviour independently via the export flag above.
 	if head_mesh:
+		# head_mesh.visible = show_head_mesh *and* (not hidden for VR)
 		head_mesh.visible = show_head_mesh and not (is_vr_mode and hide_head_mesh_in_vr)
 	if body_mesh:
 		body_mesh.visible = show_body_mesh
