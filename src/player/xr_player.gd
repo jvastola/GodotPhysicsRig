@@ -70,6 +70,7 @@ var _desktop_trigger_event: InputEventMouseButton = null
 @export var auto_scale_physics_hands: bool = true
 @export var auto_scale_head: bool = true
 @export var auto_scale_hand_visuals: bool = true
+@export var match_cube_and_physics_to_tracked_hand_mesh: bool = true
 @export var debug_physics_hand_scale_logs: bool = false
 @export var scale_rig_with_world_scale: bool = true
 @export var hide_head_mesh_in_vr: bool = true
@@ -96,6 +97,8 @@ var _base_xr_camera_far: float = 4000.0
 var _base_desktop_camera_near: float = 0.05
 var _base_desktop_camera_far: float = 4000.0
 var _last_logged_physics_hand_scale: float = -1.0
+var _base_left_tracked_hand_global_scale: float = -1.0
+var _base_right_tracked_hand_global_scale: float = -1.0
 
 # Poke Interaction
 var left_poke_area: Area3D
@@ -630,6 +633,7 @@ func _cache_base_scales() -> void:
 		_base_desktop_camera_near = maxf(desktop_camera.near, 0.0001)
 		_base_desktop_camera_far = maxf(desktop_camera.far, _base_desktop_camera_near + 1.0)
 	_cache_hand_visual_data()
+	_cache_tracked_hand_scale_bases()
 
 
 func _cache_hand_visual_data() -> void:
@@ -658,13 +662,11 @@ func _apply_rig_scale() -> void:
 	var world_factor := XRServer.world_scale if scale_rig_with_world_scale else 1.0
 	var combined_scale := _manual_player_scale * world_factor
 	_current_rig_scale = combined_scale
+	var left_target_scale := combined_scale
+	var right_target_scale := combined_scale
 
 	if player_body:
 		player_body.scale = _base_player_body_scale * combined_scale
-	
-	if auto_scale_physics_hands:
-		_apply_physics_hand_scale(physics_hand_left, _base_left_hand_scale, combined_scale)
-		_apply_physics_hand_scale(physics_hand_right, _base_right_hand_scale, combined_scale)
 	
 	if auto_scale_head and head_area:
 		# XR tracking can ignore parent scale; compensate so the head area follows player scale.
@@ -677,20 +679,33 @@ func _apply_rig_scale() -> void:
 
 	if auto_scale_hand_visuals and not _hand_visual_nodes.is_empty():
 		for node in _hand_visual_nodes:
-			if node and is_instance_valid(node):
-				if node == left_watch and left_watch and left_watch.has_method("set_rig_scale_multiplier"):
-					left_watch.call("set_rig_scale_multiplier", combined_scale)
-					continue
-				var base_scale: Vector3 = _base_hand_visual_scales.get(node, node.scale)
-				if _use_direct_visual_scale(node):
-					node.scale = base_scale * combined_scale
-				else:
-					_scale_visual_node(node, base_scale, combined_scale)
+				if node and is_instance_valid(node):
+					if node == left_watch and left_watch and left_watch.has_method("set_rig_scale_multiplier"):
+						left_watch.call("set_rig_scale_multiplier", combined_scale)
+						continue
+					if _should_defer_cube_hand_scale(node):
+						continue
+					var base_scale: Vector3 = _base_hand_visual_scales.get(node, node.scale)
+					if _use_direct_visual_scale(node):
+						node.scale = base_scale * combined_scale
+					else:
+						_scale_visual_node(node, base_scale, combined_scale)
+
+	if match_cube_and_physics_to_tracked_hand_mesh:
+		left_target_scale = _get_tracked_hand_scale_factor(left_hand_skeleton, true, combined_scale)
+		right_target_scale = _get_tracked_hand_scale_factor(right_hand_skeleton, false, combined_scale)
+		_apply_cube_hand_mesh_scale(left_hand_mesh, left_target_scale)
+		_apply_cube_hand_mesh_scale(right_hand_mesh, right_target_scale)
+
+	if auto_scale_physics_hands:
+		_apply_physics_hand_scale(physics_hand_left, _base_left_hand_scale, left_target_scale)
+		_apply_physics_hand_scale(physics_hand_right, _base_right_hand_scale, right_target_scale)
+
 	if left_watch and is_instance_valid(left_watch) and left_watch.has_method("set_rig_scale_multiplier"):
 		left_watch.call("set_rig_scale_multiplier", combined_scale)
 	_apply_poke_scale(combined_scale)
 	_apply_camera_clip_scaling(combined_scale)
-	_maybe_log_physics_hand_scale(combined_scale)
+	_maybe_log_physics_hand_scale(combined_scale, left_target_scale, right_target_scale)
 
 
 func _apply_physics_hand_scale(hand: RigidBody3D, base_scale: Vector3, combined_scale: float) -> void:
@@ -702,7 +717,7 @@ func _apply_physics_hand_scale(hand: RigidBody3D, base_scale: Vector3, combined_
 	hand.scale = base_scale * combined_scale
 
 
-func _maybe_log_physics_hand_scale(combined_scale: float) -> void:
+func _maybe_log_physics_hand_scale(combined_scale: float, left_target_scale: float, right_target_scale: float) -> void:
 	if not debug_physics_hand_scale_logs:
 		return
 	if is_equal_approx(combined_scale, _last_logged_physics_hand_scale):
@@ -713,6 +728,11 @@ func _maybe_log_physics_hand_scale(combined_scale: float) -> void:
 	var right_mesh_scale := _node_scale_to_string(right_hand_mesh)
 	print("XRPlayer ScaleDebug: world=", snapped(XRServer.world_scale, 0.001), " manual=", snapped(_manual_player_scale, 0.001), " combined=", snapped(combined_scale, 0.001))
 	print("  left_hand_mesh(global)=", left_mesh_scale, " right_hand_mesh(global)=", right_mesh_scale)
+	print("  left_target_scale=", snapped(left_target_scale, 0.001), " right_target_scale=", snapped(right_target_scale, 0.001))
+	if left_hand_skeleton:
+		print("  left_tracked_hand(global)=", _node_scale_to_string(left_hand_skeleton))
+	if right_hand_skeleton:
+		print("  right_tracked_hand(global)=", _node_scale_to_string(right_hand_skeleton))
 	if left_hand_mesh:
 		var left_g := left_hand_mesh.global_transform.basis.get_scale()
 		var left_ratio := left_g.x / maxf(combined_scale, 0.0001)
@@ -734,6 +754,48 @@ func _node_scale_to_string(node: Node3D) -> String:
 		return "n/a"
 	var s: Vector3 = node.global_transform.basis.get_scale()
 	return "(%.4f, %.4f, %.4f)" % [s.x, s.y, s.z]
+
+
+func _cache_tracked_hand_scale_bases() -> void:
+	_base_left_tracked_hand_global_scale = _get_uniform_global_scale(left_hand_skeleton)
+	_base_right_tracked_hand_global_scale = _get_uniform_global_scale(right_hand_skeleton)
+
+
+func _get_uniform_global_scale(node: Node3D) -> float:
+	if not node:
+		return -1.0
+	var s: Vector3 = node.global_transform.basis.get_scale()
+	return (absf(s.x) + absf(s.y) + absf(s.z)) / 3.0
+
+
+func _get_tracked_hand_scale_factor(tracked_node: Node3D, is_left: bool, fallback_scale: float) -> float:
+	if not tracked_node:
+		return fallback_scale
+	var tracked_scale := _get_uniform_global_scale(tracked_node)
+	if tracked_scale <= 0.0001:
+		return fallback_scale
+
+	var base_scale := _base_left_tracked_hand_global_scale if is_left else _base_right_tracked_hand_global_scale
+	if base_scale <= 0.0001:
+		base_scale = tracked_scale
+		if is_left:
+			_base_left_tracked_hand_global_scale = base_scale
+		else:
+			_base_right_tracked_hand_global_scale = base_scale
+	if base_scale <= 0.0001:
+		return fallback_scale
+	return tracked_scale / base_scale
+
+
+func _apply_cube_hand_mesh_scale(hand_mesh_node: Node3D, target_scale: float) -> void:
+	if not hand_mesh_node:
+		return
+	var base_scale: Vector3 = _base_hand_visual_scales.get(hand_mesh_node, hand_mesh_node.scale)
+	_scale_visual_node(hand_mesh_node, base_scale, target_scale)
+
+
+func _should_defer_cube_hand_scale(node: Node3D) -> bool:
+	return match_cube_and_physics_to_tracked_hand_mesh and (node == left_hand_mesh or node == right_hand_mesh)
 
 
 func _use_direct_visual_scale(node: Node3D) -> bool:

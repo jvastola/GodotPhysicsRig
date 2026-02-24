@@ -68,8 +68,12 @@ size = Vector3(0.1, 0.1, 0.1)
 [sub_resource type="BoxShape3D" id="BoxShape3D_tqmwh"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_vf3tq"]
+size = Vector3(0.1, 0.1, 0.1)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hand"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_dcy27"]
+material = ExtResource("3_yb8bw")
 
 [node name="XRPlayer6" type="Node3D" unique_id=1985006532]
 script = ExtResource("1_player")
@@ -356,7 +360,6 @@ transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
 shape = SubResource("BoxShape3D_tqmwh")
 
 [node name="PhysicsHandLeftMesh" type="MeshInstance3D" parent="PhysicsHandLeft" unique_id=1450919141]
-transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_vf3tq")
 
@@ -381,9 +384,8 @@ shape = SubResource("BoxShape3D_hand")
 
 [node name="PhysicsHandRightMesh" type="MeshInstance3D" parent="PhysicsHandRight" unique_id=2008929583]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
-visible = false
 cast_shadow = 0
-mesh = SubResource("BoxMesh_hand")
+mesh = SubResource("BoxMesh_dcy27")
 
 [node name="PlayerMovementComponent" type="Node" parent="." unique_id=232556656]
 script = ExtResource("12_movement")
