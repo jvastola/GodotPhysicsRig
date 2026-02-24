@@ -34,6 +34,7 @@ extends RigidBody3D
 @export_range(0.5, 2.0, 0.05) var hit_sound_pitch_min: float = 0.8
 @export_range(0.5, 2.0, 0.05) var hit_sound_pitch_max: float = 1.2
 @export var hit_sound_path: String = "res://assets/audio/hitwood.ogg"
+@export var debug_scale_logs: bool = false
 
 # Release is handled via a single rising-edge check on `release_button` (ax_button)
 
@@ -59,6 +60,14 @@ var _is_pinch_grabbing: bool = false
 var _using_pinch_grab: bool = false
 var is_ghost_mode: bool = false
 var grab_sensor: Area3D = null
+var _main_collision_shape: CollisionShape3D = null
+var _main_mesh: MeshInstance3D = null
+var _grab_sensor_collision_shape: CollisionShape3D = null
+var _base_body_scale: Vector3 = Vector3.ONE
+var _base_collision_shape_scale: Vector3 = Vector3.ONE
+var _base_mesh_scale: Vector3 = Vector3.ONE
+var _base_grab_sensor_radius: float = 0.2
+var _current_scale_multiplier: float = 1.0
 
 
 func _ready() -> void:
@@ -87,6 +96,8 @@ func _ready() -> void:
 	
 	# Setup grab sensor
 	_setup_grab_sensor()
+	_cache_scale_bases()
+	set_hand_scale_multiplier(1.0)
 
 func _setup_grab_sensor() -> void:
 	grab_sensor = Area3D.new()
@@ -102,9 +113,74 @@ func _setup_grab_sensor() -> void:
 	sphere.radius = 0.2 # Detection radius
 	shape.shape = sphere
 	grab_sensor.add_child(shape)
+	_grab_sensor_collision_shape = shape
 	
 	grab_sensor.body_entered.connect(_on_sensor_body_entered)
 	grab_sensor.body_exited.connect(_on_sensor_body_exited)
+
+
+func _cache_scale_bases() -> void:
+	_base_body_scale = scale
+	_main_collision_shape = get_node_or_null("CollisionShape3D")
+	if _main_collision_shape:
+		_base_collision_shape_scale = _main_collision_shape.transform.basis.get_scale()
+	_main_mesh = _find_primary_mesh()
+	if _main_mesh:
+		_base_mesh_scale = _main_mesh.transform.basis.get_scale()
+	if _grab_sensor_collision_shape and _grab_sensor_collision_shape.shape is SphereShape3D:
+		var sphere := _grab_sensor_collision_shape.shape as SphereShape3D
+		_base_grab_sensor_radius = sphere.radius
+
+
+func _find_primary_mesh() -> MeshInstance3D:
+	for child in get_children():
+		if child is MeshInstance3D:
+			return child as MeshInstance3D
+	return null
+
+
+func set_hand_scale_multiplier(scale_multiplier: float) -> void:
+	_current_scale_multiplier = maxf(scale_multiplier, 0.0001)
+	# Keep RigidBody3D scale stable; scale child collider/mesh explicitly.
+	scale = _base_body_scale
+
+	if _main_collision_shape:
+		var c_xform := _main_collision_shape.transform
+		c_xform.basis = Basis.IDENTITY.scaled(_base_collision_shape_scale * _current_scale_multiplier)
+		_main_collision_shape.transform = c_xform
+
+	if _main_mesh:
+		var m_xform := _main_mesh.transform
+		m_xform.basis = Basis.IDENTITY.scaled(_base_mesh_scale * _current_scale_multiplier)
+		_main_mesh.transform = m_xform
+
+	if _grab_sensor_collision_shape and _grab_sensor_collision_shape.shape is SphereShape3D:
+		var sphere := _grab_sensor_collision_shape.shape as SphereShape3D
+		sphere.radius = _base_grab_sensor_radius * _current_scale_multiplier
+
+	if debug_scale_logs:
+		print("PhysicsHand ScaleDebug ", name, " mul=", snapped(_current_scale_multiplier, 0.001), " state=", get_scale_debug_state())
+
+
+func get_scale_debug_state() -> Dictionary:
+	var collider_scale := Vector3.ZERO
+	if _main_collision_shape:
+		collider_scale = _main_collision_shape.transform.basis.get_scale()
+	var mesh_scale := Vector3.ZERO
+	if _main_mesh:
+		mesh_scale = _main_mesh.transform.basis.get_scale()
+	var sensor_radius := -1.0
+	if _grab_sensor_collision_shape and _grab_sensor_collision_shape.shape is SphereShape3D:
+		sensor_radius = (_grab_sensor_collision_shape.shape as SphereShape3D).radius
+	return {
+		"name": name,
+		"multiplier": _current_scale_multiplier,
+		"node_local_scale": scale,
+		"node_global_scale": global_transform.basis.get_scale(),
+		"collider_local_scale": collider_scale,
+		"mesh_local_scale": mesh_scale,
+		"sensor_radius": sensor_radius,
+	}
 
 func _physics_process(delta: float) -> void:
 	if not is_instance_valid(target): return

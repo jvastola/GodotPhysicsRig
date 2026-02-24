@@ -74,6 +74,7 @@ size = Vector3(0.1, 0.1, 0.1)
 [node name="XRPlayer6" type="Node3D" unique_id=1985006532]
 script = ExtResource("1_player")
 desktop_extra_collider_offset = Vector3(0, 0, 0)
+debug_physics_hand_scale_logs = true
 
 [node name="BuildRoot" type="Node3D" parent="." unique_id=951936055]
 

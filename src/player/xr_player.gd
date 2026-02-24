@@ -70,6 +70,7 @@ var _desktop_trigger_event: InputEventMouseButton = null
 @export var auto_scale_physics_hands: bool = true
 @export var auto_scale_head: bool = true
 @export var auto_scale_hand_visuals: bool = true
+@export var debug_physics_hand_scale_logs: bool = false
 @export var scale_rig_with_world_scale: bool = true
 @export var hide_head_mesh_in_vr: bool = true
 @export var auto_scale_camera_clip: bool = true
@@ -94,6 +95,7 @@ var _base_xr_camera_near: float = 0.05
 var _base_xr_camera_far: float = 4000.0
 var _base_desktop_camera_near: float = 0.05
 var _base_desktop_camera_far: float = 4000.0
+var _last_logged_physics_hand_scale: float = -1.0
 
 # Poke Interaction
 var left_poke_area: Area3D
@@ -661,10 +663,8 @@ func _apply_rig_scale() -> void:
 		player_body.scale = _base_player_body_scale * combined_scale
 	
 	if auto_scale_physics_hands:
-		if physics_hand_left:
-			physics_hand_left.scale = _base_left_hand_scale * combined_scale
-		if physics_hand_right:
-			physics_hand_right.scale = _base_right_hand_scale * combined_scale
+		_apply_physics_hand_scale(physics_hand_left, _base_left_hand_scale, combined_scale)
+		_apply_physics_hand_scale(physics_hand_right, _base_right_hand_scale, combined_scale)
 	
 	if auto_scale_head and head_area:
 		# XR tracking can ignore parent scale; compensate so the head area follows player scale.
@@ -682,11 +682,83 @@ func _apply_rig_scale() -> void:
 					left_watch.call("set_rig_scale_multiplier", combined_scale)
 					continue
 				var base_scale: Vector3 = _base_hand_visual_scales.get(node, node.scale)
-				node.scale = base_scale * combined_scale
+				if _use_direct_visual_scale(node):
+					node.scale = base_scale * combined_scale
+				else:
+					_scale_visual_node(node, base_scale, combined_scale)
 	if left_watch and is_instance_valid(left_watch) and left_watch.has_method("set_rig_scale_multiplier"):
 		left_watch.call("set_rig_scale_multiplier", combined_scale)
 	_apply_poke_scale(combined_scale)
 	_apply_camera_clip_scaling(combined_scale)
+	_maybe_log_physics_hand_scale(combined_scale)
+
+
+func _apply_physics_hand_scale(hand: RigidBody3D, base_scale: Vector3, combined_scale: float) -> void:
+	if not hand:
+		return
+	if hand.has_method("set_hand_scale_multiplier"):
+		hand.call("set_hand_scale_multiplier", combined_scale)
+		return
+	hand.scale = base_scale * combined_scale
+
+
+func _maybe_log_physics_hand_scale(combined_scale: float) -> void:
+	if not debug_physics_hand_scale_logs:
+		return
+	if is_equal_approx(combined_scale, _last_logged_physics_hand_scale):
+		return
+	_last_logged_physics_hand_scale = combined_scale
+
+	var left_mesh_scale := _node_scale_to_string(left_hand_mesh)
+	var right_mesh_scale := _node_scale_to_string(right_hand_mesh)
+	print("XRPlayer ScaleDebug: world=", snapped(XRServer.world_scale, 0.001), " manual=", snapped(_manual_player_scale, 0.001), " combined=", snapped(combined_scale, 0.001))
+	print("  left_hand_mesh(global)=", left_mesh_scale, " right_hand_mesh(global)=", right_mesh_scale)
+	if left_hand_mesh:
+		var left_g := left_hand_mesh.global_transform.basis.get_scale()
+		var left_ratio := left_g.x / maxf(combined_scale, 0.0001)
+		print("  left_hand_mesh/global_to_combined_ratio=", snapped(left_ratio, 0.001))
+	if physics_hand_left:
+		if physics_hand_left.has_method("get_scale_debug_state"):
+			print("  left_physics=", str(physics_hand_left.call("get_scale_debug_state")))
+		else:
+			print("  left_physics(global)=", _node_scale_to_string(physics_hand_left))
+	if physics_hand_right:
+		if physics_hand_right.has_method("get_scale_debug_state"):
+			print("  right_physics=", str(physics_hand_right.call("get_scale_debug_state")))
+		else:
+			print("  right_physics(global)=", _node_scale_to_string(physics_hand_right))
+
+
+func _node_scale_to_string(node: Node3D) -> String:
+	if not node:
+		return "n/a"
+	var s: Vector3 = node.global_transform.basis.get_scale()
+	return "(%.4f, %.4f, %.4f)" % [s.x, s.y, s.z]
+
+
+func _use_direct_visual_scale(node: Node3D) -> bool:
+	# Controller mesh nodes inherit player/body scale, so they must use parent compensation.
+	# Hand-tracking skeleton meshes can bypass that inheritance, so keep direct scaling there.
+	return node == left_hand_skeleton or node == right_hand_skeleton
+
+
+func _scale_visual_node(node: Node3D, base_scale: Vector3, target_uniform_scale: float) -> void:
+	var parent_node: Node3D = node.get_parent_node_3d()
+	if not parent_node:
+		node.scale = base_scale * target_uniform_scale
+		return
+
+	var parent_scale: Vector3 = parent_node.global_transform.basis.get_scale()
+	var safe_parent_scale := Vector3(
+		maxf(absf(parent_scale.x), 0.0001),
+		maxf(absf(parent_scale.y), 0.0001),
+		maxf(absf(parent_scale.z), 0.0001)
+	)
+	node.scale = Vector3(
+		base_scale.x * target_uniform_scale / safe_parent_scale.x,
+		base_scale.y * target_uniform_scale / safe_parent_scale.y,
+		base_scale.z * target_uniform_scale / safe_parent_scale.z
+	)
 
 
 func _apply_camera_clip_scaling(scale_factor: float) -> void:
