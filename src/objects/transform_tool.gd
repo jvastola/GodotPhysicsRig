@@ -85,6 +85,7 @@ var _last_scale_sync_msec: Dictionary = {} # object_id -> msec
 var _last_synced_scale: Dictionary = {} # object_id -> Vector3
 var _was_grabbed_last_frame: bool = false
 var _last_network_sync_log_msec: int = 0
+var _warned_no_id_objects: Dictionary = {}
 
 const OWNERSHIP_REQUEST_RETRY_MS: int = 250
 const SCALE_SYNC_INTERVAL_MS: int = 50
@@ -633,6 +634,7 @@ func _clear_selection() -> void:
 	for node in _selected_objects:
 		_release_network_ownership_for_object(node)
 	_selected_objects.clear()
+	_warned_no_id_objects.clear()
 	_active_axis = Vector3.ZERO
 	_active_handle = null
 	_active_proj = 0.0
@@ -1058,10 +1060,44 @@ func _resolve_network_object_id(node: Node3D) -> String:
 			var save_id: String = String(raw_save_id) if raw_save_id != null else ""
 			if not save_id.is_empty():
 				return save_id
-		if probe.name.begins_with("obj_"):
+		if probe.name.begins_with("obj_") or probe.name.begins_with("static_"):
 			return probe.name
 		probe = probe.get_parent()
-	return ""
+		
+	# Could not resolve a save_id or obj_ name up the tree.
+	# We will auto-assign one so that static meshes (like the island) can be networked.
+	return _upgrade_to_networked_object(node)
+
+
+func _upgrade_to_networked_object(node: Node3D) -> String:
+	if not is_instance_valid(node):
+		return ""
+	if node == self:
+		return ""
+	
+	# Generate a save_id based on the node's path so it is deterministic across clients
+	var path_str := str(node.get_path())
+	var auto_id := "static_path_:" + path_str
+	
+	node.set_meta("save_id", auto_id)
+	
+	# Ensure the node has a StaticNetworkSync component attached
+	var sync_comp: Node = null
+	for child in node.get_children():
+		if child.name == "StaticNetworkSync":
+			sync_comp = child
+			break
+			
+	if not sync_comp:
+		var static_sync_script = load("res://src/objects/components/static_network_sync.gd")
+		if static_sync_script:
+			sync_comp = static_sync_script.new()
+			sync_comp.name = "StaticNetworkSync"
+			node.add_child(sync_comp)
+			if sync_comp.has_method("setup"):
+				sync_comp.setup(auto_id)
+				
+	return auto_id
 
 
 func _claim_network_ownership_for_selection() -> void:
@@ -1077,7 +1113,10 @@ func _claim_network_ownership_for_object(node: Node3D) -> void:
 	var object_id := _resolve_network_object_id(node)
 	if object_id.is_empty():
 		if network_debug_logs:
-			_network_log("ownership request skipped; no object id for %s path=%s" % [node.name, str(node.get_path())])
+			var instance_id = node.get_instance_id()
+			if not _warned_no_id_objects.has(instance_id):
+				_network_log("ownership request skipped; no object id for %s path=%s" % [node.name, str(node.get_path())])
+				_warned_no_id_objects[instance_id] = true
 		return
 	if _is_locally_authoritative_for_object(network_manager, object_id):
 		_owned_selected_object_ids[object_id] = true
@@ -1089,9 +1128,9 @@ func _claim_network_ownership_for_object(node: Node3D) -> void:
 	if _owned_selected_object_ids.has(object_id) and (now_msec - last_request_msec) < OWNERSHIP_REQUEST_RETRY_MS:
 		return
 	if network_manager.has_method("grab_object"):
-		network_manager.grab_object(object_id, "transform_tool")
+		network_manager.grab_object(object_id, "transform_tool", Vector3.ZERO, Quaternion.IDENTITY, node.scale)
 	elif network_manager.has_method("request_object_ownership"):
-		network_manager.request_object_ownership(object_id, "transform_tool")
+		network_manager.request_object_ownership(object_id, "transform_tool", Vector3.ZERO, Quaternion.IDENTITY, node.scale)
 	else:
 		return
 	_owned_selected_object_ids[object_id] = true
@@ -1130,7 +1169,8 @@ func _release_network_ownership_for_object(node: Node3D) -> void:
 		Vector3.ZERO,
 		Vector3.ZERO,
 		persist_mode,
-		"RELEASED_STATIC"
+		"RELEASED_STATIC",
+		node.scale
 	)
 	_set_local_network_component_ownership(node, false)
 	_network_log("released ownership for %s" % object_id)
@@ -1152,6 +1192,7 @@ func _release_all_owned_selection_objects() -> void:
 	_ownership_request_msec.clear()
 	_last_scale_sync_msec.clear()
 	_last_synced_scale.clear()
+	_warned_no_id_objects.clear()
 
 
 func _find_selected_object_by_id(object_id: String) -> Node3D:
@@ -1191,7 +1232,7 @@ func _broadcast_selected_transform_updates(force_scale_sync: bool = false, claim
 			continue
 		_set_local_network_component_ownership(node, true)
 		var rot: Quaternion = node.global_transform.basis.orthonormalized().get_rotation_quaternion().normalized()
-		network_manager.update_grabbed_object(object_id, node.global_position, rot)
+		network_manager.update_grabbed_object(object_id, node.global_position, rot, node.scale)
 		_maybe_broadcast_object_scale(network_manager, object_id, node.scale, force_scale_sync)
 		sent_count += 1
 	if network_debug_logs:

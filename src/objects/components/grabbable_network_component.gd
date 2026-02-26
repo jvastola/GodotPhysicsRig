@@ -29,21 +29,24 @@ func set_grabbed(grabbed: bool) -> void:
 func set_network_owner(is_owner: bool) -> void:
 	is_network_owner = is_owner
 
-func notify_grab(p_save_id: String, hand_name: String = "", rel_pos: Vector3 = Vector3.ZERO, rel_rot: Quaternion = Quaternion.IDENTITY) -> void:
+func notify_grab(p_save_id: String, hand_name: String = "", rel_pos: Vector3 = Vector3.ZERO, rel_rot: Quaternion = Quaternion.IDENTITY, scale: Variant = null) -> void:
 	if network_manager and is_network_owner:
-		network_manager.grab_object(p_save_id, hand_name, rel_pos, rel_rot)
+		if network_manager.has_method("request_object_ownership"):
+			network_manager.request_object_ownership(p_save_id, hand_name, rel_pos, rel_rot, scale)
+		else:
+			network_manager.grab_object(p_save_id, hand_name, rel_pos, rel_rot)
 
-func notify_release(p_save_id: String, position: Vector3, rotation: Quaternion, lin_vel: Vector3 = Vector3.ZERO, ang_vel: Vector3 = Vector3.ZERO, release_mode: String = "RELEASED_DYNAMIC") -> void:
+func notify_release(p_save_id: String, position: Vector3, rotation: Quaternion, lin_vel: Vector3 = Vector3.ZERO, ang_vel: Vector3 = Vector3.ZERO, release_mode: String = "RELEASED_DYNAMIC", scale: Variant = null) -> void:
 	if network_manager and is_network_owner:
-		network_manager.release_object(p_save_id, position, rotation, lin_vel, ang_vel, "placed_room", release_mode)
+		network_manager.release_object(p_save_id, position, rotation, lin_vel, ang_vel, "placed_room", release_mode, scale)
 
-func notify_update(p_save_id: String, position: Vector3, rotation: Quaternion) -> void:
+func notify_update(p_save_id: String, position: Vector3, rotation: Quaternion, scale: Variant = null) -> void:
 	if network_manager and is_network_owner:
-		network_manager.update_grabbed_object(p_save_id, position, rotation)
+		network_manager.update_grabbed_object(p_save_id, position, rotation, scale)
 
-func notify_update_with_offsets(p_save_id: String, position: Vector3, rotation: Quaternion, rel_pos: Vector3, rel_rot: Quaternion) -> void:
+func notify_update_with_offsets(p_save_id: String, position: Vector3, rotation: Quaternion, rel_pos: Vector3, rel_rot: Quaternion, scale: Variant = null) -> void:
 	if network_manager and is_network_owner:
-		network_manager.update_grabbed_object(p_save_id, position, rotation, rel_pos, rel_rot)
+		network_manager.update_grabbed_object(p_save_id, position, rotation, scale, rel_pos, rel_rot)
 
 func process_network_sync(delta: float) -> void:
 	# Update network position if we own this object (with delta compression)
@@ -71,12 +74,13 @@ func process_network_sync(delta: float) -> void:
 		network_update_timer = 0.0
 		
 		# For desktop grab, we also check if the RELATIVE offset changed (distance/rotation)
+		var current_scale = parent_grabbable.scale
 		if parent_grabbable.get("is_desktop_grabbed"):
 			var rel_pos = parent_grabbable.get("remote_grab_offset_pos")
 			var rel_rot = parent_grabbable.get("remote_grab_offset_rot")
-			notify_update_with_offsets(save_id, current_pos, current_rot, rel_pos, rel_rot)
+			notify_update_with_offsets(save_id, current_pos, current_rot, rel_pos, rel_rot, current_scale)
 		else:
-			notify_update(save_id, current_pos, current_rot)
+			notify_update(save_id, current_pos, current_rot, current_scale)
 			
 		last_network_position = current_pos
 		last_network_rotation = current_rot

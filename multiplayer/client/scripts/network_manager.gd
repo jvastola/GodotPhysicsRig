@@ -575,12 +575,23 @@ func get_player_avatar_texture(peer_id: String) -> ImageTexture:
 
 func _ensure_object_registry(object_id: String) -> Dictionary:
 	if not room_object_registry.has(object_id):
+		var initial_pos := Vector3.ZERO
+		var initial_rot := Quaternion.IDENTITY
+		var initial_scale := Vector3.ONE
+		
+		# Attempt to find the node if it already exists to capture its current transform
+		var existing = get_tree().current_scene.get_node_or_null(object_id) if get_tree().current_scene else null
+		if existing and existing is Node3D:
+			initial_pos = existing.global_position
+			initial_rot = existing.global_transform.basis.get_rotation_quaternion()
+			initial_scale = existing.scale
+		
 		room_object_registry[object_id] = {
 			"object_id": object_id,
 			"owner_id": _get_host_peer_id(),
 			"held_by": "",
-			"placed": false,
-			"persist_mode": "transient_held",
+			"placed": true, # Static island objects start placed
+			"persist_mode": "placed_room",
 			"sim_state": OBJECT_STATE_RELEASED_STATIC,
 			"state_version": 0,
 			"manifest_id": "",
@@ -588,8 +599,9 @@ func _ensure_object_registry(object_id: String) -> Dictionary:
 			"property_seq": 0,
 			"properties": {},
 			"scene_path": "",
-			"position": _vec3_to_dict(Vector3.ZERO),
-			"rotation": _quat_to_dict(Quaternion.IDENTITY),
+			"position": _vec3_to_dict(initial_pos),
+			"rotation": _quat_to_dict(initial_rot),
+			"scale": _vec3_to_dict(initial_scale),
 			"spawned_by": ""
 		}
 	return room_object_registry[object_id]
@@ -628,19 +640,9 @@ func _trace_object_state(object_id: String, state_name: String, state_version: i
 	print("[ObjectState] ", object_id, " v", state_version, " ", state_name, " via ", source)
 
 
-func request_object_ownership(object_id: String, hand_name: String = "", rel_pos: Vector3 = Vector3.ZERO, rel_rot: Quaternion = Quaternion.IDENTITY) -> void:
+func request_object_ownership(object_id: String, hand_name: String = "", rel_pos: Vector3 = Vector3.ZERO, rel_rot: Quaternion = Quaternion.IDENTITY, scale: Variant = null) -> void:
 	var my_id := get_nakama_user_id()
 	if my_id.is_empty() or object_id.is_empty():
-		return
-
-	if is_server():
-		_handle_ownership_request(my_id, {
-			"object_id": object_id,
-			"requester_id": my_id,
-			"hand_name": hand_name,
-			"rel_pos": _vec3_to_dict(rel_pos),
-			"rel_rot": _quat_to_dict(rel_rot)
-		})
 		return
 
 	var request_data = {
@@ -650,6 +652,13 @@ func request_object_ownership(object_id: String, hand_name: String = "", rel_pos
 		"rel_pos": _vec3_to_dict(rel_pos),
 		"rel_rot": _quat_to_dict(rel_rot)
 	}
+	if scale is Vector3: request_data["scale"] = _vec3_to_dict(scale)
+	elif scale is Dictionary: request_data["scale"] = scale
+
+	if is_server():
+		_handle_ownership_request(my_id, request_data)
+		return
+
 	NakamaManager.send_match_state(NakamaManager.MatchOpCode.OWNERSHIP_REQUEST, request_data)
 
 
@@ -658,6 +667,7 @@ func _handle_ownership_request(sender_id: String, data: Dictionary) -> void:
 		return
 
 	var object_id: String = data.get("object_id", "")
+	_ensure_static_node_upgraded(object_id)
 	var requester_id: String = data.get("requester_id", sender_id)
 	if object_id.is_empty() or requester_id.is_empty():
 		return
@@ -676,7 +686,8 @@ func _handle_ownership_request(sender_id: String, data: Dictionary) -> void:
 			"placed": false,
 			"persist_mode": "transient_held",
 			"sim_state": OBJECT_STATE_HELD,
-			"state_version": state_version
+			"state_version": state_version,
+			"scale": data.get("scale", _vec3_to_dict(Vector3.ONE))
 		})
 		_trace_object_state(object_id, OBJECT_STATE_HELD, state_version, "ownership_request")
 		grabbed_objects[object_id] = {
@@ -697,7 +708,8 @@ func _handle_ownership_request(sender_id: String, data: Dictionary) -> void:
 		grabbable_sync_update.emit(object_id, {
 			"is_held": true,
 			"state": OBJECT_STATE_HELD,
-			"state_version": state_version
+			"state_version": state_version,
+			"scale": _parse_vector3(data.get("scale", {}), Vector3.ONE)
 		})
 		var grant_data = {
 			"object_id": object_id,
@@ -709,6 +721,7 @@ func _handle_ownership_request(sender_id: String, data: Dictionary) -> void:
 			"hand_name": data.get("hand_name", ""),
 			"rel_pos": data.get("rel_pos", _vec3_to_dict(Vector3.ZERO)),
 			"rel_rot": data.get("rel_rot", _quat_to_dict(Quaternion.IDENTITY)),
+			"scale": data.get("scale", _vec3_to_dict(Vector3.ONE)),
 			"seq": state.get("seq", 0)
 		}
 		NakamaManager.send_match_state(NakamaManager.MatchOpCode.OWNERSHIP_GRANTED, grant_data)
@@ -726,6 +739,7 @@ func _handle_ownership_request(sender_id: String, data: Dictionary) -> void:
 
 func _handle_ownership_granted(_sender_id: String, data: Dictionary) -> void:
 	var object_id: String = data.get("object_id", "")
+	_ensure_static_node_upgraded(object_id)
 	if object_id.is_empty():
 		return
 
@@ -761,7 +775,8 @@ func _handle_ownership_granted(_sender_id: String, data: Dictionary) -> void:
 	grabbable_sync_update.emit(object_id, {
 		"is_held": true,
 		"state": state_name,
-		"state_version": incoming_version
+		"state_version": incoming_version,
+		"scale": _parse_vector3(data.get("scale", {}), Vector3.ONE)
 	})
 
 
@@ -775,6 +790,7 @@ func _handle_ownership_denied(_sender_id: String, data: Dictionary) -> void:
 
 func _handle_ownership_released(sender_id: String, data: Dictionary) -> void:
 	var object_id: String = data.get("object_id", "")
+	_ensure_static_node_upgraded(object_id)
 	if object_id.is_empty():
 		return
 	var incoming_version := int(data.get("state_version", 0))
@@ -800,15 +816,16 @@ func _handle_ownership_released(sender_id: String, data: Dictionary) -> void:
 		"placed": true,
 		"persist_mode": persist_mode,
 		"sim_state": release_mode,
-		"state_version": incoming_version
+		"state_version": incoming_version,
+		"scale": data.get("scale", _vec3_to_dict(Vector3.ONE))
 	})
 	_trace_object_state(object_id, release_mode, incoming_version, "ownership_released")
 	ownership_changed.emit(object_id, "", sender_id)
 
 
-func grab_object(object_id: String, hand_name: String = "", rel_pos: Vector3 = Vector3.ZERO, rel_rot: Quaternion = Quaternion.IDENTITY) -> void:
+func grab_object(object_id: String, hand_name: String = "", rel_pos: Vector3 = Vector3.ZERO, rel_rot: Quaternion = Quaternion.IDENTITY, scale: Variant = null) -> void:
 	var my_id = get_nakama_user_id()
-	request_object_ownership(object_id, hand_name, rel_pos, rel_rot)
+	request_object_ownership(object_id, hand_name, rel_pos, rel_rot, scale)
 	grabbed_objects[object_id] = {
 		"owner_peer_id": my_id,
 		"is_grabbed": true,
@@ -816,7 +833,7 @@ func grab_object(object_id: String, hand_name: String = "", rel_pos: Vector3 = V
 	}
 
 
-func release_object(object_id: String, final_pos: Vector3, final_rot: Quaternion, lin_vel: Vector3 = Vector3.ZERO, ang_vel: Vector3 = Vector3.ZERO, persist_mode: String = "placed_room", release_mode: String = OBJECT_STATE_RELEASED_DYNAMIC) -> void:
+func release_object(object_id: String, final_pos: Vector3, final_rot: Quaternion, lin_vel: Vector3 = Vector3.ZERO, ang_vel: Vector3 = Vector3.ZERO, persist_mode: String = "placed_room", release_mode: String = OBJECT_STATE_RELEASED_DYNAMIC, scale: Variant = null) -> void:
 	var my_id = get_nakama_user_id()
 	if grabbed_objects.has(object_id): grabbed_objects.erase(object_id)
 	if _last_object_rep_send_msec.has(object_id):
@@ -834,8 +851,13 @@ func release_object(object_id: String, final_pos: Vector3, final_rot: Quaternion
 		"release_mode": release_mode,
 		"state_version": state_version
 	}
+	if scale is Vector3: 
+		release_data["scale"] = _vec3_to_dict(scale)
+	elif scale is Dictionary:
+		release_data["scale"] = scale
+	
 	NakamaManager.send_match_state(NakamaManager.MatchOpCode.RELEASE_OBJECT, release_data)
-	NakamaManager.send_match_state(NakamaManager.MatchOpCode.OWNERSHIP_RELEASED, {
+	var ownership_data = {
 		"object_id": object_id,
 		"released_by": my_id,
 		"owner_id": "",
@@ -844,8 +866,14 @@ func release_object(object_id: String, final_pos: Vector3, final_rot: Quaternion
 		"state_version": state_version,
 		"pos": _vec3_to_dict(final_pos),
 		"rot": _quat_to_dict(final_rot)
-	})
-	_update_object_registry_state(object_id, {
+	}
+	if scale is Vector3:
+		ownership_data["scale"] = _vec3_to_dict(scale)
+	elif scale is Dictionary:
+		ownership_data["scale"] = scale
+		
+	NakamaManager.send_match_state(NakamaManager.MatchOpCode.OWNERSHIP_RELEASED, ownership_data)
+	var registry_update = {
 		"owner_id": "",
 		"held_by": "",
 		"placed": true,
@@ -854,11 +882,17 @@ func release_object(object_id: String, final_pos: Vector3, final_rot: Quaternion
 		"state_version": state_version,
 		"position": _vec3_to_dict(final_pos),
 		"rotation": _quat_to_dict(final_rot)
-	})
+	}
+	if scale is Vector3:
+		registry_update["scale"] = _vec3_to_dict(scale)
+	elif scale is Dictionary:
+		registry_update["scale"] = scale
+		
+	_update_object_registry_state(object_id, registry_update)
 	grabbable_released.emit(object_id, my_id)
 
 
-func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion, rel_pos: Variant = null, rel_rot: Variant = null) -> void:
+func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion, scale: Variant = null, rel_pos: Variant = null, rel_rot: Variant = null) -> void:
 	if object_id.is_empty():
 		return
 	var my_id := get_nakama_user_id()
@@ -884,6 +918,7 @@ func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion, rel
 		"state_version": state_version,
 		"is_held": true
 	}
+	if scale is Vector3: update_data["scale"] = scale
 	if rel_pos is Vector3: update_data["rel_pos"] = rel_pos
 	if rel_rot is Quaternion: update_data["rel_rot"] = rel_rot
 
@@ -898,6 +933,8 @@ func update_grabbed_object(object_id: String, pos: Vector3, rot: Quaternion, rel
 			"state_version": state_version,
 			"is_held": true
 		}
+		if scale is Vector3: packet["scale"] = _vec3_to_dict(scale)
+		elif scale is Dictionary: packet["scale"] = scale
 		if rel_pos is Vector3: packet["rel_pos"] = _vec3_to_dict(rel_pos)
 		if rel_rot is Quaternion: packet["rel_rot"] = _quat_to_dict(rel_rot)
 		_livekit_wrapper.send_json_packet(packet, LIVEKIT_TOPIC_REP_OBJECT, false)
@@ -1019,7 +1056,9 @@ func spawn_network_object_with_mode(scene_path: String, position: Vector3, persi
 	return object_id
 
 
-func _do_spawn_object(scene_path: String, position: Vector3, object_id: String, persist_mode: String = "") -> void:
+func _do_spawn_object(scene_path: String, position: Vector3, object_id: String, persist_mode: String = "", initial_scale: Vector3 = Vector3.ONE) -> void:
+	if scene_path.is_empty():
+		return
 	if scene_path.begins_with("primitive:"):
 		var primitive_type := scene_path.trim_prefix("primitive:")
 		_do_spawn_primitive_object(primitive_type, position, object_id)
@@ -1037,6 +1076,7 @@ func _do_spawn_object(scene_path: String, position: Vector3, object_id: String, 
 		world.add_child(instance)
 		if instance is Node3D:
 			instance.global_position = position
+			instance.scale = initial_scale
 		elif instance is Node2D:
 			instance.global_position = Vector2(position.x, position.y)
 		if not persist_mode.is_empty() and instance.has_method("set_release_persist_mode"):
@@ -1270,6 +1310,7 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 				grabbable_sync_update.emit(release_data.object_id, {
 					"position": _parse_vector3(release_data.pos),
 					"rotation": _parse_quaternion(release_data.get("rot", {})),
+					"scale": _parse_vector3(release_data.get("scale", {}), Vector3.ONE),
 					"linear_velocity": _parse_vector3(release_data.get("lin_vel", {})),
 					"angular_velocity": _parse_vector3(release_data.get("ang_vel", {})),
 					"is_held": false,
@@ -1283,9 +1324,11 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 			update_data = bytes_to_var(data)
 			
 		if update_data is Dictionary and update_data.has("object_id") and update_data.has("pos") and update_data.has("rot"):
-			var state = _ensure_object_registry(update_data.object_id)
+			var object_id: String = update_data.object_id
+			_ensure_static_node_upgraded(object_id)
+			var state = _ensure_object_registry(object_id)
 			var incoming_version := int(update_data.get("state_version", 0))
-			if not _is_transform_version_valid(update_data.object_id, incoming_version):
+			if not _is_transform_version_valid(object_id, incoming_version):
 				return
 			if String(state.get("sim_state", OBJECT_STATE_RELEASED_STATIC)) != OBJECT_STATE_HELD:
 				return
@@ -1295,6 +1338,7 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 			var sync_data = {
 				"position": _parse_vector3(update_data.pos),
 				"rotation": _parse_quaternion(update_data.rot),
+				"scale": _parse_vector3(update_data.get("scale", {}), Vector3.ONE),
 				"is_held": bool(update_data.get("is_held", true)),
 				"state": update_data.get("state", OBJECT_STATE_HELD),
 				"state_version": incoming_version
@@ -1345,10 +1389,11 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 			_handle_snapshot_done(peer_id, data)
 
 
-func _parse_vector3(data) -> Vector3:
+func _parse_vector3(data, default_value: Vector3 = Vector3.ZERO) -> Vector3:
 	if data is Vector3: return data
-	if data is Dictionary: return Vector3(data.get("x", 0), data.get("y", 0), data.get("z", 0))
-	return Vector3.ZERO
+	if data is Dictionary and data.size() >= 3: 
+		return Vector3(data.get("x", default_value.x), data.get("y", default_value.y), data.get("z", default_value.z))
+	return default_value
 
 func _parse_color(data) -> Color:
 	if data is Color: return data
@@ -1412,6 +1457,7 @@ func _apply_livekit_object_update(sender_identity: String, update_data: Dictiona
 	if not update_data.has("object_id") or not update_data.has("pos") or not update_data.has("rot"):
 		return
 	var object_id: String = update_data.object_id
+	_ensure_static_node_upgraded(object_id)
 	var state = _ensure_object_registry(object_id)
 	var incoming_version := int(update_data.get("state_version", 0))
 	if not _is_transform_version_valid(object_id, incoming_version):
@@ -1432,7 +1478,8 @@ func _apply_livekit_object_update(sender_identity: String, update_data: Dictiona
 	if update_data.has("rel_rot"): sync_data["rel_rot"] = _parse_quaternion(update_data.rel_rot)
 	_update_object_registry_state(object_id, {
 		"position": update_data.pos,
-		"rotation": update_data.rot
+		"rotation": update_data.rot,
+		"scale": update_data.get("scale", _vec3_to_dict(Vector3.ONE))
 	})
 	grabbable_sync_update.emit(object_id, sync_data)
 
@@ -1479,6 +1526,17 @@ func _apply_property_update(sender_identity: String, data: Dictionary) -> void:
 func _apply_network_property_to_node(object_id: String, property_name: String, value: Variant) -> void:
 	if object_id.is_empty() or property_name.is_empty():
 		return
+		
+	# Special case for static objects upgraded via TransformTool	
+	if object_id.begins_with("static_path_:"):
+		_ensure_static_node_upgraded(object_id)
+		# We route the property update through the grabbable sync update signal so the attached
+		# StaticNetworkSync handles interpolation logic just like it handles transforms.
+		if property_name == "scale":
+			var vec_val = _parse_vector3(value)
+			grabbable_sync_update.emit(object_id, {"scale": vec_val})
+		return
+		
 	var scene := get_tree().current_scene
 	if scene == null:
 		return
@@ -1605,14 +1663,25 @@ func _apply_snapshot_object_state(object_state: Dictionary) -> void:
 	for key in object_state.keys():
 		normalized[key] = object_state[key]
 	room_object_registry[object_id] = normalized
+	
+	# Apply initial transform from properties if available (restored from snapshot)
+	var props: Dictionary = normalized.get("properties", {})
+	var final_scale: Vector3 = Vector3.ONE
+	if props.has("scale"):
+		final_scale = _parse_vector3(props["scale"], Vector3.ONE)
+	elif normalized.has("scale"):
+		final_scale = _parse_vector3(normalized["scale"], Vector3.ONE)
+		
 	var path: String = object_state.get("scene_path", "")
 	var pos: Vector3 = _parse_vector3(object_state.get("position", object_state.get("pos", {})))
-	if path.is_empty():
-		return
-	var existing := get_tree().current_scene.get_node_or_null(object_id) if get_tree().current_scene else null
+	
+	var existing = get_tree().current_scene.get_node_or_null(object_id) if get_tree().current_scene else null
 	if existing:
+		if existing is Node3D:
+			existing.scale = final_scale
 		return
-	_do_spawn_object(path, pos, object_id, object_state.get("persist_mode", "placed_room"))
+		
+	_do_spawn_object(path, pos, object_id, object_state.get("persist_mode", "placed_room"), final_scale)
 
 
 func _handle_peer_disconnect_objects(peer_id: String) -> void:
@@ -1675,3 +1744,31 @@ func is_voice_transmitting() -> bool:
 		VoiceMode.ALWAYS_ON: return true
 		VoiceMode.PUSH_TO_TALK: return is_push_to_talk_pressed
 	return false
+
+
+func _ensure_static_node_upgraded(object_id: String) -> void:
+	if not object_id.begins_with("static_path_:"):
+		return
+	var path_str = object_id.substr(13) # length of "static_path_:"
+	var node = get_node_or_null(path_str)
+	if not node or not node is Node3D:
+		return
+	if node.has_meta("save_id"):
+		return
+	
+	node.set_meta("save_id", object_id)
+	
+	var sync_comp: Node = null
+	for child in node.get_children():
+		if child.name == "StaticNetworkSync":
+			sync_comp = child
+			break
+			
+	if not sync_comp:
+		var static_sync_script = load("res://src/objects/components/static_network_sync.gd")
+		if static_sync_script:
+			sync_comp = static_sync_script.new()
+			sync_comp.name = "StaticNetworkSync"
+			node.add_child(sync_comp)
+			if sync_comp.has_method("setup"):
+				sync_comp.setup(object_id)

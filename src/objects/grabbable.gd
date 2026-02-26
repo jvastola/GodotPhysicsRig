@@ -286,7 +286,7 @@ func try_grab(hand: RigidBody3D) -> bool:
 	
 	# Notify network
 	if network_component:
-		network_component.notify_grab(save_id)
+		network_component.notify_grab(save_id, "", Vector3.ZERO, Quaternion.IDENTITY, scale)
 	
 	grabbed.emit(hand)
 	print("Grabbable: Object grabbed by ", hand.name)
@@ -402,7 +402,8 @@ func release() -> void:
 			release_global_transform.basis.get_rotation_quaternion(),
 			hand_velocity,
 			hand_angular_velocity,
-			release_mode
+			release_mode,
+			release_global_transform.basis.get_scale()
 		)
 		network_component.set_network_owner(false)
 		network_component.set_grabbed(false)
@@ -740,6 +741,11 @@ func _on_network_sync(data: Dictionary) -> void:
 		current_quat = current_quat.normalized()
 		var interpolated = current_quat.slerp(target_rot, 0.3)
 		global_transform.basis = Basis(interpolated)
+		
+	if data.has("scale"):
+		var target_scale = data["scale"]
+		if target_scale is Vector3:
+			scale = scale.lerp(target_scale, 0.3)
 
 
 func _apply_network_state_mode(mode: String, data: Dictionary = {}) -> void:
