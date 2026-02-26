@@ -350,12 +350,7 @@ func _process(delta: float) -> void:
 				hand_capsule_setup(1, tracker)
 
 	_update_hand_tracking_ui_pinches()
-	_process_poke_and_pinch(delta)
-
-	var current_world_scale := XRServer.world_scale
-	if not is_equal_approx(current_world_scale, _last_world_scale):
-		_last_world_scale = current_world_scale
-		_apply_rig_scale()
+	_sync_rig_scale_with_world_scale()
 
 	if movement_component:
 		movement_component.process_turning(delta)
@@ -371,6 +366,9 @@ func _process(delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_sync_rig_scale_with_world_scale()
+	_process_poke_and_pinch(delta)
+
 	# Handle raycasts in physics process to avoid Jolt "Space state inaccessible" errors
 	if _left_index_pinch_active:
 		if left_hand_ray_cast:
@@ -397,6 +395,18 @@ func _physics_process(delta: float) -> void:
 		movement_component.physics_process_locomotion(delta)
 
 	_sync_head_follow_rigidbody_shape(delta)
+
+
+func _sync_rig_scale_with_world_scale() -> void:
+	var current_world_scale := XRServer.world_scale
+	if is_equal_approx(current_world_scale, _last_world_scale):
+		return
+	_last_world_scale = current_world_scale
+	_apply_rig_scale()
+
+
+func force_world_scale_sync() -> void:
+	_sync_rig_scale_with_world_scale()
 
 
 func _check_initial_mode() -> void:
@@ -1296,16 +1306,17 @@ func _process_poke_and_pinch(_delta: float) -> void:
 	var left_tracker := XRServer.get_tracker("/user/hand_tracker/left") as XRHandTracker
 	var right_tracker := XRServer.get_tracker("/user/hand_tracker/right") as XRHandTracker
 
+	# World scale is needed for the tracker-space fallback path.
+	# Preferred path uses the rendered hand skeleton tip transform directly.
+	var ws := maxf(XRServer.world_scale, 0.0001)
+
 	# --- Left Hand ---
 	if left_tracker and left_tracker.has_tracking_data:
 		# Update Poke Position (Index Tip = 10)
-		var index_tip: Transform3D = left_tracker.get_hand_joint_transform(10 as XRHandTracker.HandJoint)
-		# Transform to world space
-		if xr_origin:
-			var world_tip = (xr_origin.global_transform * index_tip).orthonormalized()
-			if left_poke_area:
-				left_poke_area.global_transform = world_tip
-				_handle_poke_physics(left_poke_area, left_poke_visual, true)
+		var left_tip_world := _get_index_tip_world_transform(left_tracker, left_hand_skeleton, ws)
+		if left_poke_area and left_tip_world != Transform3D():
+			left_poke_area.global_transform = left_tip_world
+			_handle_poke_physics(left_poke_area, left_poke_visual, true)
 		
 		# Update Pinch Grab
 		var pinch_strength = _get_manual_pinch_strength(left_tracker, 10)
@@ -1317,12 +1328,10 @@ func _process_poke_and_pinch(_delta: float) -> void:
 	# --- Right Hand ---
 	if right_tracker and right_tracker.has_tracking_data:
 		# Update Poke Position
-		var index_tip: Transform3D = right_tracker.get_hand_joint_transform(10 as XRHandTracker.HandJoint)
-		if xr_origin:
-			var world_tip = (xr_origin.global_transform * index_tip).orthonormalized()
-			if right_poke_area:
-				right_poke_area.global_transform = world_tip
-				_handle_poke_physics(right_poke_area, right_poke_visual, false)
+		var right_tip_world := _get_index_tip_world_transform(right_tracker, right_hand_skeleton, ws)
+		if right_poke_area and right_tip_world != Transform3D():
+			right_poke_area.global_transform = right_tip_world
+			_handle_poke_physics(right_poke_area, right_poke_visual, false)
 
 		# Update Pinch Grab
 		var pinch_strength = _get_manual_pinch_strength(right_tracker, 10)
@@ -1330,6 +1339,23 @@ func _process_poke_and_pinch(_delta: float) -> void:
 			physics_hand_right.set_pinch_grab(pinch_strength > _pinch_threshold)
 	else:
 		if right_poke_area: right_poke_area.visible = false
+
+
+func _get_index_tip_world_transform(tracker: XRHandTracker, hand_skeleton_node: Node, ws: float) -> Transform3D:
+	# Prefer skeleton tip pose so poke sits exactly on the rendered fingertip.
+	var skeleton := hand_skeleton_node as Skeleton3D
+	if skeleton and skeleton.get_bone_count() > 10:
+		var tip_local: Transform3D = skeleton.get_bone_global_pose(10)
+		return (skeleton.global_transform * tip_local).orthonormalized()
+
+	if not xr_origin:
+		return Transform3D()
+
+	# Fallback to raw tracker-space joint transform.
+	var index_tip: Transform3D = tracker.get_hand_joint_transform(10 as XRHandTracker.HandJoint)
+	var adjusted := index_tip
+	adjusted.origin /= ws
+	return (xr_origin.global_transform * adjusted).orthonormalized()
 
 
 func _handle_poke_physics(area: Area3D, visual: MeshInstance3D, is_left: bool) -> void:
