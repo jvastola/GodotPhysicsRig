@@ -37,6 +37,13 @@ class_name TransformTool
 @export var handle_color_y: Color = Color(0.3, 1.0, 0.3, 0.85)
 @export var handle_color_z: Color = Color(0.3, 0.5, 1.0, 0.85)
 
+# === Scaling ===
+@export_group("Scaling")
+@export var scale_controls_with_tool: bool = true
+@export var scale_controls_with_player: bool = false # Legacy toggle kept for old scenes.
+@export_range(0.05, 100.0, 0.05) var controls_scale_min: float = 0.1
+@export_range(0.1, 1000.0, 0.1) var controls_scale_max: float = 100.0
+
 # === Child Nodes (created dynamically) ===
 var raycast: RayCast3D
 var ray_visual: MeshInstance3D
@@ -65,6 +72,8 @@ var _rotate_last_angle: float = 0.0
 var _scale_reference: float = 0.1
 var _last_center: Vector3 = Vector3.ZERO
 var _last_half_size: Vector3 = Vector3.ZERO
+var _controls_scale_multiplier: float = 1.0
+var _last_applied_controls_scale: float = -1.0
 
 
 func _ready() -> void:
@@ -76,6 +85,7 @@ func _ready() -> void:
 	_create_hit_marker()
 	_setup_selection_bounds()
 	_setup_selection_handles()
+	_update_controls_scale(true)
 	_apply_indicator_size()
 	
 	print("TransformTool: Ready with indicator size ", indicator_size)
@@ -137,9 +147,8 @@ func _create_hit_marker() -> void:
 	hit_marker.name = "TransformToolHitMarker"
 	
 	var sphere = SphereMesh.new()
-	sphere.radius = 0.02
-	sphere.height = 0.04
 	hit_marker.mesh = sphere
+	_apply_hit_marker_size()
 	
 	var mat = StandardMaterial3D.new()
 	mat.albedo_color = ray_hit_color
@@ -153,6 +162,7 @@ func _create_hit_marker() -> void:
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
 	
+	_update_controls_scale()
 	_ensure_visuals_in_tree()
 	
 	if not is_grabbed or not is_instance_valid(grabbing_hand):
@@ -337,8 +347,17 @@ func _adjust_indicator_size(delta_input: float) -> void:
 func _apply_indicator_size() -> void:
 	if indicator_mesh and indicator_mesh.mesh is SphereMesh:
 		var sphere = indicator_mesh.mesh as SphereMesh
-		sphere.radius = indicator_size * 0.5
-		sphere.height = indicator_size
+		var scaled_size := maxf(indicator_size * _controls_scale_multiplier, 0.001)
+		sphere.radius = scaled_size * 0.5
+		sphere.height = scaled_size
+
+
+func _apply_hit_marker_size() -> void:
+	if hit_marker and hit_marker.mesh is SphereMesh:
+		var sphere := hit_marker.mesh as SphereMesh
+		var marker_size := maxf(0.04 * _controls_scale_multiplier, 0.002)
+		sphere.radius = marker_size * 0.5
+		sphere.height = marker_size
 
 
 func _set_visuals_visible(visible_state: bool) -> void:
@@ -732,6 +751,7 @@ func _position_handles(center: Vector3, half_size: Vector3) -> void:
 		return
 	var has_selection := half_size != Vector3.ZERO
 	var abs_half := Vector3(abs(half_size.x), abs(half_size.y), abs(half_size.z))
+	var control_scale := _controls_scale_multiplier
 	for handle in _selection_handles:
 		if not is_instance_valid(handle):
 			continue
@@ -742,13 +762,13 @@ func _position_handles(center: Vector3, half_size: Vector3) -> void:
 		var axis: Vector3 = handle.get_meta("selection_axis", Vector3.ZERO)
 		var mode: String = handle.get_meta("selection_mode", "translate")
 		var axis_len: float = abs(axis.x) * abs_half.x + abs(axis.y) * abs_half.y + abs(axis.z) * abs_half.z
-		var extra: float = handle_offset
+		var extra: float = handle_offset * control_scale
 		if mode == "translate":
-			extra += handle_length * 0.6
+			extra += handle_length * 0.6 * control_scale
 		elif mode == "scale":
-			extra += 0.05
+			extra += 0.05 * control_scale
 		else:
-			extra += 0.1
+			extra += 0.1 * control_scale
 		var pos := center + axis.normalized() * (axis_len + extra)
 		if mode == "rotate":
 			var y := axis.normalized()
@@ -761,6 +781,7 @@ func _position_handles(center: Vector3, half_size: Vector3) -> void:
 			# Basis.looking_at aims -Z to target; flip to make +Z point outward
 			var h_basis := Basis.looking_at(-axis.normalized(), up)
 			handle.global_transform = Transform3D(h_basis, pos)
+		handle.scale = Vector3.ONE * control_scale
 
 
 func _begin_handle_drag(handle: Node) -> void:
@@ -915,6 +936,34 @@ func _any_perpendicular(axis: Vector3) -> Vector3:
 	if abs(n.dot(Vector3.UP)) < 0.99:
 		return n.cross(Vector3.UP).normalized()
 	return n.cross(Vector3.FORWARD).normalized()
+
+
+func _update_controls_scale(force: bool = false) -> void:
+	var next_scale := _resolve_controls_scale_multiplier()
+	if not force and is_equal_approx(next_scale, _last_applied_controls_scale):
+		return
+	_controls_scale_multiplier = next_scale
+	_last_applied_controls_scale = next_scale
+	_apply_indicator_size()
+	_apply_hit_marker_size()
+
+
+func _resolve_controls_scale_multiplier() -> float:
+	if not scale_controls_with_tool and not scale_controls_with_player:
+		return 1.0
+	return clampf(_get_tool_scale_multiplier(), controls_scale_min, controls_scale_max)
+
+
+func _get_tool_scale_multiplier() -> float:
+	var global_scale := global_transform.basis.get_scale()
+	var approx_uniform := (absf(global_scale.x) + absf(global_scale.y) + absf(global_scale.z)) / 3.0
+	if is_finite(approx_uniform):
+		return maxf(approx_uniform, 0.0001)
+	var local_scale := scale
+	var local_uniform := (absf(local_scale.x) + absf(local_scale.y) + absf(local_scale.z)) / 3.0
+	if is_finite(local_uniform):
+		return maxf(local_uniform, 0.0001)
+	return 1.0
 
 
 # === Public API ===

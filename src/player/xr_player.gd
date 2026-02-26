@@ -650,6 +650,10 @@ func set_scale_rig_with_world_scale(enabled: bool) -> void:
 	_apply_rig_scale()
 
 
+func get_rig_scale_multiplier() -> float:
+	return maxf(_current_rig_scale, 0.0001)
+
+
 func _cache_base_scales() -> void:
 	if player_body:
 		_base_player_body_scale = player_body.scale
