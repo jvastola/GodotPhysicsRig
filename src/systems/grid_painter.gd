@@ -104,17 +104,24 @@ var _save_timer: float = 0.0
 var _network_update_pending: bool = false
 var _network_update_timer: float = 0.0
 var _last_paint_time: float = 0.0
+var _cached_other_painters: Array[Node] = []
+var _painters_cache_valid: bool = false
+var _cached_network_component: Node = null
+var _network_component_cached: bool = false
 const SAVE_DEBOUNCE_TIME: float = 0.5  # Save at most every 0.5 seconds during continuous painting
 const NETWORK_UPDATE_DEBOUNCE_TIME: float = 3.0  # Wait 3 seconds after last paint before sending
 const NETWORK_UPDATE_IDLE_CHECK: float = 0.1  # Check every 0.1 seconds if painting has stopped
 
 func _ready() -> void:
-	print("GridPainter: _ready() called, load_for_player: ", load_for_player)
+	if developer_mode:
+		print("GridPainter: _ready() called, load_for_player: ", load_for_player)
 	_rng.randomize()
 	_load_handler_script()
-	print("GridPainter: Registered surfaces: ", _surfaces.keys())
+	if developer_mode:
+		print("GridPainter: Registered surfaces: ", _surfaces.keys())
 	# Always load saved grid data so both player and preview grids show the same state
-	print("GridPainter: Loading saved grid data from: ", _save_path)
+	if developer_mode:
+		print("GridPainter: Loading saved grid data from: ", _save_path)
 	load_grid_data(_save_path)
 	# Defer surface resolution and texture application to ensure player meshes are ready
 	call_deferred("_deferred_init")
@@ -136,7 +143,8 @@ func _process(delta: float) -> void:
 			# User stopped painting, send update now
 			_network_update_pending = false
 			_trigger_network_avatar_update()
-			print("GridPainter: Sending avatar update after ", snappedf(time_since_last_paint, 0.1), "s idle")
+			if developer_mode:
+				print("GridPainter: Sending avatar update after ", snappedf(time_since_last_paint, 0.1), "s idle")
 
 
 func _schedule_save() -> void:
@@ -157,12 +165,15 @@ func _schedule_network_update() -> void:
 
 func _deferred_init() -> void:
 	"""Deferred initialization to ensure player meshes are ready"""
-	print("GridPainter: Resolving surface nodes...")
+	if developer_mode:
+		print("GridPainter: Resolving surface nodes...")
 	_resolve_all_surface_nodes()
 	_attach_handler_scripts()
-	print("GridPainter: Applying all surface textures, surfaces count: ", _surfaces.size())
+	if developer_mode:
+		print("GridPainter: Applying all surface textures, surfaces count: ", _surfaces.size())
 	_apply_all_surface_textures()
-	print("GridPainter: _ready() complete")
+	if developer_mode:
+		print("GridPainter: _ready() complete")
 
 
 func _load_handler_script() -> void:
@@ -327,23 +338,29 @@ func _resolve_all_surface_nodes() -> void:
 func _resolve_surface_paths(surface: SurfaceSlot) -> void:
 	var base := _get_surface_base(surface)
 	if base == null:
-		print("GridPainter: Cannot resolve paths for surface ", surface.id, " - base is null")
+		if developer_mode:
+			print("GridPainter: Cannot resolve paths for surface ", surface.id, " - base is null")
 		return
-	print("GridPainter: Resolving surface ", surface.id, " from base: ", base.name)
+	if developer_mode:
+		print("GridPainter: Resolving surface ", surface.id, " from base: ", base.name)
 	if surface.target_relative != NodePath(""):
 		var target_node := base.get_node_or_null(surface.target_relative)
 		if target_node and target_node is MeshInstance3D:
 			surface.resolved_target_path = target_node.get_path()
-			print("GridPainter:   Target resolved: ", surface.resolved_target_path)
+			if developer_mode:
+				print("GridPainter:   Target resolved: ", surface.resolved_target_path)
 		else:
-			print("GridPainter:   Target NOT found at: ", surface.target_relative)
+			if developer_mode:
+				print("GridPainter:   Target NOT found at: ", surface.target_relative)
 	if surface.paint_relative != NodePath(""):
 		var paint_node := base.get_node_or_null(surface.paint_relative)
 		if paint_node and paint_node is MeshInstance3D:
 			surface.resolved_paint_path = paint_node.get_path()
-			print("GridPainter:   Paint resolved: ", surface.resolved_paint_path)
+			if developer_mode:
+				print("GridPainter:   Paint resolved: ", surface.resolved_paint_path)
 		else:
-			print("GridPainter:   Paint NOT found at: ", surface.paint_relative)
+			if developer_mode:
+				print("GridPainter:   Paint NOT found at: ", surface.paint_relative)
 	surface.resolved_extra_paths = []
 	for extra in surface.extra_targets:
 		var extra_node := base.get_node_or_null(extra)
@@ -399,25 +416,37 @@ func _apply_all_surface_textures() -> void:
 
 func _apply_surface_texture(surface: SurfaceSlot, apply_primary: bool = true, apply_extras: bool = true) -> void:
 	if not surface:
-		print("GridPainter: _apply_surface_texture - surface is null")
+		if developer_mode:
+			print("GridPainter: _apply_surface_texture - surface is null")
 		return
-	print("GridPainter: Applying texture for surface: ", surface.id)
+	if developer_mode:
+		print("GridPainter: Applying texture for surface: ", surface.id)
 	if not surface.texture:
 		surface.texture = _build_texture_from_surface(surface)
 	if apply_primary:
 		var target_node := _resolve_surface_node(surface, true)
 		if target_node:
-			print("GridPainter: Found target node for ", surface.id, ": ", target_node.name)
-			var cube_mesh := _build_cube_mesh_for_node(surface, target_node)
-			_assign_texture_to_mesh(target_node, surface.texture, cube_mesh)
+			if developer_mode:
+				print("GridPainter: Found target node for ", surface.id, ": ", target_node.name)
+			# Only rebuild the mesh if the node doesn't already have an ArrayMesh
+			if not target_node.mesh or not target_node.mesh is ArrayMesh:
+				var cube_mesh := _build_cube_mesh_for_node(surface, target_node)
+				_assign_texture_to_mesh(target_node, surface.texture, cube_mesh)
+			else:
+				_assign_texture_to_mesh(target_node, surface.texture, null)
 		else:
-			print("GridPainter: No target node found for ", surface.id)
+			if developer_mode:
+				print("GridPainter: No target node found for ", surface.id)
 	if apply_extras:
 		for idx in range(surface.resolved_extra_paths.size()):
 			var extra_node := _resolve_surface_node(surface, true, idx)
 			if extra_node:
-				var cube_mesh := _build_cube_mesh_for_node(surface, extra_node)
-				_assign_texture_to_mesh(extra_node, surface.texture, cube_mesh)
+				# Only rebuild the mesh if the node doesn't already have an ArrayMesh
+				if not extra_node.mesh or not extra_node.mesh is ArrayMesh:
+					var cube_mesh := _build_cube_mesh_for_node(surface, extra_node)
+					_assign_texture_to_mesh(extra_node, surface.texture, cube_mesh)
+				else:
+					_assign_texture_to_mesh(extra_node, surface.texture, null)
 
 func _build_cube_mesh_for_node(surface: SurfaceSlot, node: MeshInstance3D) -> ArrayMesh:
 	var cube_size := _get_mesh_size_for_node(node)
@@ -481,9 +510,7 @@ func _build_texture_from_surface(surface: SurfaceSlot) -> ImageTexture:
 	for gy in range(surface.grid_h()):
 		for gx in range(surface.grid_w()):
 			var color: Color = surface.grid_colors[gy][gx]
-			for py in range(TILE_PIXELS):
-				for px in range(TILE_PIXELS):
-					img.set_pixel(gx * TILE_PIXELS + px, gy * TILE_PIXELS + py, color)
+			img.fill_rect(Rect2i(gx * TILE_PIXELS, gy * TILE_PIXELS, TILE_PIXELS, TILE_PIXELS), color)
 	
 	if developer_mode:
 		print("GridPainter: Built texture for surface '", surface.id, "': ", w, "x", h, " pixels (", surface.grid_w(), "x", surface.grid_h(), " grid cells)")
@@ -491,6 +518,17 @@ func _build_texture_from_surface(surface: SurfaceSlot) -> ImageTexture:
 		print("  Face offsets: ", surface.face_offsets)
 	
 	return ImageTexture.create_from_image(img)
+
+
+func _update_texture_cell(surface: SurfaceSlot, gx: int, gy: int) -> void:
+	"""Incrementally update a single cell in the texture without rebuilding the entire image"""
+	if not surface.texture:
+		surface.texture = _build_texture_from_surface(surface)
+		return
+	var img := surface.texture.get_image()
+	var color: Color = surface.grid_colors[gy][gx]
+	img.fill_rect(Rect2i(gx * TILE_PIXELS, gy * TILE_PIXELS, TILE_PIXELS, TILE_PIXELS), color)
+	surface.texture.update(img)
 
 func _generate_cube_mesh_with_uvs_for_surface(surface: SurfaceSlot, cube_size: Vector3 = Vector3(1, 1, 1)) -> ArrayMesh:
 	if surface.face_cell_dims.size() != 6 or surface.face_offsets.size() != 6:
@@ -568,7 +606,8 @@ func set_cell_color(x: int, y: int, color: Color, origin: NodePath = NodePath(""
 	if not surface or x < 0 or y < 0 or x >= surface.grid_w() or y >= surface.grid_h():
 		return
 	surface.grid_colors[y][x] = color
-	surface.texture = _build_texture_from_surface(surface)
+	# Incrementally update only the changed cell instead of rebuilding the entire texture
+	_update_texture_cell(surface, x, y)
 	_apply_surface_texture(surface)
 	if origin != NodePath(""):
 		var origin_node := get_node_or_null(origin)
@@ -618,7 +657,8 @@ func save_grid_data(path: String = _save_path) -> void:
 		var json_str := JSON.stringify({"surfaces": payload})
 		file.store_string(json_str)
 		file.close()
-		print("GridPainter: Saved ", payload.keys().size(), " surfaces to: ", path)
+		if developer_mode:
+			print("GridPainter: Saved ", payload.keys().size(), " surfaces to: ", path)
 		# Notify other grid painters to refresh (e.g., player's grid painter)
 		_notify_other_grid_painters()
 	else:
@@ -630,15 +670,21 @@ func _notify_other_grid_painters() -> void:
 	var tree := get_tree()
 	if not tree:
 		return
-	# Find all GridPainter nodes in the scene
-	var all_painters: Array[Node] = []
-	_find_grid_painters_recursive(tree.root, all_painters)
-	for painter in all_painters:
+	# Use cached painter list if available, otherwise rebuild
+	if not _painters_cache_valid:
+		_cached_other_painters.clear()
+		_find_grid_painters_recursive(tree.root, _cached_other_painters)
+		_painters_cache_valid = true
+	for painter in _cached_other_painters:
 		if painter == self:
+			continue
+		if not is_instance_valid(painter):
+			_painters_cache_valid = false
 			continue
 		if painter.has_method("refresh_all_surfaces"):
 			painter.call_deferred("refresh_all_surfaces")
-			print("GridPainter: Notified ", painter.name, " to refresh")
+			if developer_mode:
+				print("GridPainter: Notified ", painter.name, " to refresh")
 	
 	# Schedule network avatar update if this is the player's grid painter
 	# (uses debouncing to avoid flooding the network)
@@ -652,23 +698,34 @@ func _find_grid_painters_recursive(node: Node, result: Array[Node]) -> void:
 	for child in node.get_children():
 		_find_grid_painters_recursive(child, result)
 
+
+func _invalidate_painter_cache() -> void:
+	"""Call this when the scene tree changes to force re-discovery of GridPainter nodes"""
+	_painters_cache_valid = false
+	_network_component_cached = false
+	_cached_network_component = null
+
 func load_grid_data(path: String = _save_path) -> void:
 	const DEFAULT_PATH := "res://assets/textures/grid_painter_surfaces.json"
 	var load_path := path
 	
 	# If no saved file exists, try to load from default
 	if not FileAccess.file_exists(path):
-		print("GridPainter: No save file found at: ", path)
+		if developer_mode:
+			print("GridPainter: No save file found at: ", path)
 		if FileAccess.file_exists(DEFAULT_PATH):
-			print("GridPainter: Loading default surfaces from: ", DEFAULT_PATH)
+			if developer_mode:
+				print("GridPainter: Loading default surfaces from: ", DEFAULT_PATH)
 			load_path = DEFAULT_PATH
 		else:
-			print("GridPainter: No default file found either, skipping load")
+			if developer_mode:
+				print("GridPainter: No default file found either, skipping load")
 			return
 	
 	var file := FileAccess.open(load_path, FileAccess.READ)
 	if not file:
-		print("GridPainter: Failed to open file: ", load_path)
+		if developer_mode:
+			print("GridPainter: Failed to open file: ", load_path)
 		return
 	var json := JSON.new()
 	var file_content := file.get_as_text()
@@ -679,17 +736,23 @@ func load_grid_data(path: String = _save_path) -> void:
 		return
 	var data: Variant = json.get_data()
 	if not data.has("surfaces"):
-		print("GridPainter: File has no 'surfaces' key: ", load_path)
+		if developer_mode:
+			print("GridPainter: File has no 'surfaces' key: ", load_path)
 		return
-	print("GridPainter: Loading ", data["surfaces"].keys().size(), " surfaces from: ", load_path)
+	if developer_mode:
+		print("GridPainter: Loading ", data["surfaces"].keys().size(), " surfaces from: ", load_path)
 	for id in data["surfaces"].keys():
 		var surface := _get_surface(id)
 		if surface:
 			_deserialize_surface(surface, data["surfaces"][id])
-			surface.texture = _build_texture_from_surface(surface)
-			print("GridPainter: Loaded surface '", id, "' with grid size ", surface.grid_w(), "x", surface.grid_h())
+			# Skip texture build here — _deferred_init() -> _apply_all_surface_textures() will do it.
+			# Mark texture as stale so it gets rebuilt on first use.
+			surface.texture = null
+			if developer_mode:
+				print("GridPainter: Loaded surface '", id, "' with grid size ", surface.grid_w(), "x", surface.grid_h())
 		else:
-			print("GridPainter: Surface '", id, "' not found in registered surfaces")
+			if developer_mode:
+				print("GridPainter: Surface '", id, "' not found in registered surfaces")
 
 func reset_grid_data(path: String = _save_path, remove_save_file: bool = true) -> void:
 	for surface in _surfaces.values():
@@ -738,7 +801,8 @@ func _deserialize_surface(surface: SurfaceSlot, payload: Dictionary) -> void:
 				var cd = row_data[x]
 				surface.grid_colors[y][x] = Color(cd["r"], cd["g"], cd["b"], cd["a"])
 				loaded_count += 1
-		print("GridPainter: Deserialized ", loaded_count, " color cells for surface")
+		if developer_mode:
+			print("GridPainter: Deserialized ", loaded_count, " color cells for surface")
 
 func _convert_grid_to_face_colors(surface: SurfaceSlot) -> Array:
 	var out: Array = []
@@ -852,12 +916,14 @@ func debug_print_grid(surface_id: String = "") -> void:
 
 func refresh_all_surfaces() -> void:
 	"""Reload saved data and reapply all surface textures. Call after edits to update player meshes."""
-	print("GridPainter: Refreshing all surfaces...")
+	if developer_mode:
+		print("GridPainter: Refreshing all surfaces...")
 	if load_for_player:
 		load_grid_data(_save_path)
 	_resolve_all_surface_nodes()
 	_apply_all_surface_textures()
-	print("GridPainter: Refresh complete")
+	if developer_mode:
+		print("GridPainter: Refresh complete")
 
 
 func get_surface_texture(surface_id: String) -> ImageTexture:
@@ -872,6 +938,13 @@ func get_surface_texture(surface_id: String) -> ImageTexture:
 
 func _trigger_network_avatar_update() -> void:
 	"""Trigger a network update to send the updated avatar to other players"""
+	# Use cached reference if available
+	if _network_component_cached and is_instance_valid(_cached_network_component):
+		_cached_network_component.call_deferred("send_avatar_texture")
+		if developer_mode:
+			print("GridPainter: Triggered network avatar update (cached)")
+		return
+	
 	# Find the PlayerNetworkComponent in the scene
 	var network_component: Node = null
 	
@@ -894,12 +967,18 @@ func _trigger_network_avatar_update() -> void:
 			if network_component:
 				break
 	
+	# Cache the result for future calls
+	_cached_network_component = network_component
+	_network_component_cached = true
+	
 	if network_component:
 		# Defer the call to ensure textures are fully updated
 		network_component.call_deferred("send_avatar_texture")
-		print("GridPainter: Triggered network avatar update")
+		if developer_mode:
+			print("GridPainter: Triggered network avatar update")
 	else:
-		print("GridPainter: Could not find PlayerNetworkComponent to trigger avatar update")
+		if developer_mode:
+			print("GridPainter: Could not find PlayerNetworkComponent to trigger avatar update")
 
 
 func force_network_avatar_update() -> void:
@@ -907,4 +986,5 @@ func force_network_avatar_update() -> void:
 	if load_for_player:
 		_network_update_pending = false
 		_trigger_network_avatar_update()
-		print("GridPainter: Forced immediate network avatar update")
+		if developer_mode:
+			print("GridPainter: Forced immediate network avatar update")
