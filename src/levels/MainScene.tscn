@@ -18,7 +18,7 @@
 [ext_resource type="PackedScene" uid="uid://cdgp2jenr70oq" path="res://src/objects/grabbables/TrianglePointTool.tscn" id="28_triangle_tool"]
 [ext_resource type="PackedScene" uid="uid://cqtv3jhgmgsfw" path="res://src/levels/poly_exports/poly_2025-12-09T16-25-02.gltf" id="28_wb7rf"]
 [ext_resource type="PackedScene" uid="uid://wly7in1mfwww" path="res://src/objects/grabbables/PolyTool.tscn" id="29_poly_tool"]
-[ext_resource type="PackedScene" path="res://src/objects/TransformTool.tscn" id="33_transform_tool"]
+[ext_resource type="PackedScene" uid="uid://o3q2q4e8c7mg" path="res://src/objects/TransformTool.tscn" id="33_transform_tool"]
 [ext_resource type="Script" uid="uid://df75mfql4rt54" path="res://src/systems/tool_pool_manager.gd" id="34_tool_pool"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/TwoHandGrabCube.tscn" id="36_two_hand_cube"]
 [ext_resource type="PackedScene" uid="uid://bdgtb4clc5scx" path="res://src/levels/island.tscn" id="37_82eun"]
@@ -203,6 +203,7 @@ grab_mode = 0
 
 [node name="TransformTool" parent="Node3D" unique_id=1583429753 instance=ExtResource("33_transform_tool")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.1291399, -0.5, -3)
+network_debug_logs = true
 grab_mode = 0
 
 [node name="GrappleHook" parent="." unique_id=2106789012 instance=ExtResource("42_grapple_hook")]

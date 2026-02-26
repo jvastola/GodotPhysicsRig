@@ -44,6 +44,10 @@ class_name TransformTool
 @export_range(0.05, 100.0, 0.05) var controls_scale_min: float = 0.1
 @export_range(0.1, 1000.0, 0.1) var controls_scale_max: float = 100.0
 
+# === Networking ===
+@export_group("Networking")
+@export var network_debug_logs: bool = false
+
 # === Child Nodes (created dynamically) ===
 var raycast: RayCast3D
 var ray_visual: MeshInstance3D
@@ -74,6 +78,18 @@ var _last_center: Vector3 = Vector3.ZERO
 var _last_half_size: Vector3 = Vector3.ZERO
 var _controls_scale_multiplier: float = 1.0
 var _last_applied_controls_scale: float = -1.0
+var _network_manager: Node = null
+var _owned_selected_object_ids: Dictionary = {} # object_id -> true while this tool owns selection authority
+var _ownership_request_msec: Dictionary = {} # object_id -> last ownership request tick
+var _last_scale_sync_msec: Dictionary = {} # object_id -> msec
+var _last_synced_scale: Dictionary = {} # object_id -> Vector3
+var _was_grabbed_last_frame: bool = false
+var _last_network_sync_log_msec: int = 0
+
+const OWNERSHIP_REQUEST_RETRY_MS: int = 250
+const SCALE_SYNC_INTERVAL_MS: int = 50
+const SCALE_SYNC_EPSILON: float = 0.0005
+const NETWORK_LOG_INTERVAL_MS: int = 250
 
 
 func _ready() -> void:
@@ -92,8 +108,7 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
-	# Visuals are recreated on demand in _ensure_visuals_in_tree()
-	pass
+	_release_all_owned_selection_objects()
 
 
 func _create_raycast() -> void:
@@ -101,6 +116,7 @@ func _create_raycast() -> void:
 	raycast.name = "TransformRaycast"
 	raycast.target_position = Vector3(0, 0, -ray_length)
 	raycast.enabled = true
+	raycast.exclude_parent = true
 	raycast.collision_mask = 1  # World/handles layer
 	raycast.collide_with_areas = true
 	raycast.collide_with_bodies = true
@@ -164,10 +180,23 @@ func _physics_process(delta: float) -> void:
 	
 	_update_controls_scale()
 	_ensure_visuals_in_tree()
+	_refresh_raycast_exceptions()
 	
-	if not is_grabbed or not is_instance_valid(grabbing_hand):
+	if not is_grabbed:
+		if _was_grabbed_last_frame:
+			_broadcast_selected_transform_updates(true, false)
+			_release_all_owned_selection_objects()
+			_was_grabbed_last_frame = false
 		_set_visuals_visible(false)
 		return
+	if not is_desktop_grabbed and not is_instance_valid(grabbing_hand):
+		if _was_grabbed_last_frame:
+			_broadcast_selected_transform_updates(true, false)
+			_release_all_owned_selection_objects()
+			_was_grabbed_last_frame = false
+		_set_visuals_visible(false)
+		return
+	_was_grabbed_last_frame = true
 	
 	_process_input(delta)
 	_process_raycast()
@@ -208,6 +237,10 @@ func _ensure_visuals_in_tree() -> void:
 
 
 func _process_input(delta: float) -> void:
+	if is_desktop_grabbed:
+		_process_desktop_input(delta)
+		return
+
 	var controller = _get_controller()
 	if not controller:
 		return
@@ -256,6 +289,43 @@ func _process_input(delta: float) -> void:
 		_adjust_indicator_size(axis_input.x * delta)
 
 
+func _process_desktop_input(delta: float) -> void:
+	_is_remove_mode = Input.is_action_pressed("grip_click")
+	var trigger_pressed = Input.is_action_pressed("trigger_click")
+
+	# Handle selection / handle dragging
+	if trigger_pressed and not _was_trigger_pressed:
+		if _hit_collider and _hit_collider.has_meta("selection_axis"):
+			_begin_handle_drag(_hit_collider)
+		elif _hit_collider and _hit_collider is Node3D:
+			_add_selected_object(_hit_collider as Node3D)
+		else:
+			_clear_selection()
+	elif not trigger_pressed and _was_trigger_pressed and _active_axis != Vector3.ZERO:
+		_end_handle_drag()
+
+	if trigger_pressed and _active_axis != Vector3.ZERO:
+		_update_handle_drag()
+
+	_was_trigger_pressed = trigger_pressed
+
+	# Desktop ray-length adjustment
+	if Input.is_action_just_pressed("ui_text_scroll_up"):
+		_adjust_ray_length(1.0, delta)
+	elif Input.is_action_just_pressed("ui_text_scroll_down"):
+		_adjust_ray_length(-1.0, delta)
+
+
+func _adjust_ray_length(direction: float, delta: float) -> void:
+	ray_length = clamp(
+		ray_length + direction * ray_length_adjust_speed * delta * 5.0,
+		ray_length_min,
+		ray_length_max
+	)
+	if raycast:
+		raycast.target_position = Vector3(0, 0, -ray_length)
+
+
 func _get_controller() -> XRController3D:
 	if not is_instance_valid(grabbing_hand):
 		return null
@@ -277,6 +347,15 @@ func _process_raycast() -> void:
 		_hit_point = raycast.to_global(Vector3(0, 0, -ray_length))
 		_hit_normal = Vector3.UP
 		_hit_collider = null
+
+
+func _refresh_raycast_exceptions() -> void:
+	if raycast == null:
+		return
+	raycast.clear_exceptions()
+	raycast.add_exception(self)
+	if is_instance_valid(grabbing_hand):
+		raycast.add_exception(grabbing_hand)
 
 
 func _update_visuals() -> void:
@@ -542,10 +621,17 @@ func _add_selected_object(node: Node3D) -> void:
 	if not target or _selected_objects.has(target):
 		return
 	_selected_objects.append(target)
+	if network_debug_logs:
+		var selected_object_id := _resolve_network_object_id(target)
+		_network_log("selected %s id=%s path=%s" % [target.name, selected_object_id if not selected_object_id.is_empty() else "<none>", str(target.get_path())])
+	_claim_network_ownership_for_object(target)
 	_update_selection_visuals()
 
 
 func _clear_selection() -> void:
+	_broadcast_selected_transform_updates(true, false)
+	for node in _selected_objects:
+		_release_network_ownership_for_object(node)
 	_selected_objects.clear()
 	_active_axis = Vector3.ZERO
 	_active_handle = null
@@ -559,6 +645,16 @@ func _selection_move_target(node: Node3D) -> Node3D:
 	while probe and probe is Node3D and probe != self:
 		candidates.append(probe as Node3D)
 		probe = probe.get_parent()
+	# Prefer network-addressable grabbables (save_id) so transform sync can replicate.
+	for candidate in candidates:
+		if candidate.has_method("get"):
+			var raw_save_id: Variant = candidate.get("save_id")
+			var save_id: String = String(raw_save_id) if raw_save_id != null else ""
+			if not save_id.is_empty():
+				return candidate
+	for candidate in candidates:
+		if candidate is RigidBody3D and candidate.is_in_group("grabbable"):
+			return candidate
 	for candidate in candidates:
 		if _has_visual_descendant(candidate) and _has_collision_descendant(candidate):
 			return candidate
@@ -787,6 +883,7 @@ func _position_handles(center: Vector3, half_size: Vector3) -> void:
 func _begin_handle_drag(handle: Node) -> void:
 	if not handle or not handle.has_meta("selection_axis"):
 		return
+	_claim_network_ownership_for_selection()
 	_active_axis = (handle.get_meta("selection_axis") as Vector3).normalized()
 	_active_handle = handle as Node3D
 	_active_mode = handle.get_meta("selection_mode", "translate")
@@ -808,11 +905,13 @@ func _update_handle_drag() -> void:
 		return
 	var proj := _hit_point.dot(_active_axis)
 	var delta := proj - _active_proj
+	var did_transform := false
 	if _active_mode == "translate":
 		if abs(delta) <= 0.0005:
 			return
 		_move_selected_objects_along_axis(_active_axis, delta)
 		_active_proj = proj
+		did_transform = true
 	elif _active_mode == "scale":
 		if abs(delta) <= 0.0005 or _scale_reference <= 0.0:
 			return
@@ -820,6 +919,7 @@ func _update_handle_drag() -> void:
 		scale_factor = clamp(scale_factor, 0.05, 10.0)
 		_scale_selected_objects_along_axis(_active_axis, scale_factor)
 		_active_proj = proj
+		did_transform = true
 	elif _active_mode == "rotate":
 		var cur_vec := _project_on_plane(_hit_point - _rotate_center, _active_axis)
 		if cur_vec.length() < 0.0001 or _rotate_ref.length() < 0.0001:
@@ -829,7 +929,10 @@ func _update_handle_drag() -> void:
 		if abs(delta_angle) > 0.0001:
 			_rotate_selected_objects(_active_axis, _rotate_center, delta_angle)
 			_rotate_last_angle = angle
+			did_transform = true
 	_active_proj = proj
+	if did_transform:
+		_broadcast_selected_transform_updates()
 	_update_selection_visuals()
 
 
@@ -936,6 +1039,248 @@ func _any_perpendicular(axis: Vector3) -> Vector3:
 	if abs(n.dot(Vector3.UP)) < 0.99:
 		return n.cross(Vector3.UP).normalized()
 	return n.cross(Vector3.FORWARD).normalized()
+
+
+func _get_network_manager() -> Node:
+	if _network_manager and is_instance_valid(_network_manager):
+		return _network_manager
+	_network_manager = get_node_or_null("/root/NetworkManager")
+	return _network_manager
+
+
+func _resolve_network_object_id(node: Node3D) -> String:
+	if not is_instance_valid(node):
+		return ""
+	var probe: Node = node
+	while probe and probe is Node3D and probe != self:
+		if probe.has_method("get"):
+			var raw_save_id: Variant = probe.get("save_id")
+			var save_id: String = String(raw_save_id) if raw_save_id != null else ""
+			if not save_id.is_empty():
+				return save_id
+		if probe.name.begins_with("obj_"):
+			return probe.name
+		probe = probe.get_parent()
+	return ""
+
+
+func _claim_network_ownership_for_selection() -> void:
+	for node in _selected_objects:
+		if is_instance_valid(node):
+			_claim_network_ownership_for_object(node)
+
+
+func _claim_network_ownership_for_object(node: Node3D) -> void:
+	var network_manager := _get_network_manager()
+	if network_manager == null:
+		return
+	var object_id := _resolve_network_object_id(node)
+	if object_id.is_empty():
+		if network_debug_logs:
+			_network_log("ownership request skipped; no object id for %s path=%s" % [node.name, str(node.get_path())])
+		return
+	if _is_locally_authoritative_for_object(network_manager, object_id):
+		_owned_selected_object_ids[object_id] = true
+		_set_local_network_component_ownership(node, true)
+		_network_log("ownership already local for %s" % object_id)
+		return
+	var now_msec := Time.get_ticks_msec()
+	var last_request_msec := int(_ownership_request_msec.get(object_id, 0))
+	if _owned_selected_object_ids.has(object_id) and (now_msec - last_request_msec) < OWNERSHIP_REQUEST_RETRY_MS:
+		return
+	if network_manager.has_method("grab_object"):
+		network_manager.grab_object(object_id, "transform_tool")
+	elif network_manager.has_method("request_object_ownership"):
+		network_manager.request_object_ownership(object_id, "transform_tool")
+	else:
+		return
+	_owned_selected_object_ids[object_id] = true
+	_ownership_request_msec[object_id] = now_msec
+	_network_log("requested ownership for %s" % object_id)
+
+
+func _release_network_ownership_for_object(node: Node3D) -> void:
+	var object_id := _resolve_network_object_id(node)
+	if object_id.is_empty():
+		return
+	_owned_selected_object_ids.erase(object_id)
+	_ownership_request_msec.erase(object_id)
+	_last_scale_sync_msec.erase(object_id)
+	_last_synced_scale.erase(object_id)
+
+	var network_manager := _get_network_manager()
+	if network_manager == null:
+		_set_local_network_component_ownership(node, false)
+		return
+	if not network_manager.has_method("release_object"):
+		_set_local_network_component_ownership(node, false)
+		return
+	if not is_instance_valid(node):
+		return
+	if not _is_locally_authoritative_for_object(network_manager, object_id):
+		_set_local_network_component_ownership(node, false)
+		return
+
+	var persist_mode := _resolve_object_persist_mode(network_manager, object_id)
+	var rot: Quaternion = node.global_transform.basis.orthonormalized().get_rotation_quaternion().normalized()
+	network_manager.release_object(
+		object_id,
+		node.global_position,
+		rot,
+		Vector3.ZERO,
+		Vector3.ZERO,
+		persist_mode,
+		"RELEASED_STATIC"
+	)
+	_set_local_network_component_ownership(node, false)
+	_network_log("released ownership for %s" % object_id)
+
+
+func _release_all_owned_selection_objects() -> void:
+	if _owned_selected_object_ids.is_empty():
+		return
+	var owned_ids: Array = _owned_selected_object_ids.keys()
+	for object_id_variant in owned_ids:
+		var object_id := String(object_id_variant)
+		if object_id.is_empty():
+			continue
+		var node := _find_selected_object_by_id(object_id)
+		if not is_instance_valid(node):
+			continue
+		_release_network_ownership_for_object(node)
+	_owned_selected_object_ids.clear()
+	_ownership_request_msec.clear()
+	_last_scale_sync_msec.clear()
+	_last_synced_scale.clear()
+
+
+func _find_selected_object_by_id(object_id: String) -> Node3D:
+	for node in _selected_objects:
+		if not is_instance_valid(node):
+			continue
+		if _resolve_network_object_id(node) == object_id:
+			return node
+	return null
+
+
+func _broadcast_selected_transform_updates(force_scale_sync: bool = false, claim_ownership: bool = true) -> void:
+	var network_manager := _get_network_manager()
+	if network_manager == null:
+		return
+	if not network_manager.has_method("update_grabbed_object"):
+		return
+	if claim_ownership:
+		_claim_network_ownership_for_selection()
+	var sent_count := 0
+	var skipped_not_authoritative := 0
+	var skipped_invalid := 0
+	var skipped_no_object_id := 0
+	var no_object_id_samples: PackedStringArray = PackedStringArray()
+	for node in _selected_objects:
+		if not is_instance_valid(node):
+			skipped_invalid += 1
+			continue
+		var object_id := _resolve_network_object_id(node)
+		if object_id.is_empty():
+			skipped_no_object_id += 1
+			if no_object_id_samples.size() < 3:
+				no_object_id_samples.append("%s(%s)" % [node.name, str(node.get_path())])
+			continue
+		if not _is_locally_authoritative_for_object(network_manager, object_id):
+			skipped_not_authoritative += 1
+			continue
+		_set_local_network_component_ownership(node, true)
+		var rot: Quaternion = node.global_transform.basis.orthonormalized().get_rotation_quaternion().normalized()
+		network_manager.update_grabbed_object(object_id, node.global_position, rot)
+		_maybe_broadcast_object_scale(network_manager, object_id, node.scale, force_scale_sync)
+		sent_count += 1
+	if network_debug_logs:
+		var now_msec := Time.get_ticks_msec()
+		if now_msec - _last_network_sync_log_msec >= NETWORK_LOG_INTERVAL_MS:
+			_last_network_sync_log_msec = now_msec
+			var sample_text := ", no_id_samples=%s" % str(no_object_id_samples) if not no_object_id_samples.is_empty() else ""
+			_network_log("sync sent=%d skipped_not_authoritative=%d skipped_no_object_id=%d skipped_invalid=%d selected=%d%s" % [sent_count, skipped_not_authoritative, skipped_no_object_id, skipped_invalid, _selected_objects.size(), sample_text])
+
+
+func _resolve_object_persist_mode(network_manager: Node, object_id: String) -> String:
+	var persist_mode := "placed_room"
+	if network_manager == null:
+		return persist_mode
+	var registry_variant: Variant = network_manager.get("room_object_registry")
+	if registry_variant is Dictionary:
+		var registry := registry_variant as Dictionary
+		var object_state_variant: Variant = registry.get(object_id, null)
+		if object_state_variant is Dictionary:
+			var object_state := object_state_variant as Dictionary
+			var state_mode := String(object_state.get("persist_mode", ""))
+			if not state_mode.is_empty():
+				persist_mode = state_mode
+	return persist_mode
+
+
+func _is_locally_authoritative_for_object(network_manager: Node, object_id: String) -> bool:
+	if network_manager == null or object_id.is_empty():
+		return false
+	if not network_manager.has_method("get_nakama_user_id"):
+		return false
+	var my_id := String(network_manager.get_nakama_user_id())
+	if my_id.is_empty():
+		return false
+	if network_manager.has_method("get_object_owner"):
+		var owner_id := String(network_manager.get_object_owner(object_id))
+		if not owner_id.is_empty() and owner_id == my_id:
+			return true
+	var registry_variant: Variant = network_manager.get("room_object_registry")
+	if registry_variant is Dictionary:
+		var registry := registry_variant as Dictionary
+		var state_variant: Variant = registry.get(object_id, null)
+		if state_variant is Dictionary:
+			var state := state_variant as Dictionary
+			var held_by := String(state.get("held_by", ""))
+			if held_by == my_id:
+				return true
+	return false
+
+
+func _maybe_broadcast_object_scale(network_manager: Node, object_id: String, object_scale: Vector3, force_sync: bool = false) -> void:
+	if network_manager == null:
+		return
+	if not network_manager.has_method("replicate_object_property"):
+		return
+	var should_send: bool = force_sync or not _last_synced_scale.has(object_id)
+	if not should_send:
+		var previous_scale: Vector3 = _last_synced_scale[object_id]
+		should_send = previous_scale.distance_to(object_scale) > SCALE_SYNC_EPSILON
+	if not should_send:
+		return
+	var now_msec := Time.get_ticks_msec()
+	var last_sent_msec := int(_last_scale_sync_msec.get(object_id, 0))
+	if not force_sync and now_msec - last_sent_msec < SCALE_SYNC_INTERVAL_MS:
+		return
+	network_manager.replicate_object_property(object_id, "scale", object_scale, false)
+	_last_scale_sync_msec[object_id] = now_msec
+	_last_synced_scale[object_id] = object_scale
+
+
+func _set_local_network_component_ownership(node: Node3D, is_owner: bool) -> void:
+	if not is_instance_valid(node):
+		return
+	if not node.has_method("get"):
+		return
+	var network_component_variant: Variant = node.get("network_component")
+	if not (network_component_variant is Node):
+		return
+	var network_component := network_component_variant as Node
+	if network_component.has_method("set_network_owner"):
+		network_component.call("set_network_owner", is_owner)
+	if network_component.has_method("set_grabbed"):
+		network_component.call("set_grabbed", is_owner)
+
+
+func _network_log(message: String) -> void:
+	if not network_debug_logs:
+		return
+	print("TransformTool Net: ", message)
 
 
 func _update_controls_scale(force: bool = false) -> void:

@@ -638,6 +638,14 @@ func _on_network_grab(peer_id: String, hand_name: String, rel_pos: Vector3, rel_
 	# Make object semi-transparent to show it's grabbed by someone else
 	_set_remote_grabbed_visual(true)
 	_apply_network_state_mode(NETWORK_STATE_HELD)
+
+	# Some ownership modes (selection/transform tools) are "authority-only":
+	# we should not visually attach objects to a remote hand for these.
+	if _is_transform_authority_mode(hand_name):
+		remote_grab_hand = null
+		_pending_remote_peer_id = ""
+		_pending_remote_hand_name = ""
+		return
 	
 	# Try to find the remote player's hand to attach to visually
 	_attach_to_remote_player(peer_id, hand_name, rel_pos, rel_rot)
@@ -690,6 +698,11 @@ func _attach_to_remote_player(peer_id: String, hand_name: String, rel_pos: Vecto
 			print("Grabbable: Visually attached to remote player ", peer_id, " hand: ", hand_name)
 
 
+func _is_transform_authority_mode(hand_name: String) -> bool:
+	var mode := hand_name.to_lower()
+	return mode == "transform_tool" or mode == "joystick_selection" or mode == "selection"
+
+
 func _on_network_sync(data: Dictionary) -> void:
 	"""Receive position update for this object from network"""
 	if data.has("state_version"):
@@ -721,7 +734,10 @@ func _on_network_sync(data: Dictionary) -> void:
 	
 	if data.has("rotation"):
 		var target_rot = data["rotation"]
+		if target_rot is Quaternion:
+			target_rot = (target_rot as Quaternion).normalized()
 		var current_quat = global_transform.basis.get_rotation_quaternion()
+		current_quat = current_quat.normalized()
 		var interpolated = current_quat.slerp(target_rot, 0.3)
 		global_transform.basis = Basis(interpolated)
 
