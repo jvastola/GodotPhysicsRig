@@ -338,6 +338,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.43112737, 0)
 shape = SubResource("BoxShape3D_dcy27")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="PlayerBody/not moving correctly with head" unique_id=217906832]
+visible = false
 mesh = SubResource("BoxMesh_n7dm8")
 
 [node name="PhysicsHandLeft" type="RigidBody3D" parent="." unique_id=1837288581 node_paths=PackedStringArray("player_rigidbody", "target")]
@@ -360,6 +361,7 @@ transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
 shape = SubResource("BoxShape3D_tqmwh")
 
 [node name="PhysicsHandLeftMesh" type="MeshInstance3D" parent="PhysicsHandLeft" unique_id=1450919141]
+visible = false
 cast_shadow = 0
 mesh = SubResource("BoxMesh_vf3tq")
 
@@ -384,6 +386,7 @@ shape = SubResource("BoxShape3D_hand")
 
 [node name="PhysicsHandRightMesh" type="MeshInstance3D" parent="PhysicsHandRight" unique_id=2008929583]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
+visible = false
 cast_shadow = 0
 mesh = SubResource("BoxMesh_dcy27")
 

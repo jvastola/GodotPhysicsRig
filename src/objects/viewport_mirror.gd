@@ -56,9 +56,15 @@ func _process(_delta):
 		return
 	
 	# Cull camera layers
-	cam.cull_mask = 0xFF
+	# Start with all layers enabled (0xFFFFFFFF for 32 layers)
+	cam.cull_mask = 0xFFFFFFFF
+	# Hide layer 11 (hand tracking meshes) from mirror
+	cam.cull_mask &= ~(1 << 10)  # Layer 11 = bit 10
 	for i in cullMask:
 		cam.cull_mask &= ~(1 << i)
+
+	# Hide hand tracking meshes from mirror viewport
+	_hide_hand_tracking_from_mirror()
 
 	# set mirror surface's size
 	mirror.mesh.size = size
@@ -91,6 +97,33 @@ func _process(_delta):
 	var cam2mirror_camlocal = cam.global_transform.basis.inverse() * cam2mirror_offset
 	var frustum_offset = Vector2(cam2mirror_camlocal.x, cam2mirror_camlocal.y)
 	cam.set_frustum(mirror.mesh.size.x, frustum_offset, near, 10000)
+
+
+func _hide_hand_tracking_from_mirror() -> void:
+	"""Hide hand tracking meshes from the mirror viewport by setting their children to a culled layer"""
+	var xr_player = get_tree().root.find_child("XRPlayer", true, false)
+	if not xr_player:
+		return
+	
+	# Find and process hand tracking meshes - set their mesh children to layer 11 (culled from mirror)
+	var left_hand_tracker = xr_player.get_node_or_null("PlayerBody/XROrigin3D/LeftHandTracker")
+	var right_hand_tracker = xr_player.get_node_or_null("PlayerBody/XROrigin3D/RightHandTracker")
+	
+	const HIDE_FROM_MIRROR_MASK = 1 << 10  # Layer 11 = bit 10
+	
+	if left_hand_tracker:
+		_set_mesh_layers_recursive(left_hand_tracker, HIDE_FROM_MIRROR_MASK)
+	if right_hand_tracker:
+		_set_mesh_layers_recursive(right_hand_tracker, HIDE_FROM_MIRROR_MASK)
+
+
+func _set_mesh_layers_recursive(node: Node, layer_mask: int) -> void:
+	"""Recursively set layers for all MeshInstance3D children"""
+	if node is MeshInstance3D:
+		node.layers = layer_mask
+	
+	for child in node.get_children():
+		_set_mesh_layers_recursive(child, layer_mask)
 
 
 # n is the normal of the mirror plane

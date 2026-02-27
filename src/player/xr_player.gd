@@ -202,6 +202,9 @@ func _ready() -> void:
 	
 	# Setup poke interaction
 	_setup_poke_interaction()
+	
+	# Setup rendering layers for mirror-only display
+	_setup_mirror_only_layer()
 
 
 func _setup_components() -> void:
@@ -489,6 +492,8 @@ func _activate_desktop_mode() -> void:
 	# Enable desktop camera
 	if desktop_camera:
 		desktop_camera.current = true
+		# Cull the mirror-only layer (layer 10) from the desktop view
+		desktop_camera.cull_mask &= ~(1 << 9)  # Layer 10 = bit 9
 	
 	# Enable desktop controller
 	if desktop_controller and desktop_controller.has_method("activate"):
@@ -889,6 +894,41 @@ func _update_local_mesh_visibility() -> void:
 		head_mesh.visible = show_head_mesh and not (is_vr_mode and hide_head_mesh_in_vr)
 	if body_mesh:
 		body_mesh.visible = show_body_mesh
+
+
+func _setup_mirror_only_layer() -> void:
+	"""Set player meshes to render only in mirrors, not in player's camera view.
+	Uses layer 10 as the 'mirror only' layer and layer 11 as 'hide from mirror' layer."""
+	const MIRROR_ONLY_LAYER = 10
+	const HIDE_FROM_MIRROR_LAYER = 11
+	const MIRROR_ONLY_MASK = 1 << (MIRROR_ONLY_LAYER - 1)  # Layer 10 = bit 9
+	const HIDE_FROM_MIRROR_MASK = 1 << (HIDE_FROM_MIRROR_LAYER - 1)  # Layer 11 = bit 10
+	
+	# Set head and body meshes to mirror-only layer (visible only in mirrors)
+	if head_mesh:
+		head_mesh.layers = MIRROR_ONLY_MASK
+	if body_mesh:
+		body_mesh.layers = MIRROR_ONLY_MASK
+	
+	# Set hand meshes to mirror-only layer (only for MeshInstance3D nodes)
+	var hand_meshes = [left_hand_mesh, right_hand_mesh]
+	for hand_mesh in hand_meshes:
+		if hand_mesh and hand_mesh is MeshInstance3D:
+			hand_mesh.layers = MIRROR_ONLY_MASK
+	
+	# Set hand tracking meshes to hide-from-mirror layer (only if they support layers property)
+	if left_hand_skeleton and left_hand_skeleton is MeshInstance3D:
+		left_hand_skeleton.layers = HIDE_FROM_MIRROR_MASK
+	if right_hand_skeleton and right_hand_skeleton is MeshInstance3D:
+		right_hand_skeleton.layers = HIDE_FROM_MIRROR_MASK
+	
+	# Set desktop camera to cull the mirror-only layer
+	if desktop_camera:
+		desktop_camera.cull_mask &= ~MIRROR_ONLY_MASK
+	
+	# Set XR camera to cull the mirror-only layer (in case head mesh is visible in VR)
+	if xr_camera:
+		xr_camera.cull_mask &= ~MIRROR_ONLY_MASK
 
 
 func apply_texture_to_head(texture: ImageTexture) -> void:
