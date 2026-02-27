@@ -56,6 +56,8 @@ var nearby_grabbables: Array = []
 
 # Sticky trigger state tracking
 var _prev_release_button_pressed: bool = false
+var _prev_trigger_pressed: bool = false
+var _prev_grip_pressed: bool = false
 var _is_pinch_grabbing: bool = false
 var _using_pinch_grab: bool = false
 var is_ghost_mode: bool = false
@@ -354,19 +356,30 @@ func _handle_grab_input() -> void:
 				print("PhysicsHand: Held object state desynchronized, clearing reference")
 				held_object = null
 
-	# Try to grab if trigger or grip pressed and not holding anything
+	# Try to grab if trigger or grip PRESSED (not held) and not holding anything
 	if held_object == null:
-		if trigger_pressed or grip_pressed or _is_pinch_grabbing:
+		# Only trigger grab on rising edge of trigger/grip, not while holding
+		var trigger_just_pressed = trigger_pressed and not _prev_trigger_pressed
+		var grip_just_pressed = grip_pressed and not _prev_grip_pressed
+		if trigger_just_pressed or grip_just_pressed or _is_pinch_grabbing:
 			_try_grab_nearest()
 
-	# Simple release: rising edge of the configured release action
+	# Handle release
 	else:
 		# Release if release button pressed OR if using pinch and we stopped pinching
-		if (release_button_pressed and not _prev_release_button_pressed) or (_using_pinch_grab and not _is_pinch_grabbing):
+		var should_release = (release_button_pressed and not _prev_release_button_pressed) or (_using_pinch_grab and not _is_pinch_grabbing)
+		
+		# Also release if holding object AND grip is held AND A button is pressed
+		if grip_pressed and release_button_pressed:
+			should_release = true
+		
+		if should_release:
 			_release_object()
 	
-	# Store previous release state for rising-edge detection
+	# Store previous state for rising-edge detection
 	_prev_release_button_pressed = release_button_pressed
+	_prev_trigger_pressed = trigger_pressed
+	_prev_grip_pressed = grip_pressed
 
 
 func set_pinch_grab(active: bool) -> void:
