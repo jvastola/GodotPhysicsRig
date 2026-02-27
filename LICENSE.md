@@ -49,8 +49,4 @@ This project incorporates code and assets from various open-source projects. We 
 
 ### Third-Party Licenses
 
-Various components in the `addons/` and `multiplayer/` directories carry their own licenses (MIT, Apache 2.0, etc.). Please refer to the individual `LICENSE` files within those directories for details:
-
-- `addons/godot-livekit`: See [addons/godot-livekit/LICENSE](file:///Users/johnathan/Documents/GodotPhysicsRig%202/addons/godot-livekit/LICENSE) (if exists)
-- `addons/godotopenxrvendors`: See licenses in [addons/godotopenxrvendors/](file:///Users/johnathan/Documents/GodotPhysicsRig%202/addons/godotopenxrvendors/)
-- `multiplayer/plugins/godot-livekit/server_node/node_modules/`: See individual package licenses.
+Various components in the `addons/` and `multiplayer/` directories carry their own licenses (MIT, Apache 2.0, etc.). Please refer to the individual `LICENSE` files within those directories for details
