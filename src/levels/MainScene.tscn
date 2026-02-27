@@ -127,14 +127,10 @@ visible = false
 mesh = SubResource("BoxMesh_or5nu")
 
 [node name="SpawnPoint" type="Marker3D" parent="." unique_id=1507894971]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -42.777176)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.497721, -42.777176)
 
 [node name="XRPlayer" parent="." unique_id=1371219310 instance=ExtResource("1_xrplayer")]
 transform = Transform3D(0.999598, 0, 0, 0, 0.999598, 0, 0, 0, 0.999598, 0, 2, -42.915047)
-
-[node name="PhysicsHandTunerViewport3D" parent="." unique_id=2110382217 instance=ExtResource("55_hand_tuner_viewport")]
-transform = Transform3D(-0.9324436, 0, -0.36131555, 0, 1, 0, 0.36131555, 0, -0.9324436, 1.25, 1.4, -39.96438)
-visible = false
 
 [node name="UnifiedRoomViewport3D" parent="." unique_id=1842196751 instance=ExtResource("13_unified_ui")]
 transform = Transform3D(-0.030811917, 0, -0.50405914, 0, 0.505, 0, 0.50405914, 0, -0.030811917, 5.048676, 0.77457607, -40.22247)
@@ -211,12 +207,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.4440007, -4.1024504, -13.2
 rope_sag_factor = 0.005
 rope_sag_max = 0.5
 
-[node name="GridLineDisplay" parent="." unique_id=1041894421 instance=ExtResource("12_grid_display")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5116463, -0.17434548, -39.516804)
-grid_size = 45
-height_noise_scale = 0.0
-line_color = Color(0, 1, 1, 0.59607846)
-
 [node name="PolyToolExport" parent="." unique_id=1827706603 instance=ExtResource("28_wb7rf")]
 transform = Transform3D(1, 0, 0, 0, 1.6025667, 0, 0, 0, 1, 10.292227, -6.0686765, 2.9155023)
 
@@ -240,6 +230,12 @@ MirrorColor = Color(1, 1, 1, 1)
 show_map = false
 mirror_only_layers = Array[int]([15])
 cull_distance = 10.0
+
+[node name="GridLineDisplay" parent="ViewportMirror" unique_id=1041894421 instance=ExtResource("12_grid_display")]
+transform = Transform3D(-0.47085792, 0, -0.88220906, 0, 1, 0, 0.88220906, 0, -0.47085792, 0.98070526, -0.71810305, 5.2546024)
+grid_size = 45
+height_noise_scale = 0.0
+line_color = Color(0, 1, 1, 0.6901961)
 
 [node name="GridPainterTest" type="Node3D" parent="." unique_id=1341686196]
 transform = Transform3D(-0.5020541, 0, -0.8648362, 0, 1, 0, 0.8648362, 0, -0.5020541, -6.640696, -0.09165305, -37.63213)
@@ -408,16 +404,20 @@ mesh = SubResource("BoxMesh_plasma_subdivided")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.6202674, 0.5, -35)
 
 [node name="WindowWrapper" parent="." unique_id=858073771 instance=ExtResource("45_giw25")]
-transform = Transform3D(-0.19999999, 0, -2.9802322e-08, 0, 0.2, 0, 2.9802322e-08, 0, -0.19999999, 2.3841858e-07, 1.8854713, -37.474968)
+transform = Transform3D(-0.19999999, 0, -2.9802322e-08, 0, 0.2, 0, 2.9802322e-08, 0, -0.19999999, 2.3841858e-07, 4.934104, -37.474968)
 visible = false
 content_viewport_scene = ExtResource("44_l4aac")
 
+[node name="PhysicsHandTunerViewport3D" parent="." unique_id=2110382217 instance=ExtResource("55_hand_tuner_viewport")]
+transform = Transform3D(-0.9324436, 0, -0.36131552, 0, 0.99999994, 0, 0.36131552, 0, -0.9324436, 1.2499999, 7.727457, -39.96438)
+visible = false
+
 [node name="InventoryUIViewport3D" parent="." unique_id=1812015456 instance=ExtResource("40_0bb85")]
-transform = Transform3D(-0.9984447, 0, 0.05575188, 0, 1, 0, -0.05575188, 0, -0.9984447, 3.9532697, 0.83622026, -34.532124)
+transform = Transform3D(-0.9984447, 0, 0.05575188, 0, 1, 0, -0.05575188, 0, -0.9984447, 3.9532697, 8.785259, -34.532124)
 visible = false
 
 [node name="MovementSettingsViewport3D" parent="." unique_id=1913748936 instance=ExtResource("44_giw25")]
-transform = Transform3D(-0.4029544, 0, 0.9152201, 0, 1, 0, -0.9152201, 0, -0.4029544, -1.1318345, 0, -38.285004)
+transform = Transform3D(-0.4029544, 0, 0.9152201, 0, 1, 0, -0.9152201, 0, -0.4029544, -1.1318345, 8.647067, -38.285004)
 visible = false
 
 [editable path="OreDeposit2"]

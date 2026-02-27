@@ -493,6 +493,9 @@ func _assign_texture_to_mesh(node: MeshInstance3D, texture: ImageTexture, cube_m
 		
 	if is_hand and hand_material_base:
 		mat = hand_material_base.duplicate()
+		# Ensure hand meshes render opaquely with unshaded mode
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 	else:
 		mat = StandardMaterial3D.new()
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
