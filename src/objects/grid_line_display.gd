@@ -16,6 +16,9 @@ extends Node3D
 @export var line_color: Color = Color(0.0, 1.0, 1.0, 1.0)  ## Color of grid lines
 @export var line_width: float = 0.02  ## Width of lines
 
+@export_group("Mirror Settings")
+@export_range(0, 31) var render_layer: int = 15  ## Layer for mirror-only rendering
+
 var terrain_mesh_instance: MeshInstance3D
 var lines_mesh_instance: MeshInstance3D
 var player: Node3D
@@ -113,6 +116,7 @@ func _create_terrain_mesh() -> void:
 	terrain_mesh_instance = MeshInstance3D.new()
 	terrain_mesh_instance.mesh = mesh
 	terrain_mesh_instance.name = "TerrainMesh"
+	terrain_mesh_instance.layers = 1 << render_layer
 	
 	# Create a simple material
 	var material := StandardMaterial3D.new()
@@ -156,6 +160,7 @@ func _create_lines_mesh() -> void:
 	lines_mesh_instance = MeshInstance3D.new()
 	lines_mesh_instance.mesh = mesh
 	lines_mesh_instance.name = "GridLines"
+	lines_mesh_instance.layers = 1 << render_layer
 	
 	# Load and setup shader material
 	var shader := load("res://assets/shaders/grid_lines.gdshader") as Shader

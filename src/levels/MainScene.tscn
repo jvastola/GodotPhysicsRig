@@ -212,13 +212,10 @@ rope_sag_factor = 0.005
 rope_sag_max = 0.5
 
 [node name="GridLineDisplay" parent="." unique_id=1041894421 instance=ExtResource("12_grid_display")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5116463, -4.5200553, -8.591313)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5116463, -0.17434548, -39.516804)
 grid_size = 45
 height_noise_scale = 0.0
-zone1_distance = 8.0
-zone2_distance = 10.0
-line_height_offset = 0.7
-line_color = Color(0, 1, 1, 0.3019608)
+line_color = Color(0, 1, 1, 0.59607846)
 
 [node name="PolyToolExport" parent="." unique_id=1827706603 instance=ExtResource("28_wb7rf")]
 transform = Transform3D(1, 0, 0, 0, 1.6025667, 0, 0, 0, 1, 10.292227, -6.0686765, 2.9155023)
@@ -234,15 +231,18 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.8, 0.95, -0.69013023)
 visible = false
 
 [node name="ViewportMirror" type="Node3D" parent="." unique_id=925737553]
-transform = Transform3D(-0.47085792, 0, 0.88220906, 0, 1, 0, -0.88220906, 0, -0.47085792, -6.6855316, 0.70563793, -36.17745)
+transform = Transform3D(-0.47085792, 0, 0.88220906, 0, 1, 0, -0.88220906, 0, -0.47085792, -6.6855316, 0.54375756, -36.17745)
 script = ExtResource("47_viewport_mirror")
 size = Vector2(2, 1.5)
 ResolutionPerUnit = 500
 MainCamPath = NodePath("../XRPlayer/PlayerBody/XROrigin3D/XRCamera3D")
 MirrorColor = Color(1, 1, 1, 1)
+show_map = false
+mirror_only_layers = Array[int]([15])
+cull_distance = 10.0
 
 [node name="GridPainterTest" type="Node3D" parent="." unique_id=1341686196]
-transform = Transform3D(0.470858, 0, -0.882209, 0, 1, 0, 0.882209, 0, 0.470858, -7.1266375, 0.20563793, -35.94202)
+transform = Transform3D(-0.5020541, 0, -0.8648362, 0, 1, 0, 0.8648362, 0, -0.5020541, -6.640696, -0.09165305, -37.63213)
 script = ExtResource("48_grid_painter")
 load_for_player = false
 left_hand_preview_mesh = NodePath("GridTargetLeft")
@@ -255,7 +255,7 @@ body_preview_mesh = NodePath("GridTargetBody")
 body_subdivisions = Vector3i(6, 8, 4)
 
 [node name="GridTargetLeft" type="MeshInstance3D" parent="GridPainterTest" unique_id=1330662245]
-transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 0.180541, 0.12471, -2)
+transform = Transform3D(0.3, 0, -7.450581e-09, 0, 0.3, 0, 7.450581e-09, 0, 0.3, 0.5175514, 0.12470999, -0.50598145)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_left_hand_grid")
 
@@ -267,7 +267,7 @@ collision_mask = 32
 shape = SubResource("BoxShape3D_left_hand_grid")
 
 [node name="GridTargetRight" type="MeshInstance3D" parent="GridPainterTest" unique_id=1454956693]
-transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, -0.534751, 0.128569, -2)
+transform = Transform3D(0.3, 0, -7.450581e-09, 0, 0.3, 0, 7.450581e-09, 0, 0.3, -0.19774246, 0.128569, -0.50598335)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_right_hand_grid")
 
@@ -279,7 +279,7 @@ collision_mask = 32
 shape = SubResource("BoxShape3D_right_hand_grid")
 
 [node name="GridTargetHead" type="MeshInstance3D" parent="GridPainterTest" unique_id=1192669384]
-transform = Transform3D(0.22, 0, 0, 0, 0.22, 0, 0, 0, 0.22, -0.174122, 0.619416, -2.1022)
+transform = Transform3D(0.22, 0, -7.450581e-09, 0, 0.22, 0, 7.450581e-09, 0, 0.22, 0.16289139, 0.619416, -0.608181)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_head_grid")
 
@@ -291,7 +291,7 @@ collision_mask = 32
 shape = SubResource("BoxShape3D_head_grid")
 
 [node name="GridTargetBody" type="MeshInstance3D" parent="GridPainterTest" unique_id=1129659143]
-transform = Transform3D(0.3, 0, 0, 0, 0.4, 0, 0, 0, 0.2, -0.167079, 0.247408, -2.018)
+transform = Transform3D(0.3, 0, 7.450581e-09, 0, 0.4, 0, 7.450581e-09, 0, 0.2, 0.1699295, 0.247408, -0.523983)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_body_grid")
 
@@ -376,7 +376,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.28916642, 0, -38.455387)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.25949258, 0, -38.708576)
 
 [node name="stick" type="RigidBody3D" parent="." unique_id=78102440 groups=["grabbable", "mining_tool"]]
-transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 2, 0.32582426, -35.550285)
+transform = Transform3D(0.7, 0, 0, 0, 0.7, 0, 0, 0, 0.7, 2, 0.32582426, -35.550285)
 mass = 0.2
 gravity_scale = 0.3
 contact_monitor = true

@@ -30,6 +30,14 @@ const whitegreen : Color = Color(0.9, 0.97, 0.94)
 @export var MirrorColor : Color = whitegreen
 @export_range(0, 30, 0.01) var MirrorDistortion : float = 0
 @export var DistortionTexture : Texture
+@export var show_map : bool = true
+@export_range(0, 31) var map_layer : int = 0
+@export_group("Mirror-Only Layers")
+@export var mirror_only_layers : Array[int] = []  # Layers visible ONLY in mirror
+@export_group("Distance Culling")
+@export var enable_distance_culling : bool = true
+@export var render_distance : float = 20.0  # Distance at which mirror starts rendering
+@export var cull_distance : float = 25.0  # Distance at which mirror stops rendering
 
 var MainCam : Camera3D = null
 var cam : Camera3D
@@ -55,6 +63,23 @@ func _process(_delta):
 		# No camera specified for the mirror to operate on
 		return
 	
+	# Check distance culling if enabled
+	if enable_distance_culling:
+		var distance = MainCam.global_position.distance_to(global_position)
+		if distance > cull_distance:
+			# Player is too far, disable mirror rendering
+			mirror.visible = false
+			return
+		elif distance > render_distance:
+			# Player is in the culling threshold but outside render distance
+			mirror.visible = false
+			return
+		else:
+			# Player is close enough, enable mirror rendering
+			mirror.visible = true
+	else:
+		mirror.visible = true
+	
 	# Cull camera layers
 	# Start with all layers enabled (0xFFFFFFFF for 32 layers)
 	cam.cull_mask = 0xFFFFFFFF
@@ -62,6 +87,14 @@ func _process(_delta):
 	cam.cull_mask &= ~(1 << 10)  # Layer 11 = bit 10
 	for i in cullMask:
 		cam.cull_mask &= ~(1 << i)
+	
+	# Hide map layer if toggle is off
+	if not show_map:
+		cam.cull_mask &= ~(1 << map_layer)
+	
+	# Ensure mirror-only layers are visible in the mirror
+	for layer in mirror_only_layers:
+		cam.cull_mask |= (1 << layer)
 
 	# Hide hand tracking meshes from mirror viewport
 	_hide_hand_tracking_from_mirror()

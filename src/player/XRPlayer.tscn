@@ -96,6 +96,7 @@ script = ExtResource("2_xr_origin")
 
 [node name="XRCamera3D" type="XRCamera3D" parent="PlayerBody/XROrigin3D" unique_id=678573024]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.03717, 0)
+cull_mask = 4294934527
 
 [node name="HeadArea" type="Area3D" parent="PlayerBody/XROrigin3D/XRCamera3D" unique_id=508713069 groups=["player"]]
 collision_layer = 2
