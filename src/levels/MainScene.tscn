@@ -302,6 +302,67 @@ collision_mask = 32
 [node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest/GridTargetBody/GridTargetBodyArea" unique_id=1858467520]
 shape = SubResource("BoxShape3D_body_grid")
 
+[node name="GridPainterTest2" type="Node3D" parent="." unique_id=319803719]
+transform = Transform3D(140.23563, 0, -206.96365, 0, 249.99998, 0, 206.96365, 0, 140.23563, 328.63947, 30.467884, 524.2639)
+script = ExtResource("48_grid_painter")
+load_for_player = false
+left_hand_preview_mesh = NodePath("GridTargetLeft")
+left_hand_subdivisions = Vector3i(4, 4, 4)
+right_hand_preview_mesh = NodePath("GridTargetRight")
+right_hand_subdivisions = Vector3i(4, 4, 4)
+head_preview_mesh = NodePath("GridTargetHead")
+head_subdivisions = Vector3i(8, 8, 8)
+body_preview_mesh = NodePath("GridTargetBody")
+body_subdivisions = Vector3i(6, 8, 4)
+
+[node name="GridTargetLeft" type="MeshInstance3D" parent="GridPainterTest2" unique_id=1351047580]
+transform = Transform3D(0.3, 0, -2.9802322e-08, 0, 0.3, 0, 2.9802322e-08, 0, 0.3, 0.49976015, 0.12370279, -0.26791477)
+cast_shadow = 0
+mesh = SubResource("BoxMesh_left_hand_grid")
+
+[node name="GridTargetLeftArea" type="Area3D" parent="GridPainterTest2/GridTargetLeft" unique_id=1841188695]
+collision_layer = 32
+collision_mask = 32
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest2/GridTargetLeft/GridTargetLeftArea" unique_id=702108878]
+shape = SubResource("BoxShape3D_left_hand_grid")
+
+[node name="GridTargetRight" type="MeshInstance3D" parent="GridPainterTest2" unique_id=1527470366]
+transform = Transform3D(0.3, 0, -4.4703484e-08, 0, 0.3, 0, 4.4703484e-08, 0, 0.3, -0.38407207, 0.15546826, -0.019179404)
+cast_shadow = 0
+mesh = SubResource("BoxMesh_right_hand_grid")
+
+[node name="GridTargetRightArea" type="Area3D" parent="GridPainterTest2/GridTargetRight" unique_id=54658715]
+collision_layer = 32
+collision_mask = 32
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest2/GridTargetRight/GridTargetRightArea" unique_id=678564660]
+shape = SubResource("BoxShape3D_right_hand_grid")
+
+[node name="GridTargetHead" type="MeshInstance3D" parent="GridPainterTest2" unique_id=519027796]
+transform = Transform3D(0.16366577, -0.025195846, 0.14484021, -0.02713539, 0.2078438, 0.06681806, -0.14448932, -0.06757332, 0.1515146, -0.00076675415, 0.619416, -0.15484428)
+cast_shadow = 0
+mesh = SubResource("BoxMesh_head_grid")
+
+[node name="GridTargetHeadArea" type="Area3D" parent="GridPainterTest2/GridTargetHead" unique_id=1798499082]
+collision_layer = 32
+collision_mask = 32
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest2/GridTargetHead/GridTargetHeadArea" unique_id=766255394]
+shape = SubResource("BoxShape3D_head_grid")
+
+[node name="GridTargetBody" type="MeshInstance3D" parent="GridPainterTest2" unique_id=1979378883]
+transform = Transform3D(0.3, 0, 2.2351742e-08, 0, 0.4, 0, 7.450581e-09, 0, 0.2, 0.0062770844, 0.247408, -0.070643425)
+cast_shadow = 0
+mesh = SubResource("BoxMesh_body_grid")
+
+[node name="GridTargetBodyArea" type="Area3D" parent="GridPainterTest2/GridTargetBody" unique_id=1365211611]
+collision_layer = 32
+collision_mask = 32
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest2/GridTargetBody/GridTargetBodyArea" unique_id=85436657]
+shape = SubResource("BoxShape3D_body_grid")
+
 [node name="island" parent="." unique_id=1304383343 instance=ExtResource("37_82eun")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0026522875, -0.009035587, -42.158504)
 
