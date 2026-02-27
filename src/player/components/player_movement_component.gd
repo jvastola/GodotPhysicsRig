@@ -67,6 +67,10 @@ enum OneHandGrabMode { RELATIVE, ANCHORED }
 @export_range(1.0, 1000.0, 1.0) var auto_respawn_distance: float = 120.0
 @export var hard_respawn_resets_settings: bool = true
 
+# === Manual Respawn Input (ABXY + Triggers) ===
+@export var respawn_input_enabled: bool = true
+@export_range(0.5, 5.0, 0.1) var respawn_hold_duration: float = 3.0
+
 # === Jump Settings ===
 @export var jump_enabled: bool = false
 @export_range(1.0, 40.0, 0.5) var jump_impulse: float = 12.0
@@ -153,6 +157,10 @@ var _two_hand_anchor_xz_line_mat: StandardMaterial3D
 # Respawn helpers
 var _spawn_transform := Transform3D.IDENTITY
 var _initial_settings: Dictionary = {}
+
+# Respawn input state
+var _respawn_hold_timer: float = 0.0
+var _respawn_input_active: bool = false
 
 # One-hand world grab state
 var _one_hand_grab_active := false
@@ -256,6 +264,9 @@ func _physics_process(delta: float) -> void:
 	if is_vr_mode:
 		physics_process_turning(delta)
 		physics_process_locomotion(delta)
+	
+	# Check respawn input (works even if locomotion disabled)
+	_check_respawn_input(delta)
 	
 	# Autojoin check runs regardless of VR mode
 	_check_autojoin()
@@ -376,6 +387,7 @@ func process_locomotion(delta: float) -> void:
 		return
 	_handle_locomotion(delta)
 	_check_auto_respawn()
+	_check_respawn_input(delta)
 
 
 func physics_process_turning(delta: float) -> void:
@@ -1149,6 +1161,48 @@ func _check_auto_respawn() -> void:
 	if dist > threshold:
 		print("PlayerMovementComponent: Auto-respawn TRIGGERED! Dist: %.2f, Threshold: %.2f, Enabled: %s" % [dist, threshold, auto_respawn_enabled])
 		respawn(hard_respawn_resets_settings)
+
+
+## Efficient respawn input handler: Check ABXY + both triggers held for duration
+func _check_respawn_input(delta: float) -> void:
+	if not respawn_input_enabled or not left_controller or not right_controller:
+		return
+	
+	# Check if all ABXY buttons + both triggers are currently held
+	var buttons_held := _are_all_respawn_buttons_held()
+	
+	if buttons_held:
+		_respawn_hold_timer += delta
+		if _respawn_hold_timer >= respawn_hold_duration and not _respawn_input_active:
+			_respawn_input_active = true
+			print("PlayerMovementComponent: Respawn input combo triggered!")
+			respawn(hard_respawn_resets_settings)
+	else:
+		# Reset timer when buttons are released
+		_respawn_hold_timer = 0.0
+		_respawn_input_active = false
+
+
+## Check if all ABXY buttons and both triggers are held (efficient bit-check approach)
+func _are_all_respawn_buttons_held() -> bool:
+	# Left hand: A/X button (ax_button) + trigger
+	var left_ax_held := _is_button_held(left_controller, "ax_button")
+	var left_trigger_held := left_controller.get_float("trigger") > 0.5
+	
+	# Right hand: B/Y button (by_button) + trigger  
+	var right_by_held := _is_button_held(right_controller, "by_button")
+	var right_trigger_held := right_controller.get_float("trigger") > 0.5
+	
+	# All four must be held simultaneously
+	return left_ax_held and left_trigger_held and right_by_held and right_trigger_held
+
+
+## Helper: Check if a button action is currently held on a controller
+func _is_button_held(controller: XRController3D, action_name: String) -> bool:
+	if not controller:
+		return false
+	var float_val := controller.get_float(action_name)
+	return float_val > 0.5
 
 
 func _check_autojoin() -> void:

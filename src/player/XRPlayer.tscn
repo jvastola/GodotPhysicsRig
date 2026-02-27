@@ -29,7 +29,6 @@ size = Vector3(0.22, 0.22, 0.22)
 [sub_resource type="BoxShape3D" id="BoxShape3D_xxbg3"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_hand"]
-material = ExtResource("3_yb8bw")
 size = Vector3(0.1, 0.1, 0.1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_watch_face"]
@@ -230,6 +229,7 @@ hit_scale_user_multiplier_max = 10.0
 
 [node name="PointerFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/RightController/HandPointer" unique_id=611834496]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.07)
+visible = false
 material_override = SubResource("StandardMaterial3D_pointer_face")
 cast_shadow = 0
 mesh = SubResource("QuadMesh_pointer_face")
