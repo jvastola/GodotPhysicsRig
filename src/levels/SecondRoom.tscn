@@ -1,169 +1,207 @@
-[gd_scene load_steps=20 format=3 uid="uid://dtvg5mcsdmt1f"]
+[gd_scene format=3 uid="uid://dtvg5mcsdmt1f"]
 
-[ext_resource type="Script" uid="uid://ct42jl8bcsjkj" path="res://src/objects/floor_interactable.gd" id="1_ra6av"]
-[ext_resource type="PackedScene" uid="uid://cyi0m4x7nswyk" path="res://src/objects/Portal.tscn" id="2_portal"]
-[ext_resource type="Script" uid="uid://exskxheotyxj" path="res://src/objects/grabbable.gd" id="3_grabbable"]
-[ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://src/objects/viewport_mirror.gd" id="5_chm60"]
-[ext_resource type="PackedScene" path="res://src/objects/grabbables/GrabbableCube.tscn" id="6_grabbable_cube"]
-[ext_resource type="PackedScene" path="res://src/objects/grabbables/GrabbableBall.tscn" id="7_grabbable_ball"]
-[ext_resource type="PackedScene" path="res://src/objects/grabbables/GrabbableBall2.tscn" id="8_grabbable_ball2"]
+[ext_resource type="Script" uid="uid://cvqfyaebx04gk" path="res://src/objects/floor_interactable.gd" id="1_ra6av"]
+[ext_resource type="Material" uid="uid://bekkfd16cqphx" path="res://src/demos/tools/materials/metal_pixel.tres" id="2_0m6qu"]
+[ext_resource type="AudioStream" uid="uid://8bbhwlp7i6sp" path="res://assets/audio/spawn.ogg" id="3_044l4"]
+[ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://src/systems/grid_painter.gd" id="4_bwlii"]
 
 [sub_resource type="Environment" id="Environment_second"]
 background_mode = 1
 background_color = Color(0.2, 0.3, 0.4, 1)
+fog_enabled = true
+fog_light_energy = 0.0
+fog_density = 0.0398
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_eecuj"]
+
+[sub_resource type="TextMesh" id="TextMesh_3luii"]
+material = SubResource("StandardMaterial3D_eecuj")
+text = "FR
+"
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_blwr8"]
+
+[sub_resource type="TextMesh" id="TextMesh_mr2or"]
+material = SubResource("StandardMaterial3D_blwr8")
+text = "en
+"
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_qvmoi"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_boq3p"]
+material = SubResource("StandardMaterial3D_qvmoi")
+size = Vector3(0.5, 0.03, 0.05)
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_portal"]
+particle_flag_align_y = true
+emission_shape = 3
+emission_box_extents = Vector3(1, 1.5, 0.1)
+direction = Vector3(0, 0, 1)
+spread = 10.0
+initial_velocity_min = 0.5
+initial_velocity_max = 1.5
+gravity = Vector3(0, 0, 0)
+scale_min = 0.05
+scale_max = 0.15
+
+[sub_resource type="PrismMesh" id="PrismMesh_bwlii"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_floor2"]
 size = Vector3(15, 1, 15)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor2"]
-albedo_color = Color(0.6, 0.4, 0.3, 1)
-
 [sub_resource type="BoxMesh" id="BoxMesh_floor2"]
-material = SubResource("StandardMaterial3D_floor2")
+material = ExtResource("2_0m6qu")
 size = Vector3(15, 1, 15)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_cube"]
-size = Vector3(0.3, 0.3, 0.3)
+[sub_resource type="BoxMesh" id="BoxMesh_nh2lw"]
+size = Vector3(0.45, 0.45, 0.45)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cube"]
-albedo_color = Color(0.8, 0.2, 0.2, 1)
-metallic = 0.5
-roughness = 0.3
+[sub_resource type="BoxShape3D" id="BoxShape3D_4ip82"]
+size = Vector3(0.45, 0.45, 0.45)
 
-[sub_resource type="BoxMesh" id="BoxMesh_cube"]
-material = SubResource("StandardMaterial3D_cube")
-size = Vector3(0.3, 0.3, 0.3)
+[sub_resource type="BoxMesh" id="BoxMesh_eecuj"]
+size = Vector3(0.45, 0.45, 0.45)
 
-[sub_resource type="SphereShape3D" id="SphereShape3D_ball"]
-radius = 0.15
+[sub_resource type="BoxShape3D" id="BoxShape3D_3luii"]
+size = Vector3(0.45, 0.45, 0.45)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ball"]
-albedo_color = Color(0.2, 0.6, 0.9, 1)
-metallic = 0.3
-roughness = 0.2
+[sub_resource type="BoxMesh" id="BoxMesh_blwr8"]
 
-[sub_resource type="SphereMesh" id="SphereMesh_ball"]
-material = SubResource("StandardMaterial3D_ball")
-radius = 0.15
-height = 0.3
+[sub_resource type="BoxShape3D" id="BoxShape3D_mr2or"]
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_slkg3"]
-size = Vector3(0.1, 1, 0.1)
+[sub_resource type="BoxMesh" id="BoxMesh_qvmoi"]
 
-[sub_resource type="BoxMesh" id="BoxMesh_ra6av"]
-size = Vector3(0.1, 1, 0.1)
+[sub_resource type="BoxShape3D" id="BoxShape3D_boq3p"]
 
-[node name="SecondRoom" type="Node3D"]
+[node name="SecondRoom" type="Node3D" unique_id=698925119]
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1225682226]
 environment = SubResource("Environment_second")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1045472939]
 transform = Transform3D(0.866023, -0.433016, 0.250001, 0, 0.499998, 0.866027, -0.500003, -0.749999, 0.43301, 0, 5, 0)
 light_color = Color(1, 0.9, 0.8, 1)
 shadow_enabled = true
 
-[node name="Floor" type="StaticBody3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+[node name="fren" type="MeshInstance3D" parent="." unique_id=166391348]
+transform = Transform3D(3.6840026, 0, 0, 0, 3.1807842, 0, 0, 0, 2.2170372, 0, 1.9748287, 0)
+cast_shadow = 0
+mesh = SubResource("TextMesh_3luii")
+skeleton = NodePath("../Floor/MeshInstance3D")
+
+[node name="fren2" type="MeshInstance3D" parent="fren" unique_id=954742495]
+transform = Transform3D(1.1573021, 0, 0, 0, 1.3481078, 0, 0, 0, 1, 0.20786487, 0.022490025, 0)
+cast_shadow = 0
+mesh = SubResource("TextMesh_mr2or")
+skeleton = NodePath("../../Floor/MeshInstance3D")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="fren" unique_id=998109583]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1024158, 0.10358739, 0)
+mesh = SubResource("BoxMesh_boq3p")
+
+[node name="MeshInstance3D3" type="MeshInstance3D" parent="fren" unique_id=1738012879]
+transform = Transform3D(-1.9818962e-08, -1, 0, 0.45340487, -4.3711392e-08, 0, 0, 0, 1, -0.1324626, -0.008553147, 0)
+mesh = SubResource("BoxMesh_boq3p")
+
+[node name="MeshInstance3D4" type="MeshInstance3D" parent="fren" unique_id=1855431871]
+transform = Transform3D(-1.9818964e-08, -1, 0, 0.45340487, -4.3711392e-08, 0, 0, 0, 1, 0.3379451, -0.008553147, 0)
+mesh = SubResource("BoxMesh_boq3p")
+
+[node name="MeshInstance3D2" type="MeshInstance3D" parent="fren" unique_id=897998657]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.10241581, -0.12146419, 0)
+mesh = SubResource("BoxMesh_boq3p")
+
+[node name="GPUParticles3D2" type="GPUParticles3D" parent="fren" unique_id=1816386417]
+transform = Transform3D(-2.4142098, -0.055159956, 0.014995944, 0.14203514, -0.8562753, 0.2799425, -0.013069652, 0.88345563, 0.27226615, -7.7149e-15, -0.10852772, -0.6249032)
+amount = 50
+lifetime = 2.0
+randomness = 0.4
+process_material = SubResource("ParticleProcessMaterial_portal")
+draw_pass_1 = SubResource("PrismMesh_bwlii")
+
+[node name="SpotLight3D" type="SpotLight3D" parent="fren" unique_id=129412783]
+transform = Transform3D(0.2714439, 0, 0, 0, 0.16866902, 0.2653121, 0, -0.3806434, 0.24198951, 0.11459108, 0.42901057, 0.55167556)
+
+[node name="Floor" type="StaticBody3D" parent="." unique_id=649644004]
+transform = Transform3D(3.66, 0, 0, 0, 1, 0, 0, 0, 3.28, 0, -0.5, 0)
 collision_mask = 0
 script = ExtResource("1_ra6av")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor" unique_id=2079197770]
 shape = SubResource("BoxShape3D_floor2")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor" unique_id=1617267536]
 mesh = SubResource("BoxMesh_floor2")
 
-[node name="SpawnPoint" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+[node name="Spawn" type="AudioStreamPlayer3D" parent="Floor" unique_id=1708401284]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.26961386, 1.14, -3.4327855)
+stream = ExtResource("3_044l4")
+autoplay = true
+parameters/looping = true
 
-[node name="PortalBack" parent="." instance=ExtResource("2_portal")]
-transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 1.5, 5)
-target_scene = "res://src/levels/MainScene.tscn"
-portal_color = Color(1, 0.6, 0.3, 0.5)
+[node name="SpawnPoint" type="Marker3D" parent="." unique_id=1649572230]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.0755663, 9.402355)
 
-[node name="PortalLabel" parent="PortalBack" index="3"]
-text = "Return"
+[node name="GridPainterTest2" type="Node3D" parent="." unique_id=1018782632]
+transform = Transform3D(-3.8328009, 0, -3.2108626, 0, 5, 0, 3.2108626, 0, -3.8328009, -1.3683691, 0, -2.3531837)
+script = ExtResource("4_bwlii")
+load_for_player = false
+left_hand_preview_mesh = NodePath("GridTargetLeft")
+left_hand_subdivisions = Vector3i(4, 4, 4)
+right_hand_preview_mesh = NodePath("GridTargetRight")
+right_hand_subdivisions = Vector3i(4, 4, 4)
+head_preview_mesh = NodePath("GridTargetHead")
+head_subdivisions = Vector3i(8, 8, 8)
+body_preview_mesh = NodePath("GridTargetBody")
+body_subdivisions = Vector3i(6, 8, 4)
 
-[node name="WelcomeLabel" type="Label3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
-text = "Second Room!"
-font_size = 64
-outline_size = 16
+[node name="GridTargetLeft" type="MeshInstance3D" parent="GridPainterTest2" unique_id=189025209]
+transform = Transform3D(0.3, 0, -4.4703484e-08, 0, 0.3, 0, 4.4703484e-08, 0, 0.3, 0.20587467, 0.43171445, -0.39652282)
+cast_shadow = 0
+mesh = SubResource("BoxMesh_nh2lw")
 
-[node name="GrabbableCube" type="RigidBody3D" parent="." groups=["grabbable"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1.5, 0)
-mass = 0.5
-contact_monitor = true
-max_contacts_reported = 4
-script = ExtResource("3_grabbable")
-save_id = "GrabbableCube"
-prototype_scene = ExtResource("6_grabbable_cube")
+[node name="GridTargetLeftArea" type="Area3D" parent="GridPainterTest2/GridTargetLeft" unique_id=126174274]
+collision_layer = 32
+collision_mask = 32
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="GrabbableCube"]
-shape = SubResource("BoxShape3D_cube")
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest2/GridTargetLeft/GridTargetLeftArea" unique_id=207757275]
+shape = SubResource("BoxShape3D_4ip82")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="GrabbableCube"]
-mesh = SubResource("BoxMesh_cube")
+[node name="GridTargetRight" type="MeshInstance3D" parent="GridPainterTest2" unique_id=441557250]
+transform = Transform3D(0.3, 0, -4.4703484e-08, 0, 0.3, 0, 4.4703484e-08, 0, 0.3, -0.38407207, 0.15546826, -0.019179404)
+cast_shadow = 0
+mesh = SubResource("BoxMesh_eecuj")
 
-[node name="Label3D" type="Label3D" parent="GrabbableCube"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
-text = "Anchor Grab"
-font_size = 24
-outline_size = 8
+[node name="GridTargetRightArea" type="Area3D" parent="GridPainterTest2/GridTargetRight" unique_id=1836667241]
+collision_layer = 32
+collision_mask = 32
 
-[node name="GrabbableBall" type="RigidBody3D" parent="." groups=["grabbable"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1.5, 0)
-mass = 0.1
-gravity_scale = 0.3
-contact_monitor = true
-max_contacts_reported = 4
-script = ExtResource("3_grabbable")
-grab_mode = 0
-save_id = "GrabbableBall"
-prototype_scene = ExtResource("7_grabbable_ball")
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest2/GridTargetRight/GridTargetRightArea" unique_id=474320336]
+shape = SubResource("BoxShape3D_3luii")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="GrabbableBall"]
-shape = SubResource("SphereShape3D_ball")
+[node name="GridTargetHead" type="MeshInstance3D" parent="GridPainterTest2" unique_id=1871071070]
+transform = Transform3D(0.21770917, 0.020727653, 0.023938425, -0.027135387, 0.20784378, 0.06681805, -0.01632028, -0.06907494, 0.20823616, -0.00076675415, 0.619416, -0.15484425)
+cast_shadow = 0
+mesh = SubResource("BoxMesh_blwr8")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="GrabbableBall"]
-mesh = SubResource("SphereMesh_ball")
+[node name="GridTargetHeadArea" type="Area3D" parent="GridPainterTest2/GridTargetHead" unique_id=1547707830]
+collision_layer = 32
+collision_mask = 32
 
-[node name="Label3D" type="Label3D" parent="GrabbableBall"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
-text = "Free Grab"
-font_size = 24
-outline_size = 8
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest2/GridTargetHead/GridTargetHeadArea" unique_id=681480557]
+shape = SubResource("BoxShape3D_mr2or")
 
-[node name="GrabbableBall2" type="RigidBody3D" parent="." groups=["grabbable"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1.5, 0)
-mass = 0.1
-gravity_scale = 0.3
-contact_monitor = true
-max_contacts_reported = 4
-script = ExtResource("3_grabbable")
-grab_mode = 0
-save_id = "GrabbableBall2"
-prototype_scene = ExtResource("8_grabbable_ball2")
+[node name="GridTargetBody" type="MeshInstance3D" parent="GridPainterTest2" unique_id=893583809]
+transform = Transform3D(0.3, 0, 2.2351742e-08, 0, 0.4, 0, 7.450581e-09, 0, 0.2, 0.0062770844, 0.247408, -0.070643425)
+cast_shadow = 0
+mesh = SubResource("BoxMesh_qvmoi")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="GrabbableBall2"]
-shape = SubResource("BoxShape3D_slkg3")
+[node name="GridTargetBodyArea" type="Area3D" parent="GridPainterTest2/GridTargetBody" unique_id=1696957611]
+collision_layer = 32
+collision_mask = 32
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="GrabbableBall2"]
-mesh = SubResource("BoxMesh_ra6av")
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest2/GridTargetBody/GridTargetBodyArea" unique_id=125458638]
+shape = SubResource("BoxShape3D_boq3p")
 
-[node name="Label3D" type="Label3D" parent="GrabbableBall2"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
-text = "Free Grab"
-font_size = 24
-outline_size = 8
-
-[node name="ViewportMirror" type="Node3D" parent="."]
-transform = Transform3D(0.184826, 0, 0.982771, 0, 1, 0, -0.982771, 0, 0.184826, -4.32121, 0.881646, 0)
-script = ExtResource("5_chm60")
-size = Vector2(2, 1.5)
-ResolutionPerUnit = 500
-MainCamPath = NodePath("../XRPlayer/PlayerBody/XROrigin3D/XRCamera3D")
-MirrorColor = Color(1, 1, 1, 1)
-
-[editable path="PortalBack"]
+[node name="SpawnPoint2" type="Marker3D" parent="." unique_id=1289765623]
+transform = Transform3D(3.6600006, 0, 0, 0, 1, 0, 0, 0, 3.28, 0, 2.997721, -140.30914)
