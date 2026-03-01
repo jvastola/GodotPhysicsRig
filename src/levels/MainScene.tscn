@@ -36,6 +36,7 @@
 [ext_resource type="PackedScene" uid="uid://beim5pnvstjcv" path="res://src/ui/WatchMenuViewport3D.tscn" id="44_l4aac"]
 [ext_resource type="PackedScene" uid="uid://qsf5yp02t1i7" path="res://src/ui/window_wrapper/WindowWrapper.tscn" id="45_giw25"]
 [ext_resource type="PackedScene" uid="uid://baesap7jjgmfh" path="res://src/objects/grabbables/PaintBrush.tscn" id="45_paint_brush"]
+[ext_resource type="PackedScene" path="res://src/ui/ColorPickerViewport3D.tscn" id="45_sv5fj"]
 [ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://src/objects/viewport_mirror.gd" id="47_viewport_mirror"]
 [ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://src/systems/grid_painter.gd" id="48_grid_painter"]
 [ext_resource type="Script" uid="uid://cfrhsl8g3fmpt" path="res://src/systems/mesh_collision_generator.gd" id="49_collision"]
@@ -226,8 +227,19 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.2, -0.69013023)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.8, 0.95, -0.69013023)
 visible = false
 
+[node name="ViewportMirror2" type="Node3D" parent="." unique_id=1441688483]
+transform = Transform3D(0.013176724, 0, 0.99991316, 0, 1, 0, -0.99991316, 0, 0.013176724, -5.9807925, 0.5382767, -36.307198)
+script = ExtResource("47_viewport_mirror")
+size = Vector2(2, 1.5)
+ResolutionPerUnit = 500
+MainCamPath = NodePath("../XRPlayer/PlayerBody/XROrigin3D/XRCamera3D")
+MirrorColor = Color(1, 1, 1, 1)
+show_map = false
+mirror_only_layers = Array[int]([15])
+cull_distance = 10.0
+
 [node name="ViewportMirror" type="Node3D" parent="." unique_id=925737553]
-transform = Transform3D(-0.47085792, 0, 0.88220906, 0, 1, 0, -0.88220906, 0, -0.47085792, -6.6855316, 0.54375756, -36.17745)
+transform = Transform3D(-0.9961657, 0, -0.08748609, 0, 1, 0, 0.08748609, 0, -0.9961657, -2.8075109, -3.7746308, 0.14668864)
 script = ExtResource("47_viewport_mirror")
 size = Vector2(2, 1.5)
 ResolutionPerUnit = 500
@@ -244,7 +256,7 @@ height_noise_scale = 0.0
 line_color = Color(0, 1, 1, 0.6901961)
 
 [node name="GridPainterTest" type="Node3D" parent="." unique_id=1341686196]
-transform = Transform3D(-0.5020541, 0, -0.8648362, 0, 1, 0, 0.8648362, 0, -0.5020541, -6.640696, -0.09165305, -37.63213)
+transform = Transform3D(0.5989258, 0, -0.80080444, 0, 1, 0, 0.80080444, 0, 0.5989258, -4.1282773, -4.410041, -0.4646089)
 script = ExtResource("48_grid_painter")
 load_for_player = false
 left_hand_preview_mesh = NodePath("GridTargetLeft")
@@ -366,10 +378,17 @@ collision_mask = 32
 shape = SubResource("BoxShape3D_body_grid")
 
 [node name="island3" parent="." unique_id=1938076424 instance=ExtResource("32_l4aac")]
-transform = Transform3D(0.99999976, 0.0005695278, 0.00041558265, -0.00056933105, 0.9999997, -0.00048417712, -0.0004158522, 0.00048394562, 0.9999999, 0, 0, -42)
+transform = Transform3D(0.99999976, 0.0005695278, 0.00041558265, -0.00056933105, 0.9999997, -0.00048417712, -0.0004158522, 0.00048394562, 0.9999999, -0.002196312, 0.026595116, -41.99833)
 
 [node name="islandcollision" type="Node" parent="island3" unique_id=1618902482]
 script = ExtResource("49_collision")
+
+[node name="leave a review" type="Label3D" parent="island3" unique_id=1280983376]
+transform = Transform3D(-0.0134394, -0.00094921386, -1.0018916, -8.000125e-05, 0.89341044, -0.0010632443, 0.84892434, 6.916624e-05, -0.01586116, 14.45502, -4.160161, 22.477737)
+outline_modulate = Color(0, 0, 0, 0)
+text = "Leave a review!"
+font_size = 24
+outline_size = 8
 
 [node name="JoystickTool" parent="." unique_id=1401087512 instance=ExtResource("39_wh2ee")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.28916642, 0, -38.455387)
@@ -425,5 +444,8 @@ visible = false
 [node name="MovementSettingsViewport3D" parent="." unique_id=1913748936 instance=ExtResource("44_giw25")]
 transform = Transform3D(-0.4029544, 0, 0.9152201, 0, 1, 0, -0.9152201, 0, -0.4029544, -1.1318345, 8.647067, -38.285004)
 visible = false
+
+[node name="ColorPickerViewport3D" parent="." unique_id=1849360015 instance=ExtResource("45_sv5fj")]
+transform = Transform3D(-0.3159503, 0, 0.05074847, 0, 0.32, 0, -0.05074847, 0, -0.3159503, -3.5784981, -3.4928527, -0.42502117)
 
 [editable path="OreDeposit2"]

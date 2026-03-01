@@ -18,14 +18,7 @@ fog_density = 0.0398
 
 [sub_resource type="TextMesh" id="TextMesh_3luii"]
 material = SubResource("StandardMaterial3D_eecuj")
-text = "FR
-"
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_blwr8"]
-
-[sub_resource type="TextMesh" id="TextMesh_mr2or"]
-material = SubResource("StandardMaterial3D_blwr8")
-text = "en
+text = "scene tree
 "
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_qvmoi"]
@@ -88,31 +81,25 @@ light_color = Color(1, 0.9, 0.8, 1)
 shadow_enabled = true
 
 [node name="fren" type="MeshInstance3D" parent="." unique_id=166391348]
-transform = Transform3D(8, 0, 0, 0, 6.707766, 0, 0, 0, 2.217, -0.82890636, 2.2847877, 0)
+transform = Transform3D(8, 0, 0, 0, 6.707766, 0, 0, 0, 4.4328957, 0, 2.2936358, 0)
 cast_shadow = 0
 mesh = SubResource("TextMesh_3luii")
 skeleton = NodePath("../Floor/MeshInstance3D")
 
-[node name="fren2" type="MeshInstance3D" parent="fren" unique_id=954742495]
-transform = Transform3D(1.1573021, 0, 0, 0, 1.3481078, 0, 0, 0, 1, 0.20786487, 0.022490025, 0)
-cast_shadow = 0
-mesh = SubResource("TextMesh_mr2or")
-skeleton = NodePath("../../Floor/MeshInstance3D")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="fren" unique_id=998109583]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1024158, 0.10358739, 0)
-mesh = SubResource("BoxMesh_boq3p")
-
 [node name="MeshInstance3D3" type="MeshInstance3D" parent="fren" unique_id=1738012879]
-transform = Transform3D(-1.9818962e-08, -1, 0, 0.45340487, -4.3711392e-08, 0, 0, 0, 1, -0.1324626, -0.008553147, 0)
+transform = Transform3D(-1.9818962e-08, -1, 0, 0.4534049, -4.3711395e-08, 0, 0, 0, 1, -0.43696645, -0.008553147, 0)
 mesh = SubResource("BoxMesh_boq3p")
 
 [node name="MeshInstance3D4" type="MeshInstance3D" parent="fren" unique_id=1855431871]
-transform = Transform3D(-1.9818964e-08, -1, 0, 0.45340487, -4.3711392e-08, 0, 0, 0, 1, 0.3379451, -0.008553147, 0)
+transform = Transform3D(-1.9818964e-08, -1, 0, 0.4534049, -4.3711395e-08, 0, 0, 0, 1, 0.43463135, -0.008553147, 0)
 mesh = SubResource("BoxMesh_boq3p")
 
 [node name="MeshInstance3D2" type="MeshInstance3D" parent="fren" unique_id=897998657]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.10241581, -0.12146419, 0)
+transform = Transform3D(1.7969981, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.12450735, 0)
+mesh = SubResource("BoxMesh_boq3p")
+
+[node name="MeshInstance3D5" type="MeshInstance3D" parent="fren" unique_id=618498490]
+transform = Transform3D(1.7969981, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.09097177, 0)
 mesh = SubResource("BoxMesh_boq3p")
 
 [node name="GPUParticles3D2" type="GPUParticles3D" parent="." unique_id=1816386417]
@@ -164,7 +151,7 @@ body_preview_mesh = NodePath("GridTargetBody")
 body_subdivisions = Vector3i(6, 8, 4)
 
 [node name="GridTargetLeft" type="MeshInstance3D" parent="GridPainterTest2" unique_id=189025209]
-transform = Transform3D(0.30000007, 0, 2.9802322e-08, 0, 0.30000013, 0, -2.9802322e-08, 0, 0.30000007, 0.17484331, 0.28536296, -0.34762812)
+transform = Transform3D(0.30000007, 0, 5.9604645e-08, 0, 0.3000002, 0, -5.9604645e-08, 0, 0.30000007, 0.15121573, 0.28536302, -0.319424)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_nh2lw")
 
