@@ -4,6 +4,8 @@
 [ext_resource type="Material" uid="uid://bekkfd16cqphx" path="res://src/demos/tools/materials/metal_pixel.tres" id="2_0m6qu"]
 [ext_resource type="AudioStream" uid="uid://8bbhwlp7i6sp" path="res://assets/audio/spawn.ogg" id="3_044l4"]
 [ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://src/systems/grid_painter.gd" id="4_bwlii"]
+[ext_resource type="Script" uid="uid://b2rt0j5sk03on" path="res://src/levels/loading_scene.gd" id="5_loading"]
+[ext_resource type="PackedScene" path="res://src/player/MinimalXRPointerRig.tscn" id="6_rig"]
 
 [sub_resource type="Environment" id="Environment_second"]
 background_mode = 1
@@ -45,13 +47,14 @@ scale_min = 0.05
 scale_max = 0.15
 
 [sub_resource type="PrismMesh" id="PrismMesh_bwlii"]
+size = Vector3(2, 2, 2)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_floor2"]
-size = Vector3(15, 1, 15)
+size = Vector3(50, 1, 50)
 
 [sub_resource type="BoxMesh" id="BoxMesh_floor2"]
 material = ExtResource("2_0m6qu")
-size = Vector3(15, 1, 15)
+size = Vector3(50, 1, 50)
 
 [sub_resource type="BoxMesh" id="BoxMesh_nh2lw"]
 size = Vector3(0.45, 0.45, 0.45)
@@ -74,6 +77,7 @@ size = Vector3(0.45, 0.45, 0.45)
 [sub_resource type="BoxShape3D" id="BoxShape3D_boq3p"]
 
 [node name="SecondRoom" type="Node3D" unique_id=698925119]
+script = ExtResource("5_loading")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1225682226]
 environment = SubResource("Environment_second")
@@ -84,7 +88,7 @@ light_color = Color(1, 0.9, 0.8, 1)
 shadow_enabled = true
 
 [node name="fren" type="MeshInstance3D" parent="." unique_id=166391348]
-transform = Transform3D(3.6840026, 0, 0, 0, 3.1807842, 0, 0, 0, 2.2170372, 0, 1.9748287, 0)
+transform = Transform3D(8, 0, 0, 0, 6.707766, 0, 0, 0, 2.217, -0.82890636, 2.2847877, 0)
 cast_shadow = 0
 mesh = SubResource("TextMesh_3luii")
 skeleton = NodePath("../Floor/MeshInstance3D")
@@ -111,19 +115,21 @@ mesh = SubResource("BoxMesh_boq3p")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.10241581, -0.12146419, 0)
 mesh = SubResource("BoxMesh_boq3p")
 
-[node name="GPUParticles3D2" type="GPUParticles3D" parent="fren" unique_id=1816386417]
-transform = Transform3D(-2.4142098, -0.055159956, 0.014995944, 0.14203514, -0.8562753, 0.2799425, -0.013069652, 0.88345563, 0.27226615, -7.7149e-15, -0.10852772, -0.6249032)
+[node name="GPUParticles3D2" type="GPUParticles3D" parent="." unique_id=1816386417]
+transform = Transform3D(-8.893955, -0.20320943, 0.055245098, 0.45178315, -2.723627, 0.8904367, -0.028975904, 1.958654, 0.60362417, -0.3274858, 1.2677685, -1.3854337)
 amount = 50
 lifetime = 2.0
 randomness = 0.4
 process_material = SubResource("ParticleProcessMaterial_portal")
 draw_pass_1 = SubResource("PrismMesh_bwlii")
 
-[node name="SpotLight3D" type="SpotLight3D" parent="fren" unique_id=129412783]
-transform = Transform3D(0.2714439, 0, 0, 0, 0.16866902, 0.2653121, 0, -0.3806434, 0.24198951, 0.11459108, 0.42901057, 0.55167556)
+[node name="SpotLight3D" type="SpotLight3D" parent="." unique_id=129412783]
+transform = Transform3D(1, 0, 0, 0, 0.53649974, 0.84390044, 0, -0.84390044, 0.5364998, -0.17456016, 4.0229235, 1.2230853)
+spot_range = 17.977
+spot_angle = 60.0
 
 [node name="Floor" type="StaticBody3D" parent="." unique_id=649644004]
-transform = Transform3D(3.66, 0, 0, 0, 1, 0, 0, 0, 3.28, 0, -0.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 collision_mask = 0
 script = ExtResource("1_ra6av")
 
@@ -136,14 +142,16 @@ mesh = SubResource("BoxMesh_floor2")
 [node name="Spawn" type="AudioStreamPlayer3D" parent="Floor" unique_id=1708401284]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.26961386, 1.14, -3.4327855)
 stream = ExtResource("3_044l4")
-autoplay = true
 parameters/looping = true
 
 [node name="SpawnPoint" type="Marker3D" parent="." unique_id=1649572230]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.0755663, 9.402355)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.0755663, 8.720273)
+
+[node name="MinimalXRPointerRig" parent="." unique_id=962016152 instance=ExtResource("6_rig")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45464826, 8.038471)
 
 [node name="GridPainterTest2" type="Node3D" parent="." unique_id=1018782632]
-transform = Transform3D(-3.8328009, 0, -3.2108626, 0, 5, 0, 3.2108626, 0, -3.8328009, -1.3683691, 0, -2.3531837)
+transform = Transform3D(-7.6656017, 0, -6.4217243, 0, 10, 0, 6.4217243, 0, -7.6656017, -3.2084332, 0, -4.3697257)
 script = ExtResource("4_bwlii")
 load_for_player = false
 left_hand_preview_mesh = NodePath("GridTargetLeft")
@@ -156,7 +164,7 @@ body_preview_mesh = NodePath("GridTargetBody")
 body_subdivisions = Vector3i(6, 8, 4)
 
 [node name="GridTargetLeft" type="MeshInstance3D" parent="GridPainterTest2" unique_id=189025209]
-transform = Transform3D(0.3, 0, -4.4703484e-08, 0, 0.3, 0, 4.4703484e-08, 0, 0.3, 0.20587467, 0.43171445, -0.39652282)
+transform = Transform3D(0.30000007, 0, 2.9802322e-08, 0, 0.30000013, 0, -2.9802322e-08, 0, 0.30000007, 0.17484331, 0.28536296, -0.34762812)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_nh2lw")
 
@@ -202,6 +210,3 @@ collision_mask = 32
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest2/GridTargetBody/GridTargetBodyArea" unique_id=125458638]
 shape = SubResource("BoxShape3D_boq3p")
-
-[node name="SpawnPoint2" type="Marker3D" parent="." unique_id=1289765623]
-transform = Transform3D(3.6600006, 0, 0, 0, 1, 0, 0, 0, 3.28, 0, 2.997721, -140.30914)

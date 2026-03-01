@@ -136,7 +136,7 @@ mesh = SubResource("BoxMesh_or5nu")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.497721, -42.777176)
 
 [node name="XRPlayer" parent="." unique_id=1371219310 instance=ExtResource("1_xrplayer")]
-transform = Transform3D(0.999598, 0, 0, 0, 0.999598, 0, 0, 0, 0.999598, 0, 2, -42.915047)
+transform = Transform3D(-0.99953103, 0, -0.011566648, 0, 0.99959797, 0, 0.011566648, 0, -0.99953103, 0, 2, -42.915047)
 
 [node name="UnifiedRoomViewport3D" parent="." unique_id=1842196751 instance=ExtResource("13_unified_ui")]
 transform = Transform3D(-0.030811917, 0, -0.50405914, 0, 0.505, 0, 0.50405914, 0, -0.030811917, 4.492344, 0.5537932, -39.29543)
