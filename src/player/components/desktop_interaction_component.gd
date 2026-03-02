@@ -133,8 +133,8 @@ func _update_look_target() -> void:
 	if center_pointer and center_pointer.has_method("get_hit_collider"):
 		var collider = center_pointer.get_hit_collider()
 		if collider and collider is Node:
-			# Check if it's grabbable
-			if collider.is_in_group("grabbable") or collider.is_in_group("interactable"):
+			# Check if it's grabbable or pointer-interactable.
+			if collider.is_in_group("grabbable") or collider.is_in_group("interactable") or collider.is_in_group("pointer_interactable") or collider.has_method("handle_pointer_event"):
 				new_target = collider
 	
 	if new_target != _look_target:
@@ -149,7 +149,43 @@ func _toggle_pickup(slot: int) -> void:
 	if held:
 		drop_item(slot)
 	else:
+		if _try_interact_look_target():
+			return
 		pickup_item(slot)
+
+
+func _try_interact_look_target() -> bool:
+	"""If the looked-at target is pointer-interactable but not grabbable, trigger a press event."""
+	if not _look_target:
+		return false
+	if _look_target.is_in_group("grabbable"):
+		return false
+	if not (_look_target.is_in_group("pointer_interactable") or _look_target.has_method("handle_pointer_event")):
+		return false
+
+	var event := {
+		"type": "press",
+		"pointer": center_pointer,
+		"controller": null,
+		"collider": _look_target,
+		"handler": _look_target,
+		"global_position": (_look_target as Node3D).global_position if _look_target is Node3D else Vector3.ZERO,
+		"global_normal": Vector3.UP,
+		"pointer_origin": camera.global_position if camera else Vector3.ZERO,
+		"pointer_direction": -camera.global_transform.basis.z if camera else Vector3.FORWARD,
+		"distance": 0.0,
+		"action": "trigger_click",
+		"action_pressed": true,
+		"action_just_pressed": true,
+		"action_just_released": false,
+		"action_strength": 1.0,
+	}
+	if _look_target.has_method("handle_pointer_event"):
+		_look_target.call_deferred("handle_pointer_event", event)
+		if debug_logs:
+			print("DesktopInteractionComponent: Triggered pointer press on ", _look_target.name)
+		return true
+	return false
 
 
 func pickup_item(slot: int) -> void:

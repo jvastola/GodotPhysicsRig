@@ -49,6 +49,8 @@ func _setup_networking() -> void:
 	network_manager.send_local_avatar.connect(send_avatar_texture)
 	if network_manager.has_signal("player_name_updated"):
 		network_manager.player_name_updated.connect(_on_player_name_updated)
+	if network_manager.has_signal("player_cosmetics_updated"):
+		network_manager.player_cosmetics_updated.connect(_on_player_cosmetics_updated)
 	
 	# Connect to NakamaManager match_joined to send avatar when we join a room
 	var nakama_manager = get_node_or_null("/root/NakamaManager")
@@ -147,6 +149,8 @@ func _update_remote_players() -> void:
 				remote_name = network_manager.get_peer_display_name(str(peer_id))
 			if not remote_name.is_empty() and remote_players[peer_id].has_method("set_player_name"):
 				remote_players[peer_id].set_player_name(remote_name)
+			if player_data.has("equipped_cosmetics") and remote_players[peer_id].has_method("set_equipped_cosmetics"):
+				remote_players[peer_id].set_equipped_cosmetics(player_data.equipped_cosmetics)
 
 func _despawn_remote_player(peer_id: Variant) -> void:
 	"""Remove a remote player's visual representation"""
@@ -278,6 +282,7 @@ func _spawn_remote_player(peer_id: Variant) -> void:
 	
 	# Try to apply their avatar texture
 	call_deferred("_apply_remote_avatar", peer_id)
+	call_deferred("_apply_remote_cosmetics", peer_id)
 
 
 func _on_player_name_updated(peer_id: String, display_name: String) -> void:
@@ -285,6 +290,15 @@ func _on_player_name_updated(peer_id: String, display_name: String) -> void:
 		return
 	if remote_players.has(peer_id) and remote_players[peer_id].has_method("set_player_name"):
 		remote_players[peer_id].set_player_name(display_name)
+
+
+func _on_player_cosmetics_updated(peer_id: String, equipped_cosmetics: Dictionary) -> void:
+	if peer_id.is_empty():
+		return
+	if not remote_players.has(peer_id):
+		return
+	if remote_players[peer_id].has_method("set_equipped_cosmetics"):
+		remote_players[peer_id].set_equipped_cosmetics(equipped_cosmetics)
 
 func _apply_remote_avatar(peer_id: Variant) -> void:
 	"""Apply avatar texture to a remote player"""
@@ -307,6 +321,17 @@ func _apply_remote_avatar(peer_id: Variant) -> void:
 		if texture:
 			remote_players[peer_id].apply_avatar_texture(texture)
 			print("PlayerNetworkComponent: Applied legacy avatar to remote player ", peer_id)
+
+
+func _apply_remote_cosmetics(peer_id: Variant) -> void:
+	"""Apply equipped cosmetics to a remote player."""
+	if not network_manager or not remote_players.has(peer_id):
+		return
+	if not network_manager.players.has(peer_id):
+		return
+	var player_data = network_manager.players[peer_id]
+	if player_data.has("equipped_cosmetics") and remote_players[peer_id].has_method("set_equipped_cosmetics"):
+		remote_players[peer_id].set_equipped_cosmetics(player_data.equipped_cosmetics)
 
 func _on_avatar_texture_received(peer_id: Variant) -> void:
 	"""Handle avatar texture received for a remote player"""

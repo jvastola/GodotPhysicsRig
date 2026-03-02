@@ -1,6 +1,7 @@
 extends Node3D
 ## NetworkPlayer - Represents a remote player in the network
 ## Handles interpolation and visualization of networked player transforms
+const CosmeticVisuals = preload("res://src/systems/cosmetic_visuals.gd")
 
 @export var peer_id: Variant = -1
 @export var interpolation_speed: float = 15.0
@@ -35,10 +36,14 @@ var label_3d: Label3D = null
 
 # Avatar texture
 var has_custom_avatar: bool = false
+var equipped_cosmetics: Dictionary = {}
+var hat_anchor: Node3D = null
+var _head_cosmetic_node: Node3D = null
 
 
 func _ready() -> void:
 	_create_visuals()
+	_ensure_hat_anchor()
 	_create_name_label()
 	# Voice player creation removed - now handled by PlayerVoiceComponent
 
@@ -185,6 +190,17 @@ func _create_visuals() -> void:
 	body_visual.material_override = body_material
 
 
+func _ensure_hat_anchor() -> void:
+	if hat_anchor and is_instance_valid(hat_anchor):
+		return
+	if not head_visual:
+		return
+	hat_anchor = Node3D.new()
+	hat_anchor.name = "HatAnchor"
+	hat_anchor.position = Vector3(0.0, 0.14, 0.0)
+	head_visual.add_child(hat_anchor)
+
+
 ## Create floating name label above head
 func _create_name_label() -> void:
 	label_3d = Label3D.new()
@@ -212,6 +228,35 @@ func set_player_name(new_name: String) -> void:
 			return
 		label_3d.text = new_name
 		print("NetworkPlayer: Set name to ", new_name)
+
+
+func set_equipped_cosmetics(cosmetics: Dictionary) -> void:
+	var normalized: Dictionary = {}
+	for slot_variant in cosmetics.keys():
+		var slot := String(slot_variant).strip_edges().to_lower()
+		if slot.is_empty():
+			continue
+		normalized[slot] = String(cosmetics[slot_variant]).strip_edges().to_lower()
+	if equipped_cosmetics == normalized:
+		return
+	equipped_cosmetics = normalized
+	_apply_head_cosmetic(String(equipped_cosmetics.get("head", "")))
+
+
+func _apply_head_cosmetic(item_id: String) -> void:
+	_ensure_hat_anchor()
+	if not hat_anchor:
+		return
+	if _head_cosmetic_node and is_instance_valid(_head_cosmetic_node):
+		_head_cosmetic_node.queue_free()
+		_head_cosmetic_node = null
+	if item_id.is_empty():
+		return
+	var node := CosmeticVisuals.create_head_cosmetic(item_id)
+	if not node:
+		return
+	_head_cosmetic_node = node
+	hat_anchor.add_child(_head_cosmetic_node)
 
 
 

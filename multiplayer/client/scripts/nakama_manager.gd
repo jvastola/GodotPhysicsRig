@@ -48,6 +48,7 @@ var match_peers: Dictionary = {}  # peer_id -> presence (EXCLUDING self)
 var _auth_retry_count: int = 0
 var _auth_max_retries: int = 3
 var _auth_retry_delay: float = 1.0
+const DEVICE_ID_FILE_PATH := "user://nakama_device_id.txt"
 
 # Op codes for match state (must match across all clients)
 enum MatchOpCode {
@@ -69,7 +70,8 @@ enum MatchOpCode {
 	SNAPSHOT_CHUNK = 25,
 	SNAPSHOT_DONE = 26,
 	OBJECT_PROPERTY_UPDATE = 27,
-	PLAYER_NAME_UPDATE = 28
+	PLAYER_NAME_UPDATE = 28,
+	PLAYER_COSMETICS_UPDATE = 29
 }
 
 
@@ -174,18 +176,40 @@ func _flush_outbound_queue() -> void:
 
 
 func _get_or_create_device_id() -> String:
-	# For local multi-instance testing: use process ID + timestamp to ensure uniqueness
-	# Each game instance gets its own ID, even on the same machine
-	var base_id = OS.get_unique_id()
+	# Highest priority: explicit override for QA/server testing.
+	var env_device_id := OS.get_environment("NAKAMA_DEVICE_ID").strip_edges()
+	if not env_device_id.is_empty():
+		return env_device_id
+
+	# Read previously persisted ID so users keep the same Nakama account across launches.
+	if FileAccess.file_exists(DEVICE_ID_FILE_PATH):
+		var existing_file := FileAccess.open(DEVICE_ID_FILE_PATH, FileAccess.READ)
+		if existing_file:
+			var existing_id := existing_file.get_as_text().strip_edges()
+			existing_file.close()
+			if not existing_id.is_empty():
+				return existing_id
+
+	# Generate a stable new ID once, then persist it.
+	var base_id := OS.get_unique_id().strip_edges()
 	if base_id.is_empty():
-		base_id = "DEVICE"
-	
-	# Use process ID to make each instance truly unique
-	var process_id = OS.get_process_id()
-	var timestamp = Time.get_ticks_msec()
-	var unique_id = base_id + "_" + str(process_id) + "_" + str(timestamp % 10000)
-	
-	return unique_id
+		var entropy := "%s_%s_%s_%s" % [
+			OS.get_name(),
+			OS.get_model_name(),
+			Time.get_unix_time_from_system(),
+			randi()
+		]
+		base_id = entropy.sha256_text().substr(0, 32)
+
+	var new_device_id := "device_" + base_id
+	var out_file := FileAccess.open(DEVICE_ID_FILE_PATH, FileAccess.WRITE)
+	if out_file:
+		out_file.store_string(new_device_id)
+		out_file.close()
+	else:
+		push_warning("NakamaManager: Could not persist device ID to %s" % DEVICE_ID_FILE_PATH)
+
+	return new_device_id
 
 
 ## Authenticate with Nakama using device ID
@@ -798,6 +822,236 @@ func _on_display_name_updated(result: int, response_code: int, _headers: PackedS
 		print("NakamaManager: Display name updated to: ", display_name)
 	else:
 		push_warning("NakamaManager: Failed to update display name (result: %d, code: %d)" % [result, response_code])
+
+
+# ============================================================================
+# Storage Objects
+# ============================================================================
+
+func read_storage_object(collection: String, key: String, user_id: String = "") -> Dictionary:
+	"""Read a Nakama storage object.
+	Returns {ok, exists, value, version, code, error}."""
+	if not is_authenticated or not session:
+		return {
+			"ok": false,
+			"exists": false,
+			"value": {},
+			"version": "",
+			"code": 0,
+			"error": "Not authenticated"
+		}
+	if collection.is_empty() or key.is_empty():
+		return {
+			"ok": false,
+			"exists": false,
+			"value": {},
+			"version": "",
+			"code": 0,
+			"error": "Collection/key required"
+		}
+
+	var storage_http := HTTPRequest.new()
+	storage_http.timeout = 10.0
+	add_child(storage_http)
+
+	var object_id := {
+		"collection": collection,
+		"key": key
+	}
+	if not user_id.is_empty():
+		object_id["user_id"] = user_id
+
+	var body_json := JSON.stringify({
+		"object_ids": [object_id]
+	})
+	var headers := [
+		"Content-Type: application/json",
+		"Authorization: Bearer " + session.token
+	]
+
+	# Use POST /v2/storage with object_ids for broad Nakama compatibility.
+	var err := storage_http.request(_get_nakama_url() + "/v2/storage", headers, HTTPClient.METHOD_POST, body_json)
+	if err != OK:
+		storage_http.queue_free()
+		return {
+			"ok": false,
+			"exists": false,
+			"value": {},
+			"version": "",
+			"code": 0,
+			"error": "Request failed to start: " + str(err)
+		}
+
+	var result_tuple = await storage_http.request_completed
+	storage_http.queue_free()
+
+	var result: int = result_tuple[0]
+	var response_code: int = result_tuple[1]
+	var response_body: PackedByteArray = result_tuple[3]
+	if result != HTTPRequest.RESULT_SUCCESS:
+		return {
+			"ok": false,
+			"exists": false,
+			"value": {},
+			"version": "",
+			"code": response_code,
+			"error": "Transport error: " + str(result)
+		}
+	if response_code != 200:
+		return {
+			"ok": false,
+			"exists": false,
+			"value": {},
+			"version": "",
+			"code": response_code,
+			"error": "HTTP error: " + str(response_code)
+		}
+
+	var parsed = JSON.parse_string(response_body.get_string_from_utf8())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {
+			"ok": false,
+			"exists": false,
+			"value": {},
+			"version": "",
+			"code": response_code,
+			"error": "Invalid JSON response"
+		}
+	var objects_variant: Variant = parsed.get("objects", [])
+	if not (objects_variant is Array):
+		return {
+			"ok": true,
+			"exists": false,
+			"value": {},
+			"version": "",
+			"code": response_code,
+			"error": ""
+		}
+	var objects: Array = objects_variant
+	if objects.is_empty():
+		return {
+			"ok": true,
+			"exists": false,
+			"value": {},
+			"version": "",
+			"code": response_code,
+			"error": ""
+		}
+	if not (objects[0] is Dictionary):
+		return {
+			"ok": false,
+			"exists": false,
+			"value": {},
+			"version": "",
+			"code": response_code,
+			"error": "Malformed storage object"
+		}
+
+	var object_data: Dictionary = objects[0]
+	var value_variant: Variant = object_data.get("value", {})
+	var value: Dictionary = {}
+	if value_variant is Dictionary:
+		value = value_variant
+	elif value_variant is String:
+		var parsed_value = JSON.parse_string(value_variant)
+		if parsed_value is Dictionary:
+			value = parsed_value
+
+	return {
+		"ok": true,
+		"exists": true,
+		"value": value.duplicate(true),
+		"version": String(object_data.get("version", "")),
+		"code": response_code,
+		"error": ""
+	}
+
+
+func write_storage_object(collection: String, key: String, value: Dictionary, version: String = "", permission_read: int = 1, permission_write: int = 1) -> Dictionary:
+	"""Write a Nakama storage object using optimistic concurrency.
+	Returns {ok, version, code, error}."""
+	if not is_authenticated or not session:
+		return {
+			"ok": false,
+			"version": "",
+			"code": 0,
+			"error": "Not authenticated"
+		}
+	if collection.is_empty() or key.is_empty():
+		return {
+			"ok": false,
+			"version": "",
+			"code": 0,
+			"error": "Collection/key required"
+		}
+
+	var write_http := HTTPRequest.new()
+	write_http.timeout = 10.0
+	add_child(write_http)
+
+	var object_payload := {
+		"collection": collection,
+		"key": key,
+		# Nakama storage write expects value as a JSON string on this backend.
+		"value": JSON.stringify(value),
+		"permission_read": permission_read,
+		"permission_write": permission_write
+	}
+	if not version.is_empty():
+		object_payload["version"] = version
+
+	var body_json := JSON.stringify({
+		"objects": [object_payload]
+	})
+	var headers := [
+		"Content-Type: application/json",
+		"Authorization: Bearer " + session.token
+	]
+
+	var err := write_http.request(_get_nakama_url() + "/v2/storage", headers, HTTPClient.METHOD_PUT, body_json)
+	if err != OK:
+		write_http.queue_free()
+		return {
+			"ok": false,
+			"version": "",
+			"code": 0,
+			"error": "Request failed to start: " + str(err)
+		}
+
+	var result_tuple = await write_http.request_completed
+	write_http.queue_free()
+
+	var result: int = result_tuple[0]
+	var response_code: int = result_tuple[1]
+	var response_body: PackedByteArray = result_tuple[3]
+	if result != HTTPRequest.RESULT_SUCCESS:
+		return {
+			"ok": false,
+			"version": "",
+			"code": response_code,
+			"error": "Transport error: " + str(result)
+		}
+	if response_code != 200:
+		return {
+			"ok": false,
+			"version": "",
+			"code": response_code,
+			"error": response_body.get_string_from_utf8()
+		}
+
+	var next_version := version
+	var parsed = JSON.parse_string(response_body.get_string_from_utf8())
+	if parsed is Dictionary:
+		var acks_variant: Variant = parsed.get("acks", [])
+		if acks_variant is Array and (acks_variant as Array).size() > 0 and (acks_variant as Array)[0] is Dictionary:
+			next_version = String((acks_variant as Array)[0].get("version", version))
+
+	return {
+		"ok": true,
+		"version": next_version,
+		"code": response_code,
+		"error": ""
+	}
 
 
 # ============================================================================

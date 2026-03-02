@@ -14,6 +14,7 @@ signal snapshot_reconstructed(snapshot_id: String, object_count: int)
 signal network_object_despawn_requested(object_id: String)
 signal object_property_updated(object_id: String, property_name: String, value: Variant, sender_peer_id: String)
 signal player_name_updated(peer_id: String, display_name: String)
+signal player_cosmetics_updated(peer_id: String, equipped_cosmetics: Dictionary)
 
 # Nakama is now the exclusive networking backend
 var use_nakama: bool = true
@@ -37,7 +38,8 @@ var local_player_info: Dictionary = {
 	"right_hand_position": Vector3.ZERO,
 	"right_hand_rotation": Vector3.ZERO,
 	"player_scale": Vector3.ONE,
-	"avatar_texture_data": PackedByteArray()
+	"avatar_texture_data": PackedByteArray(),
+	"equipped_cosmetics": {}
 }
 
 # Grabbable sync
@@ -258,6 +260,40 @@ func _set_peer_display_name(peer_id: String, display_name: String, broadcast: bo
 		})
 
 
+func _sanitize_equipped_cosmetics(cosmetics: Dictionary) -> Dictionary:
+	var sanitized: Dictionary = {}
+	for slot_variant in cosmetics.keys():
+		var slot := String(slot_variant).strip_edges().to_lower()
+		if slot.is_empty() or slot.length() > 32:
+			continue
+		var item_id := String(cosmetics[slot_variant]).strip_edges().to_lower()
+		if item_id.length() > 64:
+			continue
+		sanitized[slot] = item_id
+	return sanitized
+
+
+func set_local_equipped_cosmetics(cosmetics: Dictionary, broadcast: bool = true) -> void:
+	var my_id := get_nakama_user_id()
+	if my_id.is_empty():
+		return
+	var sanitized := _sanitize_equipped_cosmetics(cosmetics)
+	local_player_info["equipped_cosmetics"] = sanitized
+	if players.has(my_id):
+		var p: Dictionary = players[my_id].duplicate(true)
+		p["equipped_cosmetics"] = sanitized.duplicate(true)
+		players[my_id] = p
+	else:
+		players[my_id] = local_player_info.duplicate(true)
+
+	player_cosmetics_updated.emit(my_id, sanitized.duplicate(true))
+	if broadcast and NakamaManager:
+		NakamaManager.send_match_state(NakamaManager.MatchOpCode.PLAYER_COSMETICS_UPDATE, {
+			"peer_id": my_id,
+			"equipped_cosmetics": sanitized
+		})
+
+
 ## Register the local player node
 func _register_local_player() -> void:
 	var my_id = get_nakama_user_id()
@@ -280,7 +316,8 @@ func _make_default_remote_player_info(peer_id: String) -> Dictionary:
 		"right_hand_position": Vector3.ZERO,
 		"right_hand_rotation": Vector3.ZERO,
 		"player_scale": Vector3.ONE,
-		"avatar_texture_data": PackedByteArray()
+		"avatar_texture_data": PackedByteArray(),
+		"equipped_cosmetics": {}
 	}
 	var known_name := get_peer_display_name(peer_id)
 	if not known_name.is_empty():
@@ -415,6 +452,7 @@ func _on_nakama_match_joined(match_id: String) -> void:
 	# Register ourselves
 	_register_local_player()
 	set_local_display_name(local_player_info.name, true)
+	set_local_equipped_cosmetics(local_player_info.get("equipped_cosmetics", {}), true)
 	if NakamaManager and NakamaManager.match_peers.is_empty():
 		_set_host_peer_id(get_nakama_user_id())
 	else:
@@ -1365,6 +1403,25 @@ func _on_nakama_match_state_received(peer_id: String, op_code: int, data: Varian
 			var display_name := String(name_data.get("display_name", ""))
 			if not updated_peer_id.is_empty() and not display_name.is_empty():
 				_set_peer_display_name(updated_peer_id, display_name, false)
+	elif op_code == NakamaManager.MatchOpCode.PLAYER_COSMETICS_UPDATE:
+		var cosmetics_data = data
+		if data is PackedByteArray:
+			cosmetics_data = bytes_to_var(data)
+		if cosmetics_data is Dictionary:
+			var updated_peer_id := String(cosmetics_data.get("peer_id", peer_id))
+			var equipped_variant: Variant = cosmetics_data.get("equipped_cosmetics", {})
+			if updated_peer_id.is_empty() or not (equipped_variant is Dictionary):
+				return
+			var sanitized := _sanitize_equipped_cosmetics(equipped_variant)
+			if players.has(updated_peer_id):
+				var p: Dictionary = players[updated_peer_id].duplicate(true)
+				p["equipped_cosmetics"] = sanitized
+				players[updated_peer_id] = p
+			else:
+				var default_info := _make_default_remote_player_info(updated_peer_id)
+				default_info["equipped_cosmetics"] = sanitized
+				players[updated_peer_id] = default_info
+			player_cosmetics_updated.emit(updated_peer_id, sanitized.duplicate(true))
 	elif op_code == NakamaManager.MatchOpCode.OWNERSHIP_REQUEST:
 		if data is Dictionary:
 			_handle_ownership_request(peer_id, data)

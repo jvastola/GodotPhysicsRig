@@ -2,6 +2,7 @@
 # Manages the XR player including camera, controllers, and physics hands
 # Supports both VR and desktop modes
 extends Node3D
+const CosmeticVisuals = preload("res://src/systems/cosmetic_visuals.gd")
 
 @onready var player_body: RigidBody3D = $PlayerBody
 @onready var xr_origin: XROrigin3D = $PlayerBody/XROrigin3D
@@ -129,6 +130,8 @@ var _pinch_threshold: float = 0.8  # Strength to trigger grab
 # Audio Listeners
 var vr_listener: AudioListener3D = null
 var desktop_listener: AudioListener3D = null
+var _local_hat_anchor: Node3D = null
+var _local_head_cosmetic: Node3D = null
 
 
 func _ready() -> void:
@@ -179,6 +182,7 @@ func _ready() -> void:
 
 	# Initialize components
 	_setup_components()
+	_setup_local_cosmetics()
 
 	# Wait for XR origin to initialize
 	if xr_origin:
@@ -205,6 +209,54 @@ func _ready() -> void:
 	
 	# Setup rendering layers for mirror-only display
 	_setup_mirror_only_layer()
+
+
+func _setup_local_cosmetics() -> void:
+	_ensure_local_hat_anchor()
+	if CosmeticsManager and CosmeticsManager.has_signal("equipped_changed"):
+		if not CosmeticsManager.equipped_changed.is_connected(_on_local_cosmetic_equipped_changed):
+			CosmeticsManager.equipped_changed.connect(_on_local_cosmetic_equipped_changed)
+	if CosmeticsManager and CosmeticsManager.has_method("get_equipped_item"):
+		_apply_local_head_cosmetic(String(CosmeticsManager.get_equipped_item("head")))
+
+
+func _ensure_local_hat_anchor() -> void:
+	if _local_hat_anchor and is_instance_valid(_local_hat_anchor):
+		return
+	var attach_parent: Node3D = null
+	if head_mesh and is_instance_valid(head_mesh):
+		attach_parent = head_mesh
+	elif head_area and is_instance_valid(head_area):
+		attach_parent = head_area
+	if not attach_parent:
+		return
+	_local_hat_anchor = Node3D.new()
+	_local_hat_anchor.name = "LocalHatAnchor"
+	_local_hat_anchor.position = Vector3(0.0, 0.14, 0.0)
+	attach_parent.add_child(_local_hat_anchor)
+
+
+func _on_local_cosmetic_equipped_changed(slot: String, item_id: String) -> void:
+	if slot != "head":
+		return
+	_apply_local_head_cosmetic(item_id)
+
+
+func _apply_local_head_cosmetic(item_id: String) -> void:
+	_ensure_local_hat_anchor()
+	if not _local_hat_anchor:
+		return
+	if _local_head_cosmetic and is_instance_valid(_local_head_cosmetic):
+		_local_head_cosmetic.queue_free()
+		_local_head_cosmetic = null
+	var normalized_item_id := item_id.strip_edges().to_lower()
+	if normalized_item_id.is_empty():
+		return
+	var cosmetic_node := CosmeticVisuals.create_head_cosmetic(normalized_item_id)
+	if not cosmetic_node:
+		return
+	_local_head_cosmetic = cosmetic_node
+	_local_hat_anchor.add_child(_local_head_cosmetic)
 
 
 func _setup_components() -> void:

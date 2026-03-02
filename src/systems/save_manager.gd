@@ -17,6 +17,7 @@ var _active_signing_secret: String = ""
 # Debounce autosave writes to reduce churn on mobile/Quest storage.
 const AUTOSAVE_INTERVAL := 5.0  # seconds
 const LEGAL_KEY := "legal_acceptance"
+const COSMETICS_KEY := "cosmetics"
 
 
 func _ready() -> void:
@@ -492,38 +493,73 @@ func mark_object_released(object_id: String) -> void:
 
 # --- CURRENCY SYSTEM ---
 
+func _normalize_currency_type(type: String) -> String:
+	var key := type.strip_edges().to_lower()
+	if key == "coin" or key == "coins":
+		return "gold"
+	return key
+
+
+func _ensure_currency_data() -> Dictionary:
+	if not _save_data.has("currency") or not (_save_data["currency"] is Dictionary):
+		_save_data["currency"] = { "gold": 0, "gems": 0, "tokens": 0 }
+	var currency: Dictionary = _save_data["currency"]
+	for key in ["gold", "gems", "tokens"]:
+		if not currency.has(key):
+			currency[key] = 0
+	return currency
+
+
 func get_currency(type: String) -> int:
 	"""Get amount of specific currency (gold, gems, tokens)"""
-	if not _save_data.has("currency"):
-		_save_data["currency"] = { "gold": 0, "gems": 0, "tokens": 0 }
-	
-	return _save_data["currency"].get(type, 0)
+	var currency := _ensure_currency_data()
+	return int(currency.get(_normalize_currency_type(type), 0))
 
 
 func add_currency(type: String, amount: int) -> void:
 	"""Add currency amount"""
-	if not _save_data.has("currency"):
-		_save_data["currency"] = { "gold": 0, "gems": 0, "tokens": 0 }
-	
-	var current = _save_data["currency"].get(type, 0)
-	_save_data["currency"][type] = current + amount
+	var key := _normalize_currency_type(type)
+	var currency := _ensure_currency_data()
+	var current := int(currency.get(key, 0))
+	currency[key] = max(current + amount, 0)
 	_save_dirty = true
-	print("SaveManager: Added ", amount, " ", type, ". New total: ", _save_data["currency"][type])
+	print("SaveManager: Added ", amount, " ", key, ". New total: ", currency[key])
 
 
 func spend_currency(type: String, amount: int) -> bool:
 	"""Try to spend currency. Returns true if successful."""
-	if not _save_data.has("currency"):
-		_save_data["currency"] = { "gold": 0, "gems": 0, "tokens": 0 }
-	
-	var current = _save_data["currency"].get(type, 0)
+	var key := _normalize_currency_type(type)
+	var currency := _ensure_currency_data()
+	var current := int(currency.get(key, 0))
 	if current >= amount:
-		_save_data["currency"][type] = current - amount
+		currency[key] = current - amount
 		_save_dirty = true
-		print("SaveManager: Spent ", amount, " ", type, ". Remaining: ", _save_data["currency"][type])
+		print("SaveManager: Spent ", amount, " ", key, ". Remaining: ", currency[key])
 		return true
 	
 	return false
+
+
+func get_all_currency() -> Dictionary:
+	"""Get all currency values as a dictionary copy."""
+	return _ensure_currency_data().duplicate(true)
+
+
+func set_currency(type: String, amount: int) -> void:
+	"""Set a specific currency amount directly."""
+	var key := _normalize_currency_type(type)
+	var currency := _ensure_currency_data()
+	currency[key] = max(amount, 0)
+	_save_dirty = true
+
+
+func set_currency_map(currency_values: Dictionary) -> void:
+	"""Overwrite currency values from a dictionary snapshot."""
+	var currency := _ensure_currency_data()
+	for key in currency_values.keys():
+		var normalized := _normalize_currency_type(str(key))
+		currency[normalized] = max(int(currency_values[key]), 0)
+	_save_dirty = true
 
 
 # --- INVENTORY SYSTEM ---
@@ -538,6 +574,80 @@ func get_inventory() -> Array:
 func save_inventory(items: Array) -> void:
 	"""Save inventory state"""
 	_save_data["inventory"] = items
+	_save_dirty = true
+
+
+func get_inventory_items() -> Dictionary:
+	"""Get inventory as a dictionary map {item_id: count}, migrating legacy data if needed."""
+	if not _save_data.has("inventory_items") or not (_save_data["inventory_items"] is Dictionary):
+		var migrated: Dictionary = {}
+		if _save_data.has("inventory"):
+			var legacy_variant: Variant = _save_data["inventory"]
+			if legacy_variant is Dictionary:
+				var legacy_dict: Dictionary = legacy_variant
+				for key in legacy_dict.keys():
+					migrated[str(key)] = max(int(legacy_dict[key]), 0)
+			elif legacy_variant is Array:
+				var legacy_arr: Array = legacy_variant
+				for entry in legacy_arr:
+					if entry is Dictionary:
+						var row: Dictionary = entry
+						var item_id := str(row.get("id", "")).strip_edges()
+						if item_id == "":
+							continue
+						migrated[item_id] = max(int(row.get("amount", 0)), 0)
+		_save_data["inventory_items"] = migrated
+	return (_save_data["inventory_items"] as Dictionary).duplicate(true)
+
+
+func save_inventory_items(items: Dictionary) -> void:
+	"""Save inventory dictionary and maintain legacy array for compatibility."""
+	var sanitized: Dictionary = {}
+	for key in items.keys():
+		var item_id := str(key).strip_edges()
+		if item_id == "":
+			continue
+		sanitized[item_id] = max(int(items[key]), 0)
+	_save_data["inventory_items"] = sanitized
+
+	# Keep legacy array populated for older callers/tests.
+	var legacy_array: Array = []
+	for item_id in sanitized.keys():
+		legacy_array.append({
+			"id": item_id,
+			"amount": int(sanitized[item_id])
+		})
+	_save_data["inventory"] = legacy_array
+	_save_dirty = true
+
+
+# --- COSMETICS PERSISTENCE ---
+
+func get_cosmetics_state() -> Dictionary:
+	"""Get saved cosmetics state as {owned: Array[String], equipped: Dictionary}."""
+	if not _save_data.has(COSMETICS_KEY) or not (_save_data[COSMETICS_KEY] is Dictionary):
+		return {"owned": [], "equipped": {}}
+	var state: Dictionary = _save_data[COSMETICS_KEY]
+	var owned_variant: Variant = state.get("owned", [])
+	var equipped_variant: Variant = state.get("equipped", {})
+	var owned: Array = owned_variant if owned_variant is Array else []
+	var equipped: Dictionary = equipped_variant if equipped_variant is Dictionary else {}
+	return {
+		"owned": owned.duplicate(true),
+		"equipped": equipped.duplicate(true)
+	}
+
+
+func save_cosmetics_state(state: Dictionary) -> void:
+	"""Save cosmetics state dictionary."""
+	var owned_variant: Variant = state.get("owned", [])
+	var equipped_variant: Variant = state.get("equipped", {})
+	var owned: Array = owned_variant if owned_variant is Array else []
+	var equipped: Dictionary = equipped_variant if equipped_variant is Dictionary else {}
+	_save_data[COSMETICS_KEY] = {
+		"owned": owned.duplicate(true),
+		"equipped": equipped.duplicate(true)
+	}
 	_save_dirty = true
 
 
