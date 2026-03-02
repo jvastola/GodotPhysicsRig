@@ -152,8 +152,9 @@ func purchase_item(item_id: String) -> Dictionary:
 	var item_def := _catalog[item_id] as Dictionary
 	var currency_type := String(item_def.get("currency_type", "gold"))
 	var price := int(item_def.get("price", 0))
-	if not _spend_currency(currency_type, price):
-		var spend_msg := "Unable to spend %d %s" % [price, currency_type]
+	var spend_result: Dictionary = await _spend_currency(currency_type, price, "cosmetic_purchase:" + item_id)
+	if not bool(spend_result.get("ok", false)):
+		var spend_msg := String(spend_result.get("message", "Unable to spend %d %s" % [price, currency_type]))
 		purchase_processed.emit(item_id, false, spend_msg)
 		return {
 			"ok": false,
@@ -239,7 +240,7 @@ func unequip_slot(slot: String = DEFAULT_SLOT) -> Dictionary:
 
 func purchase_or_toggle(item_id: String) -> Dictionary:
 	if not is_item_owned(item_id):
-		return purchase_item(item_id)
+		return await purchase_item(item_id)
 
 	var item_def := get_item_definition(item_id)
 	if item_def.is_empty():
@@ -325,14 +326,28 @@ func _get_currency_balance(currency_type: String) -> int:
 	return 0
 
 
-func _spend_currency(currency_type: String, amount: int) -> bool:
+func _spend_currency(currency_type: String, amount: int, reason: String = "purchase") -> Dictionary:
 	if amount <= 0:
-		return true
+		return {"ok": true, "message": "No cost"}
+	if InventoryManager and InventoryManager.has_method("spend_currency_authoritative"):
+		var authoritative_variant: Variant = await InventoryManager.spend_currency_authoritative(currency_type, amount, reason)
+		if authoritative_variant is Dictionary:
+			var authoritative: Dictionary = authoritative_variant
+			if authoritative.has("ok"):
+				return authoritative
 	if InventoryManager and InventoryManager.has_method("spend_currency"):
-		return bool(InventoryManager.spend_currency(currency_type, amount))
+		var local_ok := bool(InventoryManager.spend_currency(currency_type, amount))
+		return {
+			"ok": local_ok,
+			"message": "Spent locally" if local_ok else "Insufficient funds"
+		}
 	if SaveManager and SaveManager.has_method("spend_currency"):
-		return bool(SaveManager.spend_currency(currency_type, amount))
-	return false
+		var save_ok := bool(SaveManager.spend_currency(currency_type, amount))
+		return {
+			"ok": save_ok,
+			"message": "Spent locally" if save_ok else "Insufficient funds"
+		}
+	return {"ok": false, "message": "Currency system unavailable"}
 
 
 func _purchase_failure_message(reason: String, details: Dictionary) -> String:

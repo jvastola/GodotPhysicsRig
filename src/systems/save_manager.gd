@@ -510,6 +510,11 @@ func _ensure_currency_data() -> Dictionary:
 	return currency
 
 
+func has_currency_data() -> bool:
+	"""True only when currency data already exists in save payload."""
+	return _save_data.has("currency") and (_save_data["currency"] is Dictionary)
+
+
 func get_currency(type: String) -> int:
 	"""Get amount of specific currency (gold, gems, tokens)"""
 	var currency := _ensure_currency_data()

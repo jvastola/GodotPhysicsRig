@@ -47,7 +47,8 @@ func _interact() -> void:
 		_set_status_message("Cosmetics system unavailable")
 		return
 
-	var result: Dictionary = CosmeticsManager.purchase_or_toggle(item_id)
+	var result_variant: Variant = await CosmeticsManager.purchase_or_toggle(item_id)
+	var result: Dictionary = result_variant if result_variant is Dictionary else {}
 	_set_status_message(String(result.get("message", "Done")))
 	_refresh_status_label()
 

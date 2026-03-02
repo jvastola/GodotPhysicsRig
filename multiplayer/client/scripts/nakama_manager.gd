@@ -1055,6 +1055,185 @@ func write_storage_object(collection: String, key: String, value: Dictionary, ve
 
 
 # ============================================================================
+# Generic RPC Helpers
+# ============================================================================
+
+## Call a Nakama runtime RPC endpoint.
+## Returns: {ok, code, payload, error}
+func call_rpc(rpc_id: String, payload: Variant = {}) -> Dictionary:
+	if not is_authenticated or not session:
+		return {
+			"ok": false,
+			"code": 0,
+			"payload": {},
+			"error": "Not authenticated"
+		}
+	if rpc_id.strip_edges().is_empty():
+		return {
+			"ok": false,
+			"code": 0,
+			"payload": {},
+			"error": "RPC id required"
+		}
+
+	var rpc_http := HTTPRequest.new()
+	rpc_http.timeout = 10.0
+	add_child(rpc_http)
+
+	var url := _get_nakama_url() + "/v2/rpc/" + rpc_id.uri_encode()
+	# Nakama Lua RPC endpoints expect a JSON string in the POST body.
+	var payload_json := JSON.stringify(payload)
+	var body_json := JSON.stringify(payload_json)
+	var headers := [
+		"Content-Type: application/json",
+		"Authorization: Bearer " + session.token
+	]
+
+	var err := rpc_http.request(url, headers, HTTPClient.METHOD_POST, body_json)
+	if err != OK:
+		rpc_http.queue_free()
+		return {
+			"ok": false,
+			"code": 0,
+			"payload": {},
+			"error": "RPC request failed to start: " + str(err)
+		}
+
+	var result_tuple = await rpc_http.request_completed
+	rpc_http.queue_free()
+
+	var result: int = result_tuple[0]
+	var response_code: int = result_tuple[1]
+	var response_body: PackedByteArray = result_tuple[3]
+	if result != HTTPRequest.RESULT_SUCCESS:
+		return {
+			"ok": false,
+			"code": response_code,
+			"payload": {},
+			"error": "RPC transport failed: " + str(result)
+		}
+	if response_code != 200:
+		return {
+			"ok": false,
+			"code": response_code,
+			"payload": {},
+			"error": response_body.get_string_from_utf8()
+		}
+
+	var parsed = JSON.parse_string(response_body.get_string_from_utf8())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {
+			"ok": false,
+			"code": response_code,
+			"payload": {},
+			"error": "RPC invalid response"
+		}
+
+	var rpc_payload: Variant = parsed.get("payload", {})
+	if rpc_payload is String:
+		var decoded = JSON.parse_string(rpc_payload)
+		if decoded != null:
+			rpc_payload = decoded
+
+	if not (rpc_payload is Dictionary):
+		return {
+			"ok": false,
+			"code": response_code,
+			"payload": {},
+			"error": "RPC payload parse failed"
+		}
+
+	var payload_dict: Dictionary = rpc_payload
+	if bool(payload_dict.get("ok", true)) == false:
+		return {
+			"ok": false,
+			"code": response_code,
+			"payload": payload_dict,
+			"error": String(payload_dict.get("error", "RPC returned failure"))
+		}
+
+	return {
+		"ok": true,
+		"code": response_code,
+		"payload": payload_dict,
+		"error": ""
+	}
+
+
+## Request current wallet snapshot for the authenticated user.
+## Returns: {ok, wallet, error, code}
+func request_currency_wallet_snapshot() -> Dictionary:
+	var rpc_result: Dictionary = await call_rpc("currency_wallet_snapshot", {})
+	if not bool(rpc_result.get("ok", false)):
+		return {
+			"ok": false,
+			"wallet": {},
+			"code": int(rpc_result.get("code", 0)),
+			"error": String(rpc_result.get("error", "unknown"))
+		}
+
+	var payload: Dictionary = rpc_result.get("payload", {})
+	var wallet_variant: Variant = payload.get("wallet", {})
+	var wallet: Dictionary = wallet_variant if wallet_variant is Dictionary else {}
+	return {
+		"ok": true,
+		"wallet": wallet.duplicate(true),
+		"code": int(rpc_result.get("code", 200)),
+		"error": ""
+	}
+
+
+## Commit currency deltas to server wallet with optional strict spend validation.
+## Returns: {ok, wallet, applied_earned, applied_spent, cap, window_sec, error, code}
+func commit_currency_session_deltas(
+	earned: Dictionary,
+	spent: Dictionary,
+	reason: String = "",
+	strict_spend: bool = false,
+	session_id: String = ""
+) -> Dictionary:
+	var request_payload := {
+		"earned": earned,
+		"spent": spent,
+		"reason": reason,
+		"strict_spend": strict_spend,
+		"session_id": session_id
+	}
+	var rpc_result: Dictionary = await call_rpc("currency_commit", request_payload)
+	if not bool(rpc_result.get("ok", false)):
+		var fail_payload_variant: Variant = rpc_result.get("payload", {})
+		var fail_payload: Dictionary = fail_payload_variant if fail_payload_variant is Dictionary else {}
+		var fail_wallet_variant: Variant = fail_payload.get("wallet", {})
+		var fail_applied_earned_variant: Variant = fail_payload.get("applied_earned", {})
+		var fail_applied_spent_variant: Variant = fail_payload.get("applied_spent", {})
+		return {
+			"ok": false,
+			"wallet": (fail_wallet_variant if fail_wallet_variant is Dictionary else {}),
+			"applied_earned": (fail_applied_earned_variant if fail_applied_earned_variant is Dictionary else {}),
+			"applied_spent": (fail_applied_spent_variant if fail_applied_spent_variant is Dictionary else {}),
+			"cap": int(fail_payload.get("cap", 0)),
+			"window_sec": int(fail_payload.get("window_sec", 0)),
+			"code": int(rpc_result.get("code", 0)),
+			"error": String(rpc_result.get("error", "unknown"))
+		}
+
+	var payload: Dictionary = rpc_result.get("payload", {})
+	var wallet_variant: Variant = payload.get("wallet", {})
+	var applied_earned_variant: Variant = payload.get("applied_earned", {})
+	var applied_spent_variant: Variant = payload.get("applied_spent", {})
+	return {
+		"ok": true,
+		"wallet": (wallet_variant if wallet_variant is Dictionary else {}),
+		"applied_earned": (applied_earned_variant if applied_earned_variant is Dictionary else {}),
+		"applied_spent": (applied_spent_variant if applied_spent_variant is Dictionary else {}),
+		"cap": int(payload.get("cap", 0)),
+		"window_sec": int(payload.get("window_sec", 0)),
+		"code": int(rpc_result.get("code", 200)),
+		"error": ""
+	}
+
+
+# ============================================================================
 # LiveKit Token RPC
 # ============================================================================
 
