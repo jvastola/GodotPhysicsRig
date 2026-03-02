@@ -37,6 +37,7 @@
 [ext_resource type="PackedScene" uid="uid://qsf5yp02t1i7" path="res://src/ui/window_wrapper/WindowWrapper.tscn" id="45_giw25"]
 [ext_resource type="PackedScene" uid="uid://baesap7jjgmfh" path="res://src/objects/grabbables/PaintBrush.tscn" id="45_paint_brush"]
 [ext_resource type="PackedScene" path="res://src/ui/ColorPickerViewport3D.tscn" id="45_sv5fj"]
+[ext_resource type="PackedScene" path="res://src/objects/MetaStoreTrigger.tscn" id="46_sv5fj"]
 [ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://src/objects/viewport_mirror.gd" id="47_viewport_mirror"]
 [ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://src/systems/grid_painter.gd" id="48_grid_painter"]
 [ext_resource type="Script" uid="uid://cfrhsl8g3fmpt" path="res://src/systems/mesh_collision_generator.gd" id="49_collision"]
@@ -447,5 +448,8 @@ visible = false
 
 [node name="ColorPickerViewport3D" parent="." unique_id=1849360015 instance=ExtResource("45_sv5fj")]
 transform = Transform3D(-0.3159503, 0, 0.05074847, 0, 0.32, 0, -0.05074847, 0, -0.3159503, -3.5784981, -3.4928527, -0.42502117)
+
+[node name="MetaStoreTrigger" parent="." unique_id=1849595130 instance=ExtResource("46_sv5fj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.935993, -3.916004, -19.723099)
 
 [editable path="OreDeposit2"]
