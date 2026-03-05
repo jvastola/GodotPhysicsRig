@@ -367,18 +367,18 @@ func _award_currency() -> void:
 	# Award different currencies based on ore type
 	match ore_type:
 		"iron":
-			# Iron gives tokens (yellow currency)
+			# Iron gives tokens (silver currency)
 			var token_amount = randi_range(5, 15)
 			InventoryManager.instance.add_item("tokens", token_amount)
 			print("OreDeposit: Awarded ", token_amount, " tokens for iron ore")
 		"gold":
 			# Gold gives gold currency
-			var gold_amount = randi_range(15, 30)
+			var gold_amount = randi_range(1, 5)
 			InventoryManager.instance.add_item("gold", gold_amount)
 			print("OreDeposit: Awarded ", gold_amount, " gold for gold ore")
 		"plasma":
 			# Plasma gives gems (blue currency)
-			var gem_amount = randi_range(10, 20)
+			var gem_amount = randi_range(1, 1)
 			InventoryManager.instance.add_item("gems", gem_amount)
 			print("OreDeposit: Awarded ", gem_amount, " gems for plasma ore")
 		"copper":

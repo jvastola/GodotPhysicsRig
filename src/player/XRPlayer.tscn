@@ -58,11 +58,11 @@ height = 0.001
 radial_segments = 16
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_dcy27"]
-size = Vector3(0.1, 0.1, 0.1)
+size = Vector3(0.2, 0.2, 0.2)
 
 [sub_resource type="BoxMesh" id="BoxMesh_n7dm8"]
 material = ExtResource("11_vf3tq")
-size = Vector3(0.1, 0.1, 0.1)
+size = Vector3(0.2, 0.2, 0.2)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_tqmwh"]
 
