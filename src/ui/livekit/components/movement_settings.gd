@@ -14,6 +14,7 @@ const COLOR_CARD_BG := Color(0.16, 0.17, 0.21)
 const COLOR_CARD_BORDER := Color(0.24, 0.29, 0.36)
 
 # Defaults snapshot (updated once a player component is found)
+# Defaults snapshot (updated once a player component is found)
 const DEFAULTS := {
 	"locomotion_mode": PlayerMovementComponent.LocomotionMode.HEAD_DIRECTION_3D,
 	"locomotion_speed": 5.0,
@@ -26,23 +27,15 @@ const DEFAULTS := {
 	"turn_deadzone": 0.5,
 	"snap_turn_cooldown": 0.3,
 	"invert_turn_x": false,
-	"ui_scroll_steals_stick": false,
-	"disable_joystick_on_grip": false,
 	"ui_scroll_wheel_factor": 20.0,
 	"hand_assignment": PlayerMovementComponent.HandAssignment.DEFAULT,
-	"enable_two_hand_world_scale": false,
-	"enable_two_hand_world_rotation": false,
 	"world_scale_min": 0.1,
 	"world_scale_max": 15.0,
 	"world_scale_sensitivity": 0.35,
 	"world_rotation_sensitivity": 0.6,
 	"world_grab_move_factor": 1.0,
 	"world_grab_smooth_factor": 0.15,
-	"invert_two_hand_scale_direction": true,
 	"invert_one_hand_grab_direction": true,
-	"two_hand_left_action": "trigger",
-	"two_hand_right_action": "trigger",
-	"two_hand_rotation_pivot": PlayerMovementComponent.TwoHandPivot.MIDPOINT,
 	"one_hand_grab_mode": PlayerMovementComponent.OneHandGrabMode.RELATIVE,
 	"enable_one_hand_rotation": true,
 	"enable_one_hand_world_rotate": false,
@@ -53,55 +46,14 @@ const DEFAULTS := {
 	"auto_respawn_distance": 120.0,
 	"hard_respawn_resets_settings": true,
 	"show_one_hand_grab_visual": true,
-	"show_two_hand_rotation_visual": true,
 	"enable_one_hand_world_grab": false,
 	"one_hand_world_move_sensitivity": 0.25,
-	"jump_enabled": false,
-	"jump_impulse": 12.0,
-	"jump_cooldown": 0.4,
 	"player_gravity_enabled": false,
 	"player_drag_force": 0.85,
-	# V2 Two-Hand Grab Settings
-	"enable_two_hand_grab_v2": false,
-	"v2_scale_enabled": false,
-	"v2_rotation_enabled": false,
-	"v2_world_scale_min": 0.1,
-	"v2_world_scale_max": 15.0,
-	"v2_left_action": "trigger",
-	"v2_right_action": "trigger",
-	"v2_show_visual": true,
-	"v2_debug_logs": false,
 	"enable_physics_hands": true,
-	# === Two-Hand Grab V3 Settings ===(XRTools style)
-	"enable_two_hand_grab_v3": false,
-	"v3_world_scale_min": 0.5,
-	"v3_world_scale_max": 2.0,
-	"v3_left_action": "trigger",
-	"v3_right_action": "trigger",
-	"v3_show_visual": true,
-	"v3_debug_logs": false,
-	"v3_scale_sensitivity": 1.0,
-	"v3_invert_scale": false,
-	"v3_rotation_sensitivity": 1.0,
-	"v3_translation_sensitivity": 1.0,
-	"v3_smoothing": 0.5,
-	# === Hand Movement (Middle Finger Pinch) Settings ===
-	"enable_hand_movement": false,
-	"hand_movement_grab_mode": 0,  # 0 = RELATIVE, 1 = ANCHORED
-	"hand_movement_sensitivity": 0.25,
-	"hand_movement_invert_direction": true,
-	"hand_movement_apply_release_velocity": true,
-	"hand_movement_show_visual": true,
-	"simple_world_grab_enabled": false,
 }
 
-const INPUT_ACTIONS := [
-	{
-		"action": "jump",
-		"label": "Jump",
-		"description": "Bind how the jump action is triggered.",
-	},
-]
+const INPUT_ACTIONS := []
 
 # UI References - set up dynamically
 var locomotion_mode_btn: OptionButton
@@ -166,11 +118,6 @@ var invert_one_hand_rotation_check: CheckBox
 var apply_one_hand_release_vel_check: CheckBox
 var invert_one_hand_grab_check: CheckBox
 var show_one_hand_grab_visual_check: CheckBox
-var jump_enabled_check: CheckBox
-var jump_impulse_slider: HSlider
-var jump_impulse_label: Label
-var jump_cooldown_slider: HSlider
-var jump_cooldown_label: Label
 var input_mapper_status: Label
 var profile_name_field: LineEdit
 var profile_selector: OptionButton
@@ -178,47 +125,6 @@ var profile_status_label: Label
 
 var snap_container: VBoxContainer
 var smooth_container: VBoxContainer
-
-# V2 Two-Hand Grab UI
-var v2_enable_check: CheckBox
-var v2_scale_check: CheckBox
-var v2_rotation_check: CheckBox
-var v2_scale_min_slider: HSlider
-var v2_scale_min_label: Label
-var v2_scale_max_slider: HSlider
-var v2_scale_max_label: Label
-var v2_show_visual_check: CheckBox
-var v2_debug_check: CheckBox
-
-# V3 Two-Hand Grab UI (XRTools style)
-var v3_enable_check: CheckBox
-var v3_scale_min_slider: HSlider
-var v3_scale_min_label: Label
-var v3_scale_max_slider: HSlider
-var v3_scale_max_label: Label
-var v3_show_visual_check: CheckBox
-var v3_debug_check: CheckBox
-var v3_scale_sensitivity_slider: HSlider
-var v3_scale_sensitivity_label: Label
-var v3_invert_scale_check: CheckBox
-var v3_rotation_sensitivity_slider: HSlider
-var v3_rotation_sensitivity_label: Label
-var v3_translation_sensitivity_slider: HSlider
-var v3_translation_sensitivity_label: Label
-var v3_smoothing_slider: HSlider
-var v3_smoothing_label: Label
-
-# Hand Movement (Middle Finger Pinch) UI
-var hand_movement_enable_check: CheckBox
-var hand_movement_grab_mode_btn: OptionButton
-var hand_movement_sensitivity_slider: HSlider
-var hand_movement_sensitivity_label: Label
-var hand_movement_invert_check: CheckBox
-var hand_movement_release_vel_check: CheckBox
-var hand_movement_show_visual_check: CheckBox
-
-# Simple World Grab UI
-var simple_world_grab_check: CheckBox
 
 # Input mapping UI state
 var input_rows := {}
@@ -697,28 +603,6 @@ func _build_ui():
 	two_hand_pivot_btn.tooltip_text = "Choose pivot for two-hand rotation."
 	pivot_row.add_child(two_hand_pivot_btn)
 
-	show_two_hand_visual_check = CheckBox.new()
-	show_two_hand_visual_check.text = "Show Two-Hand Rotation Visual"
-	show_two_hand_visual_check.add_theme_font_size_override("font_size", 12)
-	if movement_component:
-		show_two_hand_visual_check.button_pressed = movement_component.show_two_hand_rotation_visual
-	else:
-		show_two_hand_visual_check.button_pressed = defaults_snapshot["show_two_hand_rotation_visual"]
-	show_two_hand_visual_check.toggled.connect(func(pressed: bool): _on_show_two_hand_visual_toggled(pressed))
-	show_two_hand_visual_check.tooltip_text = "Display a line and midpoint while rotating with two hands."
-	world_card.add_child(show_two_hand_visual_check)
-
-	invert_two_hand_scale_check = CheckBox.new()
-	invert_two_hand_scale_check.text = "Invert Two-Hand Scale"
-	invert_two_hand_scale_check.add_theme_font_size_override("font_size", 12)
-	invert_two_hand_scale_check.tooltip_text = "Swap pull-apart = shrink, push-together = grow."
-	if movement_component:
-		invert_two_hand_scale_check.button_pressed = movement_component.invert_two_hand_scale_direction
-	else:
-		invert_two_hand_scale_check.button_pressed = defaults_snapshot["invert_two_hand_scale_direction"]
-	invert_two_hand_scale_check.toggled.connect(func(pressed: bool): _on_invert_two_hand_scale_toggled(pressed))
-	world_card.add_child(invert_two_hand_scale_check)
-
 	var initial_grab_move = movement_component.world_grab_move_factor if movement_component else defaults_snapshot["world_grab_move_factor"]
 	var grab_move_block = _add_slider_block(
 		world_card,
@@ -919,301 +803,6 @@ func _build_ui():
 	one_hand_rotation_smooth_slider = one_hand_rot_smooth_block.slider
 	one_hand_rotation_smooth_slider.value_changed.connect(func(value: float): _on_one_hand_rotation_smooth_changed(value))
 
-	# === V2 World Grab (Horizon Worlds Style) ===
-	var v2_card = _create_card(main_vbox, "V2 World Scale/Rotate", "Horizon Worlds-style locked point grab system", "🎮")
-	
-	v2_enable_check = CheckBox.new()
-	v2_enable_check.text = "Enable V2 Two-Hand Grab (replaces V1)"
-	v2_enable_check.add_theme_font_size_override("font_size", 12)
-	if movement_component:
-		v2_enable_check.button_pressed = movement_component.enable_two_hand_grab_v2
-	else:
-		v2_enable_check.button_pressed = defaults_snapshot["enable_two_hand_grab_v2"]
-	v2_enable_check.toggled.connect(func(pressed: bool): _on_v2_enable_toggled(pressed))
-	v2_enable_check.tooltip_text = "Use the new V2 grab system. When enabled, V1 two-hand controls are disabled."
-	v2_card.add_child(v2_enable_check)
-	
-	v2_scale_check = CheckBox.new()
-	v2_scale_check.text = "V2 Scale Enabled"
-	v2_scale_check.add_theme_font_size_override("font_size", 12)
-	if movement_component:
-		v2_scale_check.button_pressed = movement_component.v2_scale_enabled
-	else:
-		v2_scale_check.button_pressed = defaults_snapshot["v2_scale_enabled"]
-	v2_scale_check.toggled.connect(func(pressed: bool): _on_v2_scale_toggled(pressed))
-	v2_scale_check.tooltip_text = "Pull hands apart to shrink world (grow player). Push together to expand world (shrink player)."
-	v2_card.add_child(v2_scale_check)
-	
-	v2_rotation_check = CheckBox.new()
-	v2_rotation_check.text = "V2 Rotation Enabled"
-	v2_rotation_check.add_theme_font_size_override("font_size", 12)
-	if movement_component:
-		v2_rotation_check.button_pressed = movement_component.v2_rotation_enabled
-	else:
-		v2_rotation_check.button_pressed = defaults_snapshot["v2_rotation_enabled"]
-	v2_rotation_check.toggled.connect(func(pressed: bool): _on_v2_rotation_toggled(pressed))
-	v2_rotation_check.tooltip_text = "Rotate hands to rotate world. Moving one hand in front of the other = 90°."
-	v2_card.add_child(v2_rotation_check)
-	
-	var v2_min_block = _add_slider_block(
-		v2_card,
-		"V2 Scale Min",
-		"Lower bound for V2 world scaling.",
-		0.05,
-		10.0,
-		0.05,
-		movement_component.v2_world_scale_min if movement_component else defaults_snapshot["v2_world_scale_min"],
-		func(value): return " %.2fx" % value
-	)
-	v2_scale_min_label = v2_min_block.label
-	v2_scale_min_slider = v2_min_block.slider
-	v2_scale_min_slider.value_changed.connect(func(value: float): _on_v2_scale_min_changed(value))
-	
-	var v2_max_block = _add_slider_block(
-		v2_card,
-		"V2 Scale Max",
-		"Upper bound for V2 world scaling.",
-		0.5,
-		1000.0,
-		0.5,
-		movement_component.v2_world_scale_max if movement_component else defaults_snapshot["v2_world_scale_max"],
-		func(value): return " %.2fx" % value
-	)
-	v2_scale_max_label = v2_max_block.label
-	v2_scale_max_slider = v2_max_block.slider
-	v2_scale_max_slider.value_changed.connect(func(value: float): _on_v2_scale_max_changed(value))
-	
-	v2_show_visual_check = CheckBox.new()
-	v2_show_visual_check.text = "V2 Show Grab Visual"
-	v2_show_visual_check.add_theme_font_size_override("font_size", 12)
-	if movement_component:
-		v2_show_visual_check.button_pressed = movement_component.v2_show_visual
-	else:
-		v2_show_visual_check.button_pressed = defaults_snapshot["v2_show_visual"]
-	v2_show_visual_check.toggled.connect(func(pressed: bool): _on_v2_show_visual_toggled(pressed))
-	v2_show_visual_check.tooltip_text = "Display anchor points and connecting line during V2 grab."
-	v2_card.add_child(v2_show_visual_check)
-	
-	v2_debug_check = CheckBox.new()
-	v2_debug_check.text = "V2 Debug Logs"
-	v2_debug_check.add_theme_font_size_override("font_size", 12)
-	if movement_component:
-		v2_debug_check.button_pressed = movement_component.v2_debug_logs
-	else:
-		v2_debug_check.button_pressed = defaults_snapshot["v2_debug_logs"]
-	v2_debug_check.toggled.connect(func(pressed: bool): _on_v2_debug_toggled(pressed))
-	v2_debug_check.tooltip_text = "Print debug info to console during V2 grab."
-	v2_card.add_child(v2_debug_check)
-
-	# === V3 World Grab (XRTools style) ===
-	var v3_card = _create_card(main_vbox, "V3 World Scale/Rotate", "XRToolsMovementWorldGrab style - locked world point grabbing", "🔄")
-	
-	v3_enable_check = CheckBox.new()
-	v3_enable_check.text = "Enable V3 Two-Hand Grab (replaces V1/V2)"
-	v3_enable_check.add_theme_font_size_override("font_size", 12)
-	if movement_component:
-		v3_enable_check.button_pressed = movement_component.enable_two_hand_grab_v3
-	else:
-		v3_enable_check.button_pressed = defaults_snapshot["enable_two_hand_grab_v3"]
-	v3_enable_check.toggled.connect(func(pressed: bool): _on_v3_enable_toggled(pressed))
-	v3_enable_check.tooltip_text = "Use V3 grab system (XRTools algorithm). Hands lock to world positions; moving closer = scale up, apart = scale down."
-	v3_card.add_child(v3_enable_check)
-	
-	var v3_min_block = _add_slider_block(
-		v3_card,
-		"V3 Scale Min",
-		"Lower bound for V3 world scaling.",
-		0.1,
-		10.0,
-		0.1,
-		movement_component.v3_world_scale_min if movement_component else defaults_snapshot["v3_world_scale_min"],
-		func(value): return " %.1fx" % value
-	)
-	v3_scale_min_label = v3_min_block.label
-	v3_scale_min_slider = v3_min_block.slider
-	v3_scale_min_slider.value_changed.connect(func(value: float): _on_v3_scale_min_changed(value))
-	
-	var v3_max_block = _add_slider_block(
-		v3_card,
-		"V3 Scale Max",
-		"Upper bound for V3 world scaling.",
-		0.5,
-		100.0,
-		0.5,
-		movement_component.v3_world_scale_max if movement_component else defaults_snapshot["v3_world_scale_max"],
-		func(value): return " %.1fx" % value
-	)
-	v3_scale_max_label = v3_max_block.label
-	v3_scale_max_slider = v3_max_block.slider
-	v3_scale_max_slider.value_changed.connect(func(value: float): _on_v3_scale_max_changed(value))
-	
-	v3_show_visual_check = CheckBox.new()
-	v3_show_visual_check.text = "V3 Show Grab Visual"
-	v3_show_visual_check.add_theme_font_size_override("font_size", 12)
-	if movement_component:
-		v3_show_visual_check.button_pressed = movement_component.v3_show_visual
-	else:
-		v3_show_visual_check.button_pressed = defaults_snapshot["v3_show_visual"]
-	v3_show_visual_check.toggled.connect(func(pressed: bool): _on_v3_show_visual_toggled(pressed))
-	v3_show_visual_check.tooltip_text = "Display anchor points and connecting line during V3 grab."
-	v3_card.add_child(v3_show_visual_check)
-	
-	v3_debug_check = CheckBox.new()
-	v3_debug_check.text = "V3 Debug Logs"
-	v3_debug_check.add_theme_font_size_override("font_size", 12)
-	if movement_component:
-		v3_debug_check.button_pressed = movement_component.v3_debug_logs
-	else:
-		v3_debug_check.button_pressed = defaults_snapshot["v3_debug_logs"]
-	v3_debug_check.toggled.connect(func(pressed: bool): _on_v3_debug_toggled(pressed))
-	v3_debug_check.tooltip_text = "Print debug info to console during V3 grab."
-	v3_card.add_child(v3_debug_check)
-
-	var v3_scale_sense_block = _add_slider_block(
-		v3_card,
-		"V3 Scale Sensitivity",
-		"Multiplier for scale speed.",
-		0.0,
-		5.0,
-		0.1,
-		movement_component.v3_scale_sensitivity if movement_component else defaults_snapshot["v3_scale_sensitivity"],
-		func(value): return " x%.1f" % value
-	)
-	v3_scale_sensitivity_label = v3_scale_sense_block.label
-	v3_scale_sensitivity_slider = v3_scale_sense_block.slider
-	v3_scale_sensitivity_slider.value_changed.connect(func(value: float): _on_v3_scale_sensitivity_changed(value))
-
-	v3_invert_scale_check = CheckBox.new()
-	v3_invert_scale_check.text = "V3 Invert Scale"
-	v3_invert_scale_check.add_theme_font_size_override("font_size", 12)
-	v3_invert_scale_check.tooltip_text = "Invert the direction of V3 world scaling."
-	if movement_component:
-		v3_invert_scale_check.button_pressed = movement_component.v3_invert_scale
-	else:
-		v3_invert_scale_check.button_pressed = defaults_snapshot["v3_invert_scale"]
-	v3_invert_scale_check.toggled.connect(func(pressed: bool): _on_v3_invert_scale_toggled(pressed))
-	v3_card.add_child(v3_invert_scale_check)
-
-	var v3_rot_sense_block = _add_slider_block(
-		v3_card,
-		"V3 Rotation Sensitivity",
-		"Multiplier for rotation speed.",
-		0.0,
-		5.0,
-		0.1,
-		movement_component.v3_rotation_sensitivity if movement_component else defaults_snapshot["v3_rotation_sensitivity"],
-		func(value): return " x%.1f" % value
-	)
-	v3_rotation_sensitivity_label = v3_rot_sense_block.label
-	v3_rotation_sensitivity_slider = v3_rot_sense_block.slider
-	v3_rotation_sensitivity_slider.value_changed.connect(func(value: float): _on_v3_rotation_sensitivity_changed(value))
-
-	var v3_trans_sense_block = _add_slider_block(
-		v3_card,
-		"V3 Translation Sensitivity",
-		"Multiplier for movement speed.",
-		0.0,
-		5.0,
-		0.1,
-		movement_component.v3_translation_sensitivity if movement_component else defaults_snapshot["v3_translation_sensitivity"],
-		func(value): return " x%.1f" % value
-	)
-	v3_translation_sensitivity_label = v3_trans_sense_block.label
-	v3_translation_sensitivity_slider = v3_trans_sense_block.slider
-	v3_translation_sensitivity_slider.value_changed.connect(func(value: float): _on_v3_translation_sensitivity_changed(value))
-
-	var v3_smooth_block = _add_slider_block(
-		v3_card,
-		"V3 Smoothing",
-		"Interpolation factor (lower = smoother).",
-		0.0,
-		1.0,
-		0.05,
-		movement_component.v3_smoothing if movement_component else defaults_snapshot["v3_smoothing"],
-		func(value): return " %.2f" % value
-	)
-	v3_smoothing_label = v3_smooth_block.label
-	v3_smoothing_slider = v3_smooth_block.slider
-	v3_smoothing_slider.value_changed.connect(func(value: float): _on_v3_smoothing_changed(value))
-
-	# === Simple World Grab ===
-	var simple_grab_card = _create_card(main_vbox, "Simple World Grab", "Minimal world grab - grip anywhere to move", "✊")
-	
-	simple_world_grab_check = CheckBox.new()
-	simple_world_grab_check.text = "Enable Simple World Grab"
-	simple_world_grab_check.add_theme_font_size_override("font_size", 12)
-	simple_world_grab_check.tooltip_text = "Grip anywhere to grab the world and move. Works everywhere without Area3D zones."
-	simple_world_grab_check.button_pressed = _get_simple_world_grab_enabled()
-	simple_world_grab_check.toggled.connect(func(pressed: bool): _on_simple_world_grab_toggled(pressed))
-	simple_grab_card.add_child(simple_world_grab_check)
-
-	# === Hand Movement (Middle Finger Pinch) ===
-	var hand_movement_card = _create_card(main_vbox, "Hand Movement (Pinch)", "Move using middle finger pinch gesture", "🤏")
-	
-	hand_movement_enable_check = CheckBox.new()
-	hand_movement_enable_check.text = "Enable Hand Movement"
-	hand_movement_enable_check.add_theme_font_size_override("font_size", 12)
-	hand_movement_enable_check.tooltip_text = "Pinch with middle finger and thumb to grab and move the world. Works with hand tracking."
-	hand_movement_enable_check.button_pressed = _get_hand_movement_enabled()
-	hand_movement_enable_check.toggled.connect(func(pressed: bool): _on_hand_movement_toggled(pressed))
-	hand_movement_card.add_child(hand_movement_enable_check)
-	
-	# Grab Mode dropdown
-	var grab_mode_row = HBoxContainer.new()
-	grab_mode_row.add_theme_constant_override("separation", 8)
-	var grab_mode_label = Label.new()
-	grab_mode_label.text = "Grab Mode:"
-	grab_mode_label.add_theme_font_size_override("font_size", 12)
-	grab_mode_row.add_child(grab_mode_label)
-	hand_movement_grab_mode_btn = OptionButton.new()
-	hand_movement_grab_mode_btn.add_theme_font_size_override("font_size", 12)
-	hand_movement_grab_mode_btn.add_item("Relative", 0)
-	hand_movement_grab_mode_btn.add_item("Anchored", 1)
-	hand_movement_grab_mode_btn.selected = _get_hand_movement_grab_mode()
-	hand_movement_grab_mode_btn.tooltip_text = "Relative: anchor follows player. Anchored: anchor stays fixed in world."
-	hand_movement_grab_mode_btn.item_selected.connect(func(index: int): _on_hand_movement_grab_mode_changed(index))
-	grab_mode_row.add_child(hand_movement_grab_mode_btn)
-	hand_movement_card.add_child(grab_mode_row)
-	
-	var initial_hand_move_sense = _get_hand_movement_sensitivity()
-	var hand_move_sense_block = _add_slider_block(
-		hand_movement_card,
-		"Movement Sensitivity",
-		"How much the player moves relative to hand movement (0.05–2.0).",
-		0.05,
-		2.0,
-		0.05,
-		initial_hand_move_sense,
-		func(value): return " x%.2f" % value
-	)
-	hand_movement_sensitivity_label = hand_move_sense_block.label
-	hand_movement_sensitivity_slider = hand_move_sense_block.slider
-	hand_movement_sensitivity_slider.value_changed.connect(func(value: float): _on_hand_movement_sensitivity_changed(value))
-	
-	hand_movement_invert_check = CheckBox.new()
-	hand_movement_invert_check.text = "Invert Direction"
-	hand_movement_invert_check.add_theme_font_size_override("font_size", 12)
-	hand_movement_invert_check.tooltip_text = "Reverse the motion direction (pull to move forward vs push)."
-	hand_movement_invert_check.button_pressed = _get_hand_movement_invert()
-	hand_movement_invert_check.toggled.connect(func(pressed: bool): _on_hand_movement_invert_toggled(pressed))
-	hand_movement_card.add_child(hand_movement_invert_check)
-	
-	hand_movement_release_vel_check = CheckBox.new()
-	hand_movement_release_vel_check.text = "Apply Release Velocity"
-	hand_movement_release_vel_check.add_theme_font_size_override("font_size", 12)
-	hand_movement_release_vel_check.tooltip_text = "Keep momentum when releasing the pinch."
-	hand_movement_release_vel_check.button_pressed = _get_hand_movement_release_velocity()
-	hand_movement_release_vel_check.toggled.connect(func(pressed: bool): _on_hand_movement_release_vel_toggled(pressed))
-	hand_movement_card.add_child(hand_movement_release_vel_check)
-	
-	hand_movement_show_visual_check = CheckBox.new()
-	hand_movement_show_visual_check.text = "Show Visual Line"
-	hand_movement_show_visual_check.add_theme_font_size_override("font_size", 12)
-	hand_movement_show_visual_check.tooltip_text = "Display a line from the anchor point to the current pinch position."
-	hand_movement_show_visual_check.button_pressed = _get_hand_movement_show_visual()
-	hand_movement_show_visual_check.toggled.connect(func(pressed: bool): _on_hand_movement_show_visual_toggled(pressed))
-	hand_movement_card.add_child(hand_movement_show_visual_check)
-
 	# === Player ===
 	var player_card = _create_card(main_vbox, "Player", "Gravity and safety preferences", "🧍")
 
@@ -1274,64 +863,6 @@ func _build_ui():
 	player_card.add_child(hard_respawn_check)
 
 	var respawn_btn = Button.new()
-	respawn_btn.text = "Respawn Now"
-	respawn_btn.focus_mode = Control.FOCUS_NONE
-	respawn_btn.pressed.connect(_on_respawn_now_pressed)
-	player_card.add_child(respawn_btn)
-
-	var drag_block = _add_slider_block(
-		player_card,
-		"Player Drag",
-		"Linear drag applied to the player body.",
-		0.0,
-		5.0,
-		0.05,
-		movement_component.player_drag_force if movement_component else defaults_snapshot["player_drag_force"],
-		func(value): return " x%.2f" % value
-	)
-	player_drag_label = drag_block.label
-	player_drag_slider = drag_block.slider
-	player_drag_slider.value_changed.connect(func(value: float): _on_player_drag_changed(value))
-	
-	jump_enabled_check = CheckBox.new()
-	jump_enabled_check.text = "Enable Jump (action: jump)"
-	jump_enabled_check.add_theme_font_size_override("font_size", 12)
-	if movement_component:
-		jump_enabled_check.button_pressed = movement_component.jump_enabled
-	else:
-		jump_enabled_check.button_pressed = defaults_snapshot["jump_enabled"]
-	jump_enabled_check.toggled.connect(func(pressed: bool): _on_jump_enabled_toggled(pressed))
-	player_card.add_child(jump_enabled_check)
-	
-	var initial_jump_impulse = movement_component.jump_impulse if movement_component else defaults_snapshot["jump_impulse"]
-	var jump_impulse_block = _add_slider_block(
-		player_card,
-		"Jump Impulse",
-		"Upward impulse when pressing the jump action.",
-		4.0,
-		30.0,
-		0.5,
-		initial_jump_impulse,
-		func(value): return " %.1f" % value
-	)
-	jump_impulse_label = jump_impulse_block.label
-	jump_impulse_slider = jump_impulse_block.slider
-	jump_impulse_slider.value_changed.connect(func(value: float): _on_jump_impulse_changed(value))
-	
-	var initial_jump_cd = movement_component.jump_cooldown if movement_component else defaults_snapshot["jump_cooldown"]
-	var jump_cd_block = _add_slider_block(
-		player_card,
-		"Jump Cooldown",
-		"Delay before another jump can trigger.",
-		0.0,
-		2.0,
-		0.05,
-		initial_jump_cd,
-		func(value): return " %.2fs" % value
-	)
-	jump_cooldown_label = jump_cd_block.label
-	jump_cooldown_slider = jump_cd_block.slider
-	jump_cooldown_slider.value_changed.connect(func(value: float): _on_jump_cooldown_changed(value))
 	
 	# === Input Mapper ===
 	_build_input_mapper(main_vbox)
@@ -1906,41 +1437,17 @@ func _on_apply_one_hand_release_vel_toggled(pressed: bool):
 func _on_jump_enabled_toggled(pressed: bool):
 	if movement_component:
 		var old_val = movement_component.jump_enabled
-		movement_component.jump_enabled = pressed
+func _on_physics_hands_toggled(pressed: bool):
+	if movement_component:
+		var old_val = movement_component.enable_physics_hands
+		movement_component.enable_physics_hands = pressed
+		movement_component._update_physics_hands()
 		MovementSettingsPanel.record_toggle(
-			"Jump Enabled",
+			"Physics Hands",
 			"ON" if old_val else "OFF",
 			"ON" if pressed else "OFF",
-			func(): _on_jump_enabled_toggled(old_val)
+			func(): _on_physics_hands_toggled(old_val)
 		)
-	settings_changed.emit()
-
-
-func _on_jump_impulse_changed(value: float):
-	if movement_component:
-		var old_val = movement_component.jump_impulse
-		movement_component.jump_impulse = value
-		MovementSettingsPanel.record_toggle(
-			"Jump Impulse",
-			"%.1f" % old_val,
-			"%.1f" % value,
-			func(): _on_jump_impulse_changed(old_val)
-		)
-	jump_impulse_label.text = "Jump Impulse: %.1f" % value
-	settings_changed.emit()
-
-
-func _on_jump_cooldown_changed(value: float):
-	if movement_component:
-		var old_val = movement_component.jump_cooldown
-		movement_component.jump_cooldown = value
-		MovementSettingsPanel.record_toggle(
-			"Jump Cooldown",
-			"%.2fs" % old_val,
-			"%.2fs" % value,
-			func(): _on_jump_cooldown_changed(old_val)
-		)
-	jump_cooldown_label.text = "Jump Cooldown: %.2fs" % value
 	settings_changed.emit()
 
 
@@ -1971,246 +1478,7 @@ func _on_gravity_toggled(pressed: bool):
 	settings_changed.emit()
 
 
-# === V2 Two-Hand Grab Handlers ===
-
-func _on_v2_enable_toggled(pressed: bool):
-	if movement_component:
-		var old_val = movement_component.enable_two_hand_grab_v2
-		movement_component.enable_two_hand_grab_v2 = pressed
-		MovementSettingsPanel.record_toggle(
-			"V2 Two-Hand Grab",
-			"ON" if old_val else "OFF",
-			"ON" if pressed else "OFF",
-			func(): _on_v2_enable_toggled(old_val)
-		)
-	settings_changed.emit()
-
-
-func _on_v2_scale_toggled(pressed: bool):
-	if movement_component:
-		var old_val = movement_component.v2_scale_enabled
-		movement_component.v2_scale_enabled = pressed
-		MovementSettingsPanel.record_toggle(
-			"V2 Scale",
-			"ON" if old_val else "OFF",
-			"ON" if pressed else "OFF",
-			func(): _on_v2_scale_toggled(old_val)
-		)
-	settings_changed.emit()
-
-
-func _on_v2_rotation_toggled(pressed: bool):
-	if movement_component:
-		var old_val = movement_component.v2_rotation_enabled
-		movement_component.v2_rotation_enabled = pressed
-		MovementSettingsPanel.record_toggle(
-			"V2 Rotation",
-			"ON" if old_val else "OFF",
-			"ON" if pressed else "OFF",
-			func(): _on_v2_rotation_toggled(old_val)
-		)
-	settings_changed.emit()
-
-
-func _on_v2_scale_min_changed(value: float):
-	if v2_scale_max_slider and value > v2_scale_max_slider.value:
-		v2_scale_max_slider.value = value
-	if movement_component:
-		var old_val = movement_component.v2_world_scale_min
-		movement_component.v2_world_scale_min = value
-		MovementSettingsPanel.record_toggle(
-			"V2 Scale Min",
-			"%.2fx" % old_val,
-			"%.2fx" % value,
-			func(): _on_v2_scale_min_changed(old_val)
-		)
-	v2_scale_min_label.text = "V2 Scale Min: %.2fx" % value
-	settings_changed.emit()
-
-
-func _on_v2_scale_max_changed(value: float):
-	if v2_scale_min_slider and value < v2_scale_min_slider.value:
-		v2_scale_min_slider.value = value
-	if movement_component:
-		var old_val = movement_component.v2_world_scale_max
-		movement_component.v2_world_scale_max = value
-		MovementSettingsPanel.record_toggle(
-			"V2 Scale Max",
-			"%.2fx" % old_val,
-			"%.2fx" % value,
-			func(): _on_v2_scale_max_changed(old_val)
-		)
-	v2_scale_max_label.text = "V2 Scale Max: %.2fx" % value
-	settings_changed.emit()
-
-
-func _on_v2_show_visual_toggled(pressed: bool):
-	if movement_component:
-		var old_val = movement_component.v2_show_visual
-		movement_component.v2_show_visual = pressed
-		MovementSettingsPanel.record_toggle(
-			"V2 Show Visual",
-			"ON" if old_val else "OFF",
-			"ON" if pressed else "OFF",
-			func(): _on_v2_show_visual_toggled(old_val)
-		)
-	settings_changed.emit()
-
-
-func _on_v2_debug_toggled(pressed: bool):
-	if movement_component:
-		var old_val = movement_component.v2_debug_logs
-		movement_component.v2_debug_logs = pressed
-		MovementSettingsPanel.record_toggle(
-			"V2 Debug Logs",
-			"ON" if old_val else "OFF",
-			"ON" if pressed else "OFF",
-			func(): _on_v2_debug_toggled(old_val)
-		)
-	settings_changed.emit()
-
-
-# === V3 Two-Hand Grab Handlers ===
-
-func _on_v3_enable_toggled(pressed: bool):
-	if movement_component:
-		var old_val = movement_component.enable_two_hand_grab_v3
-		movement_component.enable_two_hand_grab_v3 = pressed
-		MovementSettingsPanel.record_toggle(
-			"V3 Two-Hand Grab",
-			"ON" if old_val else "OFF",
-			"ON" if pressed else "OFF",
-			func(): _on_v3_enable_toggled(old_val)
-		)
-	settings_changed.emit()
-
-
-func _on_v3_scale_min_changed(value: float):
-	if v3_scale_max_slider and value > v3_scale_max_slider.value:
-		v3_scale_max_slider.value = value
-	if movement_component:
-		var old_val = movement_component.v3_world_scale_min
-		movement_component.v3_world_scale_min = value
-		MovementSettingsPanel.record_toggle(
-			"V3 Scale Min",
-			"%.1fx" % old_val,
-			"%.1fx" % value,
-			func(): _on_v3_scale_min_changed(old_val)
-		)
-	v3_scale_min_label.text = "V3 Scale Min: %.1fx" % value
-	settings_changed.emit()
-
-
-func _on_v3_scale_max_changed(value: float):
-	if v3_scale_min_slider and value < v3_scale_min_slider.value:
-		v3_scale_min_slider.value = value
-	if movement_component:
-		var old_val = movement_component.v3_world_scale_max
-		movement_component.v3_world_scale_max = value
-		MovementSettingsPanel.record_toggle(
-			"V3 Scale Max",
-			"%.1fx" % old_val,
-			"%.1fx" % value,
-			func(): _on_v3_scale_max_changed(old_val)
-		)
-	v3_scale_max_label.text = "V3 Scale Max: %.1fx" % value
-	settings_changed.emit()
-
-
-func _on_v3_show_visual_toggled(pressed: bool):
-	if movement_component:
-		var old_val = movement_component.v3_show_visual
-		movement_component.v3_show_visual = pressed
-		MovementSettingsPanel.record_toggle(
-			"V3 Show Visual",
-			"ON" if old_val else "OFF",
-			"ON" if pressed else "OFF",
-			func(): _on_v3_show_visual_toggled(old_val)
-		)
-	settings_changed.emit()
-
-
-func _on_v3_debug_toggled(pressed: bool):
-	if movement_component:
-		var old_val = movement_component.v3_debug_logs
-		movement_component.v3_debug_logs = pressed
-		MovementSettingsPanel.record_toggle(
-			"V3 Debug Logs",
-			"ON" if old_val else "OFF",
-			"ON" if pressed else "OFF",
-			func(): _on_v3_debug_toggled(old_val)
-		)
-	settings_changed.emit()
-
-
-func _on_v3_scale_sensitivity_changed(value: float):
-	if movement_component:
-		var old_val = movement_component.v3_scale_sensitivity
-		movement_component.v3_scale_sensitivity = value
-		MovementSettingsPanel.record_toggle(
-			"V3 Scale Sensitivity",
-			"x%.1f" % old_val,
-			"x%.1f" % value,
-			func(): _on_v3_scale_sensitivity_changed(old_val)
-		)
-	v3_scale_sensitivity_label.text = "V3 Scale Sensitivity: x%.1f" % value
-	settings_changed.emit()
-
-
-func _on_v3_invert_scale_toggled(pressed: bool):
-	if movement_component:
-		var old_val = movement_component.v3_invert_scale
-		movement_component.v3_invert_scale = pressed
-		MovementSettingsPanel.record_toggle(
-			"V3 Invert Scale",
-			"ON" if old_val else "OFF",
-			"ON" if pressed else "OFF",
-			func(): _on_v3_invert_scale_toggled(old_val)
-		)
-	settings_changed.emit()
-
-
-func _on_v3_rotation_sensitivity_changed(value: float):
-	if movement_component:
-		var old_val = movement_component.v3_rotation_sensitivity
-		movement_component.v3_rotation_sensitivity = value
-		MovementSettingsPanel.record_toggle(
-			"V3 Rotation Sensitivity",
-			"x%.1f" % old_val,
-			"x%.1f" % value,
-			func(): _on_v3_rotation_sensitivity_changed(old_val)
-		)
-	v3_rotation_sensitivity_label.text = "V3 Rotation Sensitivity: x%.1f" % value
-	settings_changed.emit()
-
-
-func _on_v3_translation_sensitivity_changed(value: float):
-	if movement_component:
-		var old_val = movement_component.v3_translation_sensitivity
-		movement_component.v3_translation_sensitivity = value
-		MovementSettingsPanel.record_toggle(
-			"V3 Translation Sensitivity",
-			"x%.1f" % old_val,
-			"x%.1f" % value,
-			func(): _on_v3_translation_sensitivity_changed(old_val)
-		)
-	v3_translation_sensitivity_label.text = "V3 Translation Sensitivity: x%.1f" % value
-	settings_changed.emit()
-
-
-func _on_v3_smoothing_changed(value: float):
-	if movement_component:
-		var old_val = movement_component.v3_smoothing
-		movement_component.v3_smoothing = value
-		MovementSettingsPanel.record_toggle(
-			"V3 Smoothing",
-			"%.2f" % old_val,
-			"%.2f" % value,
-			func(): _on_v3_smoothing_changed(old_val)
-		)
-	v3_smoothing_label.text = "V3 Smoothing: %.2f" % value
-	settings_changed.emit()
-
+# === Simple World Grab Functions ===
 
 func _get_simple_world_grab_enabled() -> bool:
 	var player = get_tree().get_first_node_in_group("xr_player")
@@ -2594,34 +1862,24 @@ func refresh():
 			turn_invert_check.button_pressed = movement_component.invert_turn_x
 		if hand_swap_check:
 			hand_swap_check.button_pressed = movement_component.hand_assignment == PlayerMovementComponent.HandAssignment.SWAPPED
-		if ui_scroll_override_check:
-			ui_scroll_override_check.button_pressed = movement_component.ui_scroll_steals_stick
 		if ui_scroll_speed_slider:
 			ui_scroll_speed_slider.value = movement_component.ui_scroll_wheel_factor
-		if disable_joystick_grip_check:
-			disable_joystick_grip_check.button_pressed = movement_component.disable_joystick_on_grip
-		if world_scale_check:
-			world_scale_check.button_pressed = movement_component.enable_two_hand_world_scale
-		if world_rotation_check:
-			world_rotation_check.button_pressed = movement_component.enable_two_hand_world_rotation
-		if invert_two_hand_scale_check:
-			invert_two_hand_scale_check.button_pressed = movement_component.invert_two_hand_scale_direction
-		if show_two_hand_visual_check:
-			show_two_hand_visual_check.button_pressed = movement_component.show_two_hand_rotation_visual
-		if two_hand_left_action_btn:
-			var opts := two_hand_left_action_btn.get_item_count()
-			for i in opts:
-				if two_hand_left_action_btn.get_item_text(i) == movement_component.two_hand_left_action:
-					two_hand_left_action_btn.selected = i
-					break
-		if two_hand_right_action_btn:
-			var opts2 := two_hand_right_action_btn.get_item_count()
-			for i in opts2:
-				if two_hand_right_action_btn.get_item_text(i) == movement_component.two_hand_right_action:
-					two_hand_right_action_btn.selected = i
-					break
-		if two_hand_pivot_btn:
-			two_hand_pivot_btn.selected = movement_component.two_hand_rotation_pivot
+		if world_scale_min_slider:
+			world_scale_min_slider.value = movement_component.world_scale_min
+		if world_scale_max_slider:
+			world_scale_max_slider.value = movement_component.world_scale_max
+		if world_scale_sensitivity_slider:
+			world_scale_sensitivity_slider.value = movement_component.world_scale_sensitivity
+		if world_rotation_sensitivity_slider:
+			world_rotation_sensitivity_slider.value = movement_component.world_rotation_sensitivity
+		if one_hand_world_grab_check:
+			one_hand_world_grab_check.button_pressed = movement_component.enable_one_hand_world_grab
+		if one_hand_world_move_sense_slider:
+			one_hand_world_move_sense_slider.value = movement_component.one_hand_world_move_sensitivity
+		if invert_one_hand_grab_check:
+			invert_one_hand_grab_check.button_pressed = movement_component.invert_one_hand_grab_direction
+		if show_one_hand_grab_visual_check:
+			show_one_hand_grab_visual_check.button_pressed = movement_component.show_one_hand_grab_visual
 		if one_hand_grab_mode_btn:
 			one_hand_grab_mode_btn.selected = movement_component.one_hand_grab_mode
 		if one_hand_rotate_check:
@@ -2650,62 +1908,6 @@ func refresh():
 			hard_respawn_check.button_pressed = movement_component.hard_respawn_resets_settings
 		if player_drag_slider:
 			player_drag_slider.value = movement_component.player_drag_force
-		if invert_one_hand_grab_check:
-			invert_one_hand_grab_check.button_pressed = movement_component.invert_one_hand_grab_direction
-		if show_one_hand_grab_visual_check:
-			show_one_hand_grab_visual_check.button_pressed = movement_component.show_one_hand_grab_visual
-		if world_scale_min_slider:
-			world_scale_min_slider.value = movement_component.world_scale_min
-		if world_scale_max_slider:
-			world_scale_max_slider.value = movement_component.world_scale_max
-		if world_scale_sensitivity_slider:
-			world_scale_sensitivity_slider.value = movement_component.world_scale_sensitivity
-		if world_rotation_sensitivity_slider:
-			world_rotation_sensitivity_slider.value = movement_component.world_rotation_sensitivity
-		if one_hand_world_grab_check:
-			one_hand_world_grab_check.button_pressed = movement_component.enable_one_hand_world_grab
-		if one_hand_world_move_sense_slider:
-			one_hand_world_move_sense_slider.value = movement_component.one_hand_world_move_sensitivity
-		if jump_enabled_check:
-			jump_enabled_check.button_pressed = movement_component.jump_enabled
-		if jump_impulse_slider:
-			jump_impulse_slider.value = movement_component.jump_impulse
-		if jump_cooldown_slider:
-			jump_cooldown_slider.value = movement_component.jump_cooldown
-		# V2 Settings
-		if v2_enable_check:
-			v2_enable_check.button_pressed = movement_component.enable_two_hand_grab_v2
-		if v2_scale_check:
-			v2_scale_check.button_pressed = movement_component.v2_scale_enabled
-		if v2_rotation_check:
-			v2_rotation_check.button_pressed = movement_component.v2_rotation_enabled
-		if v2_scale_min_slider:
-			v2_scale_min_slider.value = movement_component.v2_world_scale_min
-		if v2_scale_max_slider:
-			v2_scale_max_slider.value = movement_component.v2_world_scale_max
-		if v2_show_visual_check:
-			v2_show_visual_check.button_pressed = movement_component.v2_show_visual
-		if v2_debug_check:
-			v2_debug_check.button_pressed = movement_component.v2_debug_logs
-		# V3 Settings
-		if v3_enable_check:
-			v3_enable_check.button_pressed = movement_component.enable_two_hand_grab_v3
-		if v3_scale_min_slider:
-			v3_scale_min_slider.value = movement_component.v3_world_scale_min
-		if v3_scale_max_slider:
-			v3_scale_max_slider.value = movement_component.v3_world_scale_max
-		if v3_scale_sensitivity_slider:
-			v3_scale_sensitivity_slider.value = movement_component.v3_scale_sensitivity
-		if v3_invert_scale_check:
-			v3_invert_scale_check.button_pressed = movement_component.v3_invert_scale
-		if v3_rotation_sensitivity_slider:
-			v3_rotation_sensitivity_slider.value = movement_component.v3_rotation_sensitivity
-		if v3_translation_sensitivity_slider:
-			v3_translation_sensitivity_slider.value = movement_component.v3_translation_sensitivity
-		if v3_smoothing_slider:
-			v3_smoothing_slider.value = movement_component.v3_smoothing
-		if v3_show_visual_check:
-			v3_show_visual_check.button_pressed = movement_component.v3_show_visual
 		if v3_debug_check:
 			v3_debug_check.button_pressed = movement_component.v3_debug_logs
 	
@@ -2740,61 +1942,29 @@ func _snapshot_defaults():
 		"locomotion_deadzone": movement_component.locomotion_deadzone,
 		"invert_locomotion_x": movement_component.invert_locomotion_x,
 		"invert_locomotion_y": movement_component.invert_locomotion_y,
-		"v3_show_visual": movement_component.v3_show_visual,
 		"v3_debug_logs": movement_component.v3_debug_logs,
-		"v3_scale_sensitivity": movement_component.v3_scale_sensitivity,
-		"v3_invert_scale": movement_component.v3_invert_scale,
-		"v3_rotation_sensitivity": movement_component.v3_rotation_sensitivity,
-		"v3_translation_sensitivity": movement_component.v3_translation_sensitivity,
-		"v3_smoothing": movement_component.v3_smoothing,
 		"turn_mode": movement_component.turn_mode,
 		"snap_turn_angle": movement_component.snap_turn_angle,
 		"smooth_turn_speed": movement_component.smooth_turn_speed,
 		"turn_deadzone": movement_component.turn_deadzone,
 		"snap_turn_cooldown": movement_component.snap_turn_cooldown,
 		"invert_turn_x": movement_component.invert_turn_x,
-		"ui_scroll_steals_stick": movement_component.ui_scroll_steals_stick,
 		"ui_scroll_wheel_factor": movement_component.ui_scroll_wheel_factor,
-		"disable_joystick_on_grip": movement_component.disable_joystick_on_grip,
 		"hand_assignment": movement_component.hand_assignment,
-		"enable_two_hand_world_scale": movement_component.enable_two_hand_world_scale,
-		"enable_two_hand_world_rotation": movement_component.enable_two_hand_world_rotation,
 		"world_scale_min": movement_component.world_scale_min,
 		"world_scale_max": movement_component.world_scale_max,
 		"player_gravity_enabled": movement_component.player_gravity_enabled,
 		"world_grab_move_factor": movement_component.world_grab_move_factor,
 		"world_grab_smooth_factor": movement_component.world_grab_smooth_factor,
-		"invert_two_hand_scale_direction": movement_component.invert_two_hand_scale_direction,
 		"invert_one_hand_grab_direction": movement_component.invert_one_hand_grab_direction,
-		"two_hand_left_action": movement_component.two_hand_left_action,
-		"two_hand_right_action": movement_component.two_hand_right_action,
-		"two_hand_rotation_pivot": movement_component.two_hand_rotation_pivot,
 		"show_one_hand_grab_visual": movement_component.show_one_hand_grab_visual,
-		"show_two_hand_rotation_visual": movement_component.show_two_hand_rotation_visual,
 		"player_drag_force": movement_component.player_drag_force,
 		"auto_respawn_enabled": movement_component.auto_respawn_enabled,
 		"auto_respawn_distance": movement_component.auto_respawn_distance,
 		"hard_respawn_resets_settings": movement_component.hard_respawn_resets_settings,
 		"enable_physics_hands": movement_component.enable_physics_hands,
-		"jump_enabled": movement_component.jump_enabled,
-		"jump_impulse": movement_component.jump_impulse,
-		"jump_cooldown": movement_component.jump_cooldown,
-		# V2
-		"enable_two_hand_grab_v2": movement_component.enable_two_hand_grab_v2,
-		"v2_scale_enabled": movement_component.v2_scale_enabled,
-		"v2_rotation_enabled": movement_component.v2_rotation_enabled,
-		"v2_world_scale_min": movement_component.v2_world_scale_min,
-		"v2_world_scale_max": movement_component.v2_world_scale_max,
-		"v2_left_action": movement_component.v2_left_action,
-		"v2_right_action": movement_component.v2_right_action,
-		"v2_show_visual": movement_component.v2_show_visual,
-		"v2_debug_logs": movement_component.v2_debug_logs,
-			# V3
-			"enable_two_hand_grab_v3": movement_component.enable_two_hand_grab_v3,
-			"v3_world_scale_min": movement_component.v3_world_scale_min,
-			"v3_world_scale_max": movement_component.v3_world_scale_max,
-			"simple_world_grab_enabled": _get_simple_world_grab_enabled(),
-		}
+		"simple_world_grab_enabled": _get_simple_world_grab_enabled(),
+	}
 
 
 func _apply_defaults(source: Dictionary):
@@ -2822,30 +1992,8 @@ func _apply_defaults(source: Dictionary):
 		turn_invert_check.button_pressed = source.get("invert_turn_x", DEFAULTS["invert_turn_x"])
 	if hand_swap_check:
 		hand_swap_check.button_pressed = source.get("hand_assignment", DEFAULTS["hand_assignment"]) == PlayerMovementComponent.HandAssignment.SWAPPED
-	if ui_scroll_override_check:
-		ui_scroll_override_check.button_pressed = source.get("ui_scroll_steals_stick", DEFAULTS["ui_scroll_steals_stick"])
 	if ui_scroll_speed_slider:
 		ui_scroll_speed_slider.value = source.get("ui_scroll_wheel_factor", DEFAULTS["ui_scroll_wheel_factor"])
-	if disable_joystick_grip_check:
-		disable_joystick_grip_check.button_pressed = source.get("disable_joystick_on_grip", DEFAULTS["disable_joystick_on_grip"])
-	if world_scale_check:
-		world_scale_check.button_pressed = source.get("enable_two_hand_world_scale", DEFAULTS["enable_two_hand_world_scale"])
-	if world_rotation_check:
-		world_rotation_check.button_pressed = source.get("enable_two_hand_world_rotation", DEFAULTS["enable_two_hand_world_rotation"])
-	if invert_two_hand_scale_check:
-		invert_two_hand_scale_check.button_pressed = source.get("invert_two_hand_scale_direction", DEFAULTS["invert_two_hand_scale_direction"])
-	if show_two_hand_visual_check:
-		show_two_hand_visual_check.button_pressed = source.get("show_two_hand_rotation_visual", DEFAULTS["show_two_hand_rotation_visual"])
-	if two_hand_left_action_btn:
-		var l_action: String = source.get("two_hand_left_action", DEFAULTS["two_hand_left_action"])
-		for i in two_hand_left_action_btn.get_item_count():
-			if two_hand_left_action_btn.get_item_text(i) == l_action:
-				two_hand_left_action_btn.selected = i
-				break
-	if world_grab_move_factor_slider:
-		world_grab_move_factor_slider.value = source.get("world_grab_move_factor", DEFAULTS["world_grab_move_factor"])
-	if world_grab_smooth_slider:
-		world_grab_smooth_slider.value = source.get("world_grab_smooth_factor", DEFAULTS["world_grab_smooth_factor"])
 	if world_scale_min_slider:
 		world_scale_min_slider.value = source.get("world_scale_min", DEFAULTS["world_scale_min"])
 	if world_scale_max_slider:
@@ -2854,20 +2002,16 @@ func _apply_defaults(source: Dictionary):
 		world_scale_sensitivity_slider.value = source.get("world_scale_sensitivity", DEFAULTS["world_scale_sensitivity"])
 	if world_rotation_sensitivity_slider:
 		world_rotation_sensitivity_slider.value = source.get("world_rotation_sensitivity", DEFAULTS["world_rotation_sensitivity"])
+	if world_grab_move_factor_slider:
+		world_grab_move_factor_slider.value = source.get("world_grab_move_factor", DEFAULTS["world_grab_move_factor"])
+	if world_grab_smooth_slider:
+		world_grab_smooth_slider.value = source.get("world_grab_smooth_factor", DEFAULTS["world_grab_smooth_factor"])
 	if one_hand_world_grab_check:
 		one_hand_world_grab_check.button_pressed = source.get("enable_one_hand_world_grab", DEFAULTS["enable_one_hand_world_grab"])
 	if one_hand_world_move_sense_slider:
 		one_hand_world_move_sense_slider.value = source.get("one_hand_world_move_sensitivity", DEFAULTS["one_hand_world_move_sensitivity"])
 	if invert_one_hand_grab_check:
 		invert_one_hand_grab_check.button_pressed = source.get("invert_one_hand_grab_direction", DEFAULTS["invert_one_hand_grab_direction"])
-	if two_hand_right_action_btn:
-		var r_action: String = source.get("two_hand_right_action", DEFAULTS["two_hand_right_action"])
-		for i in two_hand_right_action_btn.get_item_count():
-			if two_hand_right_action_btn.get_item_text(i) == r_action:
-				two_hand_right_action_btn.selected = i
-				break
-	if two_hand_pivot_btn:
-		two_hand_pivot_btn.selected = source.get("two_hand_rotation_pivot", DEFAULTS["two_hand_rotation_pivot"])
 	if one_hand_grab_mode_btn:
 		one_hand_grab_mode_btn.selected = source.get("one_hand_grab_mode", DEFAULTS["one_hand_grab_mode"])
 	if one_hand_rotate_check:
@@ -2888,41 +2032,12 @@ func _apply_defaults(source: Dictionary):
 		auto_respawn_distance_slider.value = source.get("auto_respawn_distance", DEFAULTS["auto_respawn_distance"])
 	if hard_respawn_check:
 		hard_respawn_check.button_pressed = source.get("hard_respawn_resets_settings", DEFAULTS["hard_respawn_resets_settings"])
-	if jump_enabled_check:
-		jump_enabled_check.button_pressed = source.get("jump_enabled", DEFAULTS["jump_enabled"])
-	if jump_impulse_slider:
-		jump_impulse_slider.value = source.get("jump_impulse", DEFAULTS["jump_impulse"])
-	if jump_cooldown_slider:
-		jump_cooldown_slider.value = source.get("jump_cooldown", DEFAULTS["jump_cooldown"])
 	if gravity_check:
 		gravity_check.button_pressed = source.get("player_gravity_enabled", DEFAULTS["player_gravity_enabled"])
 	if physics_hands_check:
 		physics_hands_check.button_pressed = source.get("enable_physics_hands", DEFAULTS["enable_physics_hands"])
 	if player_drag_slider:
 		player_drag_slider.value = source.get("player_drag_force", DEFAULTS["player_drag_force"])
-	# Hand Movement settings
-	if hand_movement_enable_check:
-		hand_movement_enable_check.button_pressed = source.get("enable_hand_movement", DEFAULTS["enable_hand_movement"])
-		_on_hand_movement_toggled(hand_movement_enable_check.button_pressed)
-	if hand_movement_grab_mode_btn:
-		hand_movement_grab_mode_btn.selected = source.get("hand_movement_grab_mode", DEFAULTS["hand_movement_grab_mode"])
-		_on_hand_movement_grab_mode_changed(hand_movement_grab_mode_btn.selected)
-	if hand_movement_sensitivity_slider:
-		hand_movement_sensitivity_slider.value = source.get("hand_movement_sensitivity", DEFAULTS["hand_movement_sensitivity"])
-		_on_hand_movement_sensitivity_changed(hand_movement_sensitivity_slider.value)
-	if hand_movement_invert_check:
-		hand_movement_invert_check.button_pressed = source.get("hand_movement_invert_direction", DEFAULTS["hand_movement_invert_direction"])
-		_on_hand_movement_invert_toggled(hand_movement_invert_check.button_pressed)
-	if hand_movement_release_vel_check:
-		hand_movement_release_vel_check.button_pressed = source.get("hand_movement_apply_release_velocity", DEFAULTS["hand_movement_apply_release_velocity"])
-		_on_hand_movement_release_vel_toggled(hand_movement_release_vel_check.button_pressed)
-	if hand_movement_show_visual_check:
-		hand_movement_show_visual_check.button_pressed = source.get("hand_movement_show_visual", DEFAULTS["hand_movement_show_visual"])
-		_on_hand_movement_show_visual_toggled(hand_movement_show_visual_check.button_pressed)
-	if simple_world_grab_check:
-		var simple_enabled: bool = source.get("simple_world_grab_enabled", DEFAULTS["simple_world_grab_enabled"])
-		simple_world_grab_check.button_pressed = simple_enabled
-		_set_simple_world_grab_enabled(simple_enabled, false)
 
 
 func _update_turn_mode_ui():
@@ -3040,16 +2155,8 @@ func _collect_settings_data() -> Dictionary:
 		"snap_turn_cooldown": snap_cooldown_slider.value if snap_cooldown_slider else DEFAULTS["snap_turn_cooldown"],
 		"smooth_turn_speed": smooth_speed_slider.value if smooth_speed_slider else DEFAULTS["smooth_turn_speed"],
 		"invert_turn_x": turn_invert_check.button_pressed if turn_invert_check else DEFAULTS["invert_turn_x"],
-		"ui_scroll_steals_stick": ui_scroll_override_check.button_pressed if ui_scroll_override_check else DEFAULTS["ui_scroll_steals_stick"],
 		"ui_scroll_wheel_factor": ui_scroll_speed_slider.value if ui_scroll_speed_slider else DEFAULTS["ui_scroll_wheel_factor"],
-		"disable_joystick_on_grip": disable_joystick_grip_check.button_pressed if disable_joystick_grip_check else DEFAULTS["disable_joystick_on_grip"],
 		"hand_assignment": PlayerMovementComponent.HandAssignment.SWAPPED if hand_swap_check and hand_swap_check.button_pressed else PlayerMovementComponent.HandAssignment.DEFAULT,
-		"enable_two_hand_world_scale": world_scale_check.button_pressed if world_scale_check else DEFAULTS["enable_two_hand_world_scale"],
-		"enable_two_hand_world_rotation": world_rotation_check.button_pressed if world_rotation_check else DEFAULTS["enable_two_hand_world_rotation"],
-		"invert_two_hand_scale_direction": invert_two_hand_scale_check.button_pressed if invert_two_hand_scale_check else DEFAULTS["invert_two_hand_scale_direction"],
-		"show_two_hand_rotation_visual": show_two_hand_visual_check.button_pressed if show_two_hand_visual_check else DEFAULTS["show_two_hand_rotation_visual"],
-		"two_hand_left_action": two_hand_left_action_btn.get_item_text(two_hand_left_action_btn.selected) if two_hand_left_action_btn else DEFAULTS["two_hand_left_action"],
-		"two_hand_right_action": two_hand_right_action_btn.get_item_text(two_hand_right_action_btn.selected) if two_hand_right_action_btn else DEFAULTS["two_hand_right_action"],
 		"world_scale_min": world_scale_min_slider.value if world_scale_min_slider else DEFAULTS["world_scale_min"],
 		"world_scale_max": world_scale_max_slider.value if world_scale_max_slider else DEFAULTS["world_scale_max"],
 		"world_scale_sensitivity": world_scale_sensitivity_slider.value if world_scale_sensitivity_slider else DEFAULTS["world_scale_sensitivity"],
@@ -3060,26 +2167,10 @@ func _collect_settings_data() -> Dictionary:
 		"one_hand_world_move_sensitivity": one_hand_world_move_sense_slider.value if one_hand_world_move_sense_slider else DEFAULTS["one_hand_world_move_sensitivity"],
 		"invert_one_hand_grab_direction": invert_one_hand_grab_check.button_pressed if invert_one_hand_grab_check else DEFAULTS["invert_one_hand_grab_direction"],
 		"show_one_hand_grab_visual": show_one_hand_grab_visual_check.button_pressed if show_one_hand_grab_visual_check else DEFAULTS["show_one_hand_grab_visual"],
-		"jump_enabled": jump_enabled_check.button_pressed if jump_enabled_check else DEFAULTS["jump_enabled"],
-		"jump_impulse": jump_impulse_slider.value if jump_impulse_slider else DEFAULTS["jump_impulse"],
-		"jump_cooldown": jump_cooldown_slider.value if jump_cooldown_slider else DEFAULTS["jump_cooldown"],
 		"player_gravity_enabled": gravity_check.button_pressed if gravity_check else DEFAULTS["player_gravity_enabled"],
 		"enable_physics_hands": physics_hands_check.button_pressed if physics_hands_check else DEFAULTS["enable_physics_hands"],
 		"player_drag_force": player_drag_slider.value if player_drag_slider else DEFAULTS["player_drag_force"],
-		"v3_scale_sensitivity": v3_scale_sensitivity_slider.value if v3_scale_sensitivity_slider else DEFAULTS["v3_scale_sensitivity"],
-		"v3_invert_scale": v3_invert_scale_check.button_pressed if v3_invert_scale_check else DEFAULTS["v3_invert_scale"],
-		"v3_rotation_sensitivity": v3_rotation_sensitivity_slider.value if v3_rotation_sensitivity_slider else DEFAULTS["v3_rotation_sensitivity"],
-		"v3_translation_sensitivity": v3_translation_sensitivity_slider.value if v3_translation_sensitivity_slider else DEFAULTS["v3_translation_sensitivity"],
-		"v3_smoothing": v3_smoothing_slider.value if v3_smoothing_slider else DEFAULTS["v3_smoothing"],
-		# Hand Movement settings
-		"enable_hand_movement": hand_movement_enable_check.button_pressed if hand_movement_enable_check else DEFAULTS["enable_hand_movement"],
-		"hand_movement_grab_mode": hand_movement_grab_mode_btn.selected if hand_movement_grab_mode_btn else DEFAULTS["hand_movement_grab_mode"],
-			"hand_movement_sensitivity": hand_movement_sensitivity_slider.value if hand_movement_sensitivity_slider else DEFAULTS["hand_movement_sensitivity"],
-			"hand_movement_invert_direction": hand_movement_invert_check.button_pressed if hand_movement_invert_check else DEFAULTS["hand_movement_invert_direction"],
-			"hand_movement_apply_release_velocity": hand_movement_release_vel_check.button_pressed if hand_movement_release_vel_check else DEFAULTS["hand_movement_apply_release_velocity"],
-			"hand_movement_show_visual": hand_movement_show_visual_check.button_pressed if hand_movement_show_visual_check else DEFAULTS["hand_movement_show_visual"],
-			"simple_world_grab_enabled": simple_world_grab_check.button_pressed if simple_world_grab_check else _get_simple_world_grab_enabled(),
-		}
+	}
 
 
 func _refresh_profiles():
