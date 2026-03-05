@@ -52,8 +52,8 @@ enum TwoHandPivot { MIDPOINT, PLAYER_ORIGIN }
 @export var two_hand_left_action: String = "trigger"
 @export var two_hand_right_action: String = "trigger"
 @export var debug_world_grab_logs: bool = true
-@export var enable_one_hand_world_grab: bool = true
-@export var enable_one_hand_world_rotate: bool = true
+@export var enable_one_hand_world_grab: bool = false
+@export var enable_one_hand_world_rotate: bool = false
 @export_range(0.0, 2.0, 0.05) var one_hand_world_move_sensitivity: float = 0.25
 @export var apply_one_hand_release_velocity: bool = true
 enum OneHandGrabMode { RELATIVE, ANCHORED }
@@ -647,6 +647,13 @@ func _signed_angle_2d(a: Vector2, b: Vector2) -> float:
 	return atan2(cross, dot)
 
 
+func _stop_player_momentum() -> void:
+	if not player_body:
+		return
+	player_body.linear_velocity = Vector3.ZERO
+	player_body.angular_velocity = Vector3.ZERO
+
+
 # === World Grab Helpers ===
 
 func physics_process_world_grab(delta: float) -> void:
@@ -721,6 +728,7 @@ func _check_render_mode_reset(delta: float) -> void:
 func _start_one_hand_grab(controller: XRController3D) -> void:
 	_ensure_visuals()
 	_one_hand_grab_active = true
+	_stop_player_momentum()
 	_one_hand_controller = controller
 	_one_hand_initial_controller_pos = controller.global_position
 	_one_hand_initial_body_pos = player_body.global_transform.origin
@@ -736,6 +744,7 @@ func _start_one_hand_grab(controller: XRController3D) -> void:
 func _update_one_hand_grab(controller: XRController3D, delta: float) -> void:
 	if not _one_hand_grab_active or not controller or not player_body:
 		return
+	_stop_player_momentum()
 	# Anchored mode keeps a fixed world-space point. Relative mode keeps a local-space anchor.
 	if one_hand_grab_mode == OneHandGrabMode.RELATIVE:
 		_one_hand_grab_anchor = player_body.to_global(_one_hand_anchor_local)

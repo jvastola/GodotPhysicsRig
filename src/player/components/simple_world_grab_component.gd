@@ -41,6 +41,7 @@ var xr_camera: XRCamera3D
 var left_controller: XRController3D
 var right_controller: XRController3D
 var _player_root: Node = null
+var _player_body: RigidBody3D = null
 
 # Grab state
 var _left_grabbing: bool = false
@@ -64,6 +65,8 @@ func setup(p_origin: XROrigin3D, p_camera: XRCamera3D, p_left: XRController3D, p
 	left_controller = p_left
 	right_controller = p_right
 	_player_root = get_parent()
+	if _player_root:
+		_player_body = _player_root.get_node_or_null("PlayerBody") as RigidBody3D
 	_base_world_scale = maxf(XRServer.world_scale, 0.0001)
 	if _player_root and _player_root.has_method("set_scale_rig_with_world_scale"):
 		_player_root.call("set_scale_rig_with_world_scale", true)
@@ -125,6 +128,7 @@ func _start_grab_left() -> void:
 			push_warning("SimpleWorldGrab: Skipping left grab start due to non-finite controller transform")
 		return
 	_left_grabbing = true
+	_stop_player_momentum()
 	_left_handle = Node3D.new()
 	get_tree().root.add_child(_left_handle)
 	_left_handle.global_transform = left_xform
@@ -142,6 +146,7 @@ func _end_grab_left() -> void:
 	if debug_logs:
 		print("SimpleWorldGrab: Left grab ended")
 	if not _right_grabbing:
+		_stop_player_momentum()
 		grab_ended.emit()
 
 
@@ -152,6 +157,7 @@ func _start_grab_right() -> void:
 			push_warning("SimpleWorldGrab: Skipping right grab start due to non-finite controller transform")
 		return
 	_right_grabbing = true
+	_stop_player_momentum()
 	_right_handle = Node3D.new()
 	get_tree().root.add_child(_right_handle)
 	_right_handle.global_transform = right_xform
@@ -169,6 +175,7 @@ func _end_grab_right() -> void:
 	if debug_logs:
 		print("SimpleWorldGrab: Right grab ended")
 	if not _left_grabbing:
+		_stop_player_momentum()
 		grab_ended.emit()
 
 
@@ -216,6 +223,7 @@ func _release_all() -> void:
 
 
 func _process_world_grab(delta: float) -> void:
+	_stop_player_momentum()
 	var offset = Vector3.ZERO
 	
 	if _left_handle and not _right_handle:
@@ -367,6 +375,13 @@ func _set_world_scale_immediate(new_scale: float) -> void:
 	XRServer.world_scale = new_scale
 	if _player_root and _player_root.has_method("force_world_scale_sync"):
 		_player_root.call("force_world_scale_sync")
+
+
+func _stop_player_momentum() -> void:
+	if not _player_body or not is_instance_valid(_player_body):
+		return
+	_player_body.linear_velocity = Vector3.ZERO
+	_player_body.angular_velocity = Vector3.ZERO
 
 
 func _is_finite_vector3(v: Vector3) -> bool:

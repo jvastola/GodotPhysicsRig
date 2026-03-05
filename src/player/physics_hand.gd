@@ -546,7 +546,7 @@ func _register_grabbed_nodes_for_scaling(nodes: Array) -> void:
 		if not is_instance_valid(node3d) or node3d.get_parent() != self:
 			continue
 		_grabbed_node_scale_bases[node3d.get_instance_id()] = {
-			"node": node3d,
+			"node_ref": weakref(node3d),
 			"base_transform": node3d.transform,
 			"base_multiplier": base_multiplier,
 		}
@@ -565,9 +565,22 @@ func _apply_grabbed_node_scale_multiplier() -> void:
 		return
 	var stale_ids: Array = []
 	for id in _grabbed_node_scale_bases.keys():
-		var entry: Dictionary = _grabbed_node_scale_bases[id]
-		var node := entry.get("node", null) as Node3D
-		if not node or not is_instance_valid(node) or node.get_parent() != self:
+		var entry_variant: Variant = _grabbed_node_scale_bases[id]
+		if not (entry_variant is Dictionary):
+			stale_ids.append(id)
+			continue
+		var entry: Dictionary = entry_variant
+		var node: Node3D = null
+		var node_ref_variant: Variant = entry.get("node_ref", null)
+		if node_ref_variant is WeakRef:
+			var resolved: Variant = (node_ref_variant as WeakRef).get_ref()
+			if resolved is Node3D and is_instance_valid(resolved):
+				node = resolved as Node3D
+		elif entry.has("node"):
+			var legacy_node: Variant = entry.get("node", null)
+			if legacy_node is Object and is_instance_valid(legacy_node) and legacy_node is Node3D:
+				node = legacy_node as Node3D
+		if not node or node.get_parent() != self:
 			stale_ids.append(id)
 			continue
 		var base_transform := entry.get("base_transform", node.transform) as Transform3D
