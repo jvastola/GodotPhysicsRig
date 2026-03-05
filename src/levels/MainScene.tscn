@@ -46,6 +46,8 @@
 [ext_resource type="PackedScene" uid="uid://b2mp18xsksksj" path="res://src/objects/OreDeposit.tscn" id="53_ore_deposit"]
 [ext_resource type="Material" uid="uid://bvqm8x7y5n8hs" path="res://src/demos/tools/materials/plasma.tres" id="54_plasma"]
 [ext_resource type="PackedScene" uid="uid://cfu4ue80xt2kr" path="res://src/ui/PhysicsHandTunerViewport3D.tscn" id="55_hand_tuner_viewport"]
+[ext_resource type="PackedScene" path="res://src/objects/grabbables/Flashlight.tscn" id="56_flashlight"]
+[ext_resource type="Script" path="res://src/levels/dark_zone_area.gd" id="57_dark_zone_script"]
 
 [sub_resource type="Environment" id="Environment_main"]
 fog_enabled = true
@@ -97,6 +99,17 @@ size = Vector3(0.05, 0.5, 0.05)
 subdivide_width = 8
 subdivide_height = 8
 subdivide_depth = 8
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_dark_zone"]
+size = Vector3(9, 4.5, 9)
+
+[sub_resource type="BoxMesh" id="BoxMesh_dark_zone_visual"]
+size = Vector3(9, 4.5, 9)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dark_zone_visual"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0.02, 0.02, 0.04, 0.28)
 
 [node name="MainScene33" type="Node3D" unique_id=1547683746]
 
@@ -451,5 +464,26 @@ transform = Transform3D(-0.3159503, 0, 0.05074847, 0, 0.32, 0, -0.05074847, 0, -
 
 [node name="MetaStoreTrigger" parent="." unique_id=497265201 instance=ExtResource("46_sv5fj")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1998911, 0, -38.001358)
+
+[node name="Flashlight" parent="." unique_id=2109123456 instance=ExtResource("56_flashlight")]
+transform = Transform3D(1, 0, 0, 0, 0.99939084, -0.034899496, 0, 0.034899496, 0.99939084, 0.69364953, 0.862393, -37.39026)
+
+[node name="DarkZoneArea" type="Area3D" parent="." unique_id=2109234567 node_paths=PackedStringArray("directional_light_path", "world_environment_path")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.8710024, 2.216625, -35.704117)
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("57_dark_zone_script")
+directional_light_path = NodePath("../DirectionalLight3D")
+world_environment_path = NodePath("../WorldEnvironment")
+dark_light_energy = 0.07
+dark_ambient_energy = 0.03
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DarkZoneArea" unique_id=2109345678]
+shape = SubResource("BoxShape3D_dark_zone")
+
+[node name="Visual" type="MeshInstance3D" parent="DarkZoneArea" unique_id=2109456789]
+cast_shadow = 0
+mesh = SubResource("BoxMesh_dark_zone_visual")
+material_override = SubResource("StandardMaterial3D_dark_zone_visual")
 
 [editable path="OreDeposit2"]

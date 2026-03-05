@@ -1,0 +1,71 @@
+[gd_scene format=3 uid="uid://c5tx0dyo0e2yf"]
+
+[ext_resource type="Script" uid="uid://cnj65rgdjsrfc" path="res://src/objects/grabbables/flashlight.gd" id="1_grabbable"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_flashlight"]
+size = Vector3(0.09, 0.09, 0.34)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_handle"]
+albedo_color = Color(0.08, 0.08, 0.09, 1)
+metallic = 0.2
+roughness = 0.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_handle"]
+bottom_radius = 0.028
+height = 0.24
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_head"]
+albedo_color = Color(0.15, 0.16, 0.17, 1)
+metallic = 0.35
+roughness = 0.4
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_head"]
+top_radius = 0.05
+bottom_radius = 0.05
+height = 0.08
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lens"]
+transparency = 1
+albedo_color = Color(1, 1, 0.85, 0.65)
+emission_enabled = true
+emission = Color(1, 0.95, 0.7, 1)
+emission_energy_multiplier = 1.6
+
+[node name="Flashlight" type="RigidBody3D" unique_id=1063893915]
+mass = 0.35
+gravity_scale = 0.8
+script = ExtResource("1_grabbable")
+grab_mode = 0
+save_id = "Flashlight"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1824383022]
+shape = SubResource("BoxShape3D_flashlight")
+
+[node name="Handle" type="MeshInstance3D" parent="." unique_id=1910802818]
+transform = Transform3D(0.1, 0, 0, 0, -4.371139e-08, -0.1, 0, 1, -4.371139e-09, 0, 0, -0.04)
+material_override = SubResource("StandardMaterial3D_handle")
+mesh = SubResource("CylinderMesh_handle")
+
+[node name="Head" type="MeshInstance3D" parent="." unique_id=796979902]
+transform = Transform3D(1, 0, 0, 0, -1.033267e-07, -0.99999994, 0, 2.3638387, -4.3711395e-08, 0, 0, -0.0558073)
+material_override = SubResource("StandardMaterial3D_head")
+mesh = SubResource("CylinderMesh_head")
+
+[node name="Lens" type="MeshInstance3D" parent="." unique_id=1152246541]
+transform = Transform3D(0.96, 0, 0, 0, 0.96, 0, 0, 0, 0.03, 0, 0, -0.22)
+material_override = SubResource("StandardMaterial3D_lens")
+mesh = SubResource("CylinderMesh_head")
+
+[node name="SpotLight3D" type="SpotLight3D" parent="." unique_id=385566245]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.22)
+light_color = Color(1, 0.964706, 0.862745, 1)
+light_energy = 4.8
+shadow_enabled = true
+spot_range = 18.0
+spot_angle = 32.0
+spot_angle_attenuation = 0.55
+
+[node name="FillLight" type="OmniLight3D" parent="." unique_id=358685249]
+light_color = Color(1, 0.945098, 0.815686, 1)
+light_energy = 0.35
+omni_range = 1.6
