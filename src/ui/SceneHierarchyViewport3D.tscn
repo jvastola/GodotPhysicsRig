@@ -23,7 +23,6 @@ script = ExtResource("1_script")
 
 [node name="SubViewport" type="SubViewport" parent="." unique_id=1882720177]
 transparent_bg = true
-size = Vector2i(600, 500)
 render_target_update_mode = 4
 
 [node name="SceneHierarchyUI" parent="SubViewport" unique_id=1292806151 instance=ExtResource("2_ui")]

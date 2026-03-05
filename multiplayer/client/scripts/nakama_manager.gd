@@ -122,7 +122,7 @@ var PLATFORM_NAME_RESPONSE_KEYS: PackedStringArray = PackedStringArray([
 ])
 var _cached_platform_user_data: Dictionary = {}
 var meta_platform_app_id: String = META_PLATFORM_APP_ID_DEFAULT
-var use_meta_username_fallback: bool = true
+var use_meta_username_fallback: bool = false
 var _nakama_custom_auth_id: String = ""
 var _platform_user_data_bootstrap_started: bool = false
 var _platform_user_data_bootstrap_completed: bool = false
@@ -201,7 +201,7 @@ func _ready() -> void:
 	if env_meta_username_fallback == "0" or env_meta_username_fallback == "false":
 		use_meta_username_fallback = false
 	elif env_meta_username_fallback == "1" or env_meta_username_fallback == "true":
-		use_meta_username_fallback = true
+		use_meta_username_fallback = OS.get_name() == "Android"
 
 	# Ensure port/protocol consistency – the default TLS port is 7443
 	if nakama_use_ssl and nakama_port == 7350:
@@ -452,6 +452,9 @@ func _initialize_meta_platform_sdk(meta_sdk: Object) -> void:
 	if meta_sdk == null:
 		print("NakamaManager: Meta init skipped - SDK object is null")
 		return
+	if OS.get_name() != "Android":
+		print("NakamaManager: Meta init skipped - current OS is %s (Android required)" % OS.get_name())
+		return
 	if _meta_initialize_attempted:
 		print("NakamaManager: Meta init skipped - already attempted in this session")
 		return
@@ -486,6 +489,9 @@ func _fetch_meta_platform_user_data(meta_sdk: Object) -> Dictionary:
 		"user_id": "",
 		"display_name": ""
 	}
+	if OS.get_name() != "Android":
+		print("NakamaManager: Meta user fetch skipped - current OS is %s (Android required)" % OS.get_name())
+		return resolved
 	if meta_sdk == null:
 		print("NakamaManager: Meta user fetch skipped - SDK object is null")
 		return resolved
@@ -547,7 +553,7 @@ func _bootstrap_platform_user_data() -> void:
 	var resolved_user_id := _variant_to_clean_string(resolved.get("user_id", ""))
 	var resolved_display_name := _variant_to_clean_string(resolved.get("display_name", ""))
 
-	if use_meta_username_fallback and Engine.has_singleton(META_PLATFORM_SINGLETON_NAME):
+	if use_meta_username_fallback and OS.get_name() == "Android" and Engine.has_singleton(META_PLATFORM_SINGLETON_NAME):
 		var sdk_variant: Variant = Engine.get_singleton(META_PLATFORM_SINGLETON_NAME)
 		if sdk_variant is Object:
 			var meta_sdk: Object = sdk_variant as Object
@@ -562,8 +568,12 @@ func _bootstrap_platform_user_data() -> void:
 					resolved_display_name = meta_display_name
 				if meta_display_name.is_empty():
 					print("NakamaManager: Meta fallback enabled but no Meta display name was resolved")
+			else:
+				print("NakamaManager: Meta singleton object resolved as null")
 		else:
 			print("NakamaManager: Meta singleton exists but is not an Object")
+	elif use_meta_username_fallback and OS.get_name() != "Android":
+		print("NakamaManager: Meta fallback enabled but current OS is %s; skipping Meta SDK lookup" % OS.get_name())
 	elif use_meta_username_fallback:
 		print("NakamaManager: MetaPlatformSDK singleton not found")
 
@@ -608,7 +618,11 @@ func is_meta_username_fallback_enabled() -> bool:
 
 func set_meta_username_fallback_enabled(enabled: bool, attempt_apply_if_needed: bool = true) -> void:
 	print("NakamaManager: Meta username fallback toggled to %s" % str(enabled))
-	use_meta_username_fallback = enabled
+	if OS.get_name() != "Android":
+		use_meta_username_fallback = false
+		print("NakamaManager: Meta username fallback forced OFF (Android only)")
+	else:
+		use_meta_username_fallback = enabled
 	if use_meta_username_fallback and attempt_apply_if_needed:
 		call_deferred("_attempt_apply_meta_display_name_if_needed")
 

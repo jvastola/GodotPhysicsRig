@@ -22,29 +22,20 @@ func _open_meta_store() -> void:
 	if item_id == "" or item_id == "32841847922127286_PLACEHOLDER": # Safety check
 		push_warning("MetaStoreTrigger: No valid item_id set.")
 		return
-	
-	# oculus://item/[ID] is the most direct way to open the store page on Quest
-	var primary_uri = "oculus://item/" + item_id
-	# Various web fallbacks just in case
-	var fallback_uris = [
+
+	# URI-only flow (no Meta Platform SDK dependency).
+	var uris := [
+		"oculus://store/apps/details?id=" + item_id,
+		"oculus://item/" + item_id,
 		"https://www.meta.com/experiences/" + item_id + "/",
 		"https://www.oculus.com/experiences/quest/" + item_id + "/"
 	]
-	
-	print("MetaStoreTrigger: Attempting primary URI: ", primary_uri)
-	
-	# OS.shell_open returns an Error enum.
-	var err = OS.shell_open(primary_uri)
-	
-	if err != OK:
-		print("MetaStoreTrigger: Primary URI failed (Error ", err, "). Attempting fallbacks...")
-		for fallback_uri in fallback_uris:
-			print("MetaStoreTrigger: Trying fallback: ", fallback_uri)
-			err = OS.shell_open(fallback_uri)
-			if err == OK:
-				print("MetaStoreTrigger: Fallback URI opened successfully: ", fallback_uri)
-				return
-		
-		push_error("MetaStoreTrigger: All URI attempts failed. Final error code: ", err)
-	else:
-		print("MetaStoreTrigger: Primary URI opened successfully.")
+
+	for uri in uris:
+		print("MetaStoreTrigger: Attempting URI: ", uri)
+		var err := OS.shell_open(uri)
+		if err == OK:
+			print("MetaStoreTrigger: URI opened successfully: ", uri)
+			return
+
+	push_error("MetaStoreTrigger: Failed to open Meta store page for item_id=", item_id)

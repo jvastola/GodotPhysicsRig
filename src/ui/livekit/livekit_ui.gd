@@ -201,6 +201,8 @@ func _on_nakama_display_name_changed(new_name: String) -> void:
 func _populate_username_from_meta_if_enabled() -> void:
 	if not connection_panel or not NakamaManager:
 		return
+	if OS.get_name() != "Android":
+		return
 	if not NakamaManager.has_method("is_meta_username_fallback_enabled"):
 		return
 	if not bool(NakamaManager.is_meta_username_fallback_enabled()):
