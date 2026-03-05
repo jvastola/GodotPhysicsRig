@@ -13,6 +13,7 @@ signal match_state_received(peer_id, op_code, data)
 signal connection_lost()
 signal connection_restored()
 signal match_list_received(matches)
+signal display_name_changed(new_name)
 
 # Nakama connection settings
 var nakama_host: String = "158.101.21.99"  # Oracle Cloud server
@@ -49,6 +50,84 @@ var _auth_retry_count: int = 0
 var _auth_max_retries: int = 3
 var _auth_retry_delay: float = 1.0
 const DEVICE_ID_FILE_PATH := "user://nakama_device_id.txt"
+const META_PLATFORM_APP_ID_DEFAULT := "32841847922127286"
+const META_PLATFORM_SINGLETON_NAME := "MetaPlatformSDK"
+const NAKAMA_CUSTOM_AUTH_ID_ENV := "NAKAMA_CUSTOM_AUTH_ID"
+var LEGACY_DEVICE_ID_FILE_PATHS: PackedStringArray = PackedStringArray([
+	"user://device_id.save",
+	"user://device_id.txt"
+])
+var PLATFORM_ID_ENV_KEYS: PackedStringArray = PackedStringArray([
+	"META_PLATFORM_USER_ID",
+	"META_USER_ID",
+	"OCULUS_USER_ID"
+])
+var PLATFORM_NAME_ENV_KEYS: PackedStringArray = PackedStringArray([
+	"META_PLATFORM_USER_NAME",
+	"META_USER_NAME",
+	"OCULUS_USER_NAME"
+])
+var PLATFORM_SINGLETON_CANDIDATES: PackedStringArray = PackedStringArray([
+	"MetaPlatformSDK",
+	"MetaPlatform",
+	"OculusPlatform",
+	"OVRPlatform",
+	"GodotMetaPlatform"
+])
+var PLATFORM_PROFILE_METHOD_CANDIDATES: PackedStringArray = PackedStringArray([
+	"get_user_profile",
+	"getUserProfile",
+	"get_logged_in_user",
+	"getLoggedInUser",
+	"get_user",
+	"getUser",
+	"get_local_user",
+	"getLocalUser"
+])
+var PLATFORM_ID_METHOD_CANDIDATES: PackedStringArray = PackedStringArray([
+	"user_get_logged_in_user_id",
+	"get_user_id",
+	"getUserId",
+	"get_logged_in_user_id",
+	"getLoggedInUserId",
+	"get_platform_user_id",
+	"getPlatformUserId",
+	"get_oculus_user_id",
+	"getOculusUserId"
+])
+var PLATFORM_NAME_METHOD_CANDIDATES: PackedStringArray = PackedStringArray([
+	"get_user_name",
+	"getUserName",
+	"get_display_name",
+	"getDisplayName",
+	"get_username",
+	"getUsername",
+	"get_oculus_user_name",
+	"getOculusUserName"
+])
+var PLATFORM_ID_RESPONSE_KEYS: PackedStringArray = PackedStringArray([
+	"user_id",
+	"id",
+	"uid",
+	"oculus_id",
+	"platform_user_id"
+])
+var PLATFORM_NAME_RESPONSE_KEYS: PackedStringArray = PackedStringArray([
+	"display_name",
+	"username",
+	"user_name",
+	"name",
+	"oculus_name",
+	"oculus_id"
+])
+var _cached_platform_user_data: Dictionary = {}
+var meta_platform_app_id: String = META_PLATFORM_APP_ID_DEFAULT
+var use_meta_username_fallback: bool = true
+var _nakama_custom_auth_id: String = ""
+var _platform_user_data_bootstrap_started: bool = false
+var _platform_user_data_bootstrap_completed: bool = false
+var _meta_initialize_attempted: bool = false
+var _using_nakama_username_fallback: bool = false
 
 # Op codes for match state (must match across all clients)
 enum MatchOpCode {
@@ -108,6 +187,21 @@ func _ready() -> void:
 		nakama_use_ssl = true
 	elif env_ssl == "0" or env_ssl == "false":
 		nakama_use_ssl = false
+	var env_meta_app_id := OS.get_environment("META_PLATFORM_APP_ID").strip_edges()
+	if env_meta_app_id.is_empty():
+		env_meta_app_id = OS.get_environment("META_APP_ID").strip_edges()
+	if not env_meta_app_id.is_empty():
+		meta_platform_app_id = env_meta_app_id
+	var env_custom_auth_id := OS.get_environment(NAKAMA_CUSTOM_AUTH_ID_ENV).strip_edges()
+	if env_custom_auth_id.is_empty():
+		env_custom_auth_id = OS.get_environment("NAKAMA_AUTH_CUSTOM_ID").strip_edges()
+	if not env_custom_auth_id.is_empty():
+		_nakama_custom_auth_id = env_custom_auth_id
+	var env_meta_username_fallback := OS.get_environment("NAKAMA_USE_META_USERNAME").strip_edges().to_lower()
+	if env_meta_username_fallback == "0" or env_meta_username_fallback == "false":
+		use_meta_username_fallback = false
+	elif env_meta_username_fallback == "1" or env_meta_username_fallback == "true":
+		use_meta_username_fallback = true
 
 	# Ensure port/protocol consistency – the default TLS port is 7443
 	if nakama_use_ssl and nakama_port == 7350:
@@ -175,6 +269,394 @@ func _flush_outbound_queue() -> void:
 	pass
 
 
+func _read_device_id_from_file(path: String) -> String:
+	if not FileAccess.file_exists(path):
+		return ""
+	var id_file := FileAccess.open(path, FileAccess.READ)
+	if id_file == null:
+		return ""
+	var stored_id := id_file.get_as_text().strip_edges()
+	id_file.close()
+	return stored_id
+
+
+func _persist_device_id(stored_id: String) -> void:
+	if stored_id.is_empty():
+		return
+	var out_file := FileAccess.open(DEVICE_ID_FILE_PATH, FileAccess.WRITE)
+	if out_file:
+		out_file.store_string(stored_id)
+		out_file.close()
+	else:
+		push_warning("NakamaManager: Could not persist device ID to %s" % DEVICE_ID_FILE_PATH)
+
+
+func _first_non_empty_env_value(keys: PackedStringArray) -> String:
+	for key in keys:
+		var value := OS.get_environment(key).strip_edges()
+		if not value.is_empty():
+			return value
+	return ""
+
+
+func _variant_to_clean_string(value: Variant) -> String:
+	match typeof(value):
+		TYPE_NIL:
+			return ""
+		TYPE_STRING, TYPE_STRING_NAME:
+			return str(value).strip_edges()
+		TYPE_INT, TYPE_FLOAT, TYPE_BOOL:
+			return str(value).strip_edges()
+		_:
+			return ""
+
+
+func _extract_string_from_variant(value: Variant, keys: PackedStringArray) -> String:
+	if value is String or value is StringName:
+		var text := _variant_to_clean_string(value)
+		if text.begins_with("{"):
+			var parsed: Variant = JSON.parse_string(text)
+			if parsed != null:
+				return _extract_string_from_variant(parsed, keys)
+		return text
+
+	if value is Dictionary:
+		var dict_value: Dictionary = value
+		for key in keys:
+			if dict_value.has(key):
+				var candidate := _variant_to_clean_string(dict_value.get(key, ""))
+				if not candidate.is_empty():
+					return candidate
+	if value is Array:
+		var items: Array = value
+		for item in items:
+			var candidate := _extract_string_from_variant(item, keys)
+			if not candidate.is_empty():
+				return candidate
+	return ""
+
+
+func _has_zero_arg_method(target: Object, method_name: String) -> bool:
+	if target == null:
+		return false
+	for method_info_variant in target.get_method_list():
+		if not (method_info_variant is Dictionary):
+			continue
+		var method_info: Dictionary = method_info_variant
+		if String(method_info.get("name", "")) != method_name:
+			continue
+		var args_variant: Variant = method_info.get("args", [])
+		if args_variant is Array:
+			return (args_variant as Array).is_empty()
+		return true
+	return false
+
+
+func _call_zero_arg_method(target: Object, method_name: String) -> Variant:
+	if target == null or not target.has_method(method_name):
+		return null
+	if not _has_zero_arg_method(target, method_name):
+		return null
+	return target.call(method_name)
+
+
+func _await_meta_completed_message(request_variant: Variant) -> Variant:
+	if not (request_variant is Object):
+		return null
+	var request_object: Object = request_variant as Object
+	if request_object == null or not request_object.has_signal("completed"):
+		return null
+	var message_variant: Variant = await request_object.completed
+	return message_variant
+
+
+func _meta_message_is_error(message_variant: Variant) -> bool:
+	if not (message_variant is Object):
+		return false
+	var message_object: Object = message_variant as Object
+	if message_object == null:
+		return false
+	if not message_object.has_method("is_error"):
+		return false
+	var is_error_variant: Variant = _call_zero_arg_method(message_object, "is_error")
+	if is_error_variant is bool:
+		return bool(is_error_variant)
+	return false
+
+
+func _extract_meta_user_from_message(message_variant: Variant) -> Variant:
+	if not (message_variant is Object):
+		return null
+	var message_object: Object = message_variant as Object
+	if message_object == null:
+		return null
+	var user_variant: Variant = _call_zero_arg_method(message_object, "get_user")
+	if user_variant != null:
+		return user_variant
+	var data_variant: Variant = _call_zero_arg_method(message_object, "get_data")
+	if data_variant != null:
+		return data_variant
+	var data_list_variant: Variant = _call_zero_arg_method(message_object, "get_data_list")
+	if data_list_variant != null:
+		return data_list_variant
+	return null
+
+
+func _extract_meta_user_id(user_variant: Variant) -> String:
+	if user_variant is Array:
+		var users: Array = user_variant
+		for candidate_user in users:
+			var nested_user_id := _extract_meta_user_id(candidate_user)
+			if not nested_user_id.is_empty():
+				return nested_user_id
+	var user_id := _extract_string_from_variant(user_variant, PLATFORM_ID_RESPONSE_KEYS)
+	if not user_id.is_empty():
+		return user_id
+	if user_variant is Object:
+		var user_object: Object = user_variant as Object
+		if user_object != null:
+			for method_name in ["get_user_id", "get_id"]:
+				var id_variant: Variant = _call_zero_arg_method(user_object, method_name)
+				if id_variant == null:
+					continue
+				user_id = _variant_to_clean_string(id_variant)
+				if not user_id.is_empty():
+					return user_id
+	return ""
+
+
+func _extract_meta_user_name(user_variant: Variant) -> String:
+	if user_variant is Array:
+		var users: Array = user_variant
+		for candidate_user in users:
+			var nested_name := _extract_meta_user_name(candidate_user)
+			if not nested_name.is_empty():
+				return nested_name
+	var display_name := _extract_string_from_variant(user_variant, PLATFORM_NAME_RESPONSE_KEYS)
+	if not display_name.is_empty():
+		return display_name
+	if user_variant is Object:
+		var user_object: Object = user_variant as Object
+		if user_object != null:
+			for method_name in ["get_display_name", "get_user_name", "get_username", "get_oculus_id", "get_oculus_name"]:
+				var name_variant: Variant = _call_zero_arg_method(user_object, method_name)
+				if name_variant == null:
+					continue
+				display_name = _variant_to_clean_string(name_variant)
+				if not display_name.is_empty():
+					return display_name
+	return ""
+
+
+func _initialize_meta_platform_sdk(meta_sdk: Object) -> void:
+	if meta_sdk == null:
+		print("NakamaManager: Meta init skipped - SDK object is null")
+		return
+	if _meta_initialize_attempted:
+		print("NakamaManager: Meta init skipped - already attempted in this session")
+		return
+	_meta_initialize_attempted = true
+	if meta_platform_app_id.is_empty():
+		push_warning("NakamaManager: Meta platform app ID is empty; skipping SDK initialization")
+		return
+	if not meta_sdk.has_method("initialize_platform_async"):
+		push_warning("NakamaManager: MetaPlatformSDK is present but initialize_platform_async is unavailable")
+		return
+	print("NakamaManager: Initializing Meta platform SDK (app id: %s)" % meta_platform_app_id)
+	var init_request: Variant = meta_sdk.call("initialize_platform_async", meta_platform_app_id)
+	var init_message: Variant = await _await_meta_completed_message(init_request)
+	if init_message == null:
+		push_warning("NakamaManager: MetaPlatformSDK initialization returned no completion message")
+		return
+	if _meta_message_is_error(init_message):
+		push_warning("NakamaManager: MetaPlatformSDK initialization returned an error")
+		return
+	print("NakamaManager: Meta platform SDK initialized")
+	if meta_sdk.has_method("entitlement_get_is_viewer_entitled_async"):
+		var entitlement_request: Variant = _call_zero_arg_method(meta_sdk, "entitlement_get_is_viewer_entitled_async")
+		var entitlement_message: Variant = await _await_meta_completed_message(entitlement_request)
+		if _meta_message_is_error(entitlement_message):
+			push_warning("NakamaManager: Meta entitlement check failed")
+		else:
+			print("NakamaManager: Meta entitlement check passed")
+
+
+func _fetch_meta_platform_user_data(meta_sdk: Object) -> Dictionary:
+	var resolved: Dictionary = {
+		"user_id": "",
+		"display_name": ""
+	}
+	if meta_sdk == null:
+		print("NakamaManager: Meta user fetch skipped - SDK object is null")
+		return resolved
+
+	var direct_user_id_variant: Variant = _call_zero_arg_method(meta_sdk, "user_get_logged_in_user_id")
+	var direct_user_id := _extract_string_from_variant(direct_user_id_variant, PLATFORM_ID_RESPONSE_KEYS)
+	if direct_user_id.is_empty() and direct_user_id_variant != null:
+		direct_user_id = _variant_to_clean_string(direct_user_id_variant)
+	if not direct_user_id.is_empty() and direct_user_id != "0":
+		resolved["user_id"] = direct_user_id
+		print("NakamaManager: Meta direct user id resolved")
+	elif direct_user_id == "0":
+		print("NakamaManager: Meta direct user id is 0 (ignoring as invalid)")
+
+	if not meta_sdk.has_method("user_get_logged_in_user_async"):
+		print("NakamaManager: Meta user_get_logged_in_user_async not available")
+		return resolved
+	var user_request: Variant = _call_zero_arg_method(meta_sdk, "user_get_logged_in_user_async")
+	var user_message: Variant = await _await_meta_completed_message(user_request)
+	if user_message == null:
+		print("NakamaManager: Meta user fetch returned no completion message")
+		return resolved
+	if _meta_message_is_error(user_message):
+		print("NakamaManager: Meta user fetch message returned error")
+		return resolved
+	var message_level_name := _extract_meta_user_name(user_message)
+	if not message_level_name.is_empty():
+		resolved["display_name"] = message_level_name
+		print("NakamaManager: Meta display name resolved from message: %s" % message_level_name)
+	var user_variant: Variant = _extract_meta_user_from_message(user_message)
+	var fetched_user_id := _extract_meta_user_id(user_variant)
+	if not fetched_user_id.is_empty() and fetched_user_id != "0":
+		resolved["user_id"] = fetched_user_id
+	elif fetched_user_id == "0":
+		print("NakamaManager: Meta fetched user id is 0 (ignoring as invalid)")
+	var fetched_display_name := _extract_meta_user_name(user_variant)
+	if not fetched_display_name.is_empty():
+		resolved["display_name"] = fetched_display_name
+		print("NakamaManager: Meta display name resolved: %s" % fetched_display_name)
+	else:
+		print("NakamaManager: Meta display name not present in profile response")
+	return resolved
+
+
+func _bootstrap_platform_user_data() -> void:
+	if _platform_user_data_bootstrap_completed:
+		return
+	if _platform_user_data_bootstrap_started:
+		while not _platform_user_data_bootstrap_completed:
+			await get_tree().process_frame
+		return
+	_platform_user_data_bootstrap_started = true
+	print("NakamaManager: Platform user data bootstrap started (meta fallback: %s)" % str(use_meta_username_fallback))
+
+	var resolved: Dictionary = {
+		"user_id": _first_non_empty_env_value(PLATFORM_ID_ENV_KEYS),
+		"display_name": _first_non_empty_env_value(PLATFORM_NAME_ENV_KEYS)
+	}
+	var resolved_user_id := _variant_to_clean_string(resolved.get("user_id", ""))
+	var resolved_display_name := _variant_to_clean_string(resolved.get("display_name", ""))
+
+	if use_meta_username_fallback and Engine.has_singleton(META_PLATFORM_SINGLETON_NAME):
+		var sdk_variant: Variant = Engine.get_singleton(META_PLATFORM_SINGLETON_NAME)
+		if sdk_variant is Object:
+			var meta_sdk: Object = sdk_variant as Object
+			if meta_sdk != null:
+				await _initialize_meta_platform_sdk(meta_sdk)
+				var meta_user_data: Dictionary = await _fetch_meta_platform_user_data(meta_sdk)
+				var meta_user_id := _variant_to_clean_string(meta_user_data.get("user_id", ""))
+				var meta_display_name := _variant_to_clean_string(meta_user_data.get("display_name", ""))
+				if not meta_user_id.is_empty():
+					resolved_user_id = meta_user_id
+				if not meta_display_name.is_empty():
+					resolved_display_name = meta_display_name
+				if meta_display_name.is_empty():
+					print("NakamaManager: Meta fallback enabled but no Meta display name was resolved")
+		else:
+			print("NakamaManager: Meta singleton exists but is not an Object")
+	elif use_meta_username_fallback:
+		print("NakamaManager: MetaPlatformSDK singleton not found")
+
+	resolved["user_id"] = resolved_user_id
+	resolved["display_name"] = resolved_display_name
+	_cached_platform_user_data = resolved.duplicate(true)
+	_platform_user_data_bootstrap_completed = true
+	print("NakamaManager: Platform user data bootstrap complete (user_id: %s, display_name: %s)" % [resolved_user_id, resolved_display_name])
+
+
+func _resolve_platform_user_data() -> Dictionary:
+	if not _cached_platform_user_data.is_empty():
+		var cached_user_id := _variant_to_clean_string(_cached_platform_user_data.get("user_id", ""))
+		var cached_name := _variant_to_clean_string(_cached_platform_user_data.get("display_name", ""))
+		if not cached_user_id.is_empty() or not cached_name.is_empty():
+			return _cached_platform_user_data.duplicate(true)
+
+	return {
+		"user_id": _first_non_empty_env_value(PLATFORM_ID_ENV_KEYS),
+		"display_name": _first_non_empty_env_value(PLATFORM_NAME_ENV_KEYS)
+	}
+
+
+func _get_platform_user_id() -> String:
+	return _variant_to_clean_string(_resolve_platform_user_data().get("user_id", ""))
+
+
+func _get_platform_display_name() -> String:
+	return _variant_to_clean_string(_resolve_platform_user_data().get("display_name", ""))
+
+
+func _get_platform_display_name_fallback_async() -> String:
+	if not use_meta_username_fallback:
+		return ""
+	await _bootstrap_platform_user_data()
+	return _get_platform_display_name()
+
+
+func is_meta_username_fallback_enabled() -> bool:
+	return use_meta_username_fallback
+
+
+func set_meta_username_fallback_enabled(enabled: bool, attempt_apply_if_needed: bool = true) -> void:
+	print("NakamaManager: Meta username fallback toggled to %s" % str(enabled))
+	use_meta_username_fallback = enabled
+	if use_meta_username_fallback and attempt_apply_if_needed:
+		call_deferred("_attempt_apply_meta_display_name_if_needed")
+
+
+func request_meta_display_name_for_ui(force_refresh: bool = false) -> String:
+	if not use_meta_username_fallback:
+		print("NakamaManager: Meta display name request skipped - fallback disabled")
+		return ""
+	if force_refresh:
+		_cached_platform_user_data.clear()
+		_platform_user_data_bootstrap_started = false
+		_platform_user_data_bootstrap_completed = false
+		_meta_initialize_attempted = false
+		print("NakamaManager: Meta display name request forcing fresh platform bootstrap")
+	await _bootstrap_platform_user_data()
+	var resolved_name := _get_platform_display_name()
+	if resolved_name.is_empty():
+		print("NakamaManager: Meta display name request completed with empty name")
+	else:
+		print("NakamaManager: Meta display name request resolved: %s" % resolved_name)
+	return resolved_name
+
+
+func _attempt_apply_meta_display_name_if_needed() -> void:
+	if not use_meta_username_fallback:
+		return
+	if not display_name.strip_edges().is_empty() and not _using_nakama_username_fallback:
+		return
+	var platform_name := await _get_platform_display_name_fallback_async()
+	if platform_name.is_empty():
+		return
+	if is_authenticated and session:
+		print("NakamaManager: Applying Meta username fallback to Nakama profile")
+		update_display_name(platform_name)
+	else:
+		print("NakamaManager: Applying Meta username fallback locally")
+		_using_nakama_username_fallback = false
+		_apply_display_name(platform_name)
+
+
+func _apply_display_name(new_name: String) -> void:
+	var normalized_name := new_name.strip_edges()
+	if normalized_name.is_empty():
+		return
+	display_name = normalized_name
+	display_name_changed.emit(display_name)
+
+
 func _get_or_create_device_id() -> String:
 	# Highest priority: explicit override for QA/server testing.
 	var env_device_id := OS.get_environment("NAKAMA_DEVICE_ID").strip_edges()
@@ -182,13 +664,18 @@ func _get_or_create_device_id() -> String:
 		return env_device_id
 
 	# Read previously persisted ID so users keep the same Nakama account across launches.
-	if FileAccess.file_exists(DEVICE_ID_FILE_PATH):
-		var existing_file := FileAccess.open(DEVICE_ID_FILE_PATH, FileAccess.READ)
-		if existing_file:
-			var existing_id := existing_file.get_as_text().strip_edges()
-			existing_file.close()
-			if not existing_id.is_empty():
-				return existing_id
+	var existing_id := _read_device_id_from_file(DEVICE_ID_FILE_PATH)
+	if not existing_id.is_empty():
+		return existing_id
+
+	# Migrate older local file names if present.
+	for legacy_path in LEGACY_DEVICE_ID_FILE_PATHS:
+		var legacy_id := _read_device_id_from_file(legacy_path)
+		if legacy_id.is_empty():
+			continue
+		_persist_device_id(legacy_id)
+		print("NakamaManager: Migrated legacy device ID from ", legacy_path)
+		return legacy_id
 
 	# Generate a stable new ID once, then persist it.
 	var base_id := OS.get_unique_id().strip_edges()
@@ -202,17 +689,28 @@ func _get_or_create_device_id() -> String:
 		base_id = entropy.sha256_text().substr(0, 32)
 
 	var new_device_id := "device_" + base_id
-	var out_file := FileAccess.open(DEVICE_ID_FILE_PATH, FileAccess.WRITE)
-	if out_file:
-		out_file.store_string(new_device_id)
-		out_file.close()
-	else:
-		push_warning("NakamaManager: Could not persist device ID to %s" % DEVICE_ID_FILE_PATH)
-
+	_persist_device_id(new_device_id)
 	return new_device_id
 
 
-## Authenticate with Nakama using device ID
+func _resolve_nakama_auth_request() -> Dictionary:
+	var auth_mode := "device"
+	var auth_path := "/v2/account/authenticate/device?create=true"
+	var auth_id := device_id
+
+	if not _nakama_custom_auth_id.is_empty():
+		auth_mode = "custom"
+		auth_path = "/v2/account/authenticate/custom?create=true"
+		auth_id = _nakama_custom_auth_id
+
+	return {
+		"mode": auth_mode,
+		"path": auth_path,
+		"id": auth_id
+	}
+
+
+## Authenticate with Nakama using device ID (or optional custom ID)
 func authenticate_device() -> void:
 	# Guard against duplicate auth attempts
 	if is_authenticated:
@@ -231,7 +729,7 @@ func authenticate_device() -> void:
 		# Wait a frame before retrying
 		await get_tree().process_frame
 	
-	print("NakamaManager: Authenticating with device ID...")
+	print("NakamaManager: Authenticating with Nakama ID...")
 	print("NakamaManager: Target URL: http://%s:%d" % [nakama_host, nakama_port])
 	
 	_do_authenticate_request()
@@ -239,9 +737,15 @@ func authenticate_device() -> void:
 
 ## Internal function to perform the actual authentication request
 func _do_authenticate_request() -> void:
-	var url = _get_nakama_url() + "/v2/account/authenticate/device?create=true"
+	var auth_request: Dictionary = _resolve_nakama_auth_request()
+	var auth_mode := _variant_to_clean_string(auth_request.get("mode", "device"))
+	var auth_path := _variant_to_clean_string(auth_request.get("path", "/v2/account/authenticate/device?create=true"))
+	var auth_id := _variant_to_clean_string(auth_request.get("id", device_id))
+	if auth_id.is_empty():
+		auth_id = device_id
+	var url = _get_nakama_url() + auth_path
 	var body = JSON.stringify({
-		"id": device_id
+		"id": auth_id
 	})
 	
 	var headers = [
@@ -249,7 +753,7 @@ func _do_authenticate_request() -> void:
 		"Authorization: Basic " + Marshalls.utf8_to_base64(nakama_server_key + ":")
 	]
 	
-	print("NakamaManager: Sending auth request to: ", url)
+	print("NakamaManager: Sending auth request (mode: %s) to: %s" % [auth_mode, url])
 	var err = http_client.request(url, headers, HTTPClient.METHOD_POST, body)
 	if err != OK:
 		push_error("NakamaManager: Failed to start auth request: ", err)
@@ -771,20 +1275,43 @@ func _on_account_fetched(result: int, response_code: int, _headers: PackedString
 	
 	if result != HTTPRequest.RESULT_SUCCESS or response_code != 200:
 		print("NakamaManager: Could not fetch account (result: %d, code: %d)" % [result, response_code])
+		var fallback_platform_name := await _get_platform_display_name_fallback_async()
+		if not fallback_platform_name.is_empty():
+			print("NakamaManager: Applying platform profile name fallback while account fetch is unavailable")
+			update_display_name(fallback_platform_name)
 		return
 	
 	var json = JSON.new()
 	if json.parse(body.get_string_from_utf8()) != OK:
 		return
 	
-	var data = json.get_data()
-	var user = data.get("user", {})
-	var fetched_name = user.get("display_name", "")
-	if not fetched_name.is_empty():
-		display_name = fetched_name
+	var data_variant: Variant = json.get_data()
+	if not (data_variant is Dictionary):
+		return
+	var data: Dictionary = data_variant
+	var user_variant: Variant = data.get("user", {})
+	if not (user_variant is Dictionary):
+		return
+	var user: Dictionary = user_variant
+	var fetched_display_name := _variant_to_clean_string(user.get("display_name", ""))
+	var fetched_username := _variant_to_clean_string(user.get("username", ""))
+	if not fetched_display_name.is_empty():
+		_using_nakama_username_fallback = (not fetched_username.is_empty() and fetched_display_name == fetched_username)
+		_apply_display_name(fetched_display_name)
 		print("NakamaManager: Display name from account: ", display_name)
 	else:
-		print("NakamaManager: No display name set in account")
+		var platform_name := await _get_platform_display_name_fallback_async()
+		if not platform_name.is_empty():
+			_using_nakama_username_fallback = false
+			print("NakamaManager: No display name set in account, seeding from platform profile")
+			update_display_name(platform_name)
+		elif not fetched_username.is_empty():
+			_using_nakama_username_fallback = true
+			_apply_display_name(fetched_username)
+			print("NakamaManager: Using Nakama generated username as local fallback: ", display_name)
+		else:
+			_using_nakama_username_fallback = false
+			print("NakamaManager: No display name set in account and no platform/Nakama username available")
 
 
 ## Update display name on Nakama (persists across sessions)
@@ -792,8 +1319,14 @@ func update_display_name(new_name: String) -> void:
 	if not is_authenticated or not session:
 		push_warning("NakamaManager: Cannot update display name - not authenticated")
 		return
-	
-	display_name = new_name
+
+	var normalized_name := new_name.strip_edges()
+	if normalized_name.is_empty():
+		push_warning("NakamaManager: Refusing to set empty display name")
+		return
+
+	_using_nakama_username_fallback = false
+	_apply_display_name(normalized_name)
 	
 	var update_http = HTTPRequest.new()
 	update_http.timeout = 10.0
@@ -802,7 +1335,7 @@ func update_display_name(new_name: String) -> void:
 	
 	var url = _get_nakama_url() + "/v2/account"
 	var body_json = JSON.stringify({
-		"display_name": new_name
+		"display_name": normalized_name
 	})
 	var headers = [
 		"Content-Type: application/json",

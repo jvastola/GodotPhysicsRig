@@ -163,7 +163,16 @@ func _setup_nakama_integration() -> void:
 			NakamaManager.match_presence.connect(_on_nakama_match_presence)
 		if not NakamaManager.match_state_received.is_connected(_on_nakama_match_state_received):
 			NakamaManager.match_state_received.connect(_on_nakama_match_state_received)
-			print("NetworkManager: Nakama integration initialized")
+		if NakamaManager.has_signal("display_name_changed") and not NakamaManager.display_name_changed.is_connected(_on_nakama_display_name_changed):
+			NakamaManager.display_name_changed.connect(_on_nakama_display_name_changed)
+		print("NetworkManager: Nakama integration initialized")
+
+
+func _on_nakama_display_name_changed(new_name: String) -> void:
+	var normalized_name := new_name.strip_edges()
+	if normalized_name.is_empty():
+		return
+	set_local_display_name(normalized_name, true)
 
 
 func _setup_livekit_integration() -> void:

@@ -64,11 +64,15 @@ func _notification(what: int) -> void:
 
 func _build_session_id() -> void:
 	var existing := _session_id.strip_edges()
-	if existing != "":
-		return
 	var base_id := "local"
-	if NakamaManager and String(NakamaManager.device_id).strip_edges() != "":
-		base_id = String(NakamaManager.device_id)
+	if NakamaManager:
+		var user_id := String(NakamaManager.local_user_id).strip_edges()
+		if not user_id.is_empty():
+			base_id = "uid_" + user_id
+		elif String(NakamaManager.device_id).strip_edges() != "":
+			base_id = String(NakamaManager.device_id)
+	if existing.begins_with(base_id + "_"):
+		return
 	_session_id = "%s_%d_%d" % [base_id, Time.get_unix_time_from_system(), randi()]
 
 
@@ -84,6 +88,7 @@ func _connect_nakama_signals() -> void:
 
 
 func _on_nakama_authenticated(_session: Dictionary) -> void:
+	_build_session_id()
 	_wallet_sync_available = true
 	_request_wallet_bootstrap()
 

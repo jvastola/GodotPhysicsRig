@@ -91,6 +91,10 @@ theme_override_styles/normal = SubResource("StyleBoxFlat_input")
 placeholder_text = "Paste token or use auto-generate"
 secret = true
 
+[node name="MetaUsernameToggle" type="CheckButton" parent="VBox"]
+layout_mode = 2
+text = "Use Meta Username Fallback"
+
 [node name="Buttons" type="HBoxContainer" parent="VBox"]
 layout_mode = 2
 theme_override_constants/separation = 8

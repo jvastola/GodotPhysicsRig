@@ -6,12 +6,14 @@ signal connect_requested(server_url: String, token: String)
 signal disconnect_requested()
 signal username_changed(new_name: String)
 signal auto_connect_requested()
+signal meta_username_fallback_toggled(enabled: bool)
 
 # UI References
 @onready var username_entry: LineEdit = $VBox/UsernameRow/UsernameEntry
 @onready var update_name_button: Button = $VBox/UsernameRow/UpdateNameButton
 @onready var server_entry: LineEdit = $VBox/ServerEntry
 @onready var token_entry: LineEdit = $VBox/TokenEntry
+@onready var meta_username_toggle: CheckButton = $VBox/MetaUsernameToggle
 @onready var connect_button: Button = $VBox/Buttons/ConnectButton
 @onready var disconnect_button: Button = $VBox/Buttons/DisconnectButton
 @onready var auto_connect_button: Button = $VBox/HelperButtons/AutoConnectButton
@@ -20,7 +22,7 @@ signal auto_connect_requested()
 # SandboxHTTPRequest removed
 
 # State
-var local_username: String = "User-" + str(randi() % 10000)
+var local_username: String = ""
 var connected_state: bool = false
 
 
@@ -35,10 +37,15 @@ func _setup_ui():
 	auto_connect_button.pressed.connect(_on_auto_connect_pressed)
 	generate_token_button.pressed.connect(_on_generate_token_pressed)
 	update_name_button.pressed.connect(_on_update_name_pressed)
+	meta_username_toggle.toggled.connect(_on_meta_username_toggle_toggled)
 	# sandbox_http_request removed
 	
 	username_entry.text = local_username
 	disconnect_button.disabled = true
+
+	if NakamaManager and NakamaManager.has_signal("display_name_changed"):
+		if not NakamaManager.display_name_changed.is_connected(_on_nakama_display_name_changed):
+			NakamaManager.display_name_changed.connect(_on_nakama_display_name_changed)
 	
 	# Register input fields with KeyboardManager for virtual keyboard
 	_register_keyboard_fields()
@@ -71,6 +78,8 @@ func _set_defaults():
 		local_username = NakamaManager.display_name
 		username_entry.text = local_username
 		print("ConnectionPanel: Auto-populated username from Nakama: ", local_username)
+	if NakamaManager and NakamaManager.has_method("is_meta_username_fallback_enabled"):
+		meta_username_toggle.button_pressed = bool(NakamaManager.is_meta_username_fallback_enabled())
 
 
 func _on_connect_pressed():
@@ -127,6 +136,18 @@ func _on_update_name_pressed():
 	if not new_name.is_empty():
 		local_username = new_name
 		username_changed.emit(new_name)
+
+
+func _on_meta_username_toggle_toggled(enabled: bool) -> void:
+	meta_username_fallback_toggled.emit(enabled)
+
+
+func _on_nakama_display_name_changed(new_name: String) -> void:
+	var normalized_name := new_name.strip_edges()
+	if normalized_name.is_empty():
+		return
+	local_username = normalized_name
+	username_entry.text = normalized_name
 
 
 

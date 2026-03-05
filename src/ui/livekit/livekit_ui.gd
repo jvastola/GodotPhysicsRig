@@ -48,6 +48,12 @@ func _ready():
 	
 	# Connect component signals
 	_connect_component_signals()
+
+	# React when Nakama resolves/changes the account display name.
+	if NakamaManager and NakamaManager.has_signal("display_name_changed"):
+		if not NakamaManager.display_name_changed.is_connected(_on_nakama_display_name_changed):
+			NakamaManager.display_name_changed.connect(_on_nakama_display_name_changed)
+	call_deferred("_populate_username_from_meta_if_enabled")
 	
 	# Set initial sample rate
 	var mix_rate = AudioServer.get_mix_rate()
@@ -109,6 +115,7 @@ func _connect_component_signals():
 	connection_panel.disconnect_requested.connect(_on_disconnect_requested)
 	connection_panel.username_changed.connect(_on_username_changed)
 	connection_panel.auto_connect_requested.connect(_on_auto_connect_requested)
+	connection_panel.meta_username_fallback_toggled.connect(_on_meta_username_fallback_toggled)
 	
 	# Audio settings signals
 	audio_settings.mute_toggled.connect(_on_mute_toggled)
@@ -174,20 +181,72 @@ func _on_auto_connect_requested():
 
 
 func _on_username_changed(new_name: String):
+	_apply_local_display_name(new_name, true)
+
+
+func _on_meta_username_fallback_toggled(enabled: bool) -> void:
+	if not NakamaManager:
+		return
+	if NakamaManager.has_method("set_meta_username_fallback_enabled"):
+		NakamaManager.set_meta_username_fallback_enabled(enabled, true)
+		_set_status("Meta username fallback: " + ("ON" if enabled else "OFF"))
+	if enabled:
+		call_deferred("_populate_username_from_meta_if_enabled")
+
+
+func _on_nakama_display_name_changed(new_name: String) -> void:
+	_apply_local_display_name(new_name, false)
+
+
+func _populate_username_from_meta_if_enabled() -> void:
+	if not connection_panel or not NakamaManager:
+		return
+	if not NakamaManager.has_method("is_meta_username_fallback_enabled"):
+		return
+	if not bool(NakamaManager.is_meta_username_fallback_enabled()):
+		return
+	if not NakamaManager.has_method("request_meta_display_name_for_ui"):
+		return
+	var meta_name: String = await NakamaManager.request_meta_display_name_for_ui(true)
+	if meta_name.is_empty():
+		print("LiveKitUI: Meta username lookup returned empty")
+		return
+	print("LiveKitUI: Applying Meta username to UI: ", meta_name)
+	_apply_local_display_name(meta_name, NakamaManager.is_authenticated)
+
+
+func _apply_local_display_name(new_name: String, sync_to_nakama: bool) -> void:
+	var normalized_name := new_name.strip_edges()
+	if normalized_name.is_empty():
+		return
+
+	# Keep the input field in sync with the resolved name.
+	if connection_panel:
+		connection_panel.local_username = normalized_name
+		if connection_panel.username_entry:
+			connection_panel.username_entry.text = normalized_name
+
 	var network_manager = get_node_or_null("/root/NetworkManager")
 	if network_manager and network_manager.has_method("set_local_display_name"):
-		network_manager.set_local_display_name(new_name, true)
+		network_manager.set_local_display_name(normalized_name, true)
 
 	# Sync to LiveKit metadata so other participants see it
 	if livekit_manager and livekit_manager.is_room_connected():
-		var metadata = JSON.stringify({"username": new_name})
+		var metadata = JSON.stringify({"username": normalized_name})
 		livekit_manager.set_metadata(metadata)
-		print("✅ Username updated in LiveKit: ", new_name)
+		print("✅ Username updated in LiveKit: ", normalized_name)
+		if participants_list:
+			var my_identity := "local"
+			if livekit_manager.has_method("get_local_identity"):
+				var resolved_identity := String(livekit_manager.get_local_identity()).strip_edges()
+				if not resolved_identity.is_empty():
+					my_identity = resolved_identity
+			participants_list.set_participant_username(my_identity, normalized_name + " (You)")
 	
 	# Sync to Nakama so it persists across sessions
-	if NakamaManager and NakamaManager.is_authenticated:
-		NakamaManager.update_display_name(new_name)
-		print("✅ Username synced to Nakama: ", new_name)
+	if sync_to_nakama and NakamaManager and NakamaManager.is_authenticated:
+		NakamaManager.update_display_name(normalized_name)
+		print("✅ Username synced to Nakama: ", normalized_name)
 
 
 # === Audio Settings Handlers ===
@@ -235,7 +294,11 @@ func _on_room_connected():
 	
 	_set_status("✅ Connected" + (" to: " + room_name if not room_name.is_empty() else ""))
 	connection_panel.set_connected(true, room_name)
-	var initial_name = connection_panel.local_username
+	var initial_name := ""
+	if NakamaManager and not NakamaManager.display_name.is_empty():
+		initial_name = NakamaManager.display_name
+	elif connection_panel:
+		initial_name = connection_panel.local_username
 	call_deferred("_sync_local_identity_and_metadata_after_connect", initial_name)
 
 

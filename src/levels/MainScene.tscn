@@ -37,7 +37,6 @@
 [ext_resource type="PackedScene" uid="uid://qsf5yp02t1i7" path="res://src/ui/window_wrapper/WindowWrapper.tscn" id="45_giw25"]
 [ext_resource type="PackedScene" uid="uid://baesap7jjgmfh" path="res://src/objects/grabbables/PaintBrush.tscn" id="45_paint_brush"]
 [ext_resource type="PackedScene" path="res://src/ui/ColorPickerViewport3D.tscn" id="45_sv5fj"]
-[ext_resource type="PackedScene" uid="uid://c6m8n8q8q8q8q" path="res://src/objects/MetaStoreTrigger.tscn" id="46_sv5fj"]
 [ext_resource type="Script" uid="uid://cwl3p0dbrbmgl" path="res://src/objects/viewport_mirror.gd" id="47_viewport_mirror"]
 [ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://src/systems/grid_painter.gd" id="48_grid_painter"]
 [ext_resource type="Script" uid="uid://cfrhsl8g3fmpt" path="res://src/systems/mesh_collision_generator.gd" id="49_collision"]
@@ -46,8 +45,6 @@
 [ext_resource type="PackedScene" uid="uid://b2mp18xsksksj" path="res://src/objects/OreDeposit.tscn" id="53_ore_deposit"]
 [ext_resource type="Material" uid="uid://bvqm8x7y5n8hs" path="res://src/demos/tools/materials/plasma.tres" id="54_plasma"]
 [ext_resource type="PackedScene" uid="uid://cfu4ue80xt2kr" path="res://src/ui/PhysicsHandTunerViewport3D.tscn" id="55_hand_tuner_viewport"]
-[ext_resource type="PackedScene" uid="uid://bb6yl6jr4fv3p" path="res://src/objects/CosmeticHatStand.tscn" id="56_cosmetic_hat_stand"]
-[ext_resource type="PackedScene" uid="uid://bht5xw74h0s4g" path="res://src/objects/CurrencyTestButton.tscn" id="57_currency_test_button"]
 
 [sub_resource type="Environment" id="Environment_main"]
 fog_enabled = true
@@ -159,7 +156,7 @@ grab_mode = 0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.8452663, -2.926793, -10.963262)
 
 [node name="TwoHandGrabCube" parent="Node3D" unique_id=1441243323 instance=ExtResource("36_two_hand_cube")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.7683787, -1.1181765, -1.5889864)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.7683787, -1.1181765, -1.2070646)
 grab_mode = 0
 
 [node name="NodeInspectorTool" parent="Node3D" unique_id=1156427494 instance=ExtResource("5_pswl6")]
@@ -450,15 +447,5 @@ visible = false
 
 [node name="ColorPickerViewport3D" parent="." unique_id=1849360015 instance=ExtResource("45_sv5fj")]
 transform = Transform3D(-0.3159503, 0, 0.05074847, 0, 0.32, 0, -0.05074847, 0, -0.3159503, -3.5784981, -3.4928527, -0.42502117)
-
-[node name="MetaStoreTrigger" parent="." unique_id=1849595130 instance=ExtResource("46_sv5fj")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.935993, -3.916004, -19.723099)
-
-[node name="CosmeticHatStand" parent="." unique_id=782664093 instance=ExtResource("56_cosmetic_hat_stand")]
-transform = Transform3D(0.99965733, 0, 0.026176946, 0, 1, 0, -0.026176946, 0, 0.99965733, 2.7525008, 0.03337574, -36.03406)
-item_id = "hat_basic_red"
-
-[node name="CurrencyTestButton" parent="." unique_id=713439115 instance=ExtResource("57_currency_test_button")]
-transform = Transform3D(0.99965733, 0, 0.026176946, 0, 1, 0, -0.026176946, 0, 0.99965733, 2.2488196, 1.2343763, -36.07517)
 
 [editable path="OreDeposit2"]
