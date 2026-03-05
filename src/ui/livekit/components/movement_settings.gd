@@ -51,6 +51,7 @@ const DEFAULTS := {
 	"player_gravity_enabled": false,
 	"player_drag_force": 0.85,
 	"enable_physics_hands": true,
+	"simple_world_grab_enabled": false,
 }
 
 const INPUT_ACTIONS := []
@@ -80,11 +81,6 @@ var ui_scroll_speed_slider: HSlider
 var ui_scroll_speed_label: Label
 var world_scale_check: CheckBox
 var world_rotation_check: CheckBox
-var invert_two_hand_scale_check: CheckBox
-var show_two_hand_visual_check: CheckBox
-var two_hand_left_action_btn: OptionButton
-var two_hand_right_action_btn: OptionButton
-var two_hand_pivot_btn: OptionButton
 var gravity_check: CheckBox
 var player_drag_slider: HSlider
 var player_drag_label: Label
@@ -118,6 +114,7 @@ var invert_one_hand_rotation_check: CheckBox
 var apply_one_hand_release_vel_check: CheckBox
 var invert_one_hand_grab_check: CheckBox
 var show_one_hand_grab_visual_check: CheckBox
+var simple_world_grab_check: CheckBox
 var input_mapper_status: Label
 var profile_name_field: LineEdit
 var profile_selector: OptionButton
@@ -538,76 +535,13 @@ func _build_ui():
 	grip_joystick_row.add_child(disable_joystick_grip_check)
 
 	# === World Manipulation ===
-	var world_card = _create_card(main_vbox, "World Manipulation", "Two-hand gestures for scaling and rotating the world", "🌍")
-
-	world_scale_check = CheckBox.new()
-	world_scale_check.text = "Two-Hand Grab: Scale"
-	world_scale_check.add_theme_font_size_override("font_size", 12)
-	if movement_component:
-		world_scale_check.button_pressed = movement_component.enable_two_hand_world_scale
-	else:
-		world_scale_check.button_pressed = defaults_snapshot["enable_two_hand_world_scale"]
-	world_scale_check.toggled.connect(func(pressed: bool): _on_world_scale_toggled(pressed))
-	world_scale_check.tooltip_text = "Pinch/pull with both grips to resize the world."
-	world_card.add_child(world_scale_check)
-
-	world_rotation_check = CheckBox.new()
-	world_rotation_check.text = "Two-Hand Grab: Rotation"
-	world_rotation_check.add_theme_font_size_override("font_size", 12)
-	if movement_component:
-		world_rotation_check.button_pressed = movement_component.enable_two_hand_world_rotation
-	else:
-		world_rotation_check.button_pressed = defaults_snapshot["enable_two_hand_world_rotation"]
-	world_rotation_check.toggled.connect(func(pressed: bool): _on_world_rotation_toggled(pressed))
-	world_rotation_check.tooltip_text = "Twist both grips to rotate the environment."
-	world_card.add_child(world_rotation_check)
-
-	var action_options := [
-		"grip",
-		"grip_click",
-		"trigger",
-		"trigger_click",
-		"primary",
-		"secondary",
-		"ax",
-		"by",
-	]
-
-	var actions_row = _create_row(world_card, "Two-Hand Inputs")
-	two_hand_left_action_btn = OptionButton.new()
-	for opt in action_options:
-		two_hand_left_action_btn.add_item(opt)
-	two_hand_left_action_btn.selected = action_options.find(
-		movement_component.two_hand_left_action if movement_component else defaults_snapshot["two_hand_left_action"]
-	)
-	two_hand_left_action_btn.item_selected.connect(func(idx: int): _on_two_hand_left_action_changed(action_options[idx]))
-	two_hand_left_action_btn.tooltip_text = "Input value used to detect left-hand grab."
-	actions_row.add_child(two_hand_left_action_btn)
-
-	two_hand_right_action_btn = OptionButton.new()
-	for opt in action_options:
-		two_hand_right_action_btn.add_item(opt)
-	two_hand_right_action_btn.selected = action_options.find(
-		movement_component.two_hand_right_action if movement_component else defaults_snapshot["two_hand_right_action"]
-	)
-	two_hand_right_action_btn.item_selected.connect(func(idx: int): _on_two_hand_right_action_changed(action_options[idx]))
-	two_hand_right_action_btn.tooltip_text = "Input value used to detect right-hand grab."
-	actions_row.add_child(two_hand_right_action_btn)
-
-	var pivot_row = _create_row(world_card, "Two-Hand Pivot")
-	two_hand_pivot_btn = OptionButton.new()
-	two_hand_pivot_btn.add_item("Midpoint")
-	two_hand_pivot_btn.add_item("Player Origin")
-	two_hand_pivot_btn.selected = (movement_component.two_hand_rotation_pivot if movement_component else defaults_snapshot["two_hand_rotation_pivot"])
-	two_hand_pivot_btn.item_selected.connect(func(idx: int): _on_two_hand_pivot_changed(idx))
-	two_hand_pivot_btn.tooltip_text = "Choose pivot for two-hand rotation."
-	pivot_row.add_child(two_hand_pivot_btn)
+	var world_card = _create_card(main_vbox, "World Manipulation", "Gestures for scaling and moving the world environment.", "🌍")
 
 	var initial_grab_move = movement_component.world_grab_move_factor if movement_component else defaults_snapshot["world_grab_move_factor"]
 	var grab_move_block = _add_slider_block(
 		world_card,
-		"Two-Hand Move Factor",
-		"Translate opposite to midpoint hand motion. 1.0 = match distance.",
+		"World Grab Move Factor",
+		"How much the world moves relative to your hand motion.",
 		0.05,
 		3.0,
 		0.05,
@@ -632,6 +566,13 @@ func _build_ui():
 	world_grab_smooth_label = grab_smooth_block.label
 	world_grab_smooth_slider = grab_smooth_block.slider
 	world_grab_smooth_slider.value_changed.connect(func(value: float): _on_world_grab_smooth_factor_changed(value))
+	
+	simple_world_grab_check = CheckBox.new()
+	simple_world_grab_check.text = "Simple World Grab (Grip anywhere to scale)"
+	simple_world_grab_check.tooltip_text = "Enable legacy two-hand scaling and movement. Works anywhere, even without specific grab points."
+	simple_world_grab_check.button_pressed = _get_simple_world_grab_enabled()
+	simple_world_grab_check.toggled.connect(_on_simple_world_grab_toggled)
+	world_card.add_child(simple_world_grab_check)
 	
 	one_hand_world_grab_check = CheckBox.new()
 	one_hand_world_grab_check.text = "One-Hand World Grab"
@@ -670,7 +611,7 @@ func _build_ui():
 	var world_min_block = _add_slider_block(
 		world_card,
 		"World Scale Min",
-		"Lower bound for two-hand world scaling.",
+		"Lower bound for world scaling.",
 		0.05,
 		10.0,
 		0.05,
@@ -685,7 +626,7 @@ func _build_ui():
 	var world_max_block = _add_slider_block(
 		world_card,
 		"World Scale Max",
-		"Upper bound for two-hand world scaling.",
+		"Upper bound for world scaling.",
 		0.5,
 		1000.0,
 		0.5,
@@ -1119,110 +1060,17 @@ func _on_ui_scroll_speed_changed(value: float):
 	settings_changed.emit()
 
 
-func _on_world_scale_toggled(pressed: bool):
-	if movement_component:
-		var old_val = movement_component.enable_two_hand_world_scale
-		movement_component.enable_two_hand_world_scale = pressed
-		MovementSettingsPanel.record_toggle(
-			"Two-Hand Scale",
-			"ON" if old_val else "OFF",
-			"ON" if pressed else "OFF",
-			func(): _on_world_scale_toggled(old_val)
-		)
-	settings_changed.emit()
-
-
-func _on_world_rotation_toggled(pressed: bool):
-	if movement_component:
-		var old_val = movement_component.enable_two_hand_world_rotation
-		movement_component.enable_two_hand_world_rotation = pressed
-		MovementSettingsPanel.record_toggle(
-			"Two-Hand Rotation",
-			"ON" if old_val else "OFF",
-			"ON" if pressed else "OFF",
-			func(): _on_world_rotation_toggled(old_val)
-		)
-	settings_changed.emit()
-
-
-func _on_two_hand_left_action_changed(value: String):
-	if movement_component:
-		var old_val = movement_component.two_hand_left_action
-		movement_component.two_hand_left_action = value
-		MovementSettingsPanel.record_toggle(
-			"Two-Hand Left Action",
-			old_val,
-			value,
-			func(): _on_two_hand_left_action_changed(old_val)
-		)
-	settings_changed.emit()
-
-
-func _on_two_hand_right_action_changed(value: String):
-	if movement_component:
-		var old_val = movement_component.two_hand_right_action
-		movement_component.two_hand_right_action = value
-		MovementSettingsPanel.record_toggle(
-			"Two-Hand Right Action",
-			old_val,
-			value,
-			func(): _on_two_hand_right_action_changed(old_val)
-		)
-	settings_changed.emit()
-
-
-func _on_two_hand_pivot_changed(idx: int):
-	if movement_component:
-		var old_val = movement_component.two_hand_rotation_pivot
-		movement_component.two_hand_rotation_pivot = idx as PlayerMovementComponent.TwoHandPivot
-		var names := ["Midpoint", "Player Origin"]
-		MovementSettingsPanel.record_toggle(
-			"Two-Hand Pivot",
-			names[old_val] if old_val < names.size() else str(old_val),
-			names[idx] if idx < names.size() else str(idx),
-			func(): _on_two_hand_pivot_changed(old_val)
-		)
-	settings_changed.emit()
-
-
-func _on_show_two_hand_visual_toggled(pressed: bool):
-	if movement_component:
-		var old_val = movement_component.show_two_hand_rotation_visual
-		movement_component.show_two_hand_rotation_visual = pressed
-		movement_component._ensure_visuals()
-		MovementSettingsPanel.record_toggle(
-			"Two-Hand Rotation Visual",
-			"ON" if old_val else "OFF",
-			"ON" if pressed else "OFF",
-			func(): _on_show_two_hand_visual_toggled(old_val)
-		)
-	settings_changed.emit()
-
-
-func _on_invert_two_hand_scale_toggled(pressed: bool):
-	if movement_component:
-		var old_val = movement_component.invert_two_hand_scale_direction
-		movement_component.invert_two_hand_scale_direction = pressed
-		MovementSettingsPanel.record_toggle(
-			"Invert Two-Hand Scale",
-			"ON" if old_val else "OFF",
-			"ON" if pressed else "OFF",
-			func(): _on_invert_two_hand_scale_toggled(old_val)
-		)
-	settings_changed.emit()
-
-
 func _on_world_grab_move_factor_changed(value: float):
 	if movement_component:
 		var old_val = movement_component.world_grab_move_factor
 		movement_component.world_grab_move_factor = value
 		MovementSettingsPanel.record_toggle(
-			"Two-Hand Move Factor",
+			"World Grab Move Factor",
 			"x%.2f" % old_val,
 			"x%.2f" % value,
 			func(): _on_world_grab_move_factor_changed(old_val)
 		)
-	world_grab_move_factor_label.text = "Two-Hand Move Factor: x%.2f" % value
+	world_grab_move_factor_label.text = "World Grab Move Factor: x%.2f" % value
 	settings_changed.emit()
 
 
@@ -1434,23 +1282,6 @@ func _on_apply_one_hand_release_vel_toggled(pressed: bool):
 	settings_changed.emit()
 
 
-func _on_jump_enabled_toggled(pressed: bool):
-	if movement_component:
-		var old_val = movement_component.jump_enabled
-func _on_physics_hands_toggled(pressed: bool):
-	if movement_component:
-		var old_val = movement_component.enable_physics_hands
-		movement_component.enable_physics_hands = pressed
-		movement_component._update_physics_hands()
-		MovementSettingsPanel.record_toggle(
-			"Physics Hands",
-			"ON" if old_val else "OFF",
-			"ON" if pressed else "OFF",
-			func(): _on_physics_hands_toggled(old_val)
-		)
-	settings_changed.emit()
-
-
 func _on_physics_hands_toggled(pressed: bool):
 	if movement_component:
 		var old_val = movement_component.enable_physics_hands
@@ -1511,161 +1342,7 @@ func _on_simple_world_grab_toggled(pressed: bool):
 	settings_changed.emit()
 
 
-# === Hand Movement (Middle Finger Pinch) Functions ===
-
-func _get_hand_movement_enabled() -> bool:
-	var player = get_tree().get_first_node_in_group("xr_player")
-	if player:
-		var hand_movement = player.get_node_or_null("HandMovementComponent")
-		if hand_movement:
-			return hand_movement.enabled
-	return defaults_snapshot.get("enable_hand_movement", false)
-
-
-func _get_hand_movement_grab_mode() -> int:
-	var player = get_tree().get_first_node_in_group("xr_player")
-	if player:
-		var hand_movement = player.get_node_or_null("HandMovementComponent")
-		if hand_movement:
-			return hand_movement.grab_mode
-	return defaults_snapshot.get("hand_movement_grab_mode", 0)
-
-
-func _get_hand_movement_sensitivity() -> float:
-	var player = get_tree().get_first_node_in_group("xr_player")
-	if player:
-		var hand_movement = player.get_node_or_null("HandMovementComponent")
-		if hand_movement:
-			return hand_movement.movement_sensitivity
-	return defaults_snapshot.get("hand_movement_sensitivity", 0.25)
-
-
-func _get_hand_movement_invert() -> bool:
-	var player = get_tree().get_first_node_in_group("xr_player")
-	if player:
-		var hand_movement = player.get_node_or_null("HandMovementComponent")
-		if hand_movement:
-			return hand_movement.invert_direction
-	return defaults_snapshot.get("hand_movement_invert_direction", true)
-
-
-func _get_hand_movement_release_velocity() -> bool:
-	var player = get_tree().get_first_node_in_group("xr_player")
-	if player:
-		var hand_movement = player.get_node_or_null("HandMovementComponent")
-		if hand_movement:
-			return hand_movement.apply_release_velocity
-	return defaults_snapshot.get("hand_movement_apply_release_velocity", true)
-
-
-func _get_hand_movement_show_visual() -> bool:
-	var player = get_tree().get_first_node_in_group("xr_player")
-	if player:
-		var hand_movement = player.get_node_or_null("HandMovementComponent")
-		if hand_movement:
-			return hand_movement.show_visual
-	return defaults_snapshot.get("hand_movement_show_visual", true)
-
-
-func _on_hand_movement_toggled(pressed: bool):
-	var player = get_tree().get_first_node_in_group("xr_player")
-	if player:
-		var hand_movement = player.get_node_or_null("HandMovementComponent")
-		if hand_movement:
-			var old_val = hand_movement.enabled
-			hand_movement.enabled = pressed
-			print("HandMovement: ", "enabled" if pressed else "disabled")
-			MovementSettingsPanel.record_toggle(
-				"Hand Movement",
-				"ON" if old_val else "OFF",
-				"ON" if pressed else "OFF",
-				func(): _on_hand_movement_toggled(old_val)
-			)
-	settings_changed.emit()
-
-
-func _on_hand_movement_grab_mode_changed(index: int):
-	var player = get_tree().get_first_node_in_group("xr_player")
-	if player:
-		var hand_movement = player.get_node_or_null("HandMovementComponent")
-		if hand_movement:
-			var old_val = hand_movement.grab_mode
-			hand_movement.grab_mode = index
-			var names := ["Relative", "Anchored"]
-			print("HandMovement: grab mode -> ", names[index] if index < names.size() else index)
-			MovementSettingsPanel.record_toggle(
-				"Hand Move Mode",
-				names[old_val] if old_val < names.size() else str(old_val),
-				names[index] if index < names.size() else str(index),
-				func(): _on_hand_movement_grab_mode_changed(old_val)
-			)
-	settings_changed.emit()
-
-
-func _on_hand_movement_sensitivity_changed(value: float):
-	var player = get_tree().get_first_node_in_group("xr_player")
-	if player:
-		var hand_movement = player.get_node_or_null("HandMovementComponent")
-		if hand_movement:
-			var old_val = hand_movement.movement_sensitivity
-			hand_movement.movement_sensitivity = value
-			MovementSettingsPanel.record_toggle(
-				"Hand Move sensitivity",
-				"x%.2f" % old_val,
-				"x%.2f" % value,
-				func(): _on_hand_movement_sensitivity_changed(old_val)
-			)
-	if hand_movement_sensitivity_label:
-		hand_movement_sensitivity_label.text = "Movement Sensitivity: x%.2f" % value
-	settings_changed.emit()
-
-
-func _on_hand_movement_invert_toggled(pressed: bool):
-	var player = get_tree().get_first_node_in_group("xr_player")
-	if player:
-		var hand_movement = player.get_node_or_null("HandMovementComponent")
-		if hand_movement:
-			var old_val = hand_movement.invert_direction
-			hand_movement.invert_direction = pressed
-			MovementSettingsPanel.record_toggle(
-				"Invert Hand Move",
-				"ON" if old_val else "OFF",
-				"ON" if pressed else "OFF",
-				func(): _on_hand_movement_invert_toggled(old_val)
-			)
-	settings_changed.emit()
-
-
-func _on_hand_movement_release_vel_toggled(pressed: bool):
-	var player = get_tree().get_first_node_in_group("xr_player")
-	if player:
-		var hand_movement = player.get_node_or_null("HandMovementComponent")
-		if hand_movement:
-			var old_val = hand_movement.apply_release_velocity
-			hand_movement.apply_release_velocity = pressed
-			MovementSettingsPanel.record_toggle(
-				"Hand Move Release Vel",
-				"ON" if old_val else "OFF",
-				"ON" if pressed else "OFF",
-				func(): _on_hand_movement_release_vel_toggled(old_val)
-			)
-	settings_changed.emit()
-
-
-func _on_hand_movement_show_visual_toggled(pressed: bool):
-	var player = get_tree().get_first_node_in_group("xr_player")
-	if player:
-		var hand_movement = player.get_node_or_null("HandMovementComponent")
-		if hand_movement:
-			var old_val = hand_movement.show_visual
-			hand_movement.show_visual = pressed
-			MovementSettingsPanel.record_toggle(
-				"Hand Move Visual",
-				"ON" if old_val else "OFF",
-				"ON" if pressed else "OFF",
-				func(): _on_hand_movement_show_visual_toggled(old_val)
-			)
-	settings_changed.emit()
+# === Event Handlers ===
 
 
 func _on_auto_respawn_toggled(pressed: bool):
@@ -1908,22 +1585,9 @@ func refresh():
 			hard_respawn_check.button_pressed = movement_component.hard_respawn_resets_settings
 		if player_drag_slider:
 			player_drag_slider.value = movement_component.player_drag_force
-		if v3_debug_check:
-			v3_debug_check.button_pressed = movement_component.v3_debug_logs
-	
-	# Hand Movement refresh (uses separate component)
-	if hand_movement_enable_check:
-		hand_movement_enable_check.button_pressed = _get_hand_movement_enabled()
-	if hand_movement_grab_mode_btn:
-		hand_movement_grab_mode_btn.selected = _get_hand_movement_grab_mode()
-	if hand_movement_sensitivity_slider:
-		hand_movement_sensitivity_slider.value = _get_hand_movement_sensitivity()
-	if hand_movement_invert_check:
-		hand_movement_invert_check.button_pressed = _get_hand_movement_invert()
-	if hand_movement_release_vel_check:
-		hand_movement_release_vel_check.button_pressed = _get_hand_movement_release_velocity()
-	if hand_movement_show_visual_check:
-		hand_movement_show_visual_check.button_pressed = _get_hand_movement_show_visual()
+		
+		if simple_world_grab_check:
+			simple_world_grab_check.button_pressed = _get_simple_world_grab_enabled()
 	
 	_update_turn_mode_ui()
 	_update_locomotion_controls_enabled()
@@ -1942,7 +1606,6 @@ func _snapshot_defaults():
 		"locomotion_deadzone": movement_component.locomotion_deadzone,
 		"invert_locomotion_x": movement_component.invert_locomotion_x,
 		"invert_locomotion_y": movement_component.invert_locomotion_y,
-		"v3_debug_logs": movement_component.v3_debug_logs,
 		"turn_mode": movement_component.turn_mode,
 		"snap_turn_angle": movement_component.snap_turn_angle,
 		"smooth_turn_speed": movement_component.smooth_turn_speed,
@@ -1963,7 +1626,6 @@ func _snapshot_defaults():
 		"auto_respawn_distance": movement_component.auto_respawn_distance,
 		"hard_respawn_resets_settings": movement_component.hard_respawn_resets_settings,
 		"enable_physics_hands": movement_component.enable_physics_hands,
-		"simple_world_grab_enabled": _get_simple_world_grab_enabled(),
 	}
 
 
@@ -2170,6 +1832,7 @@ func _collect_settings_data() -> Dictionary:
 		"player_gravity_enabled": gravity_check.button_pressed if gravity_check else DEFAULTS["player_gravity_enabled"],
 		"enable_physics_hands": physics_hands_check.button_pressed if physics_hands_check else DEFAULTS["enable_physics_hands"],
 		"player_drag_force": player_drag_slider.value if player_drag_slider else DEFAULTS["player_drag_force"],
+		"simple_world_grab_enabled": _get_simple_world_grab_enabled(),
 	}
 
 

@@ -107,8 +107,8 @@ func _update_networking(delta: float) -> void:
 		left_pos = head_pos + Vector3(-0.3, -0.3, 0.0)
 		right_pos = head_pos + Vector3(0.3, -0.3, 0.0)
 	
-	# Get player scale
-	var player_scale = player_body.scale if player_body else Vector3.ONE
+	# Get player scale (prefer XRPlayer rig multiplier when available).
+	var player_scale := _get_player_scale_for_network()
 	
 	# Send to NetworkManager
 	network_manager.update_local_player_transform(
@@ -120,6 +120,23 @@ func _update_networking(delta: float) -> void:
 	
 	# Update remote player visuals
 	_update_remote_players()
+
+
+func _get_player_scale_for_network() -> Vector3:
+	var player_root := get_parent()
+	if player_root and player_root.has_method("get_rig_scale_multiplier"):
+		var rig_scale := float(player_root.call("get_rig_scale_multiplier"))
+		if is_finite(rig_scale) and rig_scale > 0.0:
+			return Vector3.ONE * rig_scale
+	if player_body:
+		var body_scale := player_body.scale
+		if is_finite(body_scale.x) and is_finite(body_scale.y) and is_finite(body_scale.z):
+			return Vector3(
+				maxf(body_scale.x, 0.01),
+				maxf(body_scale.y, 0.01),
+				maxf(body_scale.z, 0.01)
+			)
+	return Vector3.ONE
 
 func _update_remote_players() -> void:
 	"""Update all remote player visual representations"""

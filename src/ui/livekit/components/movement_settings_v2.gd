@@ -333,16 +333,6 @@ func _collect_settings_data() -> Dictionary:
 	if not movement_component:
 		return data
 
-	# Preserve hidden legacy fields so this panel does not force-reset them.
-	data["ui_scroll_steals_stick"] = movement_component.ui_scroll_steals_stick
-	data["ui_scroll_wheel_factor"] = movement_component.ui_scroll_wheel_factor
-	data["disable_joystick_on_grip"] = movement_component.disable_joystick_on_grip
-	data["enable_two_hand_world_scale"] = movement_component.enable_two_hand_world_scale
-	data["enable_two_hand_world_rotation"] = movement_component.enable_two_hand_world_rotation
-	data["invert_two_hand_scale_direction"] = movement_component.invert_two_hand_scale_direction
-	data["show_two_hand_rotation_visual"] = movement_component.show_two_hand_rotation_visual
-	data["two_hand_left_action"] = movement_component.two_hand_left_action
-	data["two_hand_right_action"] = movement_component.two_hand_right_action
 	data["world_scale_min"] = movement_component.world_scale_min
 	data["world_scale_max"] = movement_component.world_scale_max
 	data["world_scale_sensitivity"] = movement_component.world_scale_sensitivity
@@ -359,21 +349,4 @@ func _collect_settings_data() -> Dictionary:
 	data["apply_one_hand_release_velocity"] = movement_component.apply_one_hand_release_velocity
 	data["invert_one_hand_grab_direction"] = movement_component.invert_one_hand_grab_direction
 	data["show_one_hand_grab_visual"] = movement_component.show_one_hand_grab_visual
-	data["jump_enabled"] = movement_component.jump_enabled
-	data["jump_impulse"] = movement_component.jump_impulse
-	data["jump_cooldown"] = movement_component.jump_cooldown
-	data["enable_two_hand_grab_v2"] = movement_component.enable_two_hand_grab_v2
-	data["v2_scale_enabled"] = movement_component.v2_scale_enabled
-	data["v2_rotation_enabled"] = movement_component.v2_rotation_enabled
-	data["v2_world_scale_min"] = movement_component.v2_world_scale_min
-	data["v2_world_scale_max"] = movement_component.v2_world_scale_max
-	data["v2_left_action"] = movement_component.v2_left_action
-	data["v2_right_action"] = movement_component.v2_right_action
-	data["v2_show_visual"] = movement_component.v2_show_visual
-	data["v2_debug_logs"] = movement_component.v2_debug_logs
-	data["v3_scale_sensitivity"] = movement_component.v3_scale_sensitivity
-	data["v3_invert_scale"] = movement_component.v3_invert_scale
-	data["v3_rotation_sensitivity"] = movement_component.v3_rotation_sensitivity
-	data["v3_translation_sensitivity"] = movement_component.v3_translation_sensitivity
-	data["v3_smoothing"] = movement_component.v3_smoothing
 	return data

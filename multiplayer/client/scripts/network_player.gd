@@ -22,6 +22,11 @@ var target_left_hand_rotation: Vector3 = Vector3.ZERO
 var target_right_hand_position: Vector3 = Vector3.ZERO
 var target_right_hand_rotation: Vector3 = Vector3.ZERO
 var target_scale: Vector3 = Vector3.ONE
+var visual_scale: Vector3 = Vector3.ONE
+
+const MIN_SCALE_COMPONENT := 0.01
+const BODY_HEAD_OFFSET_Y := 0.35
+const NAME_LABEL_OFFSET_Y := 0.30
 
 # Interpolation buffer for smoother movement
 var position_buffer: Array = []
@@ -45,6 +50,7 @@ func _ready() -> void:
 	_create_visuals()
 	_ensure_hat_anchor()
 	_create_name_label()
+	scale = Vector3.ONE
 	# Voice player creation removed - now handled by PlayerVoiceComponent
 
 func get_peer_id() -> String:
@@ -90,7 +96,7 @@ func update_from_network_data(player_data: Dictionary) -> void:
 	target_left_hand_rotation = player_data.get("left_hand_rotation", Vector3.ZERO)
 	target_right_hand_position = player_data.get("right_hand_position", Vector3.ZERO)
 	target_right_hand_rotation = player_data.get("right_hand_rotation", Vector3.ZERO)
-	target_scale = player_data.get("player_scale", Vector3.ONE)
+	target_scale = _sanitize_scale(player_data.get("player_scale", Vector3.ONE))
 	
 	# Voice samples removed - now handled by PlayerVoiceComponent via LiveKit
 	# Old Nakama voice_samples field is no longer used
@@ -98,7 +104,8 @@ func update_from_network_data(player_data: Dictionary) -> void:
 
 ## Smoothly interpolate to target transforms
 func _interpolate_transforms(delta: float) -> void:
-	var lerp_factor = interpolation_speed * delta
+	var lerp_factor = clampf(interpolation_speed * delta, 0.0, 1.0)
+	visual_scale = visual_scale.lerp(target_scale, lerp_factor)
 	
 	# Interpolate head
 	head_visual.global_position = head_visual.global_position.lerp(target_head_position, lerp_factor)
@@ -112,12 +119,16 @@ func _interpolate_transforms(delta: float) -> void:
 	right_hand_visual.global_position = right_hand_visual.global_position.lerp(target_right_hand_position, lerp_factor)
 	right_hand_visual.rotation_degrees = right_hand_visual.rotation_degrees.lerp(target_right_hand_rotation, lerp_factor)
 	
-	# Interpolate scale
-	scale = scale.lerp(target_scale, lerp_factor)
+	# Keep the player root unscaled; scale visuals directly to avoid parent-scale/global-position drift.
+	scale = Vector3.ONE
+	head_visual.scale = visual_scale
+	left_hand_visual.scale = visual_scale
+	right_hand_visual.scale = visual_scale
+	body_visual.scale = visual_scale
 	
 	# Update body position (directly below head at chest height)
 	var body_pos = target_head_position
-	body_pos.y = target_head_position.y - 0.3 # Chest height (slightly below head)
+	body_pos.y = target_head_position.y - (BODY_HEAD_OFFSET_Y * visual_scale.y)
 	body_visual.global_position = body_visual.global_position.lerp(body_pos, lerp_factor)
 	
 	# Rotate body to match head's Y rotation only (yaw) to keep it upright
@@ -218,7 +229,26 @@ func _create_name_label() -> void:
 ## Update the name label position above head
 func _update_label_position() -> void:
 	if label_3d and head_visual:
-		label_3d.global_position = head_visual.global_position + Vector3(0, 0.3, 0)
+		label_3d.global_position = head_visual.global_position + Vector3(0, NAME_LABEL_OFFSET_Y * visual_scale.y, 0)
+
+
+func _sanitize_scale(scale_value: Variant) -> Vector3:
+	var candidate := Vector3.ONE
+	if scale_value is Vector3:
+		candidate = scale_value
+	elif scale_value is Dictionary:
+		candidate = Vector3(
+			float(scale_value.get("x", 1.0)),
+			float(scale_value.get("y", 1.0)),
+			float(scale_value.get("z", 1.0))
+		)
+	if not is_finite(candidate.x) or not is_finite(candidate.y) or not is_finite(candidate.z):
+		return Vector3.ONE
+	return Vector3(
+		maxf(candidate.x, MIN_SCALE_COMPONENT),
+		maxf(candidate.y, MIN_SCALE_COMPONENT),
+		maxf(candidate.z, MIN_SCALE_COMPONENT)
+	)
 
 
 ## Set the display name directly on the 3D label
