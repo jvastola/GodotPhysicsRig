@@ -1,0 +1,56 @@
+[gd_scene load_steps=10 format=3 uid="uid://bohsnfhg2ax6d"]
+
+[ext_resource type="Script" path="res://src/objects/components/pokeable_button.gd" id="1_script"]
+[ext_resource type="Script" path="res://src/systems/interactions/base_interactable.gd" id="2_base"]
+[ext_resource type="Script" path="res://src/systems/interactions/poke_filter.gd" id="3_filter"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_base"]
+size = Vector3(0.06, 0.06, 0.04)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_frame"]
+albedo_color = Color(0.2, 0.2, 0.25, 1)
+metallic = 0.8
+roughness = 0.2
+
+[sub_resource type="BoxMesh" id="BoxMesh_frame"]
+material = SubResource("StandardMaterial3D_frame")
+size = Vector3(0.06, 0.06, 0.02)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_button"]
+albedo_color = Color(0.1, 0.5, 0.8, 1)
+metallic = 0.5
+roughness = 0.1
+emission_enabled = true
+emission = Color(0.1, 0.5, 0.8, 1)
+emission_energy_multiplier = 0.2
+
+[sub_resource type="BoxMesh" id="BoxMesh_button"]
+material = SubResource("StandardMaterial3D_button")
+size = Vector3(0.05, 0.05, 0.03)
+
+[node name="PokeableButton" type="StaticBody3D"]
+collision_layer = 32
+collision_mask = 0
+script = ExtResource("1_script")
+button_visual_path = NodePath("ButtonVisual")
+max_travel = 0.015
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_base")
+
+[node name="Frame" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_frame")
+
+[node name="ButtonVisual" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.01)
+mesh = SubResource("BoxMesh_button")
+
+[node name="Interactable" type="Node" parent="."]
+script = ExtResource("2_base")
+
+[node name="PokeFilter" type="Node" parent="Interactable"]
+script = ExtResource("3_filter")
+required_poke_direction = Vector3(0, 0, 1)
+direction_tolerance = 0.3
+min_poke_depth = 0.005
+max_poke_depth = 0.05
