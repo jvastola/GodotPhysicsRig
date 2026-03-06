@@ -4,10 +4,17 @@ class_name CosmeticHatStand
 const CosmeticVisuals = preload("res://src/systems/cosmetic_visuals.gd")
 
 @export var item_id: String = "hat_basic_red"
+@export var rotation_speed: float = 45.0 # Degrees per second
+@export var float_speed: float = 2.0
+@export var float_amplitude: float = 0.05
 @export var interact_cooldown_sec: float = 0.3
 
-@onready var status_label: Label3D = $StatusLabel
-@onready var preview_anchor: Node3D = $PreviewAnchor
+@onready var status_label: Label3D = $Geometry/Console/StatusLabel
+@onready var preview_anchor: Node3D = $RotatingPlatform/Mannequin/HeadMesh/PreviewAnchor
+@onready var poke_button: PokeableButton = $Geometry/Console/PokeableButton
+@onready var rotating_platform: Node3D = $RotatingPlatform
+@onready var floating_holder: Node3D = $FloatingLabelHolder
+@onready var mannequin_grid_painter: GridPainter = $MannequinGridPainter
 
 var _cooldown_until_msec: int = 0
 
@@ -15,25 +22,36 @@ var _cooldown_until_msec: int = 0
 func _ready() -> void:
 	collision_layer = 32
 	collision_mask = 0
-	add_to_group("pointer_interactable")
+	
+	if mannequin_grid_painter:
+		mannequin_grid_painter.load_grid_data("res://assets/textures/grid_painter_surfaces.json")
+		mannequin_grid_painter.refresh_all_surfaces()
+	
 	_setup_preview_mesh()
 	_refresh_status_label()
 
+	if poke_button:
+		poke_button.pressed.connect(_on_button_pressed)
+
 	if CosmeticsManager and CosmeticsManager.has_signal("cosmetics_changed"):
-		if not CosmeticsManager.cosmetics_changed.is_connected(_refresh_status_label):
-			CosmeticsManager.cosmetics_changed.connect(_refresh_status_label)
+		CosmeticsManager.cosmetics_changed.connect(_refresh_status_label)
 	if CosmeticsManager and CosmeticsManager.has_signal("purchase_processed"):
-		if not CosmeticsManager.purchase_processed.is_connected(_on_purchase_processed):
-			CosmeticsManager.purchase_processed.connect(_on_purchase_processed)
+		CosmeticsManager.purchase_processed.connect(_on_purchase_processed)
 	if InventoryManager and InventoryManager.has_signal("currency_changed"):
-		if not InventoryManager.currency_changed.is_connected(_on_currency_changed):
-			InventoryManager.currency_changed.connect(_on_currency_changed)
+		InventoryManager.currency_changed.connect(_on_currency_changed)
 
 
-func handle_pointer_event(event: Dictionary) -> void:
-	var event_type := String(event.get("type", ""))
-	if event_type != "press" and event_type != "secondary_press":
-		return
+func _process(delta: float) -> void:
+	# Rotate platform
+	if rotating_platform:
+		rotating_platform.rotate_y(deg_to_rad(rotation_speed * delta))
+	
+	# Float label
+	if floating_holder:
+		floating_holder.position.y = 1.4 + sin(Time.get_ticks_msec() * 0.001 * float_speed) * float_amplitude
+
+
+func _on_button_pressed() -> void:
 	_interact()
 
 
@@ -64,8 +82,9 @@ func _setup_preview_mesh() -> void:
 	var preview := CosmeticVisuals.create_head_cosmetic(item_id)
 	if not preview:
 		return
-	preview.scale = Vector3(1.35, 1.35, 1.35)
-	preview.rotation_degrees = Vector3(0.0, -15.0, 0.0)
+	
+	# Fitting to mannequin head
+	preview.scale = Vector3(1.1, 1.1, 1.1)
 	preview_anchor.add_child(preview)
 
 
@@ -84,11 +103,20 @@ func _refresh_status_label() -> void:
 
 	var owned := bool(CosmeticsManager.is_item_owned(item_id))
 	var equipped := bool(CosmeticsManager.is_item_equipped(item_id))
+	
+	if poke_button:
+		if owned and equipped:
+			poke_button.key_character = "REMOVE"
+		elif owned:
+			poke_button.key_character = "EQUIP"
+		else:
+			poke_button.key_character = "BUY"
+
 	if owned and equipped:
-		status_label.text = "%s\nOwned + Equipped\nTrigger/Click: Unequip" % display_name
+		status_label.text = "%s\nOwned + Equipped\nTap button: Unequip" % display_name
 		return
 	if owned:
-		status_label.text = "%s\nOwned\nTrigger/Click: Equip" % display_name
+		status_label.text = "%s\nOwned\nTap button: Equip" % display_name
 		return
 
 	var currency_type := String(item_def.get("currency_type", "gold"))
@@ -96,7 +124,7 @@ func _refresh_status_label() -> void:
 	var balance := 0
 	if InventoryManager:
 		balance = InventoryManager.get_currency(currency_type)
-	status_label.text = "%s\nPrice: %d %s\nBalance: %d\nTrigger/Click: Buy" % [
+	status_label.text = "%s\nPrice: %d %s\nBalance: %d\nTap button: Buy" % [
 		display_name,
 		price,
 		currency_type,

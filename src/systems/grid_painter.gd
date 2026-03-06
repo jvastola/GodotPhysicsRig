@@ -209,8 +209,13 @@ func _register_player_surfaces() -> void:
 	_register_player_surface(SURFACE_BODY, body_target, body_path, body_subdivisions, body_previews)
 
 func _register_preview_only_surfaces() -> void:
-	var left_previews: Array[NodePath] = _collect_node_paths([left_hand_preview_mesh])
-	var right_previews: Array[NodePath] = _collect_node_paths([right_hand_preview_mesh])
+	# Try to use preview meshes first, then fallback to target/path for mannequin use cases
+	var left_p := left_hand_preview_mesh if left_hand_preview_mesh != NodePath("") else left_hand_path
+	var left_previews: Array[NodePath] = _collect_node_paths([left_p])
+	
+	var right_p := right_hand_preview_mesh if right_hand_preview_mesh != NodePath("") else right_hand_path
+	var right_previews: Array[NodePath] = _collect_node_paths([right_p])
+	
 	if link_hands:
 		var shared_previews: Array[NodePath] = left_previews.duplicate()
 		for preview in right_previews:
@@ -228,10 +233,14 @@ func _register_preview_only_surfaces() -> void:
 			_register_preview_surface(SURFACE_LEFT_HAND, left_previews[0], left_hand_subdivisions, left_previews)
 		if right_previews.size() > 0:
 			_register_preview_surface(SURFACE_RIGHT_HAND, right_previews[0], right_hand_subdivisions, right_previews)
-	var head_previews: Array[NodePath] = _collect_node_paths([head_preview_mesh])
+	
+	var head_p := head_preview_mesh if head_preview_mesh != NodePath("") else head_path
+	var head_previews: Array[NodePath] = _collect_node_paths([head_p])
 	if head_previews.size() > 0:
 		_register_preview_surface(SURFACE_HEAD, head_previews[0], head_subdivisions, head_previews)
-	var body_previews: Array[NodePath] = _collect_node_paths([body_preview_mesh])
+		
+	var body_p := body_preview_mesh if body_preview_mesh != NodePath("") else body_path
+	var body_previews: Array[NodePath] = _collect_node_paths([body_p])
 	if body_previews.size() > 0:
 		_register_preview_surface(SURFACE_BODY, body_previews[0], body_subdivisions, body_previews)
 
@@ -493,12 +502,17 @@ func _assign_texture_to_mesh(node: MeshInstance3D, texture: ImageTexture, cube_m
 		
 	if is_hand and hand_material_base:
 		mat = hand_material_base.duplicate()
-		# Ensure hand meshes render opaquely with unshaded mode
+		# Ensure hand meshes render opaquely with unshaded mode and proper depth testing
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+		mat.no_depth_test = false
+		mat.render_priority = 0
+		if mat.next_pass:
+			mat.next_pass = null
 	else:
 		mat = StandardMaterial3D.new()
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.no_depth_test = false
 		
 	mat.albedo_texture = texture
 	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
@@ -880,7 +894,8 @@ func _get_surface(id: String) -> SurfaceSlot:
 	return null
 
 func _exit_tree() -> void:
-	save_grid_data(_save_path)
+	if load_for_player:
+		save_grid_data(_save_path)
 
 func _editor_randomize_grid(surface_id: String = "") -> void:
 	randomize_grid(surface_id)

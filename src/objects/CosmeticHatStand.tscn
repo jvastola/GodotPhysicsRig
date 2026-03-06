@@ -1,55 +1,164 @@
-[gd_scene format=3 uid="uid://bb6yl6jr4fv3p"]
+[gd_scene load_steps=22 format=3 uid="uid://bb6yl6jr4fv3p"]
 
 [ext_resource type="Script" path="res://src/objects/cosmetic_hat_stand.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://bohsnfhg2ax6d" path="res://src/objects/PokeableButton.tscn" id="2_button"]
+[ext_resource type="Script" path="res://src/systems/grid_painter.gd" id="3_grid_painter"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_base"]
-height = 0.9
-radius = 0.18
+height = 1.0
+radius = 0.3
 
-[sub_resource type="CylinderMesh" id="CylinderMesh_base"]
-bottom_radius = 0.18
-top_radius = 0.14
-height = 0.9
-radial_segments = 20
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_metal"]
+albedo_color = Color(0.12, 0.12, 0.14, 1)
+metallic = 1.0
+roughness = 0.3
+rim_enabled = true
+rim = 0.5
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_base"]
-albedo_color = Color(0.24, 0.24, 0.27, 1)
-roughness = 0.95
-metallic = 0.15
+[sub_resource type="CylinderMesh" id="CylinderMesh_bottom"]
+material = SubResource("StandardMaterial3D_metal")
+top_radius = 0.28
+bottom_radius = 0.3
+height = 0.1
+radial_segments = 8
 
-[sub_resource type="CylinderMesh" id="CylinderMesh_top"]
-top_radius = 0.22
+[sub_resource type="CylinderMesh" id="CylinderMesh_mid"]
+material = SubResource("StandardMaterial3D_metal")
+top_radius = 0.18
 bottom_radius = 0.22
-height = 0.05
-radial_segments = 24
+height = 0.7
+radial_segments = 8
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_top"]
-albedo_color = Color(0.82, 0.77, 0.66, 1)
-roughness = 0.8
-metallic = 0.0
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_glow"]
+albedo_color = Color(0, 0.6, 1, 1)
+emission_enabled = true
+emission = Color(0.1, 0.6, 1, 1)
+emission_energy_multiplier = 4.0
+
+[sub_resource type="TorusMesh" id="TorusMesh_ring"]
+material = SubResource("StandardMaterial3D_glow")
+inner_radius = 0.2
+outer_radius = 0.22
+ring_segments = 16
+radial_segments = 32
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_console"]
+albedo_color = Color(0.15, 0.15, 0.18, 1)
+metallic = 0.8
+roughness = 0.2
+
+[sub_resource type="BoxMesh" id="BoxMesh_console"]
+material = SubResource("StandardMaterial3D_console")
+size = Vector3(0.25, 0.15, 0.1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_glass"]
+transparency = 1
+albedo_color = Color(0.4, 0.8, 1, 0.2)
+metallic = 0.1
+roughness = 0.05
+refraction_enabled = true
+refraction_scale = 0.02
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_disk"]
+material = SubResource("StandardMaterial3D_glass")
+top_radius = 0.25
+bottom_radius = 0.25
+height = 0.01
+
+[sub_resource type="BoxMesh" id="BoxMesh_body"]
+size = Vector3(0.2, 0.3, 0.15)
+
+[sub_resource type="BoxMesh" id="BoxMesh_head"]
+size = Vector3(0.18, 0.18, 0.18)
+
+[sub_resource type="BoxMesh" id="BoxMesh_hand"]
+size = Vector3(0.08, 0.08, 0.08)
 
 [node name="CosmeticHatStand" type="StaticBody3D"]
 script = ExtResource("1_script")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 shape = SubResource("CylinderShape3D_base")
 
-[node name="StandBase" type="MeshInstance3D" parent="."]
+[node name="Geometry" type="Node3D" parent="."]
+
+[node name="Base" type="MeshInstance3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+mesh = SubResource("CylinderMesh_bottom")
+
+[node name="Pillar" type="MeshInstance3D" parent="Geometry"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
-mesh = SubResource("CylinderMesh_base")
-surface_material_override/0 = SubResource("StandardMaterial3D_base")
+mesh = SubResource("CylinderMesh_mid")
 
-[node name="StandTop" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.925, 0)
-mesh = SubResource("CylinderMesh_top")
-surface_material_override/0 = SubResource("StandardMaterial3D_top")
+[node name="GlowRing" type="MeshInstance3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.81, 0)
+mesh = SubResource("TorusMesh_ring")
 
-[node name="PreviewAnchor" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.97, 0)
+[node name="Console" type="MeshInstance3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 0.866025, 0.5, 0, -0.5, 0.866025, 0, 0.7, 0.2)
+mesh = SubResource("BoxMesh_console")
 
-[node name="StatusLabel" type="Label3D" parent="."]
-transform = Transform3D(0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 0, 1.42, 0)
+[node name="RotatingPlatform" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
+
+[node name="GlassDisk" type="MeshInstance3D" parent="RotatingPlatform"]
+mesh = SubResource("CylinderMesh_disk")
+
+[node name="Mannequin" type="Node3D" parent="RotatingPlatform"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 0)
+
+[node name="BodyMesh" type="MeshInstance3D" parent="RotatingPlatform/Mannequin"]
+mesh = SubResource("BoxMesh_body")
+
+[node name="HeadMesh" type="MeshInstance3D" parent="RotatingPlatform/Mannequin"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 0)
+mesh = SubResource("BoxMesh_head")
+
+[node name="LeftHandMesh" type="MeshInstance3D" parent="RotatingPlatform/Mannequin"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.18, 0, 0)
+mesh = SubResource("BoxMesh_hand")
+
+[node name="RightHandMesh" type="MeshInstance3D" parent="RotatingPlatform/Mannequin"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.18, 0, 0)
+mesh = SubResource("BoxMesh_hand")
+
+[node name="PreviewAnchor" type="Node3D" parent="RotatingPlatform/Mannequin/HeadMesh"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+
+[node name="Spotlight" type="OmniLight3D" parent="RotatingPlatform"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 0)
+light_color = Color(0.6, 0.8, 1, 1)
+light_energy = 2.0
+omni_range = 1.5
+
+[node name="StatusLabel" type="Label3D" parent="Geometry/Console"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08, 0.051)
+pixel_size = 0.001
+text = "Hat Name"
+font_size = 32
+outline_size = 8
+
+[node name="PokeableButton" parent="Geometry/Console" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0.05)
+key_character = "BUY"
+width = 0.1
+height = 0.05
+max_travel = 0.01
+
+[node name="FloatingLabelHolder" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+
+[node name="FloatingLabel" type="Label3D" parent="FloatingLabelHolder"]
 billboard = 1
-text = "Hat Stand"
-font_size = 24
-outline_size = 10
+text = "PREMIUM DISPLAY"
+font_size = 28
+outline_size = 12
+
+[node name="MannequinGridPainter" type="Node3D" parent="."]
+script = ExtResource("3_grid_painter")
+load_for_player = false
+left_hand_path = NodePath("../RotatingPlatform/Mannequin/LeftHandMesh")
+right_hand_path = NodePath("../RotatingPlatform/Mannequin/RightHandMesh")
+head_path = NodePath("../RotatingPlatform/Mannequin/HeadMesh")
+body_path = NodePath("../RotatingPlatform/Mannequin/BodyMesh")

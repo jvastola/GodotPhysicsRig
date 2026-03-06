@@ -43,7 +43,7 @@
 [ext_resource type="Script" uid="uid://cfrhsl8g3fmpt" path="res://src/systems/mesh_collision_generator.gd" id="49_collision"]
 [ext_resource type="PackedScene" uid="uid://bb6yl6jr4fv3p" path="res://src/objects/CosmeticHatStand.tscn" id="49_nwdyy"]
 [ext_resource type="PackedScene" uid="uid://bohsnfhg2ax6d" path="res://src/objects/PokeableButton.tscn" id="50_6v57d"]
-[ext_resource type="PackedScene" path="res://src/objects/Keyboard3D.tscn" id="51_n50cp"]
+[ext_resource type="PackedScene" uid="uid://c8keyboard3d" path="res://src/objects/Keyboard3D.tscn" id="51_n50cp"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/ShapeTool.tscn" id="51_shape_tool"]
 [ext_resource type="Script" uid="uid://d2d0lk7frpl5n" path="res://src/objects/grabbables/MiningTool.gd" id="52_mining_tool"]
 [ext_resource type="PackedScene" uid="uid://b2mp18xsksksj" path="res://src/objects/OreDeposit.tscn" id="53_ore_deposit"]
@@ -395,7 +395,7 @@ collision_mask = 32
 shape = SubResource("BoxShape3D_body_grid")
 
 [node name="island3" parent="." unique_id=1938076424 instance=ExtResource("32_l4aac")]
-transform = Transform3D(0.99999976, 0.0005695278, 0.00041558265, -0.00056933105, 0.9999997, -0.00048417712, -0.0004158522, 0.00048394562, 0.9999999, -0.002196312, 0.026595116, -41.99833)
+transform = Transform3D(0.99999976, 0.00056952774, 0.00041558262, -0.00056933105, 0.9999997, -0.00048417712, -0.0004158522, 0.00048394562, 0.9999999, -0.002196312, 0.026595116, -41.99833)
 
 [node name="islandcollision" type="Node" parent="island3" unique_id=1618902482]
 script = ExtResource("49_collision")
@@ -486,13 +486,13 @@ material_override = SubResource("StandardMaterial3D_dark_zone_visual")
 cast_shadow = 0
 mesh = SubResource("BoxMesh_dark_zone_visual")
 
-[node name="CosmeticHatStand" parent="." unique_id=152812869 instance=ExtResource("49_nwdyy")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.26849937, 0, -33.824776)
-
 [node name="PokeableButton" parent="." unique_id=1799923471 instance=ExtResource("50_6v57d")]
 transform = Transform3D(1, 0, 0, 0, -0.13312131, 0.9910998, 0, -0.9910998, -0.13312131, -2.755868, 0, -36.26379)
 
 [node name="Keyboard3D" parent="." unique_id=113574775 instance=ExtResource("51_n50cp")]
 transform = Transform3D(-0.81215477, -0.5688935, 0.12947917, 0, 0.22192292, 0.97506416, -0.5834421, 0.791903, -0.18023576, -3.7802553, 0, -38.14638)
+
+[node name="CosmeticHatStand" parent="." unique_id=1210930162 instance=ExtResource("49_nwdyy")]
+transform = Transform3D(-0.99998283, 0, 0.005846709, 0, 1, 0, -0.005846709, 0, -0.99998283, -2.5797398, 0, -35.32404)
 
 [editable path="OreDeposit2"]
