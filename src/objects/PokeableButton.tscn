@@ -45,6 +45,13 @@ mesh = SubResource("BoxMesh_frame")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.01)
 mesh = SubResource("BoxMesh_button")
 
+[node name="KeyLabel" type="Label3D" parent="ButtonVisual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.016)
+pixel_size = 0.001
+text = "A"
+font_size = 32
+outline_size = 4
+
 [node name="Interactable" type="Node" parent="."]
 script = ExtResource("2_base")
 

@@ -1480,6 +1480,16 @@ func _handle_poke_physics(area: Area3D, visual: MeshInstance3D, is_left: bool) -
 	# Handle Interaction
 	var last_collider = left_ui_last_collider if is_left else right_ui_last_collider
 	
+	# Release previous collider if it changed
+	if last_collider and is_instance_valid(last_collider) and last_collider != touching_ui:
+		var release_event = {
+			"type": "release",
+			"global_position": area.global_position,
+			"action_just_released": true,
+			"action_pressed": false
+		}
+		last_collider.handle_pointer_event(release_event)
+	
 	if touching_ui:
 		# Visual feedback
 		if visual:
@@ -1503,16 +1513,6 @@ func _handle_poke_physics(area: Area3D, visual: MeshInstance3D, is_left: bool) -
 		if visual:
 			var mat = visual.material_override as StandardMaterial3D
 			if mat: mat.albedo_color = _poke_visual_color
-			
-		# Release previous
-		if last_collider and is_instance_valid(last_collider):
-			var event = {
-				"type": "release",
-				"global_position": area.global_position,
-				"action_just_released": true,
-				"action_pressed": false
-			}
-			last_collider.handle_pointer_event(event)
 
 	# Update state
 	if is_left:

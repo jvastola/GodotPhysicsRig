@@ -42,7 +42,8 @@
 [ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://src/systems/grid_painter.gd" id="48_grid_painter"]
 [ext_resource type="Script" uid="uid://cfrhsl8g3fmpt" path="res://src/systems/mesh_collision_generator.gd" id="49_collision"]
 [ext_resource type="PackedScene" uid="uid://bb6yl6jr4fv3p" path="res://src/objects/CosmeticHatStand.tscn" id="49_nwdyy"]
-[ext_resource type="PackedScene" path="res://src/objects/PokeableButton.tscn" id="50_6v57d"]
+[ext_resource type="PackedScene" uid="uid://bohsnfhg2ax6d" path="res://src/objects/PokeableButton.tscn" id="50_6v57d"]
+[ext_resource type="PackedScene" path="res://src/objects/Keyboard3D.tscn" id="51_n50cp"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/ShapeTool.tscn" id="51_shape_tool"]
 [ext_resource type="Script" uid="uid://d2d0lk7frpl5n" path="res://src/objects/grabbables/MiningTool.gd" id="52_mining_tool"]
 [ext_resource type="PackedScene" uid="uid://b2mp18xsksksj" path="res://src/objects/OreDeposit.tscn" id="53_ore_deposit"]
@@ -490,5 +491,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.26849937, 0, -33.824776)
 
 [node name="PokeableButton" parent="." unique_id=1799923471 instance=ExtResource("50_6v57d")]
 transform = Transform3D(1, 0, 0, 0, -0.13312131, 0.9910998, 0, -0.9910998, -0.13312131, -2.755868, 0, -36.26379)
+
+[node name="Keyboard3D" parent="." unique_id=113574775 instance=ExtResource("51_n50cp")]
+transform = Transform3D(-0.81215477, -0.5688935, 0.12947917, 0, 0.22192292, 0.97506416, -0.5834421, 0.791903, -0.18023576, -3.7802553, 0, -38.14638)
 
 [editable path="OreDeposit2"]

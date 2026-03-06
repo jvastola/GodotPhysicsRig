@@ -1,0 +1,212 @@
+[gd_scene format=3 uid="uid://c8keyboard3d"]
+
+[ext_resource type="Script" path="res://src/objects/components/keyboard_3d_controller.gd" id="1_controller"]
+[ext_resource type="PackedScene" uid="uid://bohsnfhg2ax6d" path="res://src/objects/PokeableButton.tscn" id="2_button"]
+
+[node name="Keyboard3D" type="Node3D"]
+script = ExtResource("1_controller")
+display_label_path = NodePath("DisplayLabel")
+
+[node name="DisplayLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
+pixel_size = 0.002
+text = "Type here..."
+font_size = 48
+outline_size = 8
+
+[node name="Keys" type="Node3D" parent="."]
+
+[node name="Key_Num_1" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.315, 0.21, 0)
+key_character = "1"
+width = 0.06
+
+[node name="Key_Num_2" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.245, 0.21, 0)
+key_character = "2"
+width = 0.06
+
+[node name="Key_Num_3" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.175, 0.21, 0)
+key_character = "3"
+width = 0.06
+
+[node name="Key_Num_4" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.105, 0.21, 0)
+key_character = "4"
+width = 0.06
+
+[node name="Key_Num_5" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.035, 0.21, 0)
+key_character = "5"
+width = 0.06
+
+[node name="Key_Num_6" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.035, 0.21, 0)
+key_character = "6"
+width = 0.06
+
+[node name="Key_Num_7" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.105, 0.21, 0)
+key_character = "7"
+width = 0.06
+
+[node name="Key_Num_8" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.175, 0.21, 0)
+key_character = "8"
+width = 0.06
+
+[node name="Key_Num_9" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.245, 0.21, 0)
+key_character = "9"
+width = 0.06
+
+[node name="Key_Num_0" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.315, 0.21, 0)
+key_character = "0"
+width = 0.06
+
+[node name="Key_Q" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.315, 0.14, 0)
+key_character = "Q"
+width = 0.06
+
+[node name="Key_W" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.245, 0.14, 0)
+key_character = "W"
+width = 0.06
+
+[node name="Key_E" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.175, 0.14, 0)
+key_character = "E"
+width = 0.06
+
+[node name="Key_R" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.105, 0.14, 0)
+key_character = "R"
+width = 0.06
+
+[node name="Key_T" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.035, 0.14, 0)
+key_character = "T"
+width = 0.06
+
+[node name="Key_Y" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.035, 0.14, 0)
+key_character = "Y"
+width = 0.06
+
+[node name="Key_U" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.105, 0.14, 0)
+key_character = "U"
+width = 0.06
+
+[node name="Key_I" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.175, 0.14, 0)
+key_character = "I"
+width = 0.06
+
+[node name="Key_O" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.245, 0.14, 0)
+key_character = "O"
+width = 0.06
+
+[node name="Key_P" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.315, 0.14, 0)
+key_character = "P"
+width = 0.06
+
+[node name="Key_A" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.28, 0.07, 0)
+key_character = "A"
+width = 0.06
+
+[node name="Key_S" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.21, 0.07, 0)
+key_character = "S"
+width = 0.06
+
+[node name="Key_D" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.14, 0.07, 0)
+key_character = "D"
+width = 0.06
+
+[node name="Key_F" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.07, 0.07, 0)
+key_character = "F"
+width = 0.06
+
+[node name="Key_G" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, 0.07, 0)
+key_character = "G"
+width = 0.06
+
+[node name="Key_H" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.07, 0.07, 0)
+key_character = "H"
+width = 0.06
+
+[node name="Key_J" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.14, 0.07, 0)
+key_character = "J"
+width = 0.06
+
+[node name="Key_K" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.21, 0.07, 0)
+key_character = "K"
+width = 0.06
+
+[node name="Key_L" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.28, 0.07, 0)
+key_character = "L"
+width = 0.06
+
+[node name="Key_Z" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.2625, 0.0, 0)
+key_character = "Z"
+width = 0.06
+
+[node name="Key_X" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.1925, 0.0, 0)
+key_character = "X"
+width = 0.06
+
+[node name="Key_C" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.1225, 0.0, 0)
+key_character = "C"
+width = 0.06
+
+[node name="Key_V" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0525, 0.0, 0)
+key_character = "V"
+width = 0.06
+
+[node name="Key_B" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0175, 0.0, 0)
+key_character = "B"
+width = 0.06
+
+[node name="Key_N" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0875, 0.0, 0)
+key_character = "N"
+width = 0.06
+
+[node name="Key_M" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1575, 0.0, 0)
+key_character = "M"
+width = 0.06
+
+[node name="Key_BACK" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.245, 0.0, 0)
+key_character = "BACK"
+width = 0.09
+
+[node name="Key_SPACE" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.07, -0.07, 0)
+key_character = "SPACE"
+width = 0.3
+
+[node name="Key_ENTER" parent="Keys" instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.175, -0.07, 0)
+key_character = "ENTER"
+width = 0.12

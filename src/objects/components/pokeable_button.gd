@@ -1,3 +1,4 @@
+@tool
 # Pokeable Button
 # Responds to PokeInteractor (BaseInteractable system) and XRPlayer (handle_pointer_event system)
 extends StaticBody3D
@@ -10,6 +11,18 @@ signal released()
 
 @export_group("Button Settings")
 @export var button_visual_path: NodePath
+@export var key_character: String = "A":
+	set(value):
+		key_character = value
+		_update_label()
+@export var width: float = 0.06:
+	set(value):
+		width = value
+		_update_visuals()
+@export var height: float = 0.06:
+	set(value):
+		height = value
+		_update_visuals()
 @export var press_threshold: float = 0.8  # 0 to 1, percentage of max_travel
 @export var max_travel: float = 0.02      # Maximum distance the button can move (meters)
 @export var surface_offset: float = 0.02  # Local Z where interaction starts
@@ -31,13 +44,29 @@ var _active_poke_pos: Vector3 = Vector3.ZERO
 var _is_being_poked: bool = false
 var _child_interactable: BaseInteractable = null
 
+func get_collider() -> CollisionObject3D:
+	return self
+
+
+func _update_label() -> void:
+	var label: Label3D = null
+	if _button_visual:
+		label = _button_visual.get_node_or_null("KeyLabel") as Label3D
+	else:
+		# Fallback for editor or before _ready
+		label = get_node_or_null("ButtonVisual/KeyLabel") as Label3D
+		
+	if label:
+		label.text = key_character
+
 func _ready() -> void:
 	if not button_visual_path.is_empty():
 		_button_visual = get_node(button_visual_path)
-		_initial_local_pos = _button_visual.position
-	else:
-		_button_visual = null
-		push_warning("PokeableButton: button_visual_path is empty")
+		if _button_visual:
+			_initial_local_pos = _button_visual.position
+	
+	_update_visuals()
+	_update_label()
 
 	_audio_player = AudioStreamPlayer3D.new()
 	add_child(_audio_player)
@@ -124,6 +153,37 @@ func _play_sound(stream: AudioStream) -> void:
 	if stream and _audio_player:
 		_audio_player.stream = stream
 		_audio_player.play()
+func _update_visuals() -> void:
+	if not is_inside_tree(): return
+	
+	# Update Collision Shape
+	var collision_shape = get_node_or_null("CollisionShape3D")
+	if collision_shape and collision_shape.shape:
+		if not Engine.is_editor_hint():
+			collision_shape.shape = collision_shape.shape.duplicate()
+		var shape = collision_shape.shape as BoxShape3D
+		if shape:
+			shape.size = Vector3(width, height, 0.04)
+	
+	# Update Frame Mesh
+	var frame = get_node_or_null("Frame")
+	if frame and frame.mesh:
+		if not Engine.is_editor_hint():
+			frame.mesh = frame.mesh.duplicate()
+		var mesh = frame.mesh as BoxMesh
+		if mesh:
+			mesh.size = Vector3(width, height, 0.02)
+			
+	# Update Button Visual Mesh
+	if not _button_visual:
+		_button_visual = get_node_or_null(button_visual_path)
+	
+	if _button_visual and _button_visual is MeshInstance3D:
+		if not Engine.is_editor_hint():
+			_button_visual.mesh = _button_visual.mesh.duplicate()
+		var b_mesh = _button_visual.mesh as BoxMesh
+		if b_mesh:
+			b_mesh.size = Vector3(width - 0.01, height - 0.01, 0.03)
 
 
 func _trigger_haptic_on_interactor(interactor: Node) -> void:

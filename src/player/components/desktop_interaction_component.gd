@@ -46,6 +46,10 @@ var _look_target: Node = null
 var _left_original_parent: Node = null
 var _right_original_parent: Node = null
 
+# Active pointer interaction targets
+var _left_interact_target: Node = null
+var _right_interact_target: Node = null
+
 
 func setup(p_camera: Camera3D, p_center_pointer: Node) -> void:
 	camera = p_camera
@@ -94,11 +98,15 @@ func _input(event: InputEvent) -> void:
 	if not enabled or not camera:
 		return
 	
-	# E/F keys toggle pickup
+	# E/F keys handle interaction (press and release)
 	if event.is_action_pressed("pickup_left"):
-		_toggle_pickup(Slot.LEFT)
+		_handle_interaction(Slot.LEFT, true)
+	elif event.is_action_released("pickup_left"):
+		_handle_interaction(Slot.LEFT, false)
 	elif event.is_action_pressed("pickup_right"):
-		_toggle_pickup(Slot.RIGHT)
+		_handle_interaction(Slot.RIGHT, true)
+	elif event.is_action_released("pickup_right"):
+		_handle_interaction(Slot.RIGHT, false)
 	
 	# Distance adjustment with mouse wheel
 	if event is InputEventMouseButton:
@@ -144,48 +152,76 @@ func _update_look_target() -> void:
 			print("DesktopInteractionComponent: Looking at ", _look_target.name)
 
 
-func _toggle_pickup(slot: int) -> void:
-	var held = _get_held_item(slot)
-	if held:
-		drop_item(slot)
+func _handle_interaction(slot: int, is_press: bool) -> void:
+	if is_press:
+		var held = _get_held_item(slot)
+		if held:
+			drop_item(slot)
+		else:
+			# Try to interact with pointer-based objects first
+			var target = _try_interact_look_target(true)
+			if target:
+				if slot == Slot.LEFT: _left_interact_target = target
+				else: _right_interact_target = target
+				return
+			
+			# Fallback to pickup
+			pickup_item(slot)
 	else:
-		if _try_interact_look_target():
-			return
-		pickup_item(slot)
+		# Handle release
+		var target = _left_interact_target if slot == Slot.LEFT else _right_interact_target
+		if target:
+			_send_pointer_event(target, "release")
+			if slot == Slot.LEFT: _left_interact_target = null
+			else: _right_interact_target = null
 
 
-func _try_interact_look_target() -> bool:
-	"""If the looked-at target is pointer-interactable but not grabbable, trigger a press event."""
+func _try_interact_look_target(is_press: bool) -> Node:
+	"""If the looked-at target is pointer-interactable, trigger an event and return the target."""
 	if not _look_target:
-		return false
-	if _look_target.is_in_group("grabbable"):
-		return false
-	if not (_look_target.is_in_group("pointer_interactable") or _look_target.has_method("handle_pointer_event")):
-		return false
+		return null
+	if _look_target.is_in_group("grabbable") and is_press:
+		return null
+	
+	var is_pointer_friendly = _look_target.is_in_group("pointer_interactable") or \
+							  _look_target.has_method("handle_pointer_event")
+	
+	if not is_pointer_friendly:
+		return null
 
+	if is_press:
+		_send_pointer_event(_look_target, "press")
+		if debug_logs:
+			print("DesktopInteractionComponent: Triggered pointer press on ", _look_target.name)
+		return _look_target
+	
+	return null
+
+
+func _send_pointer_event(target: Node, type: String) -> void:
+	if not target or not target.has_method("handle_pointer_event"):
+		return
+		
 	var event := {
-		"type": "press",
+		"type": type,
 		"pointer": center_pointer,
 		"controller": null,
-		"collider": _look_target,
-		"handler": _look_target,
-		"global_position": (_look_target as Node3D).global_position if _look_target is Node3D else Vector3.ZERO,
+		"collider": target,
+		"handler": target,
+		"global_position": (target as Node3D).global_position if target is Node3D else Vector3.ZERO,
 		"global_normal": Vector3.UP,
 		"pointer_origin": camera.global_position if camera else Vector3.ZERO,
 		"pointer_direction": -camera.global_transform.basis.z if camera else Vector3.FORWARD,
 		"distance": 0.0,
 		"action": "trigger_click",
-		"action_pressed": true,
-		"action_just_pressed": true,
-		"action_just_released": false,
-		"action_strength": 1.0,
+		"action_pressed": (type == "press" or type == "hold"),
+		"action_just_pressed": (type == "press"),
+		"action_just_released": (type == "release"),
+		"action_strength": 1.0 if (type == "press" or type == "hold") else 0.0,
 	}
-	if _look_target.has_method("handle_pointer_event"):
-		_look_target.call_deferred("handle_pointer_event", event)
-		if debug_logs:
-			print("DesktopInteractionComponent: Triggered pointer press on ", _look_target.name)
-		return true
-	return false
+	
+	# Use call_deferred to avoid physics state issues
+	target.call_deferred("handle_pointer_event", event)
 
 
 func pickup_item(slot: int) -> void:
