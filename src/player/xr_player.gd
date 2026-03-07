@@ -107,8 +107,23 @@ var _base_xr_camera_far: float = 4000.0
 var _base_desktop_camera_near: float = 0.05
 var _base_desktop_camera_far: float = 4000.0
 var _last_logged_physics_hand_scale: float = -1.0
-var _base_left_tracked_hand_global_scale: float = -1.0
-var _base_right_tracked_hand_global_scale: float = -1.0
+var _base_hand_visual_transforms: Dictionary = {}
+var _left_watch_wrist_offset: Transform3D = Transform3D.IDENTITY
+var _has_left_watch_wrist_offset: bool = false
+var _hand_bone_fallback_logged: Dictionary = {}
+var _left_hand_target_anchor: Node3D = null
+var _right_hand_target_anchor: Node3D = null
+var _left_hand_target_offset: Transform3D = Transform3D.IDENTITY
+var _right_hand_target_offset: Transform3D = Transform3D.IDENTITY
+var _left_hand_mesh_anchor_offset: Transform3D = Transform3D.IDENTITY
+var _right_hand_mesh_anchor_offset: Transform3D = Transform3D.IDENTITY
+var _left_hand_pointer_anchor_offset: Transform3D = Transform3D.IDENTITY
+var _right_hand_pointer_anchor_offset: Transform3D = Transform3D.IDENTITY
+var _left_hand_anchor_reference_scale: float = 1.0
+var _right_hand_anchor_reference_scale: float = 1.0
+var _left_hand_anchor_offsets_ready: bool = false
+var _right_hand_anchor_offsets_ready: bool = false
+var _left_watch_reference_scale: float = 1.0
 
 # Poke Interaction
 var left_poke_area: Area3D
@@ -136,6 +151,7 @@ var _local_head_cosmetic: Node3D = null
 
 func _ready() -> void:
 	_cache_base_scales()
+	_ensure_hand_target_anchors()
 	_last_world_scale = XRServer.world_scale
 	_apply_rig_scale()
 
@@ -365,6 +381,7 @@ func _find_node_by_class(node: Node, target_class_name: String) -> Node:
 
 func _setup_physics_hands() -> void:
 	"""Ensure physics hands have valid references after scene transitions"""
+	_ensure_hand_target_anchors()
 	if not physics_hand_left or not physics_hand_right:
 		# Try to find them if references are lost
 		physics_hand_left = get_node_or_null("PhysicsHandLeft")
@@ -372,12 +389,12 @@ func _setup_physics_hands() -> void:
 	
 	if physics_hand_left:
 		physics_hand_left.player_rigidbody = player_body
-		physics_hand_left.target = left_controller
+		physics_hand_left.target = _left_hand_target_anchor if _left_hand_target_anchor else left_controller
 		print("XRPlayer: Physics hand left connected")
 	
 	if physics_hand_right:
 		physics_hand_right.player_rigidbody = player_body
-		physics_hand_right.target = right_controller
+		physics_hand_right.target = _right_hand_target_anchor if _right_hand_target_anchor else right_controller
 		print("XRPlayer: Physics hand right connected")
 
 
@@ -422,6 +439,8 @@ func _process(delta: float) -> void:
 
 func _physics_process(delta: float) -> void:
 	_sync_rig_scale_with_world_scale()
+	_sync_tracker_driven_hand_attachments()
+	_sync_watch_to_tracked_hand()
 	_process_poke_and_pinch(delta)
 
 	# Handle raycasts in physics process to avoid Jolt "Space state inaccessible" errors
@@ -450,6 +469,226 @@ func _physics_process(delta: float) -> void:
 		movement_component.physics_process_locomotion(delta)
 
 	_sync_head_follow_rigidbody_shape(delta)
+
+
+func _sync_tracker_driven_hand_attachments() -> void:
+	_ensure_hand_target_anchors()
+	_sync_single_hand_tracked_attachment(
+		"/user/hand_tracker/left",
+		left_hand_tracker_node,
+		left_hand_skeleton,
+		left_controller,
+		left_hand_mesh,
+		left_hand_pointer,
+		_left_hand_target_anchor,
+		true
+	)
+	_sync_single_hand_tracked_attachment(
+		"/user/hand_tracker/right",
+		right_hand_tracker_node,
+		right_hand_skeleton,
+		right_controller,
+		right_hand_mesh,
+		right_hand_pointer,
+		_right_hand_target_anchor,
+		false
+	)
+
+
+func _sync_single_hand_tracked_attachment(
+	tracker_path: String,
+	tracker_node: XRNode3D,
+	hand_skeleton_node: Node,
+	controller_node: XRController3D,
+	hand_mesh_node: Node3D,
+	hand_pointer_node: Node3D,
+	target_anchor: Node3D,
+	is_left: bool
+) -> void:
+	var tracker: XRHandTracker = XRServer.get_tracker(tracker_path) as XRHandTracker
+	if not tracker or not tracker.has_tracking_data or not tracker_node:
+		_restore_controller_hand_attachment_state(controller_node, hand_mesh_node, hand_pointer_node, target_anchor, is_left)
+		return
+
+	var hand_anchor_names: PackedStringArray = PackedStringArray(["LeftPalm", "LeftHand", "Palm", "Hand"]) if is_left else PackedStringArray(["RightPalm", "RightHand", "Palm", "Hand"])
+	var attachment_name: String = "CodexLeftHandAnchor" if is_left else "CodexRightHandAnchor"
+	var anchor_world: Transform3D = _get_hand_attachment_world_transform(
+		hand_skeleton_node,
+		attachment_name,
+		hand_anchor_names,
+		tracker,
+		0
+	)
+	if anchor_world == Transform3D():
+		anchor_world = tracker_node.global_transform.orthonormalized()
+		if anchor_world == Transform3D():
+			_restore_controller_hand_attachment_state(controller_node, hand_mesh_node, hand_pointer_node, target_anchor, is_left)
+			return
+
+	_initialize_hand_anchor_offsets(anchor_world, controller_node, hand_mesh_node, hand_pointer_node, is_left)
+
+	var current_hand_scale: float = 1.0
+	if hand_skeleton_node and hand_skeleton_node is Node3D:
+		current_hand_scale = maxf(_get_uniform_global_scale(hand_skeleton_node as Node3D), 0.0001)
+	var reference_scale: float = _left_hand_anchor_reference_scale if is_left else _right_hand_anchor_reference_scale
+	var offset_scale: float = current_hand_scale / maxf(reference_scale, 0.0001)
+
+	var target_offset: Transform3D = _scale_offset_transform(_left_hand_target_offset if is_left else _right_hand_target_offset, offset_scale)
+	if target_anchor:
+		target_anchor.global_transform = (anchor_world * target_offset).orthonormalized()
+
+	var mesh_offset: Transform3D = _scale_offset_transform(_left_hand_mesh_anchor_offset if is_left else _right_hand_mesh_anchor_offset, offset_scale)
+	var pointer_offset: Transform3D = _scale_offset_transform(_left_hand_pointer_anchor_offset if is_left else _right_hand_pointer_anchor_offset, offset_scale)
+	_apply_anchor_pose_to_node(hand_mesh_node, anchor_world, mesh_offset)
+	_apply_anchor_pose_to_node(hand_pointer_node, anchor_world, pointer_offset)
+
+
+func _initialize_hand_anchor_offsets(
+	anchor_world: Transform3D,
+	controller_node: XRController3D,
+	hand_mesh_node: Node3D,
+	hand_pointer_node: Node3D,
+	is_left: bool
+) -> void:
+	if is_left and _left_hand_anchor_offsets_ready:
+		return
+	if not is_left and _right_hand_anchor_offsets_ready:
+		return
+
+	var target_offset: Transform3D = Transform3D.IDENTITY
+	if controller_node:
+		target_offset = (anchor_world.affine_inverse() * controller_node.global_transform).orthonormalized()
+	var mesh_offset: Transform3D = Transform3D.IDENTITY
+	if hand_mesh_node:
+		mesh_offset = (anchor_world.affine_inverse() * hand_mesh_node.global_transform).orthonormalized()
+	var pointer_offset: Transform3D = Transform3D.IDENTITY
+	if hand_pointer_node:
+		pointer_offset = (anchor_world.affine_inverse() * hand_pointer_node.global_transform).orthonormalized()
+	var reference_scale: float = 1.0
+	var skeleton_node: Node3D = hand_mesh_node
+	if is_left and left_hand_skeleton and left_hand_skeleton is Node3D:
+		skeleton_node = left_hand_skeleton as Node3D
+	elif not is_left and right_hand_skeleton and right_hand_skeleton is Node3D:
+		skeleton_node = right_hand_skeleton as Node3D
+	if skeleton_node:
+		reference_scale = maxf(_get_uniform_global_scale(skeleton_node), 0.0001)
+
+	if is_left:
+		_left_hand_target_offset = target_offset
+		_left_hand_mesh_anchor_offset = mesh_offset
+		_left_hand_pointer_anchor_offset = pointer_offset
+		_left_hand_anchor_reference_scale = reference_scale
+		_left_hand_anchor_offsets_ready = true
+	else:
+		_right_hand_target_offset = target_offset
+		_right_hand_mesh_anchor_offset = mesh_offset
+		_right_hand_pointer_anchor_offset = pointer_offset
+		_right_hand_anchor_reference_scale = reference_scale
+		_right_hand_anchor_offsets_ready = true
+
+
+func _restore_controller_hand_attachment_state(
+	controller_node: XRController3D,
+	hand_mesh_node: Node3D,
+	hand_pointer_node: Node3D,
+	target_anchor: Node3D,
+	is_left: bool
+) -> void:
+	if target_anchor and controller_node:
+		target_anchor.global_transform = controller_node.global_transform.orthonormalized()
+	_restore_controller_attached_node(hand_mesh_node)
+	_restore_controller_attached_node(hand_pointer_node)
+	if is_left:
+		_restore_controller_attached_node(left_watch)
+		_has_left_watch_wrist_offset = false
+		_left_hand_anchor_offsets_ready = false
+	else:
+		_right_hand_anchor_offsets_ready = false
+
+
+func _restore_controller_attached_node(node: Node3D) -> void:
+	if not node or not is_instance_valid(node):
+		return
+	var base_transform_var: Variant = _base_hand_visual_transforms.get(node, Transform3D.IDENTITY)
+	if not (base_transform_var is Transform3D):
+		return
+	var base_transform: Transform3D = (base_transform_var as Transform3D).orthonormalized()
+	var current_local_scale: Vector3 = node.transform.basis.get_scale()
+	var restored: Transform3D = base_transform
+	restored.basis = restored.basis.scaled(current_local_scale)
+	node.transform = restored
+
+
+func _apply_anchor_pose_to_node(node: Node3D, anchor_world: Transform3D, offset: Transform3D) -> void:
+	if not node or not is_instance_valid(node):
+		return
+	var desired_pose: Transform3D = (anchor_world * offset).orthonormalized()
+	_set_node_global_pose_preserve_scale(node, desired_pose)
+
+
+func _set_node_global_pose_preserve_scale(node: Node3D, desired_pose: Transform3D) -> void:
+	if not node or not is_instance_valid(node):
+		return
+	var current_global_scale: Vector3 = node.global_transform.basis.get_scale()
+	var target_transform: Transform3D = desired_pose.orthonormalized()
+	target_transform.basis = target_transform.basis.scaled(current_global_scale)
+	node.global_transform = target_transform
+
+
+func _scale_offset_transform(offset: Transform3D, scale_factor: float) -> Transform3D:
+	var scaled_offset := offset
+	scaled_offset.origin *= scale_factor
+	return scaled_offset
+
+
+func _get_hand_attachment_world_transform(
+	hand_skeleton_node: Node,
+	attachment_name: String,
+	bone_names: PackedStringArray,
+	tracker: XRHandTracker,
+	fallback_joint: int
+) -> Transform3D:
+	var attachment: BoneAttachment3D = _ensure_hand_bone_attachment(hand_skeleton_node, attachment_name, bone_names)
+	if attachment and is_instance_valid(attachment):
+		return attachment.global_transform.orthonormalized()
+	return _get_hand_bone_world_transform(hand_skeleton_node, bone_names, tracker, fallback_joint)
+
+
+func _ensure_hand_bone_attachment(
+	hand_skeleton_node: Node,
+	attachment_name: String,
+	bone_names: PackedStringArray
+) -> BoneAttachment3D:
+	var skeleton: Skeleton3D = _resolve_hand_skeleton3d(hand_skeleton_node)
+	if not skeleton:
+		return null
+
+	var existing := skeleton.get_node_or_null(attachment_name)
+	if existing and existing is BoneAttachment3D:
+		return existing as BoneAttachment3D
+
+	for bone_name in bone_names:
+		var bone_idx: int = _find_bone_index_by_name(skeleton, bone_name)
+		if bone_idx < 0:
+			continue
+		var attachment := BoneAttachment3D.new()
+		attachment.name = attachment_name
+		attachment.bone_name = bone_name
+		skeleton.add_child(attachment)
+		return attachment
+
+	return null
+
+
+func _resolve_hand_skeleton3d(hand_skeleton_node: Node) -> Skeleton3D:
+	if not hand_skeleton_node:
+		return null
+	if hand_skeleton_node is Skeleton3D:
+		return hand_skeleton_node as Skeleton3D
+	for child in hand_skeleton_node.get_children():
+		if child is Skeleton3D:
+			return child as Skeleton3D
+	return null
 
 
 func _sync_rig_scale_with_world_scale() -> void:
@@ -727,12 +966,12 @@ func _cache_base_scales() -> void:
 		_base_desktop_camera_near = maxf(desktop_camera.near, 0.0001)
 		_base_desktop_camera_far = maxf(desktop_camera.far, _base_desktop_camera_near + 1.0)
 	_cache_hand_visual_data()
-	_cache_tracked_hand_scale_bases()
 
 
 func _cache_hand_visual_data() -> void:
 	_hand_visual_nodes.clear()
 	_base_hand_visual_scales.clear()
+	_base_hand_visual_transforms.clear()
 
 	var hand_visual_candidates: Array = [
 		left_hand_mesh,
@@ -750,10 +989,24 @@ func _cache_hand_visual_data() -> void:
 			var node3d := node as Node3D
 			_hand_visual_nodes.append(node3d)
 			_base_hand_visual_scales[node3d] = node3d.scale
+			_base_hand_visual_transforms[node3d] = node3d.transform
+
+
+func _ensure_hand_target_anchors() -> void:
+	if not xr_origin:
+		return
+	if not _left_hand_target_anchor:
+		_left_hand_target_anchor = Node3D.new()
+		_left_hand_target_anchor.name = "LeftHandTargetAnchor"
+		xr_origin.add_child(_left_hand_target_anchor)
+	if not _right_hand_target_anchor:
+		_right_hand_target_anchor = Node3D.new()
+		_right_hand_target_anchor.name = "RightHandTargetAnchor"
+		xr_origin.add_child(_right_hand_target_anchor)
 
 
 func _apply_rig_scale() -> void:
-	var world_factor := XRServer.world_scale if scale_rig_with_world_scale else 1.0
+	var world_factor: float = XRServer.world_scale if scale_rig_with_world_scale else 1.0
 	var combined_scale := _manual_player_scale * world_factor
 	_current_rig_scale = combined_scale
 	var left_target_scale := combined_scale
@@ -850,11 +1103,6 @@ func _node_scale_to_string(node: Node3D) -> String:
 	return "(%.4f, %.4f, %.4f)" % [s.x, s.y, s.z]
 
 
-func _cache_tracked_hand_scale_bases() -> void:
-	_base_left_tracked_hand_global_scale = _get_uniform_global_scale(left_hand_skeleton)
-	_base_right_tracked_hand_global_scale = _get_uniform_global_scale(right_hand_skeleton)
-
-
 func _get_uniform_global_scale(node: Node3D) -> float:
 	if not node:
 		return -1.0
@@ -862,24 +1110,13 @@ func _get_uniform_global_scale(node: Node3D) -> float:
 	return (absf(s.x) + absf(s.y) + absf(s.z)) / 3.0
 
 
-func _get_tracked_hand_scale_factor(tracked_node: Node3D, is_left: bool, fallback_scale: float) -> float:
+func _get_tracked_hand_scale_factor(tracked_node: Node3D, _is_left: bool, fallback_scale: float) -> float:
 	if not tracked_node:
 		return fallback_scale
 	var tracked_scale := _get_uniform_global_scale(tracked_node)
 	if tracked_scale <= 0.0001:
 		return fallback_scale
-
-	var base_scale := _base_left_tracked_hand_global_scale if is_left else _base_right_tracked_hand_global_scale
-	if base_scale <= 0.0001:
-		base_scale = tracked_scale
-		if is_left:
-			_base_left_tracked_hand_global_scale = base_scale
-		else:
-			_base_right_tracked_hand_global_scale = base_scale
-	if base_scale <= 0.0001:
-		return fallback_scale
-	# Preserve rig/world scaling while still inheriting tracked-hand-relative size changes.
-	return fallback_scale * (tracked_scale / base_scale)
+	return tracked_scale
 
 
 func _apply_cube_hand_mesh_scale(hand_mesh_node: Node3D, target_scale: float) -> void:
@@ -1399,6 +1636,110 @@ func _create_poke_visual(p_name: String) -> MeshInstance3D:
 	return mesh_inst
 
 
+func _sync_watch_to_tracked_hand() -> void:
+	if not left_watch or not is_instance_valid(left_watch):
+		return
+	var left_tracker := XRServer.get_tracker("/user/hand_tracker/left") as XRHandTracker
+	if not left_tracker or not left_tracker.has_tracking_data:
+		_has_left_watch_wrist_offset = false
+		return
+
+	var wrist_world := _get_hand_attachment_world_transform(
+		left_hand_skeleton,
+		"CodexLeftWatchAnchor",
+		PackedStringArray(["LeftWrist", "Wrist", "LeftHand", "LeftPalm"]),
+		left_tracker,
+		0
+	)
+	if wrist_world == Transform3D():
+		_has_left_watch_wrist_offset = false
+		return
+
+	if not _has_left_watch_wrist_offset:
+		_left_watch_wrist_offset = wrist_world.affine_inverse() * left_watch.global_transform
+		_left_watch_reference_scale = maxf(_get_uniform_global_scale(left_hand_skeleton), 0.0001)
+		_has_left_watch_wrist_offset = true
+
+	var watch_offset_scale := maxf(_get_uniform_global_scale(left_hand_skeleton), 0.0001) / maxf(_left_watch_reference_scale, 0.0001)
+	_set_node_global_pose_preserve_scale(left_watch, wrist_world * _scale_offset_transform(_left_watch_wrist_offset, watch_offset_scale))
+
+
+func _get_hand_bone_world_transform(
+	hand_skeleton_node: Node,
+	bone_names: PackedStringArray,
+	tracker: XRHandTracker,
+	fallback_joint: int
+) -> Transform3D:
+	# Preferred path: use rendered hand skeleton pose so visuals + interaction stay aligned.
+	var bone_source: Node3D = _resolve_hand_bone_source(hand_skeleton_node)
+	if bone_source:
+		for bone_name in bone_names:
+			var bone_idx: int = _find_bone_index_by_name(bone_source, bone_name)
+			if bone_idx >= 0:
+				var bone_pose: Transform3D = _get_bone_pose_transform(bone_source, bone_idx)
+				if bone_pose != Transform3D():
+					return (bone_source.global_transform * bone_pose).orthonormalized()
+
+	# Fallback path: tracker joint transformed through xr_origin.
+	if tracker and xr_origin:
+		var fallback_key: String = "|".join(PackedStringArray(bone_names))
+		if not _hand_bone_fallback_logged.has(fallback_key):
+			_hand_bone_fallback_logged[fallback_key] = true
+			push_warning("XRPlayer: Hand bone fallback to tracker joint for " + fallback_key)
+		var joint_xform := tracker.get_hand_joint_transform(fallback_joint as XRHandTracker.HandJoint)
+		if joint_xform != Transform3D():
+			var ws := maxf(XRServer.world_scale, 0.0001)
+			joint_xform.origin /= ws
+			return (xr_origin.global_transform * joint_xform).orthonormalized()
+
+	return Transform3D()
+
+
+func _resolve_hand_bone_source(hand_skeleton_node: Node) -> Node3D:
+	if not hand_skeleton_node:
+		return null
+	if hand_skeleton_node is Node3D:
+		var node3d := hand_skeleton_node as Node3D
+		if node3d.has_method("get_bone_count") and node3d.has_method("get_bone_name"):
+			return node3d
+	for child in hand_skeleton_node.get_children():
+		if child is Node3D:
+			var child3d := child as Node3D
+			if child3d.has_method("get_bone_count") and child3d.has_method("get_bone_name"):
+				return child3d
+	return null
+
+
+func _find_bone_index_by_name(bone_source: Node3D, bone_name: String) -> int:
+	if bone_source.has_method("find_bone"):
+		var idx_variant: Variant = bone_source.call("find_bone", bone_name)
+		if typeof(idx_variant) == TYPE_INT:
+			return int(idx_variant)
+	if not bone_source.has_method("get_bone_count") or not bone_source.has_method("get_bone_name"):
+		return -1
+	var count_variant: Variant = bone_source.call("get_bone_count")
+	if typeof(count_variant) != TYPE_INT:
+		return -1
+	var count: int = int(count_variant)
+	for i in count:
+		var n_variant: Variant = bone_source.call("get_bone_name", i)
+		if n_variant is String and String(n_variant) == bone_name:
+			return i
+	return -1
+
+
+func _get_bone_pose_transform(bone_source: Node3D, bone_idx: int) -> Transform3D:
+	if bone_source.has_method("get_bone_global_pose"):
+		var pose_variant: Variant = bone_source.call("get_bone_global_pose", bone_idx)
+		if pose_variant is Transform3D:
+			return pose_variant
+	if bone_source.has_method("get_bone_pose"):
+		var local_pose_variant: Variant = bone_source.call("get_bone_pose", bone_idx)
+		if local_pose_variant is Transform3D:
+			return local_pose_variant
+	return Transform3D()
+
+
 func _process_poke_and_pinch(_delta: float) -> void:
 	var left_tracker := XRServer.get_tracker("/user/hand_tracker/left") as XRHandTracker
 	var right_tracker := XRServer.get_tracker("/user/hand_tracker/right") as XRHandTracker
@@ -1406,7 +1747,7 @@ func _process_poke_and_pinch(_delta: float) -> void:
 	# --- Left Hand ---
 	if left_tracker and left_tracker.has_tracking_data:
 		# Update Poke Position (Index Tip = 10)
-		var left_tip_world := _get_index_tip_world_transform(left_tracker, left_hand_skeleton)
+		var left_tip_world := _get_index_tip_world_transform(left_tracker, left_hand_skeleton, true)
 		if left_poke_area and left_tip_world != Transform3D():
 			left_poke_area.global_transform = left_tip_world
 			_handle_poke_physics(left_poke_area, left_poke_visual, true)
@@ -1421,7 +1762,7 @@ func _process_poke_and_pinch(_delta: float) -> void:
 	# --- Right Hand ---
 	if right_tracker and right_tracker.has_tracking_data:
 		# Update Poke Position
-		var right_tip_world := _get_index_tip_world_transform(right_tracker, right_hand_skeleton)
+		var right_tip_world := _get_index_tip_world_transform(right_tracker, right_hand_skeleton, false)
 		if right_poke_area and right_tip_world != Transform3D():
 			right_poke_area.global_transform = right_tip_world
 			_handle_poke_physics(right_poke_area, right_poke_visual, false)
@@ -1434,22 +1775,12 @@ func _process_poke_and_pinch(_delta: float) -> void:
 		if right_poke_area: right_poke_area.visible = false
 
 
-func _get_index_tip_world_transform(tracker: XRHandTracker, _hand_skeleton_node: Node) -> Transform3D:
-	# Always use tracker data directly for most accurate finger tip position
-	# The skeleton may lag behind or have different transforms
-	if not tracker or not xr_origin:
+func _get_index_tip_world_transform(tracker: XRHandTracker, _hand_skeleton_node: Node, is_left: bool) -> Transform3D:
+	if not tracker:
 		return Transform3D()
-	
-	# Get raw tracker-space joint transform for index tip (joint 10)
-	var index_tip: Transform3D = tracker.get_hand_joint_transform(10 as XRHandTracker.HandJoint)
-	
-	# Check if we got valid tracking data
-	if index_tip == Transform3D():
-		return Transform3D()
-	
-	# Convert tracker space to global space through xr_origin's full transform.
-	# This keeps poke alignment consistent with any rig/world scaling and full rig orientation.
-	return (xr_origin.global_transform * index_tip).orthonormalized()
+	var bone_names: PackedStringArray = PackedStringArray(["LeftIndexTip", "IndexTip"]) if is_left else PackedStringArray(["RightIndexTip", "IndexTip"])
+	var attachment_name: String = "CodexLeftIndexTipAnchor" if is_left else "CodexRightIndexTipAnchor"
+	return _get_hand_attachment_world_transform(_hand_skeleton_node, attachment_name, bone_names, tracker, 10)
 
 
 func _handle_poke_physics(area: Area3D, visual: MeshInstance3D, is_left: bool) -> void:
