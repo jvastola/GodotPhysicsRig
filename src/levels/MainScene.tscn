@@ -231,6 +231,22 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.4440007, -4.1024504, -13.2
 rope_sag_factor = 0.005
 rope_sag_max = 0.5
 
+[node name="GrappleHook2" parent="." unique_id=544351697 instance=ExtResource("42_grapple_hook")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.407224, -4.1024504, -13.2121725)
+impulse_speed = 30.0
+winch_speed = 12.0
+hitmarker_color = Color(0.87230664, 0.38757467, 0.877053, 1)
+rope_sag_factor = 0.005
+rope_sag_max = 0.5
+
+[node name="GrappleHook3" parent="." unique_id=1227973129 instance=ExtResource("42_grapple_hook")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.336992, -4.1024504, -13.2121725)
+impulse_speed = 100.0
+winch_speed = 30.0
+hitmarker_color = Color(0.9496525, 0.00062841916, 0.07511864, 1)
+rope_sag_factor = 0.005
+rope_sag_max = 0.5
+
 [node name="PolyToolExport" parent="." unique_id=1827706603 instance=ExtResource("28_wb7rf")]
 transform = Transform3D(1, 0, 0, 0, 1.6025667, 0, 0, 0, 1, 10.292227, -6.0686765, 2.9155023)
 

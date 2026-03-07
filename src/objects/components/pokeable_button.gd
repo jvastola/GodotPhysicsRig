@@ -14,7 +14,8 @@ signal released()
 @export var key_character: String = "A":
 	set(value):
 		key_character = value
-		_update_label()
+		if is_inside_tree():
+			call_deferred("_update_label")
 @export var width: float = 0.06:
 	set(value):
 		width = value
@@ -51,20 +52,32 @@ func get_collider() -> CollisionObject3D:
 func _update_label() -> void:
 	if not is_inside_tree():
 		return
-		
+	
+	# Wait one frame to ensure all nodes are ready
+	await get_tree().process_frame
+	
 	var label: Label3D = null
+	
+	# Try to get button visual first
+	if not _button_visual and not button_visual_path.is_empty():
+		_button_visual = get_node_or_null(button_visual_path)
+	
+	# Look for label in button visual
 	if _button_visual:
 		label = _button_visual.get_node_or_null("KeyLabel") as Label3D
 	
-	# Fallback: search in common locations
+	# Fallback: search common locations
 	if not label:
 		label = get_node_or_null("ButtonVisual/KeyLabel") as Label3D
+	
+	# Last resort: recursive search
 	if not label:
-		# Try to find any Label3D child recursively
 		label = _find_label3d_recursive(self)
 		
 	if label:
 		label.text = key_character
+	else:
+		push_warning("PokeableButton: Could not find KeyLabel for key_character: " + key_character)
 
 
 func _find_label3d_recursive(node: Node) -> Label3D:

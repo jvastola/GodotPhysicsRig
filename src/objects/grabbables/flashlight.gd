@@ -50,23 +50,6 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-func _process(_delta: float) -> void:
-	# Handle VR trigger input for toggle
-	if is_grabbed and is_instance_valid(_controller):
-		var trigger_pressed: bool = false
-		if _controller.has_method("is_button_pressed"):
-			trigger_pressed = _controller.is_button_pressed("trigger_click")
-		elif _controller.has_method("get_float"):
-			trigger_pressed = _controller.get_float("trigger") > 0.5
-		
-		# Toggle on trigger press (with debounce)
-		if trigger_pressed and not _prev_trigger_pressed:
-			toggle_light()
-		
-		_prev_trigger_pressed = trigger_pressed
-
-
-var _prev_trigger_pressed: bool = false
 var _controller: Node = null
 
 
@@ -101,17 +84,36 @@ func try_grab(hand: RigidBody3D) -> bool:
 	var result := super.try_grab(hand)
 	if result:
 		# Store controller reference for VR input
-		if hand and hand.get_parent() is XRController3D:
-			_controller = hand.get_parent()
+		if hand:
+			var maybe_target = hand.get("target") if hand.has_method("get") else null
+			if not maybe_target and "target" in hand:
+				maybe_target = hand.target
+			
+			if maybe_target and maybe_target is XRController3D:
+				_controller = maybe_target
+				print("Flashlight: Got controller reference: ", _controller.name)
+				# Connect to button pressed signal
+				if not _controller.button_pressed.is_connected(_on_controller_button_pressed):
+					_controller.button_pressed.connect(_on_controller_button_pressed)
+			else:
+				print("Flashlight: Target is not XRController3D, type: ", maybe_target.get_class() if maybe_target else "null")
 		# Clone lights to the hand so they follow the grabbed object
 		_clone_lights_to_hand(hand)
 	return result
 
 
+func _on_controller_button_pressed(button_name: String) -> void:
+	print("Flashlight: Controller button pressed: ", button_name)
+	# Toggle on trigger press
+	if button_name == "trigger_click" or button_name == "ax_button" or button_name == "trigger":
+		toggle_light()
+
+
 func release() -> void:
-	# Clean up cloned lights and controller reference before releasing
+	# Disconnect controller signal and clean up
+	if is_instance_valid(_controller) and _controller.button_pressed.is_connected(_on_controller_button_pressed):
+		_controller.button_pressed.disconnect(_on_controller_button_pressed)
 	_controller = null
-	_prev_trigger_pressed = false
 	_cleanup_cloned_lights()
 	super.release()
 
