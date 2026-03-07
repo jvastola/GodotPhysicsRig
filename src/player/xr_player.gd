@@ -878,7 +878,8 @@ func _get_tracked_hand_scale_factor(tracked_node: Node3D, is_left: bool, fallbac
 			_base_right_tracked_hand_global_scale = base_scale
 	if base_scale <= 0.0001:
 		return fallback_scale
-	return tracked_scale / base_scale
+	# Preserve rig/world scaling while still inheriting tracked-hand-relative size changes.
+	return fallback_scale * (tracked_scale / base_scale)
 
 
 func _apply_cube_hand_mesh_scale(hand_mesh_node: Node3D, target_scale: float) -> void:
@@ -1402,14 +1403,10 @@ func _process_poke_and_pinch(_delta: float) -> void:
 	var left_tracker := XRServer.get_tracker("/user/hand_tracker/left") as XRHandTracker
 	var right_tracker := XRServer.get_tracker("/user/hand_tracker/right") as XRHandTracker
 
-	# World scale is needed for the tracker-space fallback path.
-	# Preferred path uses the rendered hand skeleton tip transform directly.
-	var ws := maxf(XRServer.world_scale, 0.0001)
-
 	# --- Left Hand ---
 	if left_tracker and left_tracker.has_tracking_data:
 		# Update Poke Position (Index Tip = 10)
-		var left_tip_world := _get_index_tip_world_transform(left_tracker, left_hand_skeleton, ws)
+		var left_tip_world := _get_index_tip_world_transform(left_tracker, left_hand_skeleton)
 		if left_poke_area and left_tip_world != Transform3D():
 			left_poke_area.global_transform = left_tip_world
 			_handle_poke_physics(left_poke_area, left_poke_visual, true)
@@ -1424,7 +1421,7 @@ func _process_poke_and_pinch(_delta: float) -> void:
 	# --- Right Hand ---
 	if right_tracker and right_tracker.has_tracking_data:
 		# Update Poke Position
-		var right_tip_world := _get_index_tip_world_transform(right_tracker, right_hand_skeleton, ws)
+		var right_tip_world := _get_index_tip_world_transform(right_tracker, right_hand_skeleton)
 		if right_poke_area and right_tip_world != Transform3D():
 			right_poke_area.global_transform = right_tip_world
 			_handle_poke_physics(right_poke_area, right_poke_visual, false)
@@ -1437,7 +1434,7 @@ func _process_poke_and_pinch(_delta: float) -> void:
 		if right_poke_area: right_poke_area.visible = false
 
 
-func _get_index_tip_world_transform(tracker: XRHandTracker, hand_skeleton_node: Node, ws: float) -> Transform3D:
+func _get_index_tip_world_transform(tracker: XRHandTracker, _hand_skeleton_node: Node) -> Transform3D:
 	# Always use tracker data directly for most accurate finger tip position
 	# The skeleton may lag behind or have different transforms
 	if not tracker or not xr_origin:
@@ -1450,10 +1447,9 @@ func _get_index_tip_world_transform(tracker: XRHandTracker, hand_skeleton_node: 
 	if index_tip == Transform3D():
 		return Transform3D()
 	
-	# Adjust for world scale and convert to global space
-	var adjusted := index_tip
-	adjusted.origin /= ws
-	return (xr_origin.global_transform * adjusted).orthonormalized()
+	# Convert tracker space to global space through xr_origin's full transform.
+	# This keeps poke alignment consistent with any rig/world scaling and full rig orientation.
+	return (xr_origin.global_transform * index_tip).orthonormalized()
 
 
 func _handle_poke_physics(area: Area3D, visual: MeshInstance3D, is_left: bool) -> void:

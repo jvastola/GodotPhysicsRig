@@ -126,9 +126,11 @@ func _process(delta: float) -> void:
 	gtf.basis = Basis(out_quat)
 	_needle.global_transform = gtf
 
-	# Handle watch scaling when looked at
+	# Handle watch scaling when looked at.
+	# The watch already inherits player rig scale from its parent controller,
+	# so do not multiply by rig scale again here.
 	var target_scale_val = looked_at_scale if _hit_player else 1.0
-	var target_scale_vec = _base_scale * _rig_scale_multiplier * target_scale_val
+	var target_scale_vec = _base_scale * target_scale_val
 	scale = scale.lerp(target_scale_vec, scale_smoothing * delta)
 	
 	# Handle joystick toggle for UI

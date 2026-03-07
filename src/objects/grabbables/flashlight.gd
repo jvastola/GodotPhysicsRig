@@ -103,9 +103,8 @@ func try_grab(hand: RigidBody3D) -> bool:
 
 
 func _on_controller_button_pressed(button_name: String) -> void:
-	print("Flashlight: Controller button pressed: ", button_name)
-	# Toggle on trigger press
-	if button_name == "trigger_click" or button_name == "ax_button" or button_name == "trigger":
+	# Toggle on trigger press (VR controllers send "index_pinch" for trigger)
+	if button_name == "trigger_click" or button_name == "trigger" or button_name == "index_pinch":
 		toggle_light()
 
 

@@ -124,6 +124,12 @@ func _update_networking(delta: float) -> void:
 
 func _get_player_scale_for_network() -> Vector3:
 	var player_root := get_parent()
+	if player_root and player_root.has_method("_get_uniform_global_scale"):
+		var body_mesh := player_root.get_node_or_null("PlayerBody/XROrigin3D/XRCamera3D/HeadArea/BodyMesh") as Node3D
+		if body_mesh:
+			var visual_scale := float(player_root.call("_get_uniform_global_scale", body_mesh))
+			if is_finite(visual_scale) and visual_scale > 0.0:
+				return Vector3.ONE * visual_scale
 	if player_root and player_root.has_method("get_rig_scale_multiplier"):
 		var rig_scale := float(player_root.call("get_rig_scale_multiplier"))
 		if is_finite(rig_scale) and rig_scale > 0.0:

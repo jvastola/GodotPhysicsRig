@@ -54,9 +54,6 @@ func _update_label() -> void:
 	if not is_inside_tree():
 		return
 	
-	# Wait one frame to ensure all nodes are ready
-	await get_tree().process_frame
-	
 	var label: Label3D = null
 	
 	# Try to get button visual first
