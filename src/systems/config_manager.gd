@@ -8,7 +8,7 @@ const USER_CONFIG_PATH = "user://config.json"
 var _config: Dictionary = {
 	"nakama_host": "158.101.21.99",
 	"nakama_port": 7350,
-	"nakama_server_key": "defaultkey",
+	"nakama_server_key": "c4e7a2f9b6d3e0c8a5f2b9e6d3c0a7f4b1e8d5c2a9f6e3b0d7c4a1e8f5b2d9",
 	"nakama_use_ssl": false,
 	"auth_service_url": ""
 }

@@ -18,7 +18,7 @@ signal display_name_changed(new_name)
 # Nakama connection settings
 var nakama_host: String = "158.101.21.99"  # Oracle Cloud server
 var nakama_port: int = 7350
-var nakama_server_key: String = "defaultkey"
+var nakama_server_key: String = "c4e7a2f9b6d3e0c8a5f2b9e6d3c0a7f4b1e8d5c2a9f6e3b0d7c4a1e8f5b2d9"
 # Default to non-SSL; common development Nakama instances run on 7350 without TLS.
 # Set this to true (and port 7443) for production servers with proper certificates.
 var nakama_use_ssl: bool = false
