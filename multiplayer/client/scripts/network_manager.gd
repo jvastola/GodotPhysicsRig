@@ -506,6 +506,9 @@ func _on_nakama_match_presence(joins: Array, leaves: Array) -> void:
 		if is_server():
 			_send_room_snapshot_to_peer(user_id)
 		
+		# Re-broadcast our display name and cosmetics to the new player
+		call_deferred("_rebroadcast_local_state")
+		
 	for leave in leaves:
 		var user_id = leave.get("user_id", "")
 		if user_id != my_id and not user_id.is_empty():
@@ -521,6 +524,14 @@ func _on_nakama_match_presence(joins: Array, leaves: Array) -> void:
 				_set_host_peer_id(_get_host_peer_id())
 			_handle_peer_disconnect_objects(user_id)
 			player_disconnected.emit(user_id)
+
+
+func _rebroadcast_local_state() -> void:
+	"""Re-broadcast local player's display name and cosmetics when a new player joins"""
+	# Re-broadcast display name
+	set_local_display_name(local_player_info.get("name", ""), true)
+	# Re-broadcast cosmetics
+	set_local_equipped_cosmetics(local_player_info.get("equipped_cosmetics", {}), true)
 
 
 func _handle_nakama_player_transform(sender_id: String, data: Dictionary) -> void:

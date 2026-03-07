@@ -466,7 +466,7 @@ visible = false
 transform = Transform3D(-0.3159503, 0, 0.05074847, 0, 0.32, 0, -0.05074847, 0, -0.3159503, -3.5784981, -3.4928527, -0.42502117)
 
 [node name="MetaStoreTrigger" parent="." unique_id=497265201 instance=ExtResource("46_sv5fj")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1998911, 0, -38.001358)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.091831, -3.9423923, -19.337698)
 
 [node name="Flashlight" parent="." unique_id=2109123456 instance=ExtResource("56_flashlight")]
 transform = Transform3D(1, 0, 0, 0, 0.99939084, -0.034899496, 0, 0.034899496, 0.99939084, 0.69364953, 0.862393, -37.39026)
@@ -482,6 +482,7 @@ dark_light_energy = 0.07
 shape = SubResource("BoxShape3D_dark_zone")
 
 [node name="Visual" type="MeshInstance3D" parent="DarkZoneArea" unique_id=2109456789]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.046513, -8.111523, 3.7276745)
 material_override = SubResource("StandardMaterial3D_dark_zone_visual")
 cast_shadow = 0
 mesh = SubResource("BoxMesh_dark_zone_visual")
@@ -493,6 +494,11 @@ transform = Transform3D(1, 0, 0, 0, -0.13312131, 0.9910998, 0, -0.9910998, -0.13
 transform = Transform3D(-0.81215477, -0.5688935, 0.12947917, 0, 0.22192292, 0.97506416, -0.5834421, 0.791903, -0.18023576, -3.7802553, 0, -38.14638)
 
 [node name="CosmeticHatStand" parent="." unique_id=1210930162 instance=ExtResource("49_nwdyy")]
-transform = Transform3D(-0.99998283, 0, 0.005846709, 0, 1, 0, -0.005846709, 0, -0.99998283, -2.5797398, 0, -35.32404)
+transform = Transform3D(-0.99998283, 0, 0.005846709, 0, 1, 0, -0.005846709, 0, -0.99998283, 11.9334955, -5.762139, 19.922464)
+item_id = "hat_duck"
+
+[node name="CosmeticHatStand2" parent="." unique_id=1533739805 instance=ExtResource("49_nwdyy")]
+transform = Transform3D(-0.99998283, 0, 0.005846709, 0, 1, 0, -0.005846709, 0, -0.99998283, 13.943234, -5.762139, 19.922464)
+item_id = "hat_cowboy"
 
 [editable path="OreDeposit2"]

@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://src/systems/grid_painter.gd" id="4_bwlii"]
 [ext_resource type="Script" uid="uid://b2rt0j5sk03on" path="res://src/levels/loading_scene.gd" id="5_loading"]
 [ext_resource type="PackedScene" path="res://src/player/MinimalXRPointerRig.tscn" id="6_rig"]
+[ext_resource type="PackedScene" uid="uid://cyhj2vjyqxux" path="res://assets/models/duckhat.fbx" id="7_xqwnx"]
 
 [sub_resource type="Environment" id="Environment_second"]
 background_mode = 1
@@ -197,3 +198,6 @@ collision_mask = 32
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="GridPainterTest2/GridTargetBody/GridTargetBodyArea" unique_id=125458638]
 shape = SubResource("BoxShape3D_boq3p")
+
+[node name="duckhat" parent="." unique_id=79382033 instance=ExtResource("7_xqwnx")]
+transform = Transform3D(-11.547345, 2.7911358, -9.157969, -1.6763806e-07, 14.348393, 4.3730564, 9.573862, 3.3664799, -11.045723, -1.9985218, 7.0334654, -2.6599054)

@@ -13,7 +13,6 @@ const CosmeticVisuals = preload("res://src/systems/cosmetic_visuals.gd")
 @onready var preview_anchor: Node3D = $RotatingPlatform/Mannequin/HeadMesh/PreviewAnchor
 @onready var poke_button: PokeableButton = $Geometry/Console/PokeableButton
 @onready var rotating_platform: Node3D = $RotatingPlatform
-@onready var floating_holder: Node3D = $FloatingLabelHolder
 @onready var mannequin_grid_painter: GridPainter = $MannequinGridPainter
 
 var _cooldown_until_msec: int = 0
@@ -46,10 +45,6 @@ func _process(delta: float) -> void:
 	if rotating_platform:
 		rotating_platform.rotate_y(deg_to_rad(rotation_speed * delta))
 	
-	# Float label
-	if floating_holder:
-		floating_holder.position.y = 1.4 + sin(Time.get_ticks_msec() * 0.001 * float_speed) * float_amplitude
-
 
 func _on_button_pressed() -> void:
 	_interact()
@@ -79,7 +74,7 @@ func _setup_preview_mesh() -> void:
 
 	if not CosmeticVisuals:
 		return
-	var preview := CosmeticVisuals.create_head_cosmetic(item_id)
+	var preview := CosmeticVisuals.create_head_cosmetic(item_id, false)
 	if not preview:
 		return
 	

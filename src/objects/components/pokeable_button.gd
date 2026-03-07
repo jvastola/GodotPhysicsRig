@@ -49,15 +49,33 @@ func get_collider() -> CollisionObject3D:
 
 
 func _update_label() -> void:
+	if not is_inside_tree():
+		return
+		
 	var label: Label3D = null
 	if _button_visual:
 		label = _button_visual.get_node_or_null("KeyLabel") as Label3D
-	else:
-		# Fallback for editor or before _ready
+	
+	# Fallback: search in common locations
+	if not label:
 		label = get_node_or_null("ButtonVisual/KeyLabel") as Label3D
+	if not label:
+		# Try to find any Label3D child recursively
+		label = _find_label3d_recursive(self)
 		
 	if label:
 		label.text = key_character
+
+
+func _find_label3d_recursive(node: Node) -> Label3D:
+	"""Recursively find the first Label3D in the node tree"""
+	for child in node.get_children():
+		if child is Label3D:
+			return child as Label3D
+		var found = _find_label3d_recursive(child)
+		if found:
+			return found
+	return null
 
 func _ready() -> void:
 	if not button_visual_path.is_empty():
@@ -66,7 +84,8 @@ func _ready() -> void:
 			_initial_local_pos = _button_visual.position
 	
 	_update_visuals()
-	_update_label()
+	# Defer label update to ensure all nodes are ready
+	call_deferred("_update_label")
 
 	_audio_player = AudioStreamPlayer3D.new()
 	add_child(_audio_player)

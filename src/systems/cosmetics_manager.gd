@@ -11,15 +11,15 @@ const STORAGE_KEY_FALLBACK := "cosmetics_v2"
 const DEFAULT_SLOT := "head"
 
 var _catalog := {
-	"hat_basic_red": {
-		"display_name": "Red Cap",
+	"hat_duck": {
+		"display_name": "Duck Hat",
 		"slot": "head",
-		"price": 120,
-		"currency_type": "gold",
+		"price": 1,
+		"currency_type": "tokens",
 		"auto_equip": true,
 	},
-	"hat_basic_black": {
-		"display_name": "Black Cap",
+	"hat_cowboy": {
+		"display_name": "Cowboy Hat",
 		"slot": "head",
 		"price": 90,
 		"currency_type": "gold",

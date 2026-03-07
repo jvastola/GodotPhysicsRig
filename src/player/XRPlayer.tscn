@@ -124,7 +124,7 @@ cast_shadow = 0
 mesh = SubResource("BoxMesh_hand")
 
 [node name="Watch" type="Node3D" parent="PlayerBody/XROrigin3D/LeftController" unique_id=832495262]
-transform = Transform3D(-2.94803e-08, -0.738337, 0.674431, -3.22737e-08, 0.674431, 0.738338, -0.999999, -2.12286e-22, -4.37114e-08, -0.0622383, 0.0441848, 0)
+transform = Transform3D(-0.53701764, -0.8413047, -0.06178085, -0.41667372, 0.20086402, 0.886587, -0.73348, 0.5018551, -0.45841756, -0.062238306, 0.044184804, 0)
 script = ExtResource("5_watch")
 rotation_axis_local = Vector3(0, 1, 0)
 ray_length = 1.0
@@ -395,7 +395,6 @@ mesh = SubResource("BoxMesh_dcy27")
 script = ExtResource("12_movement")
 locomotion_mode = 0
 turn_mode = 1
-debug_world_grab_logs = false
 auto_respawn_enabled = true
 player_gravity_enabled = true
 player_drag_force = 0.0

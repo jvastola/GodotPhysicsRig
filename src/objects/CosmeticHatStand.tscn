@@ -1,8 +1,8 @@
-[gd_scene load_steps=22 format=3 uid="uid://bb6yl6jr4fv3p"]
+[gd_scene format=3 uid="uid://bb6yl6jr4fv3p"]
 
-[ext_resource type="Script" path="res://src/objects/cosmetic_hat_stand.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://dduid6slk0s05" path="res://src/objects/cosmetic_hat_stand.gd" id="1_script"]
 [ext_resource type="PackedScene" uid="uid://bohsnfhg2ax6d" path="res://src/objects/PokeableButton.tscn" id="2_button"]
-[ext_resource type="Script" path="res://src/systems/grid_painter.gd" id="3_grid_painter"]
+[ext_resource type="Script" uid="uid://dn1tnmxov46vk" path="res://src/systems/grid_painter.gd" id="3_grid_painter"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_base"]
 height = 1.0
@@ -40,7 +40,6 @@ material = SubResource("StandardMaterial3D_glow")
 inner_radius = 0.2
 outer_radius = 0.22
 ring_segments = 16
-radial_segments = 32
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_console"]
 albedo_color = Color(0.15, 0.15, 0.18, 1)
@@ -74,88 +73,83 @@ size = Vector3(0.18, 0.18, 0.18)
 [sub_resource type="BoxMesh" id="BoxMesh_hand"]
 size = Vector3(0.08, 0.08, 0.08)
 
-[node name="CosmeticHatStand" type="StaticBody3D"]
+[node name="CosmeticHatStand" type="StaticBody3D" unique_id=1533739805]
 script = ExtResource("1_script")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1575660551]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 shape = SubResource("CylinderShape3D_base")
 
-[node name="Geometry" type="Node3D" parent="."]
+[node name="Geometry" type="Node3D" parent="." unique_id=1550960924]
 
-[node name="Base" type="MeshInstance3D" parent="Geometry"]
+[node name="Base" type="MeshInstance3D" parent="Geometry" unique_id=1781864179]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+cast_shadow = 0
 mesh = SubResource("CylinderMesh_bottom")
 
-[node name="Pillar" type="MeshInstance3D" parent="Geometry"]
+[node name="Pillar" type="MeshInstance3D" parent="Geometry" unique_id=522449673]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
+cast_shadow = 0
 mesh = SubResource("CylinderMesh_mid")
 
-[node name="GlowRing" type="MeshInstance3D" parent="Geometry"]
+[node name="GlowRing" type="MeshInstance3D" parent="Geometry" unique_id=8203362]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.81, 0)
+cast_shadow = 0
 mesh = SubResource("TorusMesh_ring")
 
-[node name="Console" type="MeshInstance3D" parent="Geometry"]
-transform = Transform3D(1, 0, 0, 0, 0.866025, 0.5, 0, -0.5, 0.866025, 0, 0.7, 0.2)
+[node name="Console" type="MeshInstance3D" parent="Geometry" unique_id=2127570369]
+transform = Transform3D(1, 0, 0, 0, 0.866025, 0.5, 0, -0.5, 0.866025, 0, 0.7, 0.30531448)
+cast_shadow = 0
 mesh = SubResource("BoxMesh_console")
 
-[node name="RotatingPlatform" type="Node3D" parent="."]
+[node name="StatusLabel" type="Label3D" parent="Geometry/Console" unique_id=334430750]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08, 0.051)
+pixel_size = 0.001
+text = "Hat Name"
+outline_size = 8
+
+[node name="PokeableButton" parent="Geometry/Console" unique_id=1948756527 instance=ExtResource("2_button")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0.05)
+
+[node name="RotatingPlatform" type="Node3D" parent="." unique_id=1268590509]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
 
-[node name="GlassDisk" type="MeshInstance3D" parent="RotatingPlatform"]
+[node name="GlassDisk" type="MeshInstance3D" parent="RotatingPlatform" unique_id=2126171393]
+cast_shadow = 0
 mesh = SubResource("CylinderMesh_disk")
 
-[node name="Mannequin" type="Node3D" parent="RotatingPlatform"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 0)
+[node name="Mannequin" type="Node3D" parent="RotatingPlatform" unique_id=886705082]
+transform = Transform3D(1.3, 0, 0, 0, 1.3, 0, 0, 0, 1.3, 0, 0.24776292, 0)
 
-[node name="BodyMesh" type="MeshInstance3D" parent="RotatingPlatform/Mannequin"]
+[node name="BodyMesh" type="MeshInstance3D" parent="RotatingPlatform/Mannequin" unique_id=1239525705]
+cast_shadow = 0
 mesh = SubResource("BoxMesh_body")
 
-[node name="HeadMesh" type="MeshInstance3D" parent="RotatingPlatform/Mannequin"]
+[node name="HeadMesh" type="MeshInstance3D" parent="RotatingPlatform/Mannequin" unique_id=1961164059]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 0)
+cast_shadow = 0
 mesh = SubResource("BoxMesh_head")
 
-[node name="LeftHandMesh" type="MeshInstance3D" parent="RotatingPlatform/Mannequin"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.18, 0, 0)
+[node name="PreviewAnchor" type="Node3D" parent="RotatingPlatform/Mannequin/HeadMesh" unique_id=1207966534]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08767283, 0)
+
+[node name="LeftHandMesh" type="MeshInstance3D" parent="RotatingPlatform/Mannequin" unique_id=354951712]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.22782129, 0.030000031, -0.1789296)
+cast_shadow = 0
 mesh = SubResource("BoxMesh_hand")
 
-[node name="RightHandMesh" type="MeshInstance3D" parent="RotatingPlatform/Mannequin"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.18, 0, 0)
+[node name="RightHandMesh" type="MeshInstance3D" parent="RotatingPlatform/Mannequin" unique_id=962188579]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.25, 0, -0.12366445)
+cast_shadow = 0
 mesh = SubResource("BoxMesh_hand")
 
-[node name="PreviewAnchor" type="Node3D" parent="RotatingPlatform/Mannequin/HeadMesh"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
-
-[node name="Spotlight" type="OmniLight3D" parent="RotatingPlatform"]
+[node name="Spotlight" type="OmniLight3D" parent="RotatingPlatform" unique_id=727522406]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 0)
 light_color = Color(0.6, 0.8, 1, 1)
 light_energy = 2.0
 omni_range = 1.5
 
-[node name="StatusLabel" type="Label3D" parent="Geometry/Console"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08, 0.051)
-pixel_size = 0.001
-text = "Hat Name"
-font_size = 32
-outline_size = 8
-
-[node name="PokeableButton" parent="Geometry/Console" instance=ExtResource("2_button")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0.05)
-key_character = "BUY"
-width = 0.1
-height = 0.05
-max_travel = 0.01
-
-[node name="FloatingLabelHolder" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
-
-[node name="FloatingLabel" type="Label3D" parent="FloatingLabelHolder"]
-billboard = 1
-text = "PREMIUM DISPLAY"
-font_size = 28
-outline_size = 12
-
-[node name="MannequinGridPainter" type="Node3D" parent="."]
+[node name="MannequinGridPainter" type="Node3D" parent="." unique_id=1640021961]
 script = ExtResource("3_grid_painter")
 load_for_player = false
 left_hand_path = NodePath("../RotatingPlatform/Mannequin/LeftHandMesh")

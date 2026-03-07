@@ -282,7 +282,7 @@ func _apply_head_cosmetic(item_id: String) -> void:
 		_head_cosmetic_node = null
 	if item_id.is_empty():
 		return
-	var node := CosmeticVisuals.create_head_cosmetic(item_id)
+	var node := CosmeticVisuals.create_head_cosmetic(item_id, false)
 	if not node:
 		return
 	_head_cosmetic_node = node

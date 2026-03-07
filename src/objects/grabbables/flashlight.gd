@@ -44,10 +44,30 @@ func _ready() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	# Toggle with left click / trigger while held (desktop or VR)
-	if (is_grabbed or is_desktop_grabbed) and event.is_action_pressed("trigger_click"):
+	# Toggle with left click while held (desktop)
+	if is_desktop_grabbed and event.is_action_pressed("trigger_click"):
 		toggle_light()
 		get_viewport().set_input_as_handled()
+
+
+func _process(_delta: float) -> void:
+	# Handle VR trigger input for toggle
+	if is_grabbed and is_instance_valid(_controller):
+		var trigger_pressed: bool = false
+		if _controller.has_method("is_button_pressed"):
+			trigger_pressed = _controller.is_button_pressed("trigger_click")
+		elif _controller.has_method("get_float"):
+			trigger_pressed = _controller.get_float("trigger") > 0.5
+		
+		# Toggle on trigger press (with debounce)
+		if trigger_pressed and not _prev_trigger_pressed:
+			toggle_light()
+		
+		_prev_trigger_pressed = trigger_pressed
+
+
+var _prev_trigger_pressed: bool = false
+var _controller: Node = null
 
 
 func toggle_light() -> void:
@@ -80,13 +100,18 @@ func _apply_light_state() -> void:
 func try_grab(hand: RigidBody3D) -> bool:
 	var result := super.try_grab(hand)
 	if result:
+		# Store controller reference for VR input
+		if hand and hand.get_parent() is XRController3D:
+			_controller = hand.get_parent()
 		# Clone lights to the hand so they follow the grabbed object
 		_clone_lights_to_hand(hand)
 	return result
 
 
 func release() -> void:
-	# Clean up cloned lights before releasing
+	# Clean up cloned lights and controller reference before releasing
+	_controller = null
+	_prev_trigger_pressed = false
 	_cleanup_cloned_lights()
 	super.release()
 
