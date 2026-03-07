@@ -5,6 +5,8 @@ class_name Keyboard3DController
 
 @export var display_label_path: NodePath
 @export var max_length: int = 20
+@export var keypress_sound: AudioStream = preload("res://assets/audio/keypress.ogg")
+@export var pitch_randomness: float = 0.15
 
 var _display_label: Label3D
 var _current_text: String = ""
@@ -22,6 +24,10 @@ func _connect_buttons(root: Node) -> void:
 	for child in root.get_children():
 		if child is PokeableButton:
 			child.pressed.connect(_on_key_pressed.bind(child.key_character))
+			# Configure audio for each button
+			if keypress_sound:
+				child.press_sound = keypress_sound
+				child.pitch_randomness = pitch_randomness
 		
 		# Recursive to find buttons in sub-containers
 		if child.get_child_count() > 0:

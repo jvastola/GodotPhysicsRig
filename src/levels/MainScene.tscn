@@ -230,6 +230,7 @@ grab_mode = 0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.4440007, -4.1024504, -13.2121725)
 rope_sag_factor = 0.005
 rope_sag_max = 0.5
+grab_mode = 1
 
 [node name="GrappleHook2" parent="." unique_id=544351697 instance=ExtResource("42_grapple_hook")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.407224, -4.1024504, -13.2121725)
@@ -238,6 +239,7 @@ winch_speed = 12.0
 hitmarker_color = Color(0.87230664, 0.38757467, 0.877053, 1)
 rope_sag_factor = 0.005
 rope_sag_max = 0.5
+grab_mode = 1
 
 [node name="GrappleHook3" parent="." unique_id=1227973129 instance=ExtResource("42_grapple_hook")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.336992, -4.1024504, -13.2121725)
@@ -246,6 +248,7 @@ winch_speed = 30.0
 hitmarker_color = Color(0.9496525, 0.00062841916, 0.07511864, 1)
 rope_sag_factor = 0.005
 rope_sag_max = 0.5
+grab_mode = 1
 
 [node name="PolyToolExport" parent="." unique_id=1827706603 instance=ExtResource("28_wb7rf")]
 transform = Transform3D(1, 0, 0, 0, 1.6025667, 0, 0, 0, 1, 10.292227, -6.0686765, 2.9155023)
@@ -430,7 +433,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.28916642, 0, -38.455387)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.25949258, 0, -38.708576)
 
 [node name="stick" type="RigidBody3D" parent="." unique_id=78102440 groups=["grabbable", "mining_tool"]]
-transform = Transform3D(0.7, 0, 0, 0, 0.7, 0, 0, 0, 0.7, 2, 0.32582426, -35.550285)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.32582426, -35.550285)
 mass = 0.2
 gravity_scale = 0.3
 contact_monitor = true

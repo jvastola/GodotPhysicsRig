@@ -124,7 +124,7 @@ cast_shadow = 0
 mesh = SubResource("BoxMesh_hand")
 
 [node name="Watch" type="Node3D" parent="PlayerBody/XROrigin3D/LeftController" unique_id=832495262]
-transform = Transform3D(-0.53701764, -0.8413047, -0.06178085, -0.41667372, 0.20086402, 0.886587, -0.73348, 0.5018551, -0.45841756, -0.062238306, 0.044184804, 0)
+transform = Transform3D(-0.03809816, -0.8951821, 0.44406658, -0.49447706, 0.40305698, 0.77008903, -0.86835396, -0.19024211, -0.45800388, -0.062238306, 0.044184804, 0)
 script = ExtResource("5_watch")
 rotation_axis_local = Vector3(0, 1, 0)
 ray_length = 1.0
@@ -132,13 +132,13 @@ show_line = false
 show_hitpoint = false
 
 [node name="PlayerHUDViewport3D" parent="PlayerBody/XROrigin3D/LeftController/Watch" unique_id=1836078463 instance=ExtResource("10_vv0y5")]
-transform = Transform3D(0.1, 0, 0, 0, -4.371139e-09, 0.1, 0, -0.1, -4.371139e-09, 0, 0, 0)
+transform = Transform3D(0.1, 0, 0, 0, -4.371139e-09, 0.1, 0, -0.1, -4.371139e-09, 0, -0.0016567624, 1.4226859e-10)
 
 [node name="UIViewportWatch" parent="PlayerBody/XROrigin3D/LeftController/Watch" unique_id=766114696 instance=ExtResource("18_watch_viewport")]
 transform = Transform3D(0.069999985, 4.440892e-16, 2.220446e-16, -6.528123e-16, 0.032518122, 0.061988477, -4.440892e-16, -0.061988488, 0.03251812, 0, 0.034306794, -0.0764575)
 
 [node name="WatchFace" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch" unique_id=1295475450]
-transform = Transform3D(0.99999964, 1.13670915e-14, -1.7763568e-14, -2.3092649e-14, 1, 4.4703484e-07, 0, -4.4703484e-07, 1, -5.1195637e-17, -0.0040805195, 1.8241344e-09)
+transform = Transform3D(1.1, 2.5401923e-14, 1.11808355e-20, -2.5401923e-14, 1.1, 4.917383e-07, 1.7470944e-22, -4.917383e-07, 1.1, -5.1195637e-17, -0.0040805195, 1.8241344e-09)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_watch_face")
 

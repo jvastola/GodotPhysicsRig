@@ -34,6 +34,7 @@ signal released()
 @export_group("Audio")
 @export var press_sound: AudioStream
 @export var release_sound: AudioStream
+@export var pitch_randomness: float = 0.1  # Random pitch variation (0.0 = none, 1.0 = max)
 
 # Internal state
 var _button_visual: Node3D
@@ -184,6 +185,11 @@ func _on_button_released(_interactor: Node) -> void:
 func _play_sound(stream: AudioStream) -> void:
 	if stream and _audio_player:
 		_audio_player.stream = stream
+		# Add pitch randomness
+		if pitch_randomness > 0.0:
+			_audio_player.pitch_scale = 1.0 + randf_range(-pitch_randomness, pitch_randomness)
+		else:
+			_audio_player.pitch_scale = 1.0
 		_audio_player.play()
 func _update_visuals() -> void:
 	if not is_inside_tree(): return
