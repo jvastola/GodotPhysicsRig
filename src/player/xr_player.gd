@@ -1438,17 +1438,19 @@ func _process_poke_and_pinch(_delta: float) -> void:
 
 
 func _get_index_tip_world_transform(tracker: XRHandTracker, hand_skeleton_node: Node, ws: float) -> Transform3D:
-	# Prefer skeleton tip pose so poke sits exactly on the rendered fingertip.
-	var skeleton := hand_skeleton_node as Skeleton3D
-	if skeleton and skeleton.get_bone_count() > 10:
-		var tip_local: Transform3D = skeleton.get_bone_global_pose(10)
-		return (skeleton.global_transform * tip_local).orthonormalized()
-
-	if not xr_origin:
+	# Always use tracker data directly for most accurate finger tip position
+	# The skeleton may lag behind or have different transforms
+	if not tracker or not xr_origin:
 		return Transform3D()
-
-	# Fallback to raw tracker-space joint transform.
+	
+	# Get raw tracker-space joint transform for index tip (joint 10)
 	var index_tip: Transform3D = tracker.get_hand_joint_transform(10 as XRHandTracker.HandJoint)
+	
+	# Check if we got valid tracking data
+	if index_tip == Transform3D():
+		return Transform3D()
+	
+	# Adjust for world scale and convert to global space
 	var adjusted := index_tip
 	adjusted.origin /= ws
 	return (xr_origin.global_transform * adjusted).orthonormalized()
