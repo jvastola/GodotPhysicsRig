@@ -223,6 +223,24 @@ func _find_hand_from_interactor(interactor: BaseInteractor) -> RigidBody3D:
 	return null
 
 
+func _get_hand_input_controller(hand: RigidBody3D) -> XRController3D:
+	"""Resolve the XR controller used for input for a grabbed hand.
+	The hand may follow a tracker anchor, so `hand.target` is not always the controller."""
+	if not is_instance_valid(hand):
+		return null
+	if hand.has_method("_get_input_controller"):
+		var controller_variant: Variant = hand.call("_get_input_controller")
+		if controller_variant is XRController3D and is_instance_valid(controller_variant):
+			return controller_variant as XRController3D
+	var input_controller_variant: Variant = hand.get("input_controller") if hand.has_method("get") else null
+	if input_controller_variant is XRController3D and is_instance_valid(input_controller_variant):
+		return input_controller_variant as XRController3D
+	var target_variant: Variant = hand.get("target") if hand.has_method("get") else null
+	if target_variant is XRController3D and is_instance_valid(target_variant):
+		return target_variant as XRController3D
+	return null
+
+
 func try_grab(hand: RigidBody3D) -> bool:
 	"""Attempt to grab this object with a hand"""
 	if is_grabbed:

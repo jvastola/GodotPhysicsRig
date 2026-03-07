@@ -390,11 +390,13 @@ func _setup_physics_hands() -> void:
 	if physics_hand_left:
 		physics_hand_left.player_rigidbody = player_body
 		physics_hand_left.target = _left_hand_target_anchor if _left_hand_target_anchor else left_controller
+		physics_hand_left.set("input_controller", left_controller)
 		print("XRPlayer: Physics hand left connected")
-	
+
 	if physics_hand_right:
 		physics_hand_right.player_rigidbody = player_body
 		physics_hand_right.target = _right_hand_target_anchor if _right_hand_target_anchor else right_controller
+		physics_hand_right.set("input_controller", right_controller)
 		print("XRPlayer: Physics hand right connected")
 
 
@@ -1639,6 +1641,8 @@ func _create_poke_visual(p_name: String) -> MeshInstance3D:
 func _sync_watch_to_tracked_hand() -> void:
 	if not left_watch or not is_instance_valid(left_watch):
 		return
+	if left_watch.has_method("is_pointer_grab_active") and bool(left_watch.call("is_pointer_grab_active")):
+		return
 	var left_tracker := XRServer.get_tracker("/user/hand_tracker/left") as XRHandTracker
 	if not left_tracker or not left_tracker.has_tracking_data:
 		_has_left_watch_wrist_offset = false
@@ -1814,6 +1818,7 @@ func _handle_poke_physics(area: Area3D, visual: MeshInstance3D, is_left: bool) -
 		var release_event = {
 			"type": "release",
 			"global_position": area.global_position,
+			"pointer_color": _get_current_interaction_color(),
 			"action_just_released": true,
 			"action_pressed": false
 		}
@@ -1833,9 +1838,13 @@ func _handle_poke_physics(area: Area3D, visual: MeshInstance3D, is_left: bool) -
 		var event = {
 			"type": event_type,
 			"global_position": area.global_position,
+			"pointer_color": _get_current_interaction_color(),
 			"action_just_pressed": just_pressed,
 			"action_pressed": true
 		}
+		if touching_ui is Node3D:
+			var touching_ui_3d := touching_ui as Node3D
+			event["local_position"] = touching_ui_3d.to_local(area.global_position)
 		touching_ui.handle_pointer_event(event)
 	else:
 		# Visual feedback
@@ -1848,3 +1857,9 @@ func _handle_poke_physics(area: Area3D, visual: MeshInstance3D, is_left: bool) -
 		left_ui_last_collider = touching_ui
 	else:
 		right_ui_last_collider = touching_ui
+
+
+func _get_current_interaction_color() -> Color:
+	if ColorPickerUI.instance and is_instance_valid(ColorPickerUI.instance):
+		return ColorPickerUI.instance.get_current_color()
+	return Color.WHITE

@@ -44,6 +44,9 @@ size = Vector3(0.02, 0.002, 0.002)
 radius = 0.015
 height = 0.03
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_watch_grab"]
+size = Vector3(0.065, 0.02, 0.065)
+
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pointer_face"]
 transparency = 1
 albedo_color = Color(0.87, 0.24, 0.24, 0.85)
@@ -160,6 +163,14 @@ cast_shadow = 0
 [node name="RayHit" type="MeshInstance3D" parent="PlayerBody/XROrigin3D/LeftController/Watch" unique_id=1095179302]
 cast_shadow = 0
 mesh = SubResource("SphereMesh_watch_hit")
+
+[node name="GrabBody" type="StaticBody3D" parent="PlayerBody/XROrigin3D/LeftController/Watch" unique_id=1811452937]
+collision_layer = 32
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PlayerBody/XROrigin3D/LeftController/Watch/GrabBody" unique_id=1811452938]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.004, 0)
+shape = SubResource("BoxShape3D_watch_grab")
 
 [node name="RayCast3D" type="RayCast3D" parent="PlayerBody/XROrigin3D/LeftController" unique_id=762596766]
 target_position = Vector3(0, 0, -10)

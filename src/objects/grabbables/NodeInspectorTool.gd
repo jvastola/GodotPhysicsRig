@@ -158,12 +158,7 @@ func _create_volume_shapecast() -> void:
 func _on_tool_grabbed(hand: RigidBody3D) -> void:
 	"""Called when the tool is grabbed"""
 	_hand = hand
-	_controller = null
-	
-	if is_instance_valid(hand) and hand.has_method("get"):
-		var maybe_target = hand.get("target")
-		if maybe_target and maybe_target is Node3D:
-			_controller = maybe_target
+	_controller = _get_hand_input_controller(hand)
 	
 	_is_active = true
 	set_physics_process(true)

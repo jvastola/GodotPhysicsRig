@@ -85,9 +85,7 @@ func try_grab(hand: RigidBody3D) -> bool:
 	if result:
 		# Store controller reference for VR input
 		if hand:
-			var maybe_target = hand.get("target") if hand.has_method("get") else null
-			if not maybe_target and "target" in hand:
-				maybe_target = hand.target
+			var maybe_target = _get_hand_input_controller(hand)
 			
 			if maybe_target and maybe_target is XRController3D:
 				_controller = maybe_target

@@ -41,6 +41,9 @@ var _hit_player := false
 var _manual_ui_visible := false
 var _base_scale := Vector3.ONE
 var _rig_scale_multiplier: float = 1.0
+var _pointer_grab_scale_multiplier: float = 1.0
+var _last_pointer_grab_time_sec: float = -1.0
+const POINTER_GRAB_ACTIVE_TIMEOUT_SEC: float = 0.2
 
 func _get_effective_ray_length() -> float:
 	return maxf(ray_length * _rig_scale_multiplier, 0.001)
@@ -130,7 +133,7 @@ func _process(delta: float) -> void:
 	# The watch already inherits player rig scale from its parent controller,
 	# so do not multiply by rig scale again here.
 	var target_scale_val = looked_at_scale if _hit_player else 1.0
-	var target_scale_vec = _base_scale * target_scale_val
+	var target_scale_vec = _base_scale * target_scale_val * _pointer_grab_scale_multiplier
 	scale = scale.lerp(target_scale_vec, scale_smoothing * delta)
 	
 	# Handle joystick toggle for UI
@@ -155,6 +158,63 @@ func _process(delta: float) -> void:
 
 func set_rig_scale_multiplier(multiplier: float) -> void:
 	_rig_scale_multiplier = maxf(multiplier, 0.001)
+
+
+func handle_pointer_event(_event: Dictionary) -> void:
+	pass
+
+
+func get_grab_target() -> Node:
+	return self
+
+
+func pointer_grab_set_distance(new_distance: float, pointer: Node3D) -> void:
+	if not pointer:
+		return
+	_mark_pointer_grab_active()
+	var pointer_forward: Vector3 = -pointer.global_transform.basis.z.normalized()
+	var pointer_origin: Vector3 = pointer.global_transform.origin
+	global_position = pointer_origin + pointer_forward * new_distance
+
+
+func pointer_grab_set_rotation(pointer: Node3D, grab_point: Vector3 = Vector3.INF) -> void:
+	if not pointer:
+		return
+	_mark_pointer_grab_active()
+	var pointer_origin: Vector3 = pointer.global_transform.origin
+	var direction: Vector3 = Vector3.ZERO
+	if grab_point.is_finite():
+		direction = (grab_point - pointer_origin).normalized()
+	else:
+		direction = (global_position - pointer_origin).normalized()
+	if direction.length_squared() > 0.001:
+		look_at(global_position + direction, Vector3.UP)
+
+
+func pointer_grab_set_scale(new_scale: float) -> void:
+	_mark_pointer_grab_active()
+	_pointer_grab_scale_multiplier = clampf(new_scale, 0.25, 4.0)
+
+
+func pointer_grab_get_distance(pointer: Node3D) -> float:
+	if not pointer:
+		return 0.0
+	return global_position.distance_to(pointer.global_transform.origin)
+
+
+func pointer_grab_get_scale() -> float:
+	return _pointer_grab_scale_multiplier
+
+
+func is_pointer_grab_active() -> bool:
+	if _last_pointer_grab_time_sec < 0.0:
+		return false
+	var now_sec: float = Time.get_ticks_msec() / 1000.0
+	return now_sec - _last_pointer_grab_time_sec <= POINTER_GRAB_ACTIVE_TIMEOUT_SEC
+
+
+func _mark_pointer_grab_active() -> void:
+	_last_pointer_grab_time_sec = Time.get_ticks_msec() / 1000.0
 
 func _physics_process(_delta: float) -> void:
 	# Perform raycast and visual updates in the physics step to access space state safely

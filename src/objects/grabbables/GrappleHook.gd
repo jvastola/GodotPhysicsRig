@@ -145,13 +145,9 @@ func _ready() -> void:
 
 func _on_grabbed(hand: RigidBody3D) -> void:
 	_hand = hand
-	_controller = null
+	_controller = _get_hand_input_controller(hand)
 	_player_body = null
 	if is_instance_valid(hand) and hand.has_method("get"):
-		var maybe_target = hand.get("target")
-		if maybe_target and maybe_target is Node3D:
-			_controller = maybe_target
-
 		var maybe_player = hand.get("player_rigidbody")
 		if maybe_player and maybe_player is RigidBody3D:
 			_player_body = maybe_player

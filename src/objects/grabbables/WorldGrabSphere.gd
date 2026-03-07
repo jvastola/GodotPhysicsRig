@@ -71,9 +71,7 @@ func _process_anchor_logic() -> void:
 			_end_anchor()
 
 func _get_controller_from_hand(hand: RigidBody3D) -> XRController3D:
-	if hand.get("target") and hand.target is XRController3D:
-		return hand.target
-	return null
+	return _get_hand_input_controller(hand)
 
 func _is_trigger_pressed(controller: XRController3D) -> bool:
 	if controller.has_method("get_float"):

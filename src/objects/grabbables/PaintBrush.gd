@@ -231,9 +231,7 @@ func _process_input(delta: float) -> void:
 
 
 func _get_controller() -> XRController3D:
-	if not is_instance_valid(grabbing_hand):
-		return null
-	return grabbing_hand.target as XRController3D
+	return _get_hand_input_controller(grabbing_hand)
 
 
 func _process_raycast() -> void:

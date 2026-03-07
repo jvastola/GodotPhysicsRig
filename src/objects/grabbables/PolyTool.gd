@@ -371,9 +371,7 @@ func _exit_tree() -> void:
 	_clear_mode_select_nodes()
 
 func _on_grabbed(hand: RigidBody3D) -> void:
-	_controller = null
-	if is_instance_valid(hand) and hand.get("target"):
-		_controller = hand.get("target")
+	_controller = _get_hand_input_controller(hand)
 	
 	set_physics_process(true)
 	_orb.visible = true

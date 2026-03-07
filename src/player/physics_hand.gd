@@ -10,6 +10,7 @@ extends RigidBody3D
 @export_group("References")
 @export var player_rigidbody: RigidBody3D
 @export var target: Node3D
+@export var input_controller: XRController3D
 
 
 @export_group("Springs")
@@ -331,16 +332,15 @@ func _on_body_exited(_body: Node) -> void:
 
 func _handle_grab_input() -> void:
 	"""Handle grab and release input from VR controllers"""
-	if not is_instance_valid(target) or not target is XRController3D:
+	var controller := _get_input_controller()
+	if not controller:
 		return
-	
-	var controller = target as XRController3D
-	
+
 	# Read current input states
 	var trigger_value = controller.get_float("trigger")
 	var grip_value = controller.get_float("grip")
-	var trigger_pressed = trigger_value > 0.5
-	var grip_pressed = grip_value > 0.5
+	var trigger_pressed = trigger_value > 0.5 or controller.is_button_pressed(grab_action_trigger)
+	var grip_pressed = grip_value > 0.5 or controller.is_button_pressed(grab_action_grip)
 	
 	# Check release button through a single rising-edge on the configured action
 	var release_button_pressed = _check_release_button(controller)
@@ -663,10 +663,10 @@ func _handle_hit_feedback(_body: Node) -> void:
 
 func _trigger_haptics(impact_strength: float) -> void:
 	"""Trigger haptic feedback on the controller"""
-	if not is_instance_valid(target) or not target is XRController3D:
+	var controller := _get_input_controller()
+	if not controller:
 		return
-	
-	var controller := target as XRController3D
+
 	var amplitude := haptic_intensity * impact_strength
 	var duration := haptic_duration
 	
@@ -710,3 +710,11 @@ func _get_hand_velocity(delta: float) -> Vector3:
 	"""Calculate hand velocity from position change"""
 	var velocity: Vector3 = (global_position - _previous_position) / max(delta, 0.001)
 	return velocity
+
+
+func _get_input_controller() -> XRController3D:
+	if is_instance_valid(input_controller):
+		return input_controller
+	if is_instance_valid(target) and target is XRController3D:
+		return target as XRController3D
+	return null

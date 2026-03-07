@@ -78,12 +78,7 @@ func _create_preview_container() -> void:
 func _on_pen_grabbed(hand: RigidBody3D) -> void:
 	"""Called when the pen is grabbed"""
 	_hand = hand
-	_controller = null
-	
-	if is_instance_valid(hand) and hand.has_method("get"):
-		var maybe_target = hand.get("target")
-		if maybe_target and maybe_target is Node3D:
-			_controller = maybe_target
+	_controller = _get_hand_input_controller(hand)
 	
 	set_physics_process(true)
 	print("ConvexHullPen: Grabbed by ", hand.name)
