@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://discord_button_scene"]
+
+[ext_resource type="PackedScene" uid="uid://bohsnfhg2ax6d" path="res://src/objects/PokeableButton.tscn" id="1_button"]
+[ext_resource type="Script" path="res://src/objects/discord_button.gd" id="2_script"]
+
+[node name="DiscordButton" instance=ExtResource("1_button")]
+script = ExtResource("2_script")
+key_character = "Discord"
+width = 0.15
+height = 0.08
