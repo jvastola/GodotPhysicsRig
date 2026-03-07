@@ -14,6 +14,10 @@ const CosmeticVisuals = preload("res://src/systems/cosmetic_visuals.gd")
 @onready var right_hand_visual: MeshInstance3D = $RightHand
 @onready var body_visual: MeshInstance3D = $Body
 
+const MIN_SCALE_COMPONENT := 0.01
+const BODY_HEAD_OFFSET_Y := 0.35
+const NAME_LABEL_OFFSET_Y := 0.30
+
 # Target transforms for interpolation
 var target_head_position: Vector3 = Vector3.ZERO
 var target_head_rotation: Vector3 = Vector3.ZERO
@@ -23,10 +27,16 @@ var target_right_hand_position: Vector3 = Vector3.ZERO
 var target_right_hand_rotation: Vector3 = Vector3.ZERO
 var target_scale: Vector3 = Vector3.ONE
 var visual_scale: Vector3 = Vector3.ONE
-
-const MIN_SCALE_COMPONENT := 0.01
-const BODY_HEAD_OFFSET_Y := 0.35
-const NAME_LABEL_OFFSET_Y := 0.30
+var target_head_scale: Vector3 = Vector3.ONE
+var target_left_hand_scale: Vector3 = Vector3.ONE
+var target_right_hand_scale: Vector3 = Vector3.ONE
+var target_body_scale: Vector3 = Vector3.ONE
+var visual_head_scale: Vector3 = Vector3.ONE
+var visual_left_hand_scale: Vector3 = Vector3.ONE
+var visual_right_hand_scale: Vector3 = Vector3.ONE
+var visual_body_scale: Vector3 = Vector3.ONE
+var target_body_offset: Vector3 = Vector3(0.0, -BODY_HEAD_OFFSET_Y, 0.0)
+var visual_body_offset: Vector3 = Vector3(0.0, -BODY_HEAD_OFFSET_Y, 0.0)
 
 # Interpolation buffer for smoother movement
 var position_buffer: Array = []
@@ -97,6 +107,7 @@ func update_from_network_data(player_data: Dictionary) -> void:
 	target_right_hand_position = player_data.get("right_hand_position", Vector3.ZERO)
 	target_right_hand_rotation = player_data.get("right_hand_rotation", Vector3.ZERO)
 	target_scale = _sanitize_scale(player_data.get("player_scale", Vector3.ONE))
+	_apply_avatar_visual_targets(player_data.get("avatar_visuals", {}), target_scale)
 	
 	# Voice samples removed - now handled by PlayerVoiceComponent via LiveKit
 	# Old Nakama voice_samples field is no longer used
@@ -106,6 +117,11 @@ func update_from_network_data(player_data: Dictionary) -> void:
 func _interpolate_transforms(delta: float) -> void:
 	var lerp_factor = clampf(interpolation_speed * delta, 0.0, 1.0)
 	visual_scale = visual_scale.lerp(target_scale, lerp_factor)
+	visual_head_scale = visual_head_scale.lerp(target_head_scale, lerp_factor)
+	visual_left_hand_scale = visual_left_hand_scale.lerp(target_left_hand_scale, lerp_factor)
+	visual_right_hand_scale = visual_right_hand_scale.lerp(target_right_hand_scale, lerp_factor)
+	visual_body_scale = visual_body_scale.lerp(target_body_scale, lerp_factor)
+	visual_body_offset = visual_body_offset.lerp(target_body_offset, lerp_factor)
 	
 	# Interpolate head
 	head_visual.global_position = head_visual.global_position.lerp(target_head_position, lerp_factor)
@@ -121,14 +137,13 @@ func _interpolate_transforms(delta: float) -> void:
 	
 	# Keep the player root unscaled; scale visuals directly to avoid parent-scale/global-position drift.
 	scale = Vector3.ONE
-	head_visual.scale = visual_scale
-	left_hand_visual.scale = visual_scale
-	right_hand_visual.scale = visual_scale
-	body_visual.scale = visual_scale
+	head_visual.scale = visual_head_scale
+	left_hand_visual.scale = visual_left_hand_scale
+	right_hand_visual.scale = visual_right_hand_scale
+	body_visual.scale = visual_body_scale
 	
 	# Update body position (directly below head at chest height)
-	var body_pos = target_head_position
-	body_pos.y = target_head_position.y - (BODY_HEAD_OFFSET_Y * visual_scale.y)
+	var body_pos = target_head_position + visual_body_offset
 	body_visual.global_position = body_visual.global_position.lerp(body_pos, lerp_factor)
 	
 	# Rotate body to match head's Y rotation only (yaw) to keep it upright
@@ -229,7 +244,7 @@ func _create_name_label() -> void:
 ## Update the name label position above head
 func _update_label_position() -> void:
 	if label_3d and head_visual:
-		label_3d.global_position = head_visual.global_position + Vector3(0, NAME_LABEL_OFFSET_Y * visual_scale.y, 0)
+		label_3d.global_position = head_visual.global_position + Vector3(0, NAME_LABEL_OFFSET_Y * visual_head_scale.y, 0)
 
 
 func _sanitize_scale(scale_value: Variant) -> Vector3:
@@ -249,6 +264,45 @@ func _sanitize_scale(scale_value: Variant) -> Vector3:
 		maxf(candidate.y, MIN_SCALE_COMPONENT),
 		maxf(candidate.z, MIN_SCALE_COMPONENT)
 	)
+
+
+func _apply_avatar_visual_targets(avatar_visuals: Variant, fallback_scale: Vector3) -> void:
+	var fallback_body_offset := Vector3(0.0, -BODY_HEAD_OFFSET_Y * fallback_scale.y, 0.0)
+	target_head_scale = fallback_scale
+	target_left_hand_scale = fallback_scale
+	target_right_hand_scale = fallback_scale
+	target_body_scale = fallback_scale
+	target_body_offset = fallback_body_offset
+
+	if not (avatar_visuals is Dictionary):
+		return
+
+	var visuals_dict: Dictionary = avatar_visuals
+	if visuals_dict.has("head_scale"):
+		target_head_scale = _sanitize_scale(visuals_dict["head_scale"])
+	if visuals_dict.has("left_hand_scale"):
+		target_left_hand_scale = _sanitize_scale(visuals_dict["left_hand_scale"])
+	if visuals_dict.has("right_hand_scale"):
+		target_right_hand_scale = _sanitize_scale(visuals_dict["right_hand_scale"])
+	if visuals_dict.has("body_scale"):
+		target_body_scale = _sanitize_scale(visuals_dict["body_scale"])
+	if visuals_dict.has("body_offset"):
+		target_body_offset = _sanitize_offset(visuals_dict["body_offset"], fallback_body_offset)
+
+
+func _sanitize_offset(offset_value: Variant, fallback: Vector3) -> Vector3:
+	var candidate := fallback
+	if offset_value is Vector3:
+		candidate = offset_value
+	elif offset_value is Dictionary:
+		candidate = Vector3(
+			float(offset_value.get("x", fallback.x)),
+			float(offset_value.get("y", fallback.y)),
+			float(offset_value.get("z", fallback.z))
+		)
+	if not is_finite(candidate.x) or not is_finite(candidate.y) or not is_finite(candidate.z):
+		return fallback
+	return candidate
 
 
 ## Set the display name directly on the 3D label

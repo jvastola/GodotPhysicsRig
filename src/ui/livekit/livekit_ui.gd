@@ -4,7 +4,6 @@ extends Control
 # Component references (assigned after instancing)
 var connection_panel: ConnectionPanel
 var audio_settings: AudioSettingsPanel
-var participants_list: ParticipantsList
 
 # LiveKit manager reference
 var livekit_manager: Node
@@ -24,7 +23,6 @@ var current_room_name: String:
 # Preloaded component scenes
 const ConnectionPanelScene = preload("res://src/ui/livekit/components/ConnectionPanel.tscn")
 const AudioSettingsScene = preload("res://src/ui/livekit/components/AudioSettingsPanel.tscn")
-const ParticipantsListScene = preload("res://src/ui/livekit/components/ParticipantsList.tscn")
 
 
 func _ready():
@@ -67,6 +65,7 @@ func _setup_components():
 	# Get container references
 	var left_column = $Margin/VBox/Content/LeftColumn
 	var right_column = $Margin/VBox/Content/RightColumn
+	var column_separator = $Margin/VBox/Content/VSeparator
 	
 	# Clear existing children in left column (except separators)
 	for child in left_column.get_children():
@@ -86,11 +85,13 @@ func _setup_components():
 	audio_settings = AudioSettingsScene.instantiate()
 	audio_settings.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	left_column.add_child(audio_settings)
-	
-	# Instance participants list
-	participants_list = ParticipantsListScene.instantiate()
-	participants_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	right_column.add_child(participants_list)
+
+	# The session roster now lives in the separate Session Players panel.
+	left_column.size_flags_stretch_ratio = 1.0
+	if column_separator:
+		column_separator.visible = false
+	if right_column:
+		right_column.visible = false
 	
 	# Reflect any pre-set room name
 	_update_room_name_label()
@@ -121,11 +122,6 @@ func _connect_component_signals():
 	audio_settings.mute_toggled.connect(_on_mute_toggled)
 	audio_settings.audio_buffer_ready.connect(_on_audio_buffer_ready)
 	
-	# Participants list signals
-	participants_list.participant_volume_changed.connect(_on_participant_volume_changed)
-	participants_list.participant_muted.connect(_on_participant_muted)
-
-
 # === Connection Panel Handlers ===
 
 func _on_connect_requested(server_url: String, token: String):
@@ -137,7 +133,6 @@ func _on_disconnect_requested():
 	livekit_manager.disconnect_from_room()
 	_set_status("Disconnected")
 	connection_panel.set_connected(false)
-	participants_list.clear()
 	
 	# Clean up voice component audio players
 	var xr_player = get_tree().get_first_node_in_group("xr_player")
@@ -237,13 +232,6 @@ func _apply_local_display_name(new_name: String, sync_to_nakama: bool) -> void:
 		var metadata = JSON.stringify({"username": normalized_name})
 		livekit_manager.set_metadata(metadata)
 		print("✅ Username updated in LiveKit: ", normalized_name)
-		if participants_list:
-			var my_identity := "local"
-			if livekit_manager.has_method("get_local_identity"):
-				var resolved_identity := String(livekit_manager.get_local_identity()).strip_edges()
-				if not resolved_identity.is_empty():
-					my_identity = resolved_identity
-			participants_list.set_participant_username(my_identity, normalized_name + " (You)")
 	
 	# Sync to Nakama so it persists across sessions
 	if sync_to_nakama and NakamaManager and NakamaManager.is_authenticated:
@@ -272,16 +260,6 @@ func _on_audio_buffer_ready(buffer: PackedVector2Array):
 
 
 # === Participants List Handlers ===
-
-func _on_participant_volume_changed(identity: String, volume: float):
-	if livekit_manager and livekit_manager.has_method("set_participant_volume"):
-		livekit_manager.set_participant_volume(identity, volume)
-
-
-func _on_participant_muted(identity: String, muted: bool):
-	if livekit_manager and livekit_manager.has_method("set_participant_muted"):
-		livekit_manager.set_participant_muted(identity, muted)
-
 
 # === LiveKit Event Handlers ===
 
@@ -316,10 +294,6 @@ func _sync_local_identity_and_metadata_after_connect(initial_name: String) -> vo
 
 	if my_identity.is_empty():
 		my_identity = "local"
-	participants_list.add_participant(my_identity)
-
-	var display_name = initial_name if not initial_name.is_empty() else "You"
-	participants_list.set_participant_username(my_identity, display_name + " (You)")
 	var network_manager = get_node_or_null("/root/NetworkManager")
 	if network_manager and network_manager.has_method("set_local_display_name") and not initial_name.is_empty():
 		network_manager.set_local_display_name(initial_name, true)
@@ -328,12 +302,6 @@ func _sync_local_identity_and_metadata_after_connect(initial_name: String) -> vo
 		var metadata = JSON.stringify({"username": initial_name})
 		livekit_manager.set_metadata(metadata)
 		print("✅ Initial metadata (username) broadcasted: ", initial_name)
-
-	if livekit_manager and livekit_manager.has_method("get_participant_identities"):
-		var existing = livekit_manager.get_participant_identities()
-		for identity in existing:
-			if not identity.is_empty() and identity != my_identity:
-				participants_list.add_participant(identity)
 
 
 func _on_room_disconnected():
@@ -344,31 +312,30 @@ func _on_room_disconnected():
 	
 	# Force wipe the entire participant UI list so ghosts from ungraceful
 	# disconnects don't bleed into the next reconnect attempt
-	if participants_list and is_instance_valid(participants_list):
-		participants_list.clear()
+	pass
 
 
 func _on_participant_joined(identity: String, _name: String = ""):
 	print("👤 Joined: ", identity)
-	participants_list.add_participant(identity)
 
 
 func _on_participant_left(identity: String):
 	print("👋 Left: ", identity)
-	participants_list.remove_participant(identity)
 
 
-func _on_audio_frame(peer_id: String, frame: PackedVector2Array):
-	participants_list.process_audio_frame(peer_id, frame)
+func _on_audio_frame(_peer_id: String, _frame: PackedVector2Array):
+	pass
 
 
 func _on_participant_metadata_changed(identity: String, metadata: String):
 	var data = JSON.parse_string(metadata)
-	if data and data.has("username"):
-		participants_list.set_participant_username(identity, data.username)
+	if data is Dictionary and data.has("username"):
+		var resolved_username := String(data.get("username", "")).strip_edges()
+		if resolved_username.is_empty():
+			return
 		var network_manager = get_node_or_null("/root/NetworkManager")
 		if network_manager and network_manager.has_method("set_peer_display_name"):
-			network_manager.set_peer_display_name(identity, String(data.username), false)
+			network_manager.set_peer_display_name(identity, resolved_username, false)
 
 
 func _on_error(msg: String):

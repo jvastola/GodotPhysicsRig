@@ -47,6 +47,7 @@
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/ShapeTool.tscn" id="51_shape_tool"]
 [ext_resource type="PackedScene" path="res://src/objects/DiscordButton.tscn" id="52_csho0"]
 [ext_resource type="Script" uid="uid://d2d0lk7frpl5n" path="res://src/objects/grabbables/MiningTool.gd" id="52_mining_tool"]
+[ext_resource type="PackedScene" path="res://src/ui/session_players/SessionPlayersViewport3D.tscn" id="53_abmqk"]
 [ext_resource type="PackedScene" uid="uid://b2mp18xsksksj" path="res://src/objects/OreDeposit.tscn" id="53_ore_deposit"]
 [ext_resource type="Material" uid="uid://bvqm8x7y5n8hs" path="res://src/demos/tools/materials/plasma.tres" id="54_plasma"]
 [ext_resource type="PackedScene" uid="uid://cfu4ue80xt2kr" path="res://src/ui/PhysicsHandTunerViewport3D.tscn" id="55_hand_tuner_viewport"]
@@ -524,5 +525,8 @@ item_id = "hat_cowboy"
 [node name="DiscordButton" parent="." unique_id=1804311831 instance=ExtResource("52_csho0")]
 transform = Transform3D(-0.5059584, 0, 0.8625579, 0, 1, 0, -0.8625579, 0, -0.5059584, -5.085371, 0.10699935, -34.099873)
 press_cooldown_sec = 1.0
+
+[node name="SessionPlayersViewport3D" parent="." unique_id=1169101891 instance=ExtResource("53_abmqk")]
+transform = Transform3D(-0.9631015, 0, -0.26913837, 0, 1, 0, 0.26913837, 0, -0.9631015, 0.039592266, 0.54056156, -36.073593)
 
 [editable path="OreDeposit2"]

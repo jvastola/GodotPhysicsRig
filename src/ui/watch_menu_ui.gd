@@ -113,6 +113,7 @@ func _setup_panels_tab() -> void:
 		{"label": "🔀 Git Tracker", "node": "GitViewport3D"},
 		{"label": "🌐 Multiplayer", "node": "UnifiedRoomViewport3D"},
 		{"label": "🎤 LiveKit", "node": "LiveKitViewport3D"},
+		{"label": "👥 Session Players", "node": "SessionPlayersViewport3D"},
 		{"label": "🎨 Color Picker", "node": "ColorPickerViewport3D"},
 		{"label": "🧱 Block Library", "node": "BlockLibraryViewport3D"},
 		{"label": "🌍 Web Browser", "node": "WebviewViewport3D"},

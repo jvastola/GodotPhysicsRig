@@ -109,13 +109,15 @@ func _update_networking(delta: float) -> void:
 	
 	# Get player scale (prefer XRPlayer rig multiplier when available).
 	var player_scale := _get_player_scale_for_network()
+	var avatar_visuals := _get_avatar_visuals_for_network()
 	
 	# Send to NetworkManager
 	network_manager.update_local_player_transform(
 		head_pos, head_rot,
 		left_pos, left_rot,
 		right_pos, right_rot,
-		player_scale
+		player_scale,
+		avatar_visuals
 	)
 	
 	# Update remote player visuals
@@ -124,25 +126,54 @@ func _update_networking(delta: float) -> void:
 
 func _get_player_scale_for_network() -> Vector3:
 	var player_root := get_parent()
-	if player_root and player_root.has_method("_get_uniform_global_scale"):
-		var body_mesh := player_root.get_node_or_null("PlayerBody/XROrigin3D/XRCamera3D/HeadArea/BodyMesh") as Node3D
-		if body_mesh:
-			var visual_scale := float(player_root.call("_get_uniform_global_scale", body_mesh))
-			if is_finite(visual_scale) and visual_scale > 0.0:
-				return Vector3.ONE * visual_scale
 	if player_root and player_root.has_method("get_rig_scale_multiplier"):
 		var rig_scale := float(player_root.call("get_rig_scale_multiplier"))
 		if is_finite(rig_scale) and rig_scale > 0.0:
 			return Vector3.ONE * rig_scale
+	if player_root and player_root.has_method("_get_uniform_global_scale"):
+		var head_mesh := player_root.get_node_or_null("PlayerBody/XROrigin3D/XRCamera3D/HeadArea/HeadMesh") as Node3D
+		if head_mesh:
+			var visual_scale := float(player_root.call("_get_uniform_global_scale", head_mesh)) / 0.22
+			if is_finite(visual_scale) and visual_scale > 0.0:
+				return Vector3.ONE * visual_scale
 	if player_body:
 		var body_scale := player_body.scale
 		if is_finite(body_scale.x) and is_finite(body_scale.y) and is_finite(body_scale.z):
-			return Vector3(
-				maxf(body_scale.x, 0.01),
-				maxf(body_scale.y, 0.01),
-				maxf(body_scale.z, 0.01)
-			)
+			return _sanitize_scale_vector(body_scale)
 	return Vector3.ONE
+
+
+func _get_avatar_visuals_for_network() -> Dictionary:
+	var player_root := get_parent()
+	if not player_root:
+		return {}
+
+	var left_hand_mesh := player_root.get_node_or_null("PlayerBody/XROrigin3D/LeftController/LeftHandMesh") as Node3D
+	var right_hand_mesh := player_root.get_node_or_null("PlayerBody/XROrigin3D/RightController/RightHandMesh") as Node3D
+
+	var avatar_visuals: Dictionary = {}
+	if left_hand_mesh:
+		avatar_visuals["left_hand_scale"] = _get_node_global_scale(left_hand_mesh)
+	if right_hand_mesh:
+		avatar_visuals["right_hand_scale"] = _get_node_global_scale(right_hand_mesh)
+		
+	return avatar_visuals
+
+
+func _get_node_global_scale(node: Node3D) -> Vector3:
+	if not node:
+		return Vector3.ONE
+	return _sanitize_scale_vector(node.global_transform.basis.get_scale().abs())
+
+
+func _sanitize_scale_vector(scale_value: Vector3) -> Vector3:
+	if not is_finite(scale_value.x) or not is_finite(scale_value.y) or not is_finite(scale_value.z):
+		return Vector3.ONE
+	return Vector3(
+		maxf(absf(scale_value.x), 0.01),
+		maxf(absf(scale_value.y), 0.01),
+		maxf(absf(scale_value.z), 0.01)
+	)
 
 func _update_remote_players() -> void:
 	"""Update all remote player visual representations"""

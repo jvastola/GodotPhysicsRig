@@ -68,6 +68,7 @@ const UI_SCENE_PATHS := {
 	"GitViewport3D": "res://src/ui/git/GitViewport3D.tscn",
 	"UnifiedRoomViewport3D": "res://src/ui/multiplayer/UnifiedRoomViewport3D.tscn",
 	"LiveKitViewport3D": "res://src/ui/livekit/LiveKitViewport3D.tscn",
+	"SessionPlayersViewport3D": "res://src/ui/session_players/SessionPlayersViewport3D.tscn",
 	"NodeInspectorViewport3D": "res://src/ui/NodeInspectorViewport3D.tscn",
 	"ScriptEditorViewport3D": "res://src/ui/ScriptEditorViewport3D.tscn",
 	"LegalViewport3D": "res://src/ui/legal/LegalViewport3D.tscn",

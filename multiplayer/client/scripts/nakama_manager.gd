@@ -107,18 +107,26 @@ var PLATFORM_NAME_METHOD_CANDIDATES: PackedStringArray = PackedStringArray([
 ])
 var PLATFORM_ID_RESPONSE_KEYS: PackedStringArray = PackedStringArray([
 	"user_id",
+	"userId",
+	"userID",
 	"id",
 	"uid",
 	"oculus_id",
-	"platform_user_id"
+	"oculusId",
+	"platform_user_id",
+	"platformUserId"
 ])
 var PLATFORM_NAME_RESPONSE_KEYS: PackedStringArray = PackedStringArray([
 	"display_name",
+	"displayName",
 	"username",
+	"userName",
 	"user_name",
 	"name",
 	"oculus_name",
-	"oculus_id"
+	"oculusName",
+	"oculus_username",
+	"oculusUsername"
 ])
 var _cached_platform_user_data: Dictionary = {}
 var meta_platform_app_id: String = META_PLATFORM_APP_ID_DEFAULT
@@ -327,6 +335,10 @@ func _extract_string_from_variant(value: Variant, keys: PackedStringArray) -> St
 				var candidate := _variant_to_clean_string(dict_value.get(key, ""))
 				if not candidate.is_empty():
 					return candidate
+		for nested_value in dict_value.values():
+			var nested_candidate := _extract_string_from_variant(nested_value, keys)
+			if not nested_candidate.is_empty():
+				return nested_candidate
 	if value is Array:
 		var items: Array = value
 		for item in items:
@@ -438,7 +450,7 @@ func _extract_meta_user_name(user_variant: Variant) -> String:
 	if user_variant is Object:
 		var user_object: Object = user_variant as Object
 		if user_object != null:
-			for method_name in ["get_display_name", "get_user_name", "get_username", "get_oculus_id", "get_oculus_name"]:
+			for method_name in ["get_display_name", "get_user_name", "get_username", "get_oculus_name"]:
 				var name_variant: Variant = _call_zero_arg_method(user_object, method_name)
 				if name_variant == null:
 					continue
@@ -1369,6 +1381,203 @@ func _on_display_name_updated(result: int, response_code: int, _headers: PackedS
 		print("NakamaManager: Display name updated to: ", display_name)
 	else:
 		push_warning("NakamaManager: Failed to update display name (result: %d, code: %d)" % [result, response_code])
+
+
+func list_friends(limit: int = 1000, state: int = -1, cursor: String = "") -> Dictionary:
+	if not is_authenticated or not session:
+		return {
+			"ok": false,
+			"friends": [],
+			"friend_states": {},
+			"cursor": "",
+			"code": 0,
+			"error": "Not authenticated"
+		}
+
+	var friends_http := HTTPRequest.new()
+	friends_http.timeout = 10.0
+	add_child(friends_http)
+
+	var query_parts: PackedStringArray = PackedStringArray()
+	if limit > 0:
+		query_parts.append("limit=%d" % clampi(limit, 1, 1000))
+	if state >= 0:
+		query_parts.append("state=%d" % state)
+	if not cursor.is_empty():
+		query_parts.append("cursor=%s" % cursor.uri_encode())
+
+	var url := _get_nakama_url() + "/v2/friend"
+	if not query_parts.is_empty():
+		url += "?" + "&".join(query_parts)
+
+	var headers := [
+		"Authorization: Bearer " + session.token
+	]
+
+	var err := friends_http.request(url, headers, HTTPClient.METHOD_GET)
+	if err != OK:
+		friends_http.queue_free()
+		return {
+			"ok": false,
+			"friends": [],
+			"friend_states": {},
+			"cursor": "",
+			"code": 0,
+			"error": "Request failed to start: " + str(err)
+		}
+
+	var result_tuple = await friends_http.request_completed
+	friends_http.queue_free()
+
+	var result: int = result_tuple[0]
+	var response_code: int = result_tuple[1]
+	var response_body: PackedByteArray = result_tuple[3]
+	if result != HTTPRequest.RESULT_SUCCESS:
+		return {
+			"ok": false,
+			"friends": [],
+			"friend_states": {},
+			"cursor": "",
+			"code": response_code,
+			"error": "Transport error: " + str(result)
+		}
+	if response_code != 200:
+		return {
+			"ok": false,
+			"friends": [],
+			"friend_states": {},
+			"cursor": "",
+			"code": response_code,
+			"error": "HTTP error: " + str(response_code)
+		}
+
+	var parsed: Variant = JSON.parse_string(response_body.get_string_from_utf8())
+	if not (parsed is Dictionary):
+		return {
+			"ok": false,
+			"friends": [],
+			"friend_states": {},
+			"cursor": "",
+			"code": response_code,
+			"error": "Invalid JSON response"
+		}
+
+	var parsed_dict: Dictionary = parsed
+	var friends_variant: Variant = parsed_dict.get("friends", [])
+	var friends: Array = friends_variant if friends_variant is Array else []
+	var friend_states: Dictionary = {}
+	for friend_variant in friends:
+		if not (friend_variant is Dictionary):
+			continue
+		var friend_entry: Dictionary = friend_variant
+		var user_variant: Variant = friend_entry.get("user", {})
+		if not (user_variant is Dictionary):
+			continue
+		var user_dict: Dictionary = user_variant
+		var user_id := _variant_to_clean_string(user_dict.get("id", ""))
+		if user_id.is_empty():
+			continue
+		friend_states[user_id] = int(friend_entry.get("state", -1))
+
+	return {
+		"ok": true,
+		"friends": friends.duplicate(true),
+		"friend_states": friend_states,
+		"cursor": _variant_to_clean_string(parsed_dict.get("cursor", "")),
+		"code": response_code,
+		"error": ""
+	}
+
+
+func _send_friend_http_request(url: String, headers: Array, method: HTTPClient.Method, body: String = "") -> Dictionary:
+	var friends_http := HTTPRequest.new()
+	friends_http.timeout = 10.0
+	add_child(friends_http)
+
+	var err := friends_http.request(url, headers, method, body)
+	if err != OK:
+		friends_http.queue_free()
+		return {
+			"ok": false,
+			"code": 0,
+			"error": "Request failed to start: " + str(err)
+		}
+
+	var result_tuple = await friends_http.request_completed
+	friends_http.queue_free()
+
+	var result: int = result_tuple[0]
+	var response_code: int = result_tuple[1]
+	var response_body: PackedByteArray = result_tuple[3]
+	if result != HTTPRequest.RESULT_SUCCESS:
+		return {
+			"ok": false,
+			"code": response_code,
+			"error": "Transport error: " + str(result)
+		}
+	if response_code < 200 or response_code >= 300:
+		var error_text := response_body.get_string_from_utf8().strip_edges()
+		if error_text.is_empty():
+			error_text = "HTTP error: " + str(response_code)
+		return {
+			"ok": false,
+			"code": response_code,
+			"error": error_text
+		}
+
+	return {
+		"ok": true,
+		"code": response_code,
+		"error": ""
+	}
+
+
+func add_friend_by_id(friend_user_id: String) -> Dictionary:
+	if not is_authenticated or not session:
+		return {
+			"ok": false,
+			"code": 0,
+			"error": "Not authenticated"
+		}
+
+	var normalized_user_id := friend_user_id.strip_edges()
+	if normalized_user_id.is_empty():
+		return {
+			"ok": false,
+			"code": 0,
+			"error": "Friend user ID required"
+		}
+	if normalized_user_id == local_user_id:
+		return {
+			"ok": false,
+			"code": 0,
+			"error": "Cannot add yourself as a friend"
+		}
+
+	var auth_headers := [
+		"Authorization: Bearer " + session.token
+	]
+	var query_url := _get_nakama_url() + "/v2/friend?ids=" + normalized_user_id.uri_encode()
+	var query_result: Dictionary = await _send_friend_http_request(query_url, auth_headers, HTTPClient.METHOD_POST)
+	if bool(query_result.get("ok", false)):
+		return query_result
+
+	var json_headers := [
+		"Content-Type: application/json",
+		"Authorization: Bearer " + session.token
+	]
+	var body_json := JSON.stringify({
+		"ids": [normalized_user_id]
+	})
+	var body_result: Dictionary = await _send_friend_http_request(_get_nakama_url() + "/v2/friend", json_headers, HTTPClient.METHOD_POST, body_json)
+	if bool(body_result.get("ok", false)):
+		return body_result
+
+	return {
+		"ok": false,
+		"code": int(body_result.get("code", query_result.get("code", 0))),
+		"error": String(query_result.get("error", "Friend request failed")) + " | fallback: " + String(body_result.get("error", "Friend request failed"))
+	}
 
 
 # ============================================================================

@@ -38,6 +38,7 @@ var local_player_info: Dictionary = {
 	"right_hand_position": Vector3.ZERO,
 	"right_hand_rotation": Vector3.ZERO,
 	"player_scale": Vector3.ONE,
+	"avatar_visuals": {},
 	"avatar_texture_data": PackedByteArray(),
 	"equipped_cosmetics": {}
 }
@@ -185,6 +186,9 @@ func _setup_livekit_integration() -> void:
 	elif _livekit_wrapper.has_signal("data_received"):
 		if not _livekit_wrapper.data_received.is_connected(_on_livekit_data_received_legacy):
 			_livekit_wrapper.data_received.connect(_on_livekit_data_received_legacy)
+	if _livekit_wrapper.has_signal("participant_metadata_changed"):
+		if not _livekit_wrapper.participant_metadata_changed.is_connected(_on_livekit_participant_metadata_changed):
+			_livekit_wrapper.participant_metadata_changed.connect(_on_livekit_participant_metadata_changed)
 
 
 ## Disconnect from network
@@ -325,6 +329,7 @@ func _make_default_remote_player_info(peer_id: String) -> Dictionary:
 		"right_hand_position": Vector3.ZERO,
 		"right_hand_rotation": Vector3.ZERO,
 		"player_scale": Vector3.ONE,
+		"avatar_visuals": {},
 		"avatar_texture_data": PackedByteArray(),
 		"equipped_cosmetics": {}
 	}
@@ -382,7 +387,8 @@ func _set_host_peer_id(peer_id: String) -> void:
 func update_local_player_transform(head_pos: Vector3, head_rot: Vector3, 
 		left_pos: Vector3, left_rot: Vector3, 
 		right_pos: Vector3, right_rot: Vector3,
-		scale: Vector3) -> void:
+		scale: Vector3,
+		avatar_visuals: Dictionary = {}) -> void:
 	
 	local_player_info.head_position = head_pos
 	local_player_info.head_rotation = head_rot
@@ -391,6 +397,7 @@ func update_local_player_transform(head_pos: Vector3, head_rot: Vector3,
 	local_player_info.right_hand_position = right_pos
 	local_player_info.right_hand_rotation = right_rot
 	local_player_info.player_scale = scale
+	local_player_info.avatar_visuals = _sanitize_avatar_visuals(avatar_visuals)
 	
 	# Update our entry in players dictionary
 	var my_id = get_nakama_user_id()
@@ -413,6 +420,8 @@ func update_local_player_transform(head_pos: Vector3, head_rot: Vector3,
 			"rr": right_rot,
 			"s": scale
 		}
+		if not local_player_info.avatar_visuals.is_empty():
+			transform_data["avs"] = _avatar_visuals_to_dict(local_player_info.avatar_visuals)
 
 		if _can_use_livekit_realtime():
 			var packet = {
@@ -426,6 +435,8 @@ func update_local_player_transform(head_pos: Vector3, head_rot: Vector3,
 				"rr": _vec3_to_dict(right_rot),
 				"s": _vec3_to_dict(scale)
 			}
+			if not local_player_info.avatar_visuals.is_empty():
+				packet["avs"] = _avatar_visuals_to_dict(local_player_info.avatar_visuals)
 			_livekit_wrapper.send_json_packet(packet, LIVEKIT_TOPIC_REP_TRANSFORM, false)
 			return
 
@@ -546,6 +557,7 @@ func _handle_nakama_player_transform(sender_id: String, data: Dictionary) -> voi
 	if data.has("rp"): p.right_hand_position = _dict_to_vec3(data.rp)
 	if data.has("rr"): p.right_hand_rotation = _dict_to_vec3(data.rr)
 	if data.has("s"): p.player_scale = _dict_to_vec3(data.s)
+	if data.has("avs"): p.avatar_visuals = _dict_to_avatar_visuals(data.avs)
 
 
 func _vec3_to_dict(v: Vector3) -> Dictionary:
@@ -557,6 +569,51 @@ func _dict_to_vec3(d: Variant) -> Vector3:
 	if d is Dictionary:
 		return Vector3(d.get("x", 0), d.get("y", 0), d.get("z", 0))
 	return Vector3.ZERO
+
+
+func _sanitize_avatar_visuals(avatar_visuals: Dictionary) -> Dictionary:
+	var sanitized: Dictionary = {}
+	var scale_keys := {
+		"head_scale": true,
+		"body_scale": true,
+		"left_hand_scale": true,
+		"right_hand_scale": true,
+	}
+	for key_variant in avatar_visuals.keys():
+		var key := String(key_variant).strip_edges()
+		if key.is_empty():
+			continue
+		var value: Variant = avatar_visuals[key_variant]
+		if scale_keys.has(key):
+			sanitized[key] = _sanitize_scale_vector(_dict_to_vec3(value))
+		elif key == "body_offset":
+			sanitized[key] = _dict_to_vec3(value)
+	return sanitized
+
+
+func _sanitize_scale_vector(scale_value: Vector3) -> Vector3:
+	return Vector3(
+		maxf(absf(scale_value.x), 0.01),
+		maxf(absf(scale_value.y), 0.01),
+		maxf(absf(scale_value.z), 0.01)
+	)
+
+
+func _avatar_visuals_to_dict(avatar_visuals: Dictionary) -> Dictionary:
+	var encoded: Dictionary = {}
+	var sanitized := _sanitize_avatar_visuals(avatar_visuals)
+	for key_variant in sanitized.keys():
+		var key := String(key_variant)
+		var value: Variant = sanitized[key_variant]
+		if value is Vector3:
+			encoded[key] = _vec3_to_dict(value)
+	return encoded
+
+
+func _dict_to_avatar_visuals(data: Variant) -> Dictionary:
+	if not (data is Dictionary):
+		return {}
+	return _sanitize_avatar_visuals(data)
 
 func _quat_to_dict(q: Quaternion) -> Dictionary:
 	return {"x": snappedf(q.x, 0.001), "y": snappedf(q.y, 0.001), "z": snappedf(q.z, 0.001), "w": snappedf(q.w, 0.001)}
@@ -1574,6 +1631,20 @@ func _apply_livekit_player_transform(sender_identity: String, data: Dictionary) 
 	if data.has("rp"): p.right_hand_position = _dict_to_vec3(data.rp)
 	if data.has("rr"): p.right_hand_rotation = _dict_to_vec3(data.rr)
 	if data.has("s"): p.player_scale = _dict_to_vec3(data.s)
+	if data.has("avs"): p.avatar_visuals = _dict_to_avatar_visuals(data.avs)
+
+
+func _on_livekit_participant_metadata_changed(identity: String, metadata: String) -> void:
+	if identity.is_empty():
+		return
+	var parsed: Variant = JSON.parse_string(metadata)
+	if not (parsed is Dictionary):
+		return
+	var parsed_dict: Dictionary = parsed
+	var resolved_name := String(parsed_dict.get("username", "")).strip_edges()
+	if resolved_name.is_empty():
+		return
+	_set_peer_display_name(identity, resolved_name, false)
 
 
 func _apply_property_update(sender_identity: String, data: Dictionary) -> void:
