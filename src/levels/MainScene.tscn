@@ -45,6 +45,7 @@
 [ext_resource type="PackedScene" uid="uid://bohsnfhg2ax6d" path="res://src/objects/PokeableButton.tscn" id="50_6v57d"]
 [ext_resource type="PackedScene" uid="uid://c8keyboard3d" path="res://src/objects/Keyboard3D.tscn" id="51_n50cp"]
 [ext_resource type="PackedScene" path="res://src/objects/grabbables/ShapeTool.tscn" id="51_shape_tool"]
+[ext_resource type="PackedScene" path="res://src/objects/DiscordButton.tscn" id="52_csho0"]
 [ext_resource type="Script" uid="uid://d2d0lk7frpl5n" path="res://src/objects/grabbables/MiningTool.gd" id="52_mining_tool"]
 [ext_resource type="PackedScene" uid="uid://b2mp18xsksksj" path="res://src/objects/OreDeposit.tscn" id="53_ore_deposit"]
 [ext_resource type="Material" uid="uid://bvqm8x7y5n8hs" path="res://src/demos/tools/materials/plasma.tres" id="54_plasma"]
@@ -519,5 +520,9 @@ item_id = "hat_duck"
 [node name="CosmeticHatStand2" parent="." unique_id=1533739805 instance=ExtResource("49_nwdyy")]
 transform = Transform3D(-0.99998283, 0, 0.005846709, 0, 1, 0, -0.005846709, 0, -0.99998283, 13.943234, -5.762139, 19.922464)
 item_id = "hat_cowboy"
+
+[node name="DiscordButton" parent="." unique_id=1804311831 instance=ExtResource("52_csho0")]
+transform = Transform3D(-0.5059584, 0, 0.8625579, 0, 1, 0, -0.8625579, 0, -0.5059584, -5.085371, 0.10699935, -34.099873)
+press_cooldown_sec = 1.0
 
 [editable path="OreDeposit2"]

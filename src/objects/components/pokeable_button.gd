@@ -130,7 +130,7 @@ func _process(delta: float) -> void:
 	var deepest_interactor: Node = null
 	
 	# 1. Check selecting interactors from child BaseInteractable (standard system)
-	if _child_interactable:
+	if _child_interactable and "selecting_interactors" in _child_interactable:
 		for interactor in _child_interactable.selecting_interactors:
 			if interactor.has_method("get_interaction_point"):
 				var interactor_pos = interactor.get_interaction_point()
